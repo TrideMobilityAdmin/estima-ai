@@ -1,0 +1,11 @@
+dask
+duckdb
+networkx
+matplotlib
+nltk
+numpy
+pandas
+seaborn
+spacy
+scikit-learn
+inflect

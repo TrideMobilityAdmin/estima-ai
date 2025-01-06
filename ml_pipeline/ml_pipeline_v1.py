@@ -1,4 +1,4 @@
-# Imports 
+# Imports
 import pandas as pd
 import numpy as np
 import string
@@ -12,9 +12,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import inflect
 from typing import List, Dict, Set
 import duckdb
-
-import matplotlib.pyplot as plt
-import seaborn as sns
+import prefect
+from prefect import task, Flow
 
 # Initialize necessary components
 nltk.download('punkt')
@@ -26,6 +25,7 @@ q = inflect.engine()
 vectorizer = TfidfVectorizer()
 
 # Connect to DuckDB and load data
+@task
 def load_data():
     """Load data from DuckDB."""
     con = duckdb.connect("Mro_warehouse.db")
@@ -34,6 +34,7 @@ def load_data():
     return exdata
 
 # Preprocessing functions
+@task
 def preprocess_text(text: str, preserve_symbols=[], words_to_remove=['DURING', 'INSPECTION', 'OBSERVED']) -> str:
     """Perform text preprocessing."""
     if isinstance(text, float) and np.isnan(text):
@@ -47,6 +48,7 @@ def preprocess_text(text: str, preserve_symbols=[], words_to_remove=['DURING', '
     
     return text
 
+@task
 def tokenization(preprocessed_text: str) -> list:
     """Perform text tokenization."""
     preprocessed_text = preprocessed_text.lower()
@@ -63,6 +65,7 @@ def tokenization(preprocessed_text: str) -> list:
     
     return preprocessed_tokens
 
+@task
 def calculate_embeddings(preprocessed_tokens: list) -> list:
     """Calculate embeddings from preprocessed tokens."""
     embeddings = []
@@ -74,6 +77,7 @@ def calculate_embeddings(preprocessed_tokens: list) -> list:
     return embeddings
 
 # TF-IDF and Embedding Computation
+@task
 def compute_tfidf(corpus: list, preserve_symbols=['-', '/']) -> np.ndarray:
     """Preprocess corpus and compute TF-IDF embeddings."""
     preprocessed_corpus = [preprocess_text(text, preserve_symbols) for text in corpus]
@@ -81,13 +85,14 @@ def compute_tfidf(corpus: list, preserve_symbols=['-', '/']) -> np.ndarray:
     return embeddings.toarray()
 
 # Threshold transformation
+@task
 def threshold_transform(data, threshold=0.5, above_value=1, below_value=0):
     """Apply a threshold transformation to data."""
     data = np.array(data)
     transformed_data = np.where(data > threshold, above_value, below_value)
     return transformed_data
 
-# Calculate probabilities
+@task
 def calculate_probability(x: List[int], y: List[str]) -> List[float]:
     """Calculate probabilities based on frequency and scaling."""
     result = []
@@ -101,7 +106,7 @@ def calculate_probability(x: List[int], y: List[str]) -> List[float]:
     
     return result
 
-# Group and Similarity Calculation
+@task
 def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
     """Compute similarity and group information."""
     mro_data = exdata.copy()
@@ -174,6 +179,7 @@ def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
     return mro_data, group_df
 
 # Write updated data to DuckDB
+@task
 def write_to_duckdb(group_df: pd.DataFrame):
     """Write the updated DataFrame to DuckDB."""
     con = duckdb.connect("Mro_warehouse.db")
@@ -183,9 +189,8 @@ def write_to_duckdb(group_df: pd.DataFrame):
     con.execute('PRAGMA force_checkpoint;')
     con.close()
 
-# Main pipeline execution
-def main_pipeline():
-    """Run the entire pipeline."""
+# Define the Prefect flow
+with Flow("MRO_Pipeline") as flow:
     # Step 1: Load data
     exdata = load_data()
 
@@ -195,9 +200,6 @@ def main_pipeline():
     # Step 3: Write updated data to DuckDB
     write_to_duckdb(group_df)
 
-    print("Updated table successfully written to DuckDB.")
-    return mro_data
-
-# Execute the pipeline
+# Execute the flow
 if __name__ == "__main__":
-    result_data = main_pipeline()
+    flow.run()
