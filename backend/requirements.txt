@@ -1,0 +1,5 @@
+fastapi
+pydantic
+duckdb
+dependency-injector
+uvicorn
