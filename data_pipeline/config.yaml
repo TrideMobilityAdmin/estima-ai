@@ -1,0 +1,6 @@
+database:
+  name: "Mro_warehouse.db"
+  path: "/path/to/db"
+
+excel_files:
+  path: "/path/to/excel/files"
