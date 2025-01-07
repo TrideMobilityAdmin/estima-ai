@@ -1,5 +1,10 @@
 fastapi
 pydantic
 duckdb
+pymongo
+passlib[bcrypt]
 dependency-injector
 uvicorn
+jose
+python-dotenv
+pydantic-settings

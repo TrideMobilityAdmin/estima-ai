@@ -2,17 +2,18 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class UserBase(BaseModel):
+class User(BaseModel):
     username: str
     email: str
 
-class UserCreate(UserBase):
+class UserCreate(User):
     password: str
 
-class UserInDB(UserBase):
+class UserInDB(User):
     hashed_password: str
 
 class UserLogin(BaseModel):
+    
     username: str
     password: str
 

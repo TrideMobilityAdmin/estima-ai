@@ -1,45 +1,26 @@
-from fastapi import APIRouter, Depends
-from app.services.task_analytics_service import TaskAnalyticsService
-from app.models.task_models import TaskProbabilityModel, TaskManHoursModel, SparePartsModel
-from app.core.dependencies import get_task_service
-from fastapi import APIRouter, Depends, HTTPException
-from models.user import UserCreate, UserLogin, Token
-from core.auth import hash_password, verify_password, create_access_token
-from core.dependencies import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.models.user import UserCreate, UserLogin, Token, UserInDB
+from app.services.user.userrepo import UserRepository
+from app.pyjwt.jwt import create_access_token, validate_token
+from app.core.dependencies import get_current_user
 from typing import List
-
-# Simulating a database with in-memory storage
-fake_users_db = {}
 router = APIRouter()
 
-@router.get("/analytics/task_probability/{source_task}", response_model=TaskProbabilityModel)
-def task_probability(source_task: str, service: TaskAnalyticsService = Depends(get_task_service)):
-    return service.get_task_probability(source_task)
-
-@router.get("/estimation/task_man_hours/{source_task}", response_model=TaskManHoursModel)
-def task_man_hours(source_task: str, service: TaskAnalyticsService = Depends(get_task_service)):
-    return service.get_task_man_hours(source_task)
-
-@router.get("/estimation/spare_parts/{source_task}", response_model=SparePartsModel)
-def spare_parts(source_task: str, service: TaskAnalyticsService = Depends(get_task_service)):
-    return service.get_spare_parts(source_task)
-
 # Register new user
-@router.post("/register", response_model=UserCreate)
-async def register_user(user: UserCreate):
-    if user.username in fake_users_db:
+@router.post("/register", response_model=UserInDB)
+async def register_user(user: UserCreate, repo: UserRepository = Depends()):
+    existing_user = repo.get_user_by_username(user.username)
+    if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
-    hashed_password = hash_password(user.password)
-    fake_users_db[user.username] = {"username": user.username, "email": user.email, "password": hashed_password}
-    
-    return user
+    user_id = repo.create_user(user)
+    return UserInDB(**user.dict(), hashed_password=repo.hash_password(user.password))
 
 # Login to get token
 @router.post("/login", response_model=Token)
-async def login(user: UserLogin):
-    db_user = fake_users_db.get(user.username)
-    if db_user is None or not verify_password(user.password, db_user['password']):
+async def login(user: UserLogin, repo: UserRepository = Depends()):
+    db_user = repo.get_user_by_username(user.username)
+    if db_user is None or not repo.verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token = create_access_token(data={"sub": user.username})
