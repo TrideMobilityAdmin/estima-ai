@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from typing import List, Optional
 from .auth import get_user_from_token
-from models.user import UserInDB
+from app.models.user import UserInDB
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
