@@ -1,0 +1,518 @@
+openapi: 3.0.0
+info:
+  title: Estamaai APIs
+  description: ''
+  version: 1.0.0
+paths:
+  /api/v1/estimates:
+    get:
+      summary: Get all estimates
+      description: Retrieves a list of all estimates.
+      responses:
+        '200':
+          description: List of estimates
+          content:
+            application/json:
+              example:
+                estimates:
+                  - id: EST-001
+                    description: AVIONICS EQUIPMENT VENTILATION
+                    createdBy: user@example.com
+                    createdAt: '2025-01-05T10:15:30Z'
+                    lastUpdated: '2025-01-06T12:00:00Z'
+                  - id: EST-002
+                    description: NORMAL EXTENSION AND RETRACTION
+                    createdBy: user2@example.com
+                    createdAt: '2025-01-06T12:45:00Z'
+                    lastUpdated: '2025-01-07T09:30:00Z'
+    post:
+      summary: Create a new estimate
+      description: Creates a new estimate with tasks and relevant metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tasks:
+                  type: array
+                  items:
+                    type: string
+                probability:
+                  type: number
+                operator:
+                  type: string
+                aircraftAge:
+                  type: integer
+                aircraftFlightHours:
+                  type: integer
+                aircraftFlightCycles:
+                  type: integer
+              required:
+                - tasks
+                - probability
+                - operator
+            example:
+              tasks:
+                - 212600-11-1
+                - 323000-26-1
+              probability: 0.9
+              operator: AirlineX
+              aircraftAge: 10
+              aircraftFlightHours: 25000
+              aircraftFlightCycles: 15000
+      responses:
+        '201':
+          description: Estimate created successfully
+          content:
+            application/json:
+              example:
+                id: EST-001
+                description: AVIONICS EQUIPMENT VENTILATION
+                tasks:
+                  - id: 212600-11-1
+                    desc: AVIONICS EQUIPMENT VENTILATION
+                    mhs:
+                      min: 10
+                      max: 20
+                      avg: 15
+                      est: 18
+                    spareParts:
+                      - partId: AC9780F15Y21
+                        desc: Filter
+                        qty: 1
+                        unit: int
+                        price: 100
+                aggregatedTasks:
+                  aggregatedMhs:
+                    min: 18
+                    max: 35
+                    avg: 27
+                    est: 31
+                  totalPartsCost: 1300
+                createdBy: user@example.com
+                createdAt: '2025-01-05T10:15:30Z'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              example:
+                error: Invalid input data
+  /api/v1/estimates/{estimateId}:
+    get:
+      summary: Get estimate by ID
+      description: >-
+        Retrieves the details of a specific estimate by its ID, including tasks,
+        findings, and aggregated data.
+      parameters:
+        - name: estimateId
+          in: path
+          required: true
+          description: The unique ID of the estimate.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Details of the estimate
+          content:
+            application/json:
+              example:
+                id: EST-001
+                description: AVIONICS EQUIPMENT VENTILATION
+                tasks:
+                  - id: 212600-11-1
+                    desc: AVIONICS EQUIPMENT VENTILATION
+                    mhs:
+                      min: 10
+                      max: 20
+                      avg: 15
+                      est: 18
+                    spareParts:
+                      - partId: AC9780F15Y21
+                        desc: Filter
+                        qty: 1
+                        unit: int
+                        price: 100
+                  - id: 323000-26-1
+                    desc: NORMAL EXTENSION AND RETRACTION
+                    mhs:
+                      min: 12
+                      max: 25
+                      avg: 18
+                      est: 22
+                    spareParts:
+                      - partId: F30WT8-840
+                        desc: Lamp
+                        qty: 2
+                        unit: int
+                        price: 250
+                aggregatedTasks:
+                  totalMhs: 40
+                  totalPartsCost: 700
+                findings:
+                  - taskId: 212600-11-1
+                    details:
+                      - id: FND-001
+                        desc: Oil leakage inspection
+                        mhs:
+                          min: 5
+                          max: 10
+                          avg: 8
+                          est: 9
+                        spareParts:
+                          - partId: O-RING
+                            desc: Oil O-Ring
+                            qty: 2
+                            unit: int
+                            price: 50
+                aggregatedFindingsByTask:
+                  - taskId: 212600-11-1
+                    aggregatedMhs:
+                      min: 5
+                      max: 10
+                      avg: 8
+                      est: 9
+                    totalPartsCost: 50
+                aggregatedFindings:
+                  totalMhs: 9
+                  totalPartsCost: 100
+                createdBy: user@example.com
+                createdAt: '2025-01-05T10:15:30Z'
+                lastUpdated: '2025-01-06T12:00:00Z'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              example:
+                error: Invalid or expired token
+        '404':
+          description: Estimate not found
+          content:
+            application/json:
+              example:
+                error: Estimate not found
+  /api/v1/estimates/{estimateId}/download:
+    get:
+      summary: Download estimate as PDF
+      description: Generates and downloads a PDF of a specific estimate.
+      parameters:
+        - name: estimateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF file of the estimate
+          content:
+            application/pdf:
+              example: Binary content of the PDF file
+        '404':
+          description: Estimate not found
+          content:
+            application/json:
+              example:
+                error: Estimate not found
+  /api/v1/estimates/{estimateId}/compare:
+    post:
+      summary: Compare an estimate with actual data
+      description: Compares an existing estimate with actual data provided in Excel files.
+      parameters:
+        - name: estimateId
+          in: path
+          required: true
+          description: The unique ID of the estimate.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required:
+                - files
+      responses:
+        '200':
+          description: Comparison result
+          content:
+            application/json:
+              example:
+                estimateId: EST-001
+                comparisonResults:
+                  - metric: TAT Time
+                    estimated: 10 days
+                    actual: 12 days
+                    difference: +2 days
+                  - metric: Man-Hours
+                    estimated: 500
+                    actual: 540
+                    difference: +40 hours
+                  - metric: Spare Cost
+                    estimated: 15000
+                    actual: 15500
+                    difference: '+500'
+        '400':
+          description: Invalid input or missing files
+          content:
+            application/json:
+              example:
+                error: Invalid input. Please upload valid Excel files.
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              example:
+                error: Invalid or expired token
+        '404':
+          description: Estimate not found
+          content:
+            application/json:
+              example:
+                error: Estimate not found
+  /api/v1/parts/usage:
+    get:
+      summary: Get part usage report
+      description: Retrieves a part usage report based on part ID and date range.
+      parameters:
+        - name: partId
+          in: query
+          required: true
+          description: Unique ID of the part.
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          required: true
+          description: Start date for the usage report (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          description: End date for the usage report (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Part usage report
+          content:
+            application/json:
+              example:
+                partId: AC9780F15Y21
+                partDescription: Filter
+                usage:
+                  tasks:
+                    - taskId: 212600-11-1
+                      taskDescription: AVIONICS EQUIPMENT VENTILATION
+                      packages:
+                        - packageId: HMV24/000242/1124
+                          date: '2024-12-10'
+                          quantity: 3
+                  findings:
+                    tasks:
+                      - taskId: 212600-11-1
+                        skills:
+                          - skill: B1
+                            manHours:
+                              min: 2
+                              avg: 3
+                              max: 5
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              example:
+                error: Missing or invalid query parameters
+  /api/v1/skills/analysis:
+    post:
+      summary: Analyze skills required for tasks
+      description: >-
+        Analyzes skills required for a list of source tasks provided in an Excel
+        file. Returns required skills and man-hours (min, avg, max) at both task
+        and findings level.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        '200':
+          description: Skill analysis result
+          content:
+            application/json:
+              example:
+                skillAnalysis:
+                  tasks:
+                    - taskId: 212600-11-1
+                      taskDescription: AVIONICS EQUIPMENT VENTILATION
+                      skills:
+                        - skill: B1
+                          manHours:
+                            min: 5
+                            avg: 7
+                            max: 10
+                  findings:
+                    tasks:
+                      - taskId: 212600-11-1
+                        skills:
+                          - skill: B2
+                            manHours:
+                              min: 3
+                              avg: 4
+                              max: 6
+        '400':
+          description: Invalid file format
+          content:
+            application/json:
+              example:
+                error: Invalid file format. Please upload a valid Excel file.
+  /api/v1/configurations:
+    get:
+      summary: Get all configurations
+      description: >-
+        Retrieves all configurations (e.g., default probability, thresholds,
+        miscellaneous tasks).
+      responses:
+        '200':
+          description: List of configurations
+          content:
+            application/json:
+              example:
+                configurations:
+                  defaultProbability: 0.9
+                  thresholds:
+                    tatThreshold: 10
+                    manHoursThreshold: 500
+                  miscLaborTasks:
+                    - id: MLT001
+                      description: Routine maintenance cleanup
+                      manHours: 6
+    put:
+      summary: Update configurations
+      description: >-
+        Updates configurations (e.g., default probability, thresholds,
+        miscellaneous tasks).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                defaultProbability:
+                  type: number
+                thresholds:
+                  type: object
+                  properties:
+                    tatThreshold:
+                      type: integer
+                    manHoursThreshold:
+                      type: integer
+                miscLaborTasks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      description:
+                        type: string
+                      manHours:
+                        type: integer
+              required:
+                - defaultProbability
+                - thresholds
+                - miscLaborTasks
+            example:
+              defaultProbability: 0.85
+              thresholds:
+                tatThreshold: 8
+                manHoursThreshold: 400
+              miscLaborTasks:
+                - id: MLT003
+                  description: Remove excess materials
+                  manHours: 5
+      responses:
+        '200':
+          description: Configurations updated successfully
+          content:
+            application/json:
+              example:
+                message: Configurations updated successfully
+                configurations:
+                  defaultProbability: 0.85
+                  thresholds:
+                    tatThreshold: 8
+                    manHoursThreshold: 400
+                  miscLaborTasks:
+                    - id: MLT003
+                      description: Remove excess materials
+                      manHours: 5
+  /api/v1/auth/login:
+    post:
+      summary: User login
+      description: Allows a user or admin to log in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+            example:
+              username: user@example.com
+              password: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              example:
+                error: Invalid username or password
+  /api/v1/auth/logout:
+    post:
+      summary: User logout
+      description: Logs out the current user.
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              example:
+                message: Logout successful
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              example:
+                error: Invalid or expired token
