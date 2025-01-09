@@ -9,5 +9,5 @@ async def auth(current_user: dict = Depends(get_current_user)):
         "id": str(current_user["_id"]),
         "username": current_user["username"],
         "email": current_user["email"],
-        "created_at": current_user["created_at"]
+        "createAt": current_user["createAt"]
     }

@@ -1,0 +1,8 @@
+app/_pycache_
+core/_pycache_
+v1/_pycache_
+db/_pycache_
+middleware/_pycache_
+models/_pycache_
+pyjwt/_pycache_
+services/_pycache_

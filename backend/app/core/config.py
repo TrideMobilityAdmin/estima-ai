@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "gmr-mro"
     SECRET_KEY: str = "AIzaSyBtLc5L8WECfgz6i1NzzNU7uFfhIig7DyQ"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 24*60
 
     class Config:
         env_file = ".env"

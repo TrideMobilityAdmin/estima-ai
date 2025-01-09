@@ -24,9 +24,9 @@ async def register(user: UserCreate):
     user_dict = {
         "username": user.username,
         "email": user.email,
-        "hashed_password": hashed_password,
-         "created_at": datetime.utcnow(),
-        "is_active": True
+        "password": hashed_password,
+         "createAt": datetime.utcnow(),
+        "active": True
     }
     
     result = users_collection.insert_one(user_dict)
@@ -35,13 +35,13 @@ async def register(user: UserCreate):
         "id": str(result.inserted_id),
         "username": user.username,
         "email": user.email,
-        "created_at": user_dict["created_at"]
+        "createAt": user_dict["createAt"]
     }
 
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = users_collection.find_one({"username": form_data.username})
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
+    if not user or not verify_password(form_data.password, user["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"

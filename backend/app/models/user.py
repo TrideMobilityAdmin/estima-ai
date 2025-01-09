@@ -10,13 +10,13 @@ class UserCreate(UserBase):
     password: str
 
 class UserInDB(UserBase):
-    hashed_password: bytes
-    created_at: datetime = datetime.utcnow()
-    is_active: bool = True
+    password: bytes
+    createAt: datetime = datetime.utcnow()
+    active: bool = True
 
 class UserResponse(UserBase):
     id: str
-    created_at: datetime
+    createAt: datetime
 
 class UserLogin(BaseModel):
     username: str
