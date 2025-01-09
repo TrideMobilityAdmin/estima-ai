@@ -1,25 +1,30 @@
-# models/user.py
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import datetime
 
-class User(BaseModel):
+class UserBase(BaseModel):
     username: str
-    email: str
+    email: EmailStr
 
-class UserCreate(User):
+class UserCreate(UserBase):
     password: str
 
-class UserInDB(User):
-    hashed_password: str
+class UserInDB(UserBase):
+    hashed_password: bytes
+    created_at: datetime = datetime.utcnow()
+    is_active: bool = True
+
+class UserResponse(UserBase):
+    id: str
+    created_at: datetime
 
 class UserLogin(BaseModel):
-    
     username: str
     password: str
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
 
 class TokenData(BaseModel):
-    username: str
+    username: Optional[str] = None

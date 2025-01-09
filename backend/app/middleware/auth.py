@@ -1,24 +1,26 @@
-from fastapi import Request, HTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.base import RequestResponseEndpoint
-from starlette.responses import JSONResponse
-from app.pyjwt.jwt import validate_token
+from fastapi import HTTPException,Depends
+from app.pyjwt.jwt import verify_token
+from fastapi.security import OAuth2PasswordBearer
+import bcrypt
+from app.db.database_connection import users_collection
 
-class AuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        auth_header = request.headers.get("Authorization")
-        if auth_header is None:
-            return JSONResponse(status_code=401, content={"error": "Authorization header is missing"})
-        
-        auth_parts = auth_header.split(" ")
-        if len(auth_parts) != 2 or auth_parts[0] != "Bearer":
-            return JSONResponse(status_code=401, content={"error": "Invalid token format"})
-        
-        token = auth_parts[1]
-        username = validate_token(token)
-        if username is None:
-            return JSONResponse(status_code=401, content={"error": "Invalid token"})
-        
-        request.state.user = username
-        response = await call_next(request)
-        return response
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+def hash_password(password: str) -> str:
+    hashed= bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    return hashed.decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = verify_token(token)
+    username: str = payload.get("sub")
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    
+    user = users_collection.find_one({"username": username})
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user
