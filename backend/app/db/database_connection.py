@@ -17,3 +17,4 @@ class MongoDBClient:
 # Usage
 mongo_client = MongoDBClient()
 users_collection = mongo_client.get_collection("users")
+# spares-costing=mongo_client.get_collection("spares-costing")
