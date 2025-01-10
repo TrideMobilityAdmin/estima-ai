@@ -1,13 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends,Response
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
-from app.models.user import UserCreate,UserResponse,Token
+from app.models.user import UserCreate,UserResponse,Token,UserLogin
 from app.middleware.auth import hash_password,verify_password,get_current_user
 from app.db.database_connection import users_collection
 from app.pyjwt.jwt import create_access_token
 from app.core.config import settings
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse)
 async def register(user: UserCreate):
@@ -39,16 +39,30 @@ async def register(user: UserCreate):
     }
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = users_collection.find_one({"username": form_data.username})
-    if not user or not verify_password(form_data.password, user["password"]):
+async def login(user: UserLogin):
+    user_found = users_collection.find_one({"username": user.username})
+    if not user_found or not verify_password(user.password, user_found["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
         )
     
     access_token = create_access_token(
-        data={"sub": user["username"]},
+        data={"sub": user_found["username"]},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return {"access_token": access_token, "token_type": "bearer"}
+@router.post("/logout")
+async def logout(response: Response, current_user: dict = Depends(get_current_user)):
+    """
+    User logout endpoint that invalidates the JWT token
+    """
+    try:
+        # Clear the token cookie if using cookies
+        response.delete_cookie(key="access_token")
+        return {"message": "Logout successful"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error during logout"
+        )
