@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
 from app.middleware.auth import get_current_user
 import logging
+from typing import List
 from app.models.task_models import TaskManHoursModel
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SparePart
 from app.services.task_analytics_service import TaskService
-logger = logging.getLogger(__name__)
+from app.log.logs import logger
+# logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
@@ -44,3 +47,28 @@ async def get_task_man_hours(
             status_code=500,
             detail="Internal server error"
         )
+@router.get("/estimates/", response_model=List[Estimate])
+async def get_all_estimates(
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    return await task_service.get_all_estimates()
+
+@router.get("/spare_parts/{task_id}", response_model=List[SparePart])
+async def get_spare_parts(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get spare parts for a specific task.
+    """
+    return await task_service.get_spare_parts(task_id)
+
+@router.post("/estimates/", response_model=EstimateResponse, status_code=201)
+async def create_estimate(
+    estimate_request: EstimateRequest,
+     current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    return await task_service.create_estimate(estimate_request)
