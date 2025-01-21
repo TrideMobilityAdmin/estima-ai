@@ -6,4 +6,5 @@ class TaskManHoursModel(BaseModel):
     Max: float
     Min: float
     Avg: float
+    Est:float
 
