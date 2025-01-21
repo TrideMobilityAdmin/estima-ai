@@ -6,14 +6,15 @@ import nltk
 import spacy
 import dask.dataframe as dd
 import networkx as nx
+import asyncio
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import inflect
 from typing import List, Dict, Set
-import duckdb
-import prefect
 from prefect import task, Flow
+from motor.motor_asyncio import AsyncIOMotorClient
+from prefect import flow
 
 # Initialize necessary components
 nltk.download('punkt')
@@ -24,14 +25,38 @@ le = LabelEncoder()
 q = inflect.engine()
 vectorizer = TfidfVectorizer()
 
-# Connect to DuckDB and load data
+
+# Connect to MongoDB
 @task
-def load_data():
-    """Load data from DuckDB."""
-    con = duckdb.connect("Mro_warehouse.db")
-    exdata = con.execute("SELECT * FROM Mro_data").fetchdf()
-    con.close()
-    return exdata
+async def connect_to_database(db_name="gmr-mro"):
+    try:
+        client = AsyncIOMotorClient("mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl")
+        db = client[db_name]
+        collection = db["sub_task_description"]
+        # Test the connection
+        await client.admin.command('ping')
+        print(f"Connected to database: {db_name}, Collection: {collection.name}")
+        return collection
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
+
+@task(cache_policy=None)
+async def fetch_data(collection=None):
+    """Fetch data from MongoDB collection."""
+    # Return an empty DataFrame if no collection is provided
+    if collection is None:
+        return pd.DataFrame()
+
+    # Retrieve documents from the collection
+    documents = []
+    async for doc in collection.find():
+        documents.append(doc)
+
+    # Return the documents as a DataFrame
+    return pd.DataFrame(documents)
+
+
 
 # Preprocessing functions
 @task
@@ -107,14 +132,18 @@ def calculate_probability(x: List[int], y: List[str]) -> List[float]:
     return result
 
 @task
-def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
+async def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> tuple:
     """Compute similarity and group information."""
+    if exdata.empty:
+        return pd.DataFrame(), pd.DataFrame()
+        
     mro_data = exdata.copy()
     mro_data["group"] = float('nan')
     mro_data["prob"] = float('nan')
 
-    for task in exdata['SourceTask'].unique():
-        temp = exdata[exdata['SourceTask'] == task]
+
+    for task in exdata['Source Task/Discrep. #'].unique():
+        temp = exdata[exdata['Source Task/Discrep. #'] == task]
         exdata_Description = compute_tfidf(temp['Description'].tolist(), preserve_symbols=['-', '/'])
         exdata_Description_embeddings = pd.DataFrame(exdata_Description, index=temp['Log Item #'].tolist()).T
         
@@ -137,7 +166,7 @@ def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
         df_unpivoted = df_unpivoted[df_unpivoted['obsid_d'] != 'level_0']
         df_unpivoted.reset_index(inplace=True)
         combined_df = temp
-        df_unpivoted = pd.merge(df_unpivoted, combined_df[['Log Item #', 'SourceTask']], 
+        df_unpivoted = pd.merge(df_unpivoted, combined_df[['Log Item #', 'Source Task/Discrep. #']], 
                                 left_on='obsid_s', right_on='Log Item #', how='left').drop(columns='Log Item #')
         
         # Process the value column based on conditions
@@ -160,13 +189,13 @@ def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
                             left_on='Log Item #', right_on='obsid_s', how='left').drop(columns='obsid_s')
         
         group_df.rename(columns={'Group': 'group'}, inplace=True)
-        group_df['group'].fillna(0, inplace=True)
+        group_df['group'] = group_df['group'].fillna(0)
         group_df['group'] = group_df['group'].astype(int)
 
         # Fill probabilities
-        sheet_name = list(group_df["sheet_name"])
+        Folder_Name = list(group_df["Folder_Name"])
         group = list(group_df["group"])
-        probabilities = calculate_probability(group, sheet_name)
+        probabilities = calculate_probability(group, Folder_Name)
         group_df["probabilities"] = probabilities
 
         # Update mro_data
@@ -175,31 +204,100 @@ def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> pd.DataFrame:
             prob_value = group_df.loc[group_df['Log Item #'] == i, "probabilities"].values[0]
             mro_data.loc[mro_data['Log Item #'] == i, "group"] = group_value
             mro_data.loc[mro_data['Log Item #'] == i, "prob"] = prob_value
+            
+            
 
     return mro_data, group_df
 
-# Write updated data to DuckDB
+
+    
+
+# Write updated data to MongoDB
+
 @task
-def write_to_duckdb(group_df: pd.DataFrame):
-    """Write the updated DataFrame to DuckDB."""
-    con = duckdb.connect("Mro_warehouse.db")
-    con.execute("DROP TABLE IF EXISTS Mro_data")
-    con.register("updated_mro_data", group_df)
-    con.execute("CREATE TABLE Mro_data AS SELECT * FROM updated_mro_data")
-    con.execute('PRAGMA force_checkpoint;')
-    con.close()
+async def write_to_mongodb(mro_data: pd.DataFrame, db_name="gmr-mro", collection_name="Predicted_data"):
+    """Write the updated DataFrame to MongoDB."""
+    if mro_data.empty:
+        print("No data to write to MongoDB")
+        return
+        
+    try:
+        # Log the number of rows being written
+        print(f"Group DataFrame contains {len(mro_data)} rows")
+        records = mro_data.to_dict(orient="records")
+        print(f"Number of records to write: {len(records)}")
 
-# Define the Prefect flow
-with Flow("MRO_Pipeline") as flow:
-    # Step 1: Load data
-    exdata = load_data()
+        client = AsyncIOMotorClient("mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl")
+        db = client[db_name]
+        collection = db[collection_name]
 
-    # Step 2: Compute similarity and group information
-    mro_data, group_df = calculate_similarity_and_grouping(exdata)
+        # Insert all records
+        result = await collection.insert_many(records)
+        print(f"Inserted {len(result.inserted_ids)} documents into MongoDB")
+    except Exception as e:
+        print(f"Error writing to MongoDB: {e}")
 
-    # Step 3: Write updated data to DuckDB
-    write_to_duckdb(group_df)
+async def verify_mongodb_collection(db_name="gmr-mro", collection_name="Predicted_data"):
+    """Verify the total number of documents in MongoDB."""
+    try:
+        client = AsyncIOMotorClient("mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl")
+        db = client[db_name]
+        collection = db[collection_name]
+        
+        count = await collection.count_documents({})
+        print(f"Total documents in MongoDB: {count}")
+    except Exception as e:
+        print(f"Error verifying MongoDB collection: {e}")
 
-# Execute the flow
+@flow(name="MRO_Pipeline")
+async def run_flow():
+    """Run the Prefect flow with proper async handling."""
+    # Connect and fetch data
+    collection = await connect_to_database()
+    exdata = await fetch_data(collection)
+    print("Fetched data shape:", exdata.shape)
+    
+    # Process data
+    mro_data, group_df = await calculate_similarity_and_grouping(exdata)
+    
+    # Write results
+    await write_to_mongodb(mro_data)
+    
+    # Verify MongoDB
+    await verify_mongodb_collection()
+    
+    return mro_data, group_df
+
+
+def main():
+    """Main function to run the pipeline"""
+    try:
+        # Create a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the flow
+        mro_data, group_df = loop.run_until_complete(run_flow())
+        
+        # Print results
+        print("\nResults:")
+        if not mro_data.empty:
+            print("MRO Data shape:", mro_data.shape)
+        else:
+            print("MRO Data is Empty")
+        if not group_df.empty:
+            print(f"Group DataFrame shape: {group_df.shape}")
+        else:
+            print("Group DataFrame is Empty")
+
+        # Verify and log group_df rows
+        print(f"Group DataFrame contains {len(group_df)} rows:")
+        print(group_df.head())
+
+    finally:
+        # Clean up
+        loop.close()
+
+
 if __name__ == "__main__":
-    flow.run()
+    main()

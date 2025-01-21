@@ -3,7 +3,9 @@ from prefect import flow
 from extract.extract import connect_to_database, get_all_data
 from transform.transform import transform_all_data
 from load.load import load_all_data
-import logger
+from prefect import get_run_logger
+
+logger = get_run_logger()
 
 @flow(name="GMR MRO ETL Pipeline")
 async def main_flow():
