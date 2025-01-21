@@ -1,16 +1,22 @@
-# models/user.py
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import datetime
 
 class UserBase(BaseModel):
     username: str
-    email: str
+    email: EmailStr
 
 class UserCreate(UserBase):
     password: str
 
 class UserInDB(UserBase):
-    hashed_password: str
+    password: bytes
+    createAt: datetime = datetime.utcnow()
+    active: bool = True
+
+class UserResponse(UserBase):
+    id: str
+    createAt: datetime
 
 class UserLogin(BaseModel):
     username: str
@@ -18,7 +24,7 @@ class UserLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
 
 class TokenData(BaseModel):
-    username: str
+    username: Optional[str] = None
