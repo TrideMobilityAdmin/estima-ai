@@ -26,6 +26,9 @@ def clean_dataframe(df: pd.DataFrame, name: str) -> pd.DataFrame:
             logger.warning(f"Empty DataFrame received for {name}")
             return df
         
+        # Create a copy to avoid SettingWithCopyWarning
+        df = df.copy()
+        
         # Convert column names to strings
         df.columns = df.columns.astype(str)
         
@@ -37,15 +40,15 @@ def clean_dataframe(df: pd.DataFrame, name: str) -> pd.DataFrame:
         for column in df.columns:
             try:
                 if df[column].dtype == 'datetime64[ns]' or isinstance(df[column].dtype, pd.DatetimeTZDtype):
-                    df[column] = df[column].apply(
+                    df.loc[:, column] = df[column].apply(
                         lambda x: x.isoformat() if pd.notnull(x) else None
                     )
                 elif df[column].dtype == 'timedelta64[ns]':
-                    df[column] = df[column].apply(
+                    df.loc[:, column] = df[column].apply(
                         lambda x: x.total_seconds() if pd.notnull(x) else None
                     )
                 elif np.issubdtype(df[column].dtype, np.number):
-                    df[column] = df[column].astype(float)
+                    df.loc[:, column] = df[column].astype(float)
             except Exception as e:
                 logger.warning(f"Error processing column {column}: {str(e)}")
         
@@ -59,9 +62,9 @@ def clean_dataframe(df: pd.DataFrame, name: str) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Error cleaning {name} dataset: {str(e)}")
         raise
-
+    
 @task
-def transform_all_data(dataframes: Tuple[pd.DataFrame, ...]) -> Dict[str, pd.DataFrame]:
+async def transform_all_data(dataframes: Tuple[pd.DataFrame, ...]) -> Dict[str, pd.DataFrame]:
     """
     Transforms all datasets.
     
