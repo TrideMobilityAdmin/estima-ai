@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
 from app.middleware.auth import get_current_user
 import logging
 from typing import List
+from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SparePart
 from app.services.task_analytics_service import TaskService
@@ -11,14 +12,14 @@ from app.log.logs import logger
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
-@router.get("/auth", response_model=UserResponse)
-async def auth(current_user: dict = Depends(get_current_user)):
-    return {
-        "id": str(current_user["_id"]),
-        "username": current_user["username"],
-        "email": current_user["email"],
-        "createAt": current_user["createAt"]
-    }
+# @router.get("/auth", response_model=UserResponse)
+# async def auth(current_user: dict = Depends(get_current_user)):
+#     return {
+#         "id": str(current_user["_id"]),
+#         "username": current_user["username"],
+#         "email": current_user["email"],
+#         "createAt": current_user["createAt"]
+#     }
 
 @router.get(
     "/estimation/man_hours/{source_task}",
@@ -28,6 +29,7 @@ async def auth(current_user: dict = Depends(get_current_user)):
         500: {"description": "Internal server error"}
     }
 )
+
 async def get_task_man_hours(
     source_task: str,
     current_user: dict = Depends(get_current_user)
@@ -72,3 +74,13 @@ async def create_estimate(
     task_service: TaskService = Depends()
 ):
     return await task_service.create_estimate(estimate_request)
+
+
+
+excel_service = ExcelUploadService()
+@router.post("/upload/excel/")
+async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """
+    Endpoint to handle Excel file uploads
+    """
+    return await excel_service.upload_excel(file)

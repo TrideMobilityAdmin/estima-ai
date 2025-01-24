@@ -18,7 +18,7 @@ from app.db.database_connection import MongoDBClient
 class TaskService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
-        self.collection = self.mongo_client.get_collection("spares-costing")
+        # self.collection = self.mongo_client.get_collection("spares-costing")
         self.estimates_collection = self.mongo_client.get_collection("estimates")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
         # self.tasks_collection = self.mongo_client.get_collection("tasks")
@@ -33,12 +33,12 @@ class TaskService:
         try:
             # Modify the pipeline to extract the nested "ActualManHrs.value"
             pipeline = [
-                {"$match": {"SourceTask": source_task}},
+                {"$match": {"Task #": source_task}},
                 {"$project": {"_id": 0, "ActualManHrs": "$ActualManHrs.value"}},
             ]
 
             logger.debug(f"Aggregation pipeline: {pipeline}")
-            results = list(self.collection.aggregate(pipeline))
+            results = list(self.taskdescription_collection.aggregate(pipeline))
             logger.debug(f"Aggregation results: {results}")
 
             if not results:
@@ -75,7 +75,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching man hours: {e}", exc_info=True)
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error fetching man hours: {str(e)}"
             )
 
