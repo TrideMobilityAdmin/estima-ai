@@ -1,52 +1,49 @@
-# main.py
-from prefect import flow
-from extract.extract import connect_to_database, get_all_data
-from transform.transform import transform_all_data
-from load.load import load_all_data
-from prefect import get_run_logger
+import sys
+import os
 import asyncio
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from extract.extract import connect_to_database, get_processed_files
+from transform.transform import clean_data
+from load.load import append_to_database
 
 
-@flow(name="GMR MRO ETL Pipeline")
-async def main_flow():
-    """Main ETL flow that orchestrates the entire pipeline."""
-    logger = get_run_logger()
+async def main():
+    """
+    Main execution function to manage the data pipeline.
+    """
     try:
-        # Extract
-
+        print("Starting main process...")
         db = await connect_to_database()
-        raw_data = await get_all_data()
-        
-        # Transform
-        transformed_data = await transform_all_data(raw_data)
-        
-        # Load
-        await load_all_data(db, transformed_data)
-        
+        if db is None:
+            print("Failed to connect to database")
+            return
+
+        data_path = r"C:\\Users\\pavan\\TRide\\GMR-MRO\\estima-ai\\Data\\2024"
+        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts = await get_processed_files(
+            data_path, "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material Consumption Pricing"
+        )
+
+        collections_to_process = [
+            ("aircraft_details", aircraft_details),
+            ("task_description", task_description),
+            ("task_parts", task_parts),
+            ("sub_task_description", sub_task_description),
+            ("sub_task_parts", sub_task_parts)
+        ]
+
+        for collection_name, dataframe in collections_to_process:
+            if not dataframe.empty:
+                try:
+                    processed_data = clean_data(dataframe)
+                    await append_to_database(db[collection_name], processed_data)
+                except Exception as collection_error:
+                    print(f"Error processing {collection_name}: {collection_error}")
+
+        print("Process completed")
     except Exception as e:
-        logger.error(f"Pipeline failed: {str(e)}")
-        raise
+        print(f"Unexpected error in main: {e}")
 
-
-def main():
-    """Main function to run the pipeline"""
-    try:
-        # Create a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Run the flow
-        loop.run_until_complete(main_flow())
-        
-        # Print results
-        print("\nResults:")
-        print("ETL pipeline completed successfully")
-
-    finally:
-        # Clean up
-        loop.close()
-        
 if __name__ == "__main__":
-    main()
-
+    asyncio.run(main())

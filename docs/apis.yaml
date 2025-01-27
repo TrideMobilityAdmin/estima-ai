@@ -16,12 +16,12 @@ paths:
               example:
                 estimates:
                   - id: EST-001
-                    description: AVIONICS EQUIPMENT VENTILATION
+                    description: LG REPLACEMENT for FLYDUBAI
                     createdBy: user@example.com
                     createdAt: '2025-01-05T10:15:30Z'
                     lastUpdated: '2025-01-06T12:00:00Z'
                   - id: EST-002
-                    description: NORMAL EXTENSION AND RETRACTION
+                    description: ENTRY INTO SERVICE for INDIGO
                     createdBy: user2@example.com
                     createdAt: '2025-01-06T12:45:00Z'
                     lastUpdated: '2025-01-07T09:30:00Z'
@@ -84,15 +84,52 @@ paths:
                         qty: 1
                         unit: int
                         price: 100
+                  - id: 323000-26-1
+                    desc: NORMAL EXTENSION AND RETRACTION
+                    mhs:
+                      min: 12
+                      max: 25
+                      avg: 18
+                      est: 22
+                    spareParts:
+                      - partId: F30WT8-840
+                        desc: Lamp
+                        qty: 2
+                        unit: int
+                        price: 250
                 aggregatedTasks:
-                  aggregatedMhs:
-                    min: 18
-                    max: 35
-                    avg: 27
-                    est: 31
-                  totalPartsCost: 1300
+                  totalMhs: 40
+                  totalPartsCost: 700
+                findings:
+                  - taskId: 212600-11-1
+                    details:
+                      - id: FND-001
+                        desc: Oil leakage inspection
+                        mhs:
+                          min: 5
+                          max: 10
+                          avg: 8
+                          est: 9
+                        spareParts:
+                          - partId: O-RING
+                            desc: Oil O-Ring
+                            qty: 2
+                            unit: int
+                            price: 50
+                aggregatedFindingsByTask:
+                  - taskId: 212600-11-1
+                    aggregatedMhs:
+                      min: 5
+                      max: 10
+                      avg: 8
+                      est: 9
+                    totalPartsCost: 50
+                aggregatedFindings:
+                  totalMhs: 9
+                  totalPartsCost: 100
                 createdBy: user@example.com
                 createdAt: '2025-01-05T10:15:30Z'
+                lastUpdated: '2025-01-06T12:00:00Z'
         '400':
           description: Invalid input
           content:
@@ -250,15 +287,12 @@ paths:
                   - metric: TAT Time
                     estimated: 10 days
                     actual: 12 days
-                    difference: +2 days
                   - metric: Man-Hours
                     estimated: 500
                     actual: 540
-                    difference: +40 hours
                   - metric: Spare Cost
                     estimated: 15000
                     actual: 15500
-                    difference: '+500'
         '400':
           description: Invalid input or missing files
           content:
@@ -308,25 +342,59 @@ paths:
           content:
             application/json:
               example:
-                partId: AC9780F15Y21
-                partDescription: Filter
-                usage:
-                  tasks:
-                    - taskId: 212600-11-1
-                      taskDescription: AVIONICS EQUIPMENT VENTILATION
+                partId: P12345
+                partDescription: Oil Filter
+                Usage:
+                  Tasks:
+                    - taskId: ST123
+                      taskDescription: Routine Engine Inspection
                       packages:
-                        - packageId: HMV24/000242/1124
-                          date: '2024-12-10'
+                        - packageId: Package1
+                          date: "2024-12-10"
                           quantity: 3
-                  findings:
-                    tasks:
-                      - taskId: 212600-11-1
-                        skills:
-                          - skill: B1
-                            manHours:
-                              min: 2
-                              avg: 3
-                              max: 5
+                        - packageId: Package2
+                          date: "2024-12-12"
+                          quantity: 1
+                    - taskId: ST124
+                      taskDescription: Hydraulic System Check
+                      packages:
+                        - packageId: Package1
+                          date: "2024-12-11"
+                          quantity: 2
+                        - packageId: Package2
+                          date: "2024-12-13"
+                          quantity: 5
+                  Findings:
+                    - taskId: ST123
+                      taskDescription: Routine Engine Inspection
+                      packages:
+                        - packageId: Package1
+                          finding: Engine Check
+                          logItem: L001
+                          description: Engine oil leakage inspection
+                          date: "2024-12-10"
+                          quantity: 2
+                        - packageId: Package2
+                          finding: Air System
+                          logItem: L003
+                          description: Air filter replacement
+                          date: "2024-12-12"
+                          quantity: 3
+                    - taskId: ST124
+                      taskDescription: Hydraulic System Check
+                      packages:
+                        - packageId: Package1
+                          finding: Fuel System
+                          logItem: L002
+                          description: Fuel pump inspection
+                          date: "2024-12-11"
+                          quantity: 1
+                        - packageId: Package2
+                          finding: Hydraulic System
+                          logItem: L004
+                          description: Hydraulic fluid refill
+                          date: "2024-12-13"
+                          quantity: 4
         '400':
           description: Invalid query parameters
           content:
