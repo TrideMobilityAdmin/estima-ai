@@ -80,6 +80,21 @@ async def get_parts_usage(
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
 
+@router.get("/api/v1/skills/analysis")
+
+async def get_parts_usage(
+    Source_Tasks: List,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get  parts usage for a part_id.
+    """
+    skills_analysis=await task_service.get_skills_analysis(Source_Tasks)
+    logging.info("skills analysis data: %s", skills_analysis)
+    return skills_analysis
+
+
 
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 async def create_estimate(

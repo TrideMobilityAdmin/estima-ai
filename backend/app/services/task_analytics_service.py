@@ -360,3 +360,46 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
             return {}
+        
+    async def get_skills_analysis(self,Source_Tasks:List)->Dict:
+        """
+        Get skills analysis for a specific task.
+        """
+        try:
+            logger.info(f"Fetching skills analysis for Source_Tasks: {Source_Tasks}")
+            pipeline = [
+                {"$match": {"SourceTask": {"$in": Source_Tasks}}},
+                {
+                    "$group": {
+                        "_id": "$SourceTask",
+                        "skills": {
+                            "$push": {
+                                "skill": "$Skill",
+                                "level": "$Level"
+                            }
+                        }
+                    }
+                },
+                {"$project": {"_id": 0, "skills": 1}}
+            ]
+            results = list(self.tasks_collection.aggregate(pipeline))
+            if not results:
+                logger.warning(f"No skills analysis found for Source_Tasks: {Source_Tasks}")
+                return {}
+            skills = [
+                {
+                    "SourceTask": result["_id"],
+                    "skills": [
+                        {
+                            "skill": skill["skill"],
+                            "level": skill["level"]
+                        }
+                        for skill in result["skills"]
+                    ]
+                }
+                for result in results
+            ]
+            return {"skills": skills}
+        except Exception as e:
+            logger.error(f"Error fetching skills analysis: {str(e)}")
+            return {"Invalid data": "No data found"}
