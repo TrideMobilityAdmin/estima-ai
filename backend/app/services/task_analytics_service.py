@@ -2,7 +2,7 @@ from app.models.task_models import TaskManHoursModel
 from statistics import mean
 from fastapi import HTTPException
 import logging
-from typing import List
+from typing import List , Dict
 from datetime import datetime
 from app.models.estimates import (
     Estimate,
@@ -21,7 +21,9 @@ class TaskService:
         self.collection = self.mongo_client.get_collection("spares-costing")
         self.estimates_collection = self.mongo_client.get_collection("estimates")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
-        # self.tasks_collection = self.mongo_client.get_collection("tasks")
+        self.taskparts_collection=self.mongo_client.get_collection("task_parts")
+        self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
+        self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
 
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -265,3 +267,96 @@ class TaskService:
     #     except Exception as e:
     #         logger.error(f"Error generating description: {str(e)}")
     #         return "Error generating description"
+    
+
+
+    async def get_parts_usage(self, part_id: str, start_date: str, end_date: str) -> Dict:
+        """
+        Get parts usage for a specific part_id within a date range.
+        """
+        try:
+            logger.info(f"Fetching parts usage for part_id: {part_id} between {start_date} and {end_date}")
+
+            # Convert date strings to ISODate format
+            start_date_iso = datetime.strptime(start_date, "%d-%m-%Y")
+            end_date_iso = datetime.strptime(end_date, "%d-%m-%Y")
+
+            # Pipeline for task_parts
+            task_parts_pipeline = [
+            {
+                "$match": {"Requested Part #": part_id}
+            },
+            {
+            "$lookup": {
+            "from": "task_description",  
+            "localField": "Task #",               
+            "foreignField": "Task #",            
+            "as": "task_details"                  
+            }
+            },
+            {
+            "$unwind": "$task_details"  
+            },
+            {
+            "$group": {
+            "_id": "$Requested Part #",
+            "tasks": {
+                "$push": {
+                    "taskId": "$Task #",
+                    "taskDescription": "$task_details.Description",
+                    "Part Description":"$Part Description", 
+                    "packages": {
+                        "packageId": "$Folder_Name",
+                        "quantity": "$Requested Qty"
+                    }
+                }
+            }
+            }
+            }
+            ]
+
+            # Pipeline for sub_task_parts
+            sub_task_parts_pipeline = [
+            {"$match": {"Issued Part #":part_id }},
+            {
+                "$group": {
+                    "_id": "$Issued Part #",
+                    "findings": {
+                        "$push": {
+                            "Task Id":"$Task #",
+                            "Task Description":"$Task Description",
+                            "packageId": "$Package #",
+                            "date": "$Issue Date",
+                            "quantity": "$Used Qty",
+                            "stockStatus": "$Stock Status",
+                            "priceUSD": "$Billable Value (USD)"
+                        }
+                    }
+                }
+                }
+            ]
+
+            # Execute pipelines
+            task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
+            sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
+            logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
+
+            if not task_parts_result and not sub_task_parts_result:
+                logger.warning(f"No parts usage found for part_id: {part_id}")
+                return {}
+
+            # Construct final output
+            output = {
+                "partId": part_id,
+                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("Part Description", "") if task_parts_result else "",
+                "usage": {
+                "tasks": task_parts_result[0]["tasks"] if task_parts_result else [],
+                "findings": sub_task_parts_result[0]["findings"] if sub_task_parts_result else []
+            }
+            }
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error fetching parts usage: {str(e)}")
+            return {}

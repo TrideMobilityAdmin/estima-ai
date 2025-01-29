@@ -65,6 +65,22 @@ async def get_spare_parts(
     """
     return await task_service.get_spare_parts(task_id)
 
+
+@router.get("/api/v1/parts/usage")
+
+async def get_parts_usage(
+    part_id: str,start_date: str, end_date: str,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get  parts usage for a part_id.
+    """
+    parts_usage=await task_service.get_parts_usage(part_id,start_date,end_date)
+    logging.info("Parts usage data: %s", parts_usage)
+    return parts_usage
+
+
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 async def create_estimate(
     estimate_request: EstimateRequest,

@@ -1,15 +1,24 @@
-import { AppShell, Button, Flex, Group } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { Outlet, useNavigate } from "react-router-dom";
+import {ActionIcon, AppShell, Button, Flex, Group, useDisclosure, Outlet, useNavigate, useState} from "../constants/GlobalImports";
 import gmrIcon from "../../public/GMR_Icon.jpeg";
-import Footer from "./footer";
+import { MdPerson } from "react-icons/md";
 export default function Basic() {
-  const navigate = useNavigate();
 
+  const navigate = useNavigate();
   const [opened] = useDisclosure();
+  const [active, setActive] = useState('');
+
+  const links = [
+    { link: '/home/estimate', label: 'ESTIMATE' },
+    { link: '/home/compare-estimate', label: 'COMPARE ESTIMATE' },
+    { link: '/home/part-usage', label: 'PART USAGE' },
+    { link: '/home/skill-requirement', label: 'SKILL REQUIREMENT' },
+    { link: '/home/configuration', label: 'CONFIGURATION' },
+  ];
+
+
   return (
     <AppShell
-      header={{ height: 60 }}
+      header={{ height: 60}}
       navbar={{
         width: 300,
         breakpoint: "sm",
@@ -20,101 +29,106 @@ export default function Basic() {
       <AppShell.Header
         style={{
           background: "#1A237E",
+          // background: colors.gmrColor1,
           borderRadius: "0",
         }}
       >
-        <Flex pl={20} pt={5} direction="row" justify="space-between" >
+        <div style={{height: 60, backgroundColor:"#1A237E"}}>
+        <Flex pl={20} pt={5} pr={20} direction="row" align='center' justify="space-between" >
           <div>
+            <img
+              src={gmrIcon}
+              style={{
+                height: "3em",
+                // width: "2em",
+                cursor: "pointer",
+                borderRadius: 15
+                // paddingBottom: "6px",
+              }}
+              onClick={() => {
+                navigate("/home");
+                setActive('');
+              }}
+            />
+          </div>
 
-          <img
-                // title="Logo"
-                // src={EvRidesLogo}
-                src={gmrIcon}
+          <Group gap={5}>
+
+          {links.map((link) => (
+              <Button
+                key={link.label}
+                variant="subtle"
                 style={{
-                  height: "3em",
-                  // width: "2em",
-                  cursor: "pointer",
-                  borderRadius:15
-                  // paddingBottom: "6px",
+                  color: active === link.link ? "yellow" : "white",
+                  backgroundColor: active === link.link ? "rgba(255, 255, 0, 0.1)" : "transparent",
                 }}
                 onClick={() => {
-                  navigate("/home");
+                  setActive(link.link); // Set the clicked button as active
+                  navigate(link.link); // Navigate to the respective link
                 }}
-              />
-          </div>
-          
-          <Group gap={5}>
-          <Button
-              // leftSection={<IconPhoto size={14} />}
-              variant="transparent"
-              color="rgba(255, 255, 255, 1)"
-              onClick={() => {
-                navigate("/tasks");
-              }}
-            >
-              ANALYTICS
-            </Button>
-            <Footer />
+              >
+                {link.label}
+              </Button>
+            ))}
+            {/* <Footer /> */}
           </Group>
-        </Flex>
 
-        {/* <Group align="center" justify="space-between" style={{ flex: 1 }}> */}
-          {/* <MantineLogo size={30} /> */}
-          {/* <Group>
-            <div
+          <div>
+          <ActionIcon variant="default" color="indigo" size="lg" radius="lg" aria-label="Settings">
+      <MdPerson style={{ width: '70%', height: '70%' }} width={1.5} />
+    </ActionIcon>
+          </div>
+        </Flex>
+        </div>
+        {/* <div style={{height: 60, backgroundColor:"white"}}>
+        <Flex pl={20} pt={5} pr={20} direction="row" align='center' justify="space-between" >
+          <div>
+            <img
+              src={gmrIcon}
               style={{
-                paddingTop: "8px",
+                height: "3em",
+                // width: "2em",
+                cursor: "pointer",
+                borderRadius: 15
+                // paddingBottom: "6px",
               }}
-            >
-              <Space w={10} />
-              <img
-                title="Logo"
-                src={EvRidesLogo}
+              onClick={() => {
+                navigate("/home");
+                setActive('');
+              }}
+            />
+          </div>
+
+          <Group gap={5}>
+
+          {links.map((link) => (
+              <Button
+                key={link.label}
+                variant="subtle"
                 style={{
-                  height: "1.5em",
-                  // width: "2em",
-                  cursor: "pointer",
-                  // paddingBottom: "6px",
+                  color: active === link.link ? "blue" : "#1A237E",
+                  backgroundColor: active === link.link ? "rgba(255, 255, 0, 0.1)" : "transparent",
                 }}
-                // onClick={() => {
-                //   navigate("/home/stats");
-                // }}
-              />
-            </div>
-          </Group> */}
-          {/* <Group ml="xl" gap={0} visibleFrom="sm"> */}
-            {/* <UnstyledButton
-              className="control"
-              onClick={() => {
-                navigate("/dashboard");
-              }}
-            >
-              Dashboard
-            </UnstyledButton> */}
-            {/* <Button
-              // leftSection={<IconPhoto size={14} />}
-              variant="transparent"
-              color="rgba(255, 255, 255, 1)"
-              onClick={() => {
-                navigate("/tasks");
-              }}
-            >
-              ANALYTICS
-            </Button> */}
-            {/* <UnstyledButton
-              c={"white"}
-              // className="control"
-              onClick={() => {
-                navigate("/tasks");
-              }}
-            >
-              Analytics
-            </UnstyledButton> */}
-            {/* <Space w="lg" />
+                onClick={() => {
+                  setActive(link.link); // Set the clicked button as active
+                  navigate(link.link); // Navigate to the respective link
+                }}
+              >
+                {link.label}
+              </Button>
+            ))}
           </Group>
-        </Group> */}
+
+          <div>
+          <ActionIcon variant="default" color="indigo" size="lg" radius="lg" aria-label="Settings">
+      <MdPerson style={{ width: '70%', height: '70%' }} width={1.5} />
+    </ActionIcon>
+          </div>
+        </Flex>
+        </div> */}
       </AppShell.Header>
-      <AppShell.Main p={0}>
+      
+      <AppShell.Main style={{ backgroundColor: "#ebebe6" }} p={0}>
         <Outlet />
       </AppShell.Main>
 
