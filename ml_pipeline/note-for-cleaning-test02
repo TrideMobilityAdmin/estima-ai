@@ -1,0 +1,6 @@
+100 packages - PLEASE CONSIDER THESE WHILE PREPARING DATA FOR EXPERIMENTS
+Anomalies observed in data
+Some packages don’t have material/pricing sheet
+Some aircrafts don’t have aircraft age (8)
+Aircraft FH is inconsistent format
+Inconsistency amongst material/pricing files reg. header rows (2nd or 3rd)
