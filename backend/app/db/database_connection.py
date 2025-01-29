@@ -1,5 +1,5 @@
 from pymongo import MongoClient
-from app.core.config import settings
+from app.config.config import settings
 
 class MongoDBClient:
     _instance = None
@@ -17,4 +17,4 @@ class MongoDBClient:
 # Usage
 mongo_client = MongoDBClient()
 users_collection = mongo_client.get_collection("users")
-# spares-costing=mongo_client.get_collection("spares-costing")
+

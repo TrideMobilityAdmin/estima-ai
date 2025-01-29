@@ -4,8 +4,8 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SparePart
+from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 # logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1", tags=["API's"])
 
 @router.get(
     "/estimation/man_hours/{source_task}",
-    response_model=TaskManHoursModel,
+    response_model=List[FindingsManHoursModel],
     responses={
         404: {"description": "Source task not found"},
         500: {"description": "Internal server error"}
@@ -33,13 +33,13 @@ router = APIRouter(prefix="/api/v1", tags=["API's"])
 async def get_task_man_hours(
     source_task: str,
     current_user: dict = Depends(get_current_user)
-) -> TaskManHoursModel:
+) -> List[FindingsManHoursModel]:
     """
     Get man hours estimation for a specific source task.
     """
     try:
         task_service = TaskService()
-        result = await task_service.get_man_hours(source_task)
+        result = await task_service.get_man_hours_findings(source_task)
         return result
     except HTTPException as he:
         raise he
@@ -56,7 +56,7 @@ async def get_all_estimates(
 ):
     return await task_service.get_all_estimates()
 
-@router.get("/spare_parts/{task_id}", response_model=List[SparePart])
+@router.get("/spare_parts/{task_id}", response_model=List[SpareResponse])
 async def get_spare_parts(
     task_id: str,
     current_user: dict = Depends(get_current_user),
@@ -65,7 +65,7 @@ async def get_spare_parts(
     """
     Get spare parts for a specific task.
     """
-    return await task_service.get_spare_parts(task_id)
+    return await task_service.get_spare_parts_findings(task_id)
 
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 async def create_estimate(
@@ -73,7 +73,7 @@ async def create_estimate(
      current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    return await task_service.create_estimate(estimate_request)
+    return await task_service.create_estimate(estimate_request,current_user)
 
 
 

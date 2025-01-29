@@ -5,7 +5,7 @@ from app.models.user import UserCreate,UserResponse,Token,UserLogin
 from app.middleware.auth import hash_password,verify_password,get_current_user
 from app.db.database_connection import users_collection
 from app.pyjwt.jwt import create_access_token
-from app.core.config import settings
+from app.config.config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 

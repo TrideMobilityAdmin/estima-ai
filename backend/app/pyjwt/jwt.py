@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from app.core.config import settings
+from app.config.config import settings
 import jwt as pyjwt
 
 from fastapi import HTTPException, status
