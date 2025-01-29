@@ -1,0 +1,25 @@
+100 packages
+1. 2 kinds of packages.
+    - All source task in one go, first level only
+    - One source task (with task# matching pkg category) in level 1 and exploded into level 2
+    - Q : no level 3 in source tasks?
+2. Discrepancies can be found during source tasks, and can be found during discrepancies also. Q : Is there a fixed number of levels of discrepancies? (practical)
+3. Pricing can refer to any task, be it source task or discrepancy.
+4. Incremental learning is for future, but from product v0 pov, will include intermediate outputs and source tasks. (APIs need it too)
+5. Q : consumption ratio between source task and discrepancies, correlated with package?
+6. Q : actual-man-hours of source-tasks includes sub-tasks/children-tasks/discrepancies?
+7. 3 kinds of pkg params
+    - Flight hour/age/cycle (Q : pattern in amongst hour/age/cycle/user?)
+    - Aircraft user/mgf/model
+    - Package category (seen to be leading to first level of source tasks)
+    - ** all these make sense for source-task decisions at least - need to fix api details
+8. 5 kinds of master data
+    - Part Master (from table) ex- invariance in desc, uom, price, stock status 
+    - Package-Category/Model -> Source Task Master (from table)
+    - Reference Manuals (from texts in table, may be required for making others)
+    - Actions (from text in table, if difficult will use latent space, explainability issue ~)
+    - Failure Modes (from text in table, if difficult use lat. space, explainability issue ~)
+    - ** master data is the nouns in our language with user, esp for explainability 
+      (read intermediate outputs)
+    - We are not provided master data, we are trying to infer from historical data
+    - Ds team to work on inferring these first, explore roles of other cols than hrs/qty
