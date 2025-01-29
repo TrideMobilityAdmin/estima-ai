@@ -2,11 +2,12 @@ import sys
 import os
 import asyncio
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Update path to include parent directory
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from extract.extract import connect_to_database, get_processed_files
-from transform.transform import clean_data
-from load.load import append_to_database
+from data_pipeline.extract.extract import connect_to_database, get_processed_files
+from data_pipeline.transform.transform import clean_data
+from data_pipeline.load.load import append_to_database
 
 
 async def main():
