@@ -36,9 +36,14 @@ async def get_processed_files(data_path, task_description_initial_name, task_par
         def read_and_process_file(file_path, sheet_name, folder_name):
             """Utility to read and process an individual Excel file."""
             df = pd.read_excel(file_path, engine='openpyxl', sheet_name=sheet_name)
-            df.columns = df.iloc[0].astype(str).str.replace('.', '', regex=False)
-            df = df[1:].reset_index(drop=True)
-            df['Folder_Name'] = folder_name
+            if(sheet_name=="PRICING"):
+                df.columns = df.iloc[1].astype(str).str.replace('.', '', regex=False)
+                df = df[2:].reset_index(drop=True)
+            else:
+                df.columns = df.iloc[0].astype(str).str.replace('.', '', regex=False)
+                df = df[1:].reset_index(drop=True)
+                df['Package'] = folder_name
+            
             return df
 
         def collect_files_by_prefix(prefix, sheet_name):
