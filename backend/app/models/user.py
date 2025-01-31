@@ -11,20 +11,24 @@ class UserCreate(UserBase):
 
 class UserInDB(UserBase):
     password: bytes
-    createAt: datetime = datetime.utcnow()
-    active: bool = True
+    createdAt: datetime = datetime.utcnow()
+    isActive: bool = True
 
 class UserResponse(UserBase):
     id: str
-    createAt: datetime
+    createdAt: datetime
 
 class UserLogin(BaseModel):
     username: str
     password: str
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+    userID: str
+    username: str
+    email: str
+    accessToken: str
+    tokenType: str = "bearer"
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+

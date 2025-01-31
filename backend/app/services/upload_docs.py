@@ -42,7 +42,7 @@ class ExcelUploadService:
                 
                 elif cleaned_data[column].dtype == 'datetime64[ns]':
                     logger.info(f"Converting datetime column: {column}")
-                    cleaned_data[column] = cleaned_data[column].dt.strftime('%Y-%m-%dT%H:%M:%S')
+                    cleaned_data[column] = pd.to_datetime(cleaned_data[column], utc=True)
                 
                 elif cleaned_data[column].dtype in ['float64', 'float32']:
                     mask = np.isinf(cleaned_data[column])
@@ -82,21 +82,22 @@ class ExcelUploadService:
                     elif isinstance(value, timedelta):
                         processed_record[str(key)] = value.total_seconds()
                     elif isinstance(value, datetime):
-                        processed_record[str(key)] = value.isoformat()
+                        processed_record[str(key)] = value.replace(tzinfo=timezone.utc)
                     else:
                         processed_record[str(key)] = value
 
                         # to split task
                 if 'Task' in processed_record and isinstance(processed_record['Task'], str):
                     processed_record['Task'] = processed_record['Task'].split(',')
-                
-                processed_record['upload_timestamp'] =  datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+                current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+                processed_record['upload_timestamp'] =  current_time
                 processed_record['original_filename'] = file.filename
+                processed_record["CreatedAt"]=current_time
                 
                 records.append(processed_record)
             
             try:
-                json.dumps(records)
+                json.dumps(records,default=str)
                 logger.info("Data is JSON serializable")
             except TypeError as e:
                 logger.error(f"Data serialization error: {str(e)}")
