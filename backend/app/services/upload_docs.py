@@ -11,7 +11,7 @@ from app.db.database_connection import MongoDBClient
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
-        self.collection = self.mongo_client.get_collection("tasks")
+        self.collection = self.mongo_client.get_collection("estima_input_upload")
     
     async def validate_excel_file(self, file: UploadFile) -> None:
         if not file.filename:
@@ -52,7 +52,7 @@ class ExcelUploadService:
             
             cleaned_data = cleaned_data.replace({np.nan: None})
             
-            logger.info("final data types:\n", cleaned_data.dtypes)
+            # logger.info("final data types:\n", cleaned_data.dtypes)
             return cleaned_data
             
         except Exception as e:
