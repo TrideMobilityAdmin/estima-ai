@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
+from typing import List, Optional
+from fastapi import APIRouter, Depends, Query
 from app.middleware.auth import get_current_user
 import logging
 from typing import List
@@ -83,19 +85,14 @@ async def get_parts_usage(
     return parts_usage
 
 @router.get("/api/v1/skills/analysis")
-
-async def get_parts_usage(
-    Source_Tasks: List,
+async def get_skills_analysis(
+    Source_Tasks: List[str] = Query(..., description="List of source tasks"),
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    """
-    Get  parts usage for a part_id.
-    """
-    skills_analysis=await task_service.get_skills_analysis(Source_Tasks)
-    logging.info("skills analysis data: %s", skills_analysis)
+    skills_analysis = await task_service.get_skills_analysis(Source_Tasks)
+    logging.info("Skills analysis data: %s", skills_analysis)
     return skills_analysis
-
 
 
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)

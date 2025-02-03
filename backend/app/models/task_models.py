@@ -1,11 +1,12 @@
 from pydantic import BaseModel
-from typing import Optional,List,Any
+from typing import Optional,List,Any,Dict
 
 class ManHrs(BaseModel):
     max: float
     min: float
     avg: float
     est:float
+    
 class TaskManHoursModel(BaseModel):
     sourceTask: str
     desciption: str
@@ -49,3 +50,21 @@ class PartsUsageResponse(BaseModel):
     usage: Usage
 
 
+
+# Pydantic Models
+class ManHours(BaseModel):
+    min: float
+    avg: float
+    max: float
+
+class SkillDetail(BaseModel):
+    skill: str
+    manHours: ManHours
+
+class TaskAnalysis(BaseModel):
+    taskId: str
+    taskDescription: Optional[str] = None
+    skills: List[SkillDetail]
+
+class SkillAnalysisResponse(BaseModel):
+    skillAnalysis: Dict[str, List[TaskAnalysis]]

@@ -1,4 +1,4 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Task,Package,Finding,Usage,SkillDetail,SkillAnalysisResponse,TaskAnalysis,ManHours
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Task,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours,SkillDetail
 from statistics import mean
 from fastapi import HTTPException,Depends
 import logging
@@ -504,21 +504,19 @@ class TaskService:
             logger.error(f"Error fetching parts usage: {str(e)}")
             return None
         
-    async def get_skills_analysis(self, file: UploadFile = File(...)) -> Optional[SkillAnalysisResponse]:
+
+    async def get_skills_analysis(self, source_tasks: List[str]) -> Optional[SkillAnalysisResponse]:
         """
         Analyzes skills required for tasks from an uploaded Excel file.
         Returns required skills and man-hours at both task and findings levels.
         """
         try:
-            # Read Excel file
-            df = pd.read_excel(file.file)
-
-            if "Task" not in df.columns:
-                logger.error("Invalid Excel format: 'Task' column missing")
+            # Ensure source_tasks is a list of strings
+            if not isinstance(source_tasks, list) or not all(isinstance(task, str) for task in source_tasks):
+                logging.error("Invalid source_tasks format. Expected a list of strings.")
                 return None
 
-            source_tasks = df["Task"].dropna().unique().tolist()
-            logger.info(f"Extracted Source Tasks: {source_tasks}")
+            logging.info(f"Extracted Source Tasks: {source_tasks}")
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
