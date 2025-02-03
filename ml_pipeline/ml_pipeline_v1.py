@@ -142,10 +142,10 @@ async def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> tuple:
     mro_data["prob"] = float('nan')
 
 
-    for task in exdata['Source Task/Discrep. #'].unique():
-        temp = exdata[exdata['Source Task/Discrep. #'] == task]
+    for task in exdata['SourceTaskDiscrep'].unique():
+        temp = exdata[exdata['SourceTaskDiscrep'] == task]
         exdata_Description = compute_tfidf(temp['Description'].tolist(), preserve_symbols=['-', '/'])
-        exdata_Description_embeddings = pd.DataFrame(exdata_Description, index=temp['Log Item #'].tolist()).T
+        exdata_Description_embeddings = pd.DataFrame(exdata_Description, index=temp['LogItem'].tolist()).T
         
         # Cosine Similarity Matrix
         cos_sim_desc_correction_mat = cosine_similarity(exdata_Description_embeddings.T)
@@ -166,8 +166,8 @@ async def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> tuple:
         df_unpivoted = df_unpivoted[df_unpivoted['obsid_d'] != 'level_0']
         df_unpivoted.reset_index(inplace=True)
         combined_df = temp
-        df_unpivoted = pd.merge(df_unpivoted, combined_df[['Log Item #', 'Source Task/Discrep. #']], 
-                                left_on='obsid_s', right_on='Log Item #', how='left').drop(columns='Log Item #')
+        df_unpivoted = pd.merge(df_unpivoted, combined_df[['LogItem', 'SourceTaskDiscrep']], 
+                                left_on='obsid_s', right_on='LogItem', how='left').drop(columns='LogItem')
         
         # Process the value column based on conditions
         df_unpivoted['Value'] = df_unpivoted.apply(lambda row: 1 if row['obsid_s'] == row['obsid_d'] else 0, axis=1)
@@ -186,7 +186,7 @@ async def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> tuple:
 
         # Merge group info with original dataframe
         group_df = pd.merge(combined_df, df_sim1[['obsid_s', 'Group']].drop_duplicates(subset=['obsid_s']), 
-                            left_on='Log Item #', right_on='obsid_s', how='left').drop(columns='obsid_s')
+                            left_on='LogItem', right_on='obsid_s', how='left').drop(columns='obsid_s')
         
         group_df.rename(columns={'Group': 'group'}, inplace=True)
         group_df['group'] = group_df['group'].fillna(0)
@@ -199,11 +199,11 @@ async def calculate_similarity_and_grouping(exdata: pd.DataFrame) -> tuple:
         group_df["probabilities"] = probabilities
 
         # Update mro_data
-        for i in group_df['Log Item #']:
-            group_value = group_df.loc[group_df['Log Item #'] == i, 'group'].values[0]
-            prob_value = group_df.loc[group_df['Log Item #'] == i, "probabilities"].values[0]
-            mro_data.loc[mro_data['Log Item #'] == i, "group"] = group_value
-            mro_data.loc[mro_data['Log Item #'] == i, "prob"] = prob_value
+        for i in group_df['LogItem']:
+            group_value = group_df.loc[group_df['LogItem'] == i, 'group'].values[0]
+            prob_value = group_df.loc[group_df['LogItem'] == i, "probabilities"].values[0]
+            mro_data.loc[mro_data['LogItem'] == i, "group"] = group_value
+            mro_data.loc[mro_data['LogItem'] == i, "prob"] = prob_value
             
             
 

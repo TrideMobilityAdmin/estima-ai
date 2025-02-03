@@ -1,13 +1,19 @@
 import sys
 import os
 import asyncio
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from extract.extract import connect_to_database, get_processed_files
 from transform.transform import clean_data
 from load.load import append_to_database
+import os
 
+
+from pathlib import Path
+
+# `cwd`: current directory is straightforward
+cwd = Path.cwd()
+dir = os.path.dirname(__file__)
 
 async def main():
     """
@@ -19,8 +25,9 @@ async def main():
         if db is None:
             print("Failed to connect to database")
             return
+        
 
-        data_path = r"C:\\Users\\pavan\\TRide\\GMR-MRO\\estima-ai\\Data\\2024"
+        data_path = os.path.join(dir,"..","..", "Data", "2024")
         aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts = await get_processed_files(
             data_path, "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material Consumption Pricing"
         )

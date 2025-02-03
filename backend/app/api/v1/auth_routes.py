@@ -5,18 +5,18 @@ from app.models.user import UserCreate,UserResponse,Token,UserLogin
 from app.middleware.auth import hash_password,verify_password,get_current_user
 from app.db.database_connection import users_collection
 from app.pyjwt.jwt import create_access_token
-from app.core.config import settings
+from app.config.config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserCreate):
-    if users_collection.find_one({"$or": [
-        {"username": user.username}, 
-        {"email": user.email}
-    ]}):
+async def User_register(user: UserCreate):
+    existing_user = users_collection.find_one({
+        "$or": [{"username": user.username}, {"email": user.email}]
+    })
+    if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
             detail="Username or email already registered"
         )
     
@@ -26,7 +26,7 @@ async def register(user: UserCreate):
         "email": user.email,
         "password": hashed_password,
          "createAt": datetime.utcnow(),
-        "active": True
+        "is_active": True
     }
     
     result = users_collection.insert_one(user_dict)
@@ -39,11 +39,11 @@ async def register(user: UserCreate):
     }
 
 @router.post("/login", response_model=Token)
-async def login(user: UserLogin):
+async def User_login(user: UserLogin):
     user_found = users_collection.find_one({"username": user.username})
     if not user_found or not verify_password(user.password, user_found["password"]):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=401,
             detail="Incorrect username or password"
         )
     
@@ -53,7 +53,7 @@ async def login(user: UserLogin):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 @router.post("/logout")
-async def logout(response: Response, current_user: dict = Depends(get_current_user)):
+async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
     """
     User logout endpoint that invalidates the JWT token
     """
@@ -63,6 +63,6 @@ async def logout(response: Response, current_user: dict = Depends(get_current_us
         return {"message": "Logout successful"}
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Error during logout"
         )
