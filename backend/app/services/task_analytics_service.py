@@ -1,11 +1,13 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Task,Package,Finding,Usage,SkillDetail,SkillAnalysisResponse,TaskAnalysis,ManHours
 from statistics import mean
 from fastapi import HTTPException,Depends
 import logging
-from typing import List , Dict
+from typing import List , Dict,Optional
+import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
 from datetime import datetime
+from fastapi import UploadFile, File
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -399,7 +401,7 @@ class TaskService:
     
 
 
-    async def get_parts_usage(self, part_id: str, start_date: str, end_date: str) -> Dict:
+    async def get_parts_usage(self, part_id: str, start_date: str, end_date: str) -> Optional[PartsUsageResponse]:
         """
         Get parts usage for a specific part_id within a date range.
         """
@@ -412,48 +414,39 @@ class TaskService:
 
             # Pipeline for task_parts
             task_parts_pipeline = [
-            {
-                "$match": {"Requested Part #": part_id}
-            },
-            {
-            "$lookup": {
-            "from": "task_description",  
-            "localField": "Task #",               
-            "foreignField": "Task #",            
-            "as": "task_details"                  
-            }
-            },
-            {
-            "$unwind": "$task_details"  
-            },
-            {
-            "$group": {
-            "_id": "$Requested Part #",
-            "tasks": {
-                "$push": {
-                    "taskId": "$Task #",
-                    "taskDescription": "$task_details.Description",
-                    "Part Description":"$Part Description", 
-                    "packages": {
-                        "packageId": "$Folder_Name",
-                        "quantity": "$Requested Qty"
+                {"$match": {"Requested Part #": part_id}},
+                {"$lookup": {
+                    "from": "task_description",
+                    "localField": "Task #",
+                    "foreignField": "Task #",
+                    "as": "task_details"
+                }},
+                {"$unwind": "$task_details"},
+                {"$group": {
+                    "_id": "$Requested Part #",
+                    "tasks": {
+                        "$push": {
+                            "taskId": "$Task #",
+                            "taskDescription": "$task_details.Description",
+                            "partDescription": "$Part Description",
+                            "packages": {
+                                "packageId": "$Folder_Name",
+                                "quantity": "$Requested Qty"
+                            }
+                        }
                     }
-                }
-            }
-            }
-            }
+                }}
             ]
 
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-            {"$match": {"Issued Part #":part_id }},
-            {
-                "$group": {
+                {"$match": {"Issued Part #": part_id}},
+                {"$group": {
                     "_id": "$Issued Part #",
                     "findings": {
                         "$push": {
-                            "Task Id":"$Task #",
-                            "Task Description":"$Task Description",
+                            "taskId": "$Task #",
+                            "taskDescription": "$Task Description",
                             "packageId": "$Package #",
                             "date": "$Issue Date",
                             "quantity": "$Used Qty",
@@ -461,74 +454,145 @@ class TaskService:
                             "priceUSD": "$Billable Value (USD)"
                         }
                     }
-                }
-                }
+                }}
             ]
 
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
+
             logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
 
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
-                return {}
+                return None
 
-            # Construct final output
-            output = {
-                "partId": part_id,
-                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("Part Description", "") if task_parts_result else "",
-                "usage": {
-                "tasks": task_parts_result[0]["tasks"] if task_parts_result else [],
-                "findings": sub_task_parts_result[0]["findings"] if sub_task_parts_result else []
-            }
-            }
+            # Parse results into data models
+            tasks = [
+                Task(
+                    taskId=t["taskId"],
+                    taskDescription=t["taskDescription"],
+                    partDescription=t["partDescription"],
+                    packages=Package(**t["packages"])
+                )
+                for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
+            ]
 
-            return output
+            findings = [
+                Finding(
+                    taskId=f["taskId"],
+                    taskDescription=f["taskDescription"],
+                    packageId=f["packageId"],
+                    date=f["date"],
+                    quantity=f["quantity"],
+                    stockStatus=f.get("stockStatus"),
+                    priceUSD=f.get("priceUSD")
+                )
+                for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
+            ]
+
+            # Construct final response
+            response = PartsUsageResponse(
+                partId=part_id,
+                partDescription=tasks[0].partDescription if tasks else "",
+                usage=Usage(tasks=tasks, findings=findings)
+            )
+
+            return response
 
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
-            return {}
+            return None
         
-    async def get_skills_analysis(self,Source_Tasks:List)->Dict:
+    async def get_skills_analysis(self, file: UploadFile = File(...)) -> Optional[SkillAnalysisResponse]:
         """
-        Get skills analysis for a specific task.
+        Analyzes skills required for tasks from an uploaded Excel file.
+        Returns required skills and man-hours at both task and findings levels.
         """
         try:
-            logger.info(f"Fetching skills analysis for Source_Tasks: {Source_Tasks}")
-            pipeline = [
-                {"$match": {"SourceTask": {"$in": Source_Tasks}}},
+            # Read Excel file
+            df = pd.read_excel(file.file)
+
+            if "Task" not in df.columns:
+                logger.error("Invalid Excel format: 'Task' column missing")
+                return None
+
+            source_tasks = df["Task"].dropna().unique().tolist()
+            logger.info(f"Extracted Source Tasks: {source_tasks}")
+
+            # MongoDB pipeline for tasks
+            task_skill_pipeline = [
+                {"$match": {"Task": {"$in": source_tasks}}},
                 {
                     "$group": {
-                        "_id": "$SourceTask",
+                        "_id": "$Task",
+                        "taskDescription": {"$first": "$Task Description"},
                         "skills": {
                             "$push": {
                                 "skill": "$Skill",
-                                "level": "$Level"
+                                "manHours": {
+                                    "min": {"$min": "$ActualManHrs"},
+                                    "avg": {"$avg": "$ActualManHrs"},
+                                    "max": {"$max": "$ActualManHrs"}
+                                }
                             }
                         }
                     }
-                },
-                {"$project": {"_id": 0, "skills": 1}}
-            ]
-            results = list(self.tasks_collection.aggregate(pipeline))
-            if not results:
-                logger.warning(f"No skills analysis found for Source_Tasks: {Source_Tasks}")
-                return {}
-            skills = [
-                {
-                    "SourceTask": result["_id"],
-                    "skills": [
-                        {
-                            "skill": skill["skill"],
-                            "level": skill["level"]
-                        }
-                        for skill in result["skills"]
-                    ]
                 }
-                for result in results
             ]
-            return {"skills": skills}
+
+            # MongoDB pipeline for sub-task findings
+            sub_tasks_skill_pipeline = [
+                {"$match": {"SourceTaskDiscrep": {"$in": source_tasks}}},
+                {
+                    "$group": {
+                        "_id": "$SourceTaskDiscrep",
+                        "skills": {
+                            "$push": {
+                                "skill": "$Skill",
+                                "manHours": {
+                                    "min": {"$min": "$ActualManHrs"},
+                                    "avg": {"$avg": "$ActualManHrs"},
+                                    "max": {"$max": "$ActualManHrs"}
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+
+            # Execute MongoDB queries
+            task_skill_results = list(self.tasks_collection.aggregate(task_skill_pipeline))
+            sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
+
+            # Process results into response format
+            tasks = [
+                TaskAnalysis(
+                    taskId=task["_id"],
+                    taskDescription=task.get("taskDescription", ""),
+                    skills=[SkillDetail(**skill) for skill in task["skills"]]
+                )
+                for task in task_skill_results
+            ]
+
+            findings = [
+                TaskAnalysis(
+                    taskId=sub_task["_id"],
+                    skills=[SkillDetail(**skill) for skill in sub_task["skills"]]
+                )
+                for sub_task in sub_task_skill_results
+            ]
+
+            # Construct final response
+            response = SkillAnalysisResponse(
+                skillAnalysis={
+                    "tasks": tasks,
+                    "findings": findings
+                }
+            )
+
+            return response
+        
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return {"Invalid data": "No data found"}
+            return None
