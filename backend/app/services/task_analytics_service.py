@@ -38,7 +38,6 @@ class TaskService:
         logger.info(f"Fetching man hours for source task: {source_task}")
 
         try:
-            # Implementing the provided MongoDB query
             pipeline = [
                 {"$match": {"Task": source_task}},
                 {
@@ -136,7 +135,6 @@ class TaskService:
                 total_parts_cost += task_parts_cost
 
                 task_details = TaskDetailsWithParts(
-                    # TaskManHours=task_mhs,
                     sourceTask=task_mhs.sourceTask,
                     desciption=task_mhs.desciption,
                     mhs=task_mhs.mhs,
@@ -281,13 +279,6 @@ class TaskService:
                 logger.warning(f"No spare parts found for task_id: {task_id}")
                 return []
             spare_parts = [
-                # SparePart(
-                #     # partId=part.get("partId", ""),
-                #     # desc=part.get("desc", ""),
-                #     # qty=float(part.get("qty",0.0)),
-                #     # unit=part.get("unit", ""),
-                #     # price=float(part.get("price", 0.0))
-                #     )
                 SpareParts(**part)
                 for part in results[0]["spareParts"] 
             ]
@@ -404,7 +395,6 @@ class TaskService:
         logger.info(f"Fetching man hours for source task: {source_task}")
 
         try:
-            # Implementing the provided MongoDB query
             pipeline = [
                 {"$match": {"SourceTaskDiscrep": source_task}},
                 {

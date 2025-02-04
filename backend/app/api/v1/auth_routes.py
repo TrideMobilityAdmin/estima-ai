@@ -75,8 +75,6 @@ async def User_login(user: UserLogin):
 async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
     try:
         current_time = datetime.utcnow()
-        
-        # Find the most recent login record for this user
         latest_login = user_login_collection.find_one(
             {"userID": str(current_user["_id"]), "logout": ""},
             sort=[("createdAt", -1)]

@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
 import json
+import re
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -12,7 +13,27 @@ class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         self.collection = self.mongo_client.get_collection("estima_input_upload")
-    
+    def clean_field_name(self, field_name: str) -> str:
+        try:
+            # Convert to string in case of non-string field names
+            field_name = str(field_name).strip()
+            
+            # Remove special characters and replace with spaces
+            clean_name = re.sub(r'[^a-zA-Z0-9\s]', ' ', field_name)
+            
+            # Split on spaces and capitalize first letter of each word except first
+            words = clean_name.lower().split()
+            if not words:
+                return "unnamedField"
+            camel_case = words[0] + ''.join(word.capitalize() for word in words[1:])
+            if not camel_case[0].isalpha():
+                camel_case = "f" + camel_case
+                
+            return camel_case
+            
+        except Exception as e:
+            logger.error(f"Error cleaning field name '{field_name}': {str(e)}")
+            return "unnamedField"
     async def validate_excel_file(self, file: UploadFile) -> None:
         if not file.filename:
             raise HTTPException(
@@ -70,6 +91,13 @@ class ExcelUploadService:
                     detail="The Excel file contains no data"
                 )
             
+            column_mapping = {col: self.clean_field_name(col) for col in excel_data.columns}
+            logger.info(f"column mapping:{column_mapping}")
+            excel_data.rename(columns=column_mapping, inplace=True)
+            logger.info(f"Renamed Columns: {list(excel_data.columns)}")
+            
+            logger.info(f"Original columns: {list(column_mapping.keys())}")
+            logger.info(f"Cleaned columns: {list(column_mapping.values())}")
             cleaned_data = self.clean_data(excel_data)
             records = []
             
@@ -87,12 +115,13 @@ class ExcelUploadService:
                         processed_record[str(key)] = value
 
                         # to split task
-                if 'Task' in processed_record and isinstance(processed_record['Task'], str):
-                    processed_record['Task'] = processed_record['Task'].split(',')
+                task_field = next((k for k in processed_record.keys() if k.lower() == 'task'), None)
+                if task_field and isinstance(processed_record[task_field], str):
+                    processed_record[task_field] = processed_record[task_field].split(',')
                 current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
                 processed_record['upload_timestamp'] =  current_time
                 processed_record['original_filename'] = file.filename
-                processed_record["CreatedAt"]=current_time
+                processed_record["createdAt"]=current_time
                 
                 records.append(processed_record)
             

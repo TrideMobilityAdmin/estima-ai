@@ -76,7 +76,7 @@ async def create_estimate(
     return await task_service.create_estimate(estimate_request,current_user)
 
 
-@router.post("/estimates/{estimate_id}", response_model=EstimateResponse)
+@router.get("/estimates/{estimate_id}", response_model=EstimateResponse)
 async def get_estimate_by_id(
     estimate_id: str,
     current_user: dict = Depends(get_current_user),
