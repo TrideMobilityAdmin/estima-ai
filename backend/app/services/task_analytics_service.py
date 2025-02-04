@@ -30,12 +30,12 @@ class TaskService:
         # self.collection = self.mongo_client.get_collection("spares-costing")
         self.estimates_collection = self.mongo_client.get_collection("estimates")
         self.task_spareparts_collection=self.mongo_client.get_collection("task_parts")
-        self.tasks_collection = self.mongo_client.get_collection("tasks")
+        # self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
         self.taskparts_collection=self.mongo_client.get_collection("task_parts")
         self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
-        self.tasks_collection = self.mongo_client.get_collection("tasks")
-        self.tasks_collection=self.mongo_client.get_collection("task_description")
+        # self.tasks_collection = self.mongo_client.get_collection("tasks")
+        # self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
@@ -667,7 +667,7 @@ class TaskService:
             ]
 
             # Execute MongoDB queries
-            task_skill_results = list(self.tasks_collection.aggregate(task_skill_pipeline))
+            task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
             logger.info(f"the skill analysis of Source Tasks: {task_skill_results} and {sub_task_skill_results}")
             
