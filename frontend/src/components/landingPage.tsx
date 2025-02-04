@@ -1,5 +1,6 @@
 import { Title, Text, Container, Overlay, Flex, Space } from "@mantine/core";
 import aircraftServiceBg from '../../public/aircraftService.jpg';
+// import aircraftServiceBg from '../../public/airCraft4.jpg';
 export default function LandingPage() {
   return (
     <>
@@ -37,37 +38,37 @@ export default function LandingPage() {
           }}
           size={"lg"}
         >
-           <Flex align='center' justify='center' direction='column'>
-           <Title
-            style={{
-              color: "white",
-              fontSize: 70,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              textAlign: "center",
-            }}
-            order={1}
-          >
-           EstimaAI 
-          </Title>
-          <Title
-            // style={{
-            //   color: "white",
-            //   fontSize: 25,
-            //   fontWeight: 600,
-            //   // lineHeight: 1.1,
-            //   textAlign: "center",
-            // }}
-            c='white'
-            fw='600'
-            fz='30'
-          >
-           Intelligent RFQ Predictor
-          </Title>
-           </Flex>
+          <Flex align='center' justify='center' direction='column'>
+            <Title
+              style={{
+                color: "white",
+                fontSize: 70,
+                fontWeight: 900,
+                lineHeight: 1.1,
+                textAlign: "center",
+              }}
+              order={1}
+            >
+              EstimaAI
+            </Title>
+            <Title
+              // style={{
+              //   color: "white",
+              //   fontSize: 25,
+              //   fontWeight: 600,
+              //   // lineHeight: 1.1,
+              //   textAlign: "center",
+              // }}
+              c='white'
+              fw='600'
+              fz='30'
+            >
+              Intelligent RFQ Predictor
+            </Title>
+          </Flex>
 
-           <Space h='lg'/>
-          
+          <Space h='lg' />
+
           <Text
             style={{
               color: "white",
@@ -80,7 +81,7 @@ export default function LandingPage() {
           >
             Advanced AI-powered solutions to optimize RFQ predictions tailored for the aviation industry.
           </Text>
-          
+
         </Container>
       </div>
     </>

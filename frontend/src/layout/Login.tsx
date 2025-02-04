@@ -26,7 +26,7 @@ import {
   // saveAuthData,
   // airportTrolleyImg,
 } from "../constants/GlobalImports";
-import flightBg  from '../../public/flightMaintenance.jpg'
+import flightBg  from '../../public/airCraft8.jpg'
 import { Overlay } from "@mantine/core";
 
 // const validCredentials = [
@@ -160,7 +160,7 @@ function Login() {
           height: "100vh",
           width: "100vw",
           position: "relative",
-          background: "rgba(255, 255, 255, 0.3)",
+          background: "rgba(0, 0, 0,0.1)",
           backdropFilter: "blur(2px)",
         }}
       >
