@@ -31,7 +31,7 @@ class TaskService:
         self.taskparts_collection=self.mongo_client.get_collection("task_parts")
         self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
         self.tasks_collection = self.mongo_client.get_collection("tasks")
-        self.taskdescription_collection=self.mongo_client.get_collection("task_description")
+        self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
 
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -401,63 +401,75 @@ class TaskService:
     
 
 
-    async def get_parts_usage(self, part_id: str, start_date: str, end_date: str) -> Optional[PartsUsageResponse]:
+    async def get_parts_usage(self, part_id: str) -> Dict:
         """
         Get parts usage for a specific part_id within a date range.
         """
         try:
-            logger.info(f"Fetching parts usage for part_id: {part_id} between {start_date} and {end_date}")
+            logger.info(f"Fetching parts usage for part_id: {part_id}")
 
             # Convert date strings to ISODate format
-            start_date_iso = datetime.strptime(start_date, "%d-%m-%Y")
-            end_date_iso = datetime.strptime(end_date, "%d-%m-%Y")
+            #start_date_iso = datetime.strptime(start_date, "%d-%m-%Y")
+            #end_date_iso = datetime.strptime(end_date, "%d-%m-%Y")
 
             # Pipeline for task_parts
             task_parts_pipeline = [
-                {"$match": {"Requested Part #": part_id}},
-                {"$lookup": {
-                    "from": "task_description",
-                    "localField": "Task #",
-                    "foreignField": "Task #",
-                    "as": "task_details"
-                }},
-                {"$unwind": "$task_details"},
-                {"$group": {
-                    "_id": "$Requested Part #",
-                    "tasks": {
-                        "$push": {
-                            "taskId": "$Task #",
-                            "taskDescription": "$task_details.Description",
-                            "partDescription": "$Part Description",
-                            "packages": {
-                                "packageId": "$Folder_Name",
-                                "quantity": "$Requested Qty"
+                {
+                    "$match": {
+                        "RequestedPart": part_id
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "task_description",
+                        "localField": "Task",
+                        "foreignField": "Task",
+                        "as": "task_details"
+                    }
+                },
+                {
+                    "$unwind": "$task_details"
+                },
+                {
+                    "$group": {
+                        "_id": "$RequestedPart",
+                        "tasks": {
+                            "$push": {
+                                "taskId": "$Task",
+                                "taskDescription": "$task_details.Description",
+                                "partDescription": "$PartDescription",
+                                "packages": [
+                                    {
+                                        "packageId": "$Folder_Name",
+                                        "quantity": "$RequestedQty"
+                                    }
+                                ]
                             }
                         }
                     }
-                }}
+                }
             ]
+
 
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-                {"$match": {"Issued Part #": part_id}},
+                {"$match": {"IssuedPart": part_id}},
                 {"$group": {
-                    "_id": "$Issued Part #",
+                    "_id": "$IssuedPart",
                     "findings": {
                         "$push": {
-                            "taskId": "$Task #",
-                            "taskDescription": "$Task Description",
-                            "packageId": "$Package #",
-                            "date": "$Issue Date",
-                            "quantity": "$Used Qty",
-                            "stockStatus": "$Stock Status",
-                            "priceUSD": "$Billable Value (USD)"
+                            "taskId": "$Task",
+                            "taskDescription": "$TaskDescription",
+                            "packageId": "$Package",
+                            "date": "$IssueDate",
+                            "quantity": "$UsedQty",
+                            "stockStatus": "$StockStatus",
+                            "priceUSD": "$BillableValueUSD"
                         }
                     }
                 }}
             ]
-
-            # Execute pipelines
+            """            # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
 
@@ -473,7 +485,7 @@ class TaskService:
                     taskId=t["taskId"],
                     taskDescription=t["taskDescription"],
                     partDescription=t["partDescription"],
-                    packages=Package(**t["packages"])
+                    packages=[Package(**pkg) for pkg in t["packages"]]
                 )
                 for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
             ]
@@ -497,34 +509,59 @@ class TaskService:
                 partDescription=tasks[0].partDescription if tasks else "",
                 usage=Usage(tasks=tasks, findings=findings)
             )
+            logger.info(f"the response is {response}")
 
-            return response
+            return task_parts_result"""
+            
+            # Execute pipelines
+            task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
+            sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
+            logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
+
+            if not task_parts_result and not sub_task_parts_result:
+                logger.warning(f"No parts usage found for part_id: {part_id}")
+                return {}
+
+            # Construct final output
+            output = {
+                "partId": part_id,
+                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("PartDescription", "") if task_parts_result else "",
+                "usage": {
+                "tasks": task_parts_result[0]["tasks"] if task_parts_result else [],
+                "findings": sub_task_parts_result[0]["findings"] if sub_task_parts_result else []
+            }
+            }
+
+
+            return output
 
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
             return None
         
 
-    async def get_skills_analysis(self, source_tasks: List[str]) -> Optional[SkillAnalysisResponse]:
+    async def get_skills_analysis(self, source_tasks: str) :
         """
         Analyzes skills required for tasks from an uploaded Excel file.
         Returns required skills and man-hours at both task and findings levels.
         """
         try:
+            """
             # Ensure source_tasks is a list of strings
             if not isinstance(source_tasks, list) or not all(isinstance(task, str) for task in source_tasks):
-                logging.error("Invalid source_tasks format. Expected a list of strings.")
+                logger.error("Invalid source_tasks format. Expected a list of strings.")
                 return None
+            """
 
-            logging.info(f"Extracted Source Tasks: {source_tasks}")
+            logger.info(f"Extracted Source Tasks: {source_tasks}")
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": {"$in": source_tasks}}},
+                {"$match": {"Task": source_tasks}},
                 {
                     "$group": {
                         "_id": "$Task",
-                        "taskDescription": {"$first": "$Task Description"},
+                        "taskDescription": {"$first": "$Description"},
                         "skills": {
                             "$push": {
                                 "skill": "$Skill",
@@ -541,7 +578,7 @@ class TaskService:
 
             # MongoDB pipeline for sub-task findings
             sub_tasks_skill_pipeline = [
-                {"$match": {"SourceTaskDiscrep": {"$in": source_tasks}}},
+                {"$match": {"SourceTaskDiscrep": source_tasks}},
                 {
                     "$group": {
                         "_id": "$SourceTaskDiscrep",
@@ -562,6 +599,10 @@ class TaskService:
             # Execute MongoDB queries
             task_skill_results = list(self.tasks_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
+            logger.info(f"the skill analysis of Source Tasks: {task_skill_results} and {sub_task_skill_results}")
+            
+            """
+
 
             # Process results into response format
             tasks = [
@@ -580,6 +621,7 @@ class TaskService:
                 )
                 for sub_task in sub_task_skill_results
             ]
+            logger.info(f"the processed skill analysis of Source Tasks:{tasks} and {findings}")
 
             # Construct final response
             response = SkillAnalysisResponse(
@@ -588,9 +630,50 @@ class TaskService:
                     "findings": findings
                 }
             )
+            """
+        # Convert results into required format (as a dictionary)
+            tasks = [
+                {
+                    "taskId": task["_id"],
+                    "taskDescription": task.get("taskDescription", ""),
+                    "skills": [
+                        {
+                            "skill": skill["skill"],
+                            "manHours": skill["manHours"]
+                        }
+                        for skill in task["skills"]
+                    ]
+                }
+                for task in task_skill_results
+            ]
+
+            findings = [
+                {
+                    "taskId": sub_task["_id"],
+                    "skills": [
+                        {
+                            "skill": skill["skill"],
+                            "manHours": skill["manHours"]
+                        }
+                        for skill in sub_task["skills"]
+                    ]
+                }
+                for sub_task in sub_task_skill_results
+            ]
+
+            logger.info(f"Processed skill analysis for Source Tasks: {tasks} and Findings: {findings}")
+
+            # Construct final response as a dictionary
+            response = {
+                "skillAnalysis": {
+                    "tasks": tasks,
+                    "findings": findings
+                }
+            }
 
             return response
-        
+
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return None
+            return {"error": "An error occurred while processing the request."}
+

@@ -73,25 +73,26 @@ async def get_spare_parts(
 @router.get("/api/v1/parts/usage")
 
 async def get_parts_usage(
-    part_id: str,start_date: str, end_date: str,
+    part_id: str,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     """
     Get  parts usage for a part_id.
     """
-    parts_usage=await task_service.get_parts_usage(part_id,start_date,end_date)
+    parts_usage=await task_service.get_parts_usage(part_id)
     logging.info("Parts usage data: %s", parts_usage)
+    print(parts_usage)
     return parts_usage
 
 @router.get("/api/v1/skills/analysis")
 async def get_skills_analysis(
-    Source_Tasks: List[str] = Query(..., description="List of source tasks"),
+    Source_Tasks:str = Query(..., description="source task"),
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     skills_analysis = await task_service.get_skills_analysis(Source_Tasks)
-    logging.info("Skills analysis data: %s", skills_analysis)
+
     return skills_analysis
 
 
