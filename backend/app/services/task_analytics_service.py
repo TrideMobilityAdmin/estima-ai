@@ -15,7 +15,11 @@ from app.models.estimates import (
     TaskDetailsWithParts,
     AggregatedTasks,
     SpareParts,
-    SpareResponse
+    SpareResponse,
+    Details,
+    FindingsDetailsWithParts,
+    AggregatedFindingsByTask,
+    AggregatedFindings
 )
 from app.log.logs import logger
 from app.db.database_connection import MongoDBClient
@@ -32,6 +36,8 @@ class TaskService:
         self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
         self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.tasks_collection=self.mongo_client.get_collection("task_description")
+        self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
+        self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
 
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -41,7 +47,6 @@ class TaskService:
         logger.info(f"Fetching man hours for source task: {source_task}")
 
         try:
-            # Implementing the provided MongoDB query
             pipeline = [
                 {"$match": {"Task": source_task}},
                 {
@@ -124,6 +129,12 @@ class TaskService:
             processed_tasks = []
             total_task_mhs=0
             total_parts_cost = 0
+
+            findings_list=[]
+            aggregated_findings_by_task=[]
+            toatal_findings_mhs=0
+            toatal_findings_parts_cost=0
+
             for task_id in estimate_request.tasks:
                 task_mhs = await self.get_man_hours(task_id)
                 total_task_mhs+=task_mhs.mhs.avg
@@ -133,7 +144,6 @@ class TaskService:
                 total_parts_cost += task_parts_cost
 
                 task_details = TaskDetailsWithParts(
-                    # TaskManHours=task_mhs,
                     sourceTask=task_mhs.sourceTask,
                     desciption=task_mhs.desciption,
                     mhs=task_mhs.mhs,
@@ -146,6 +156,62 @@ class TaskService:
                 totalPartsCost=float(total_parts_cost)
             )
 
+            # findings level implementation
+            findings_man_hours = await self.get_man_hours_findings(task_id)
+            findings_spare_parts = await self.get_spare_parts_findings(task_id)
+
+            findings_details = []
+            task_findings_mhs = 0
+            task_findings_parts_cost = 0
+
+            spare_parts_by_log_item = {}
+            for spare_part in findings_spare_parts:
+                if spare_part.logItem not in spare_parts_by_log_item:
+                    spare_parts_by_log_item[spare_part.logItem] = []
+                spare_parts_by_log_item[spare_part.logItem].append(spare_part)
+
+            for mh in findings_man_hours:
+                log_item_parts = spare_parts_by_log_item.get(mh.logItem, [])
+                parts_cost = sum(part.price * part.qty for part in log_item_parts)
+                task_findings_mhs += mh.mhs.avg
+                task_findings_parts_cost += parts_cost
+
+                details = Details(
+                    logItem=mh.logItem,
+                    desciption=mh.desciption,
+                    mhs=mh.mhs,
+                    spareParts=log_item_parts
+                )
+                findings_details.append(details)
+            if findings_details:
+                findings_list.append(FindingsDetailsWithParts(
+                    taskId=task_id,
+                    details=findings_details
+                    
+                ))
+            aggregated_findings_by_task.append(AggregatedFindingsByTask(
+                taskId=task_id,
+                aggregatedMhs=ManHrs(
+                    min=min(d.mhs.min for d in findings_details),
+                    max=max(d.mhs.max for d in findings_details),
+                    avg=sum(d.mhs.avg for d in findings_details) / len(findings_details),
+                    est=sum(d.mhs.est for d in findings_details) / len(findings_details)
+                ),
+                totalPartsCost=task_findings_parts_cost
+            ))
+            toatal_findings_mhs += task_findings_mhs
+            toatal_findings_parts_cost += task_findings_parts_cost
+
+            aggregated_tasks=AggregatedTasks(
+                totalMhs=float(total_task_mhs),
+                totalPartsCost=float(total_parts_cost)
+            )
+            aggregated_findings=AggregatedFindings(
+                totalMhs=float(toatal_findings_mhs),
+                totalPartsCost=float(toatal_findings_parts_cost)
+            )
+
+                     
             estimate_id = await self._generate_estimate_id()
             description = await self._get_estimate_description(estimate_request.tasks)
             logger.info(f'description at task level: {description}')
@@ -154,21 +220,34 @@ class TaskService:
                 "description": description,
                 "tasks": [task.dict() for task in processed_tasks],
                 "aggregatedTasks": aggregated_tasks.dict(),
+                "findings": [finding.dict() for finding in findings_list],
+                "aggregatedFindingsByTask": [agg.dict() for agg in aggregated_findings_by_task],
+                "aggregatedFindings": aggregated_findings.dict(),
+                "userID":current_user["_id"],
                 "createdAt": current_time,
                 "lastUpdated": current_time,
-                "createdBy":current_user["email"]
+                "createdBy":current_user["email"],
+                "updatedBy":current_user["_id"],
+                "originalFilename":description
+                
             }
 
             result = self.estimates_collection.insert_one(estimate_doc)
-            # logger.info("Document inserted with ID: %s", result.inserted_id)
             response = EstimateResponse(
                 id=estimate_id,
                 description=description,
                 tasks=processed_tasks,
                 aggregatedTasks=aggregated_tasks,
-                createdBy=estimate_doc["createBy"],
+                findings=findings_list,
+                aggregatedFindingsByTask=aggregated_findings_by_task,
+                aggregatedFindings=aggregated_findings,
+                userID=estimate_doc["userID"],
                 createdAt=current_time,
-                lastUpdated=current_time
+                lastUpdated=current_time,
+                createdBy=estimate_doc["createdBy"],
+                updatedBy=estimate_doc["updatedBy"],
+                originalFilename=description
+
             )
 
             return response
@@ -209,13 +288,6 @@ class TaskService:
                 logger.warning(f"No spare parts found for task_id: {task_id}")
                 return []
             spare_parts = [
-                # SparePart(
-                #     # partId=part.get("partId", ""),
-                #     # desc=part.get("desc", ""),
-                #     # qty=float(part.get("qty",0.0)),
-                #     # unit=part.get("unit", ""),
-                #     # price=float(part.get("price", 0.0))
-                #     )
                 SpareParts(**part)
                 for part in results[0]["spareParts"] 
             ]
@@ -332,7 +404,6 @@ class TaskService:
         logger.info(f"Fetching man hours for source task: {source_task}")
 
         try:
-            # Implementing the provided MongoDB query
             pipeline = [
                 {"$match": {"SourceTaskDiscrep": source_task}},
                 {
@@ -381,8 +452,7 @@ class TaskService:
             )
 
 
-            logger.error(f"Error fetching task description: {str(e)}")
-            return {"id": "", "description": ""}
+            
 
     # async def _generate_description(self, tasks: List[str]) -> str:
     #     """
@@ -677,3 +747,28 @@ class TaskService:
             logger.error(f"Error fetching skills analysis: {str(e)}")
             return {"error": "An error occurred while processing the request."}
 
+
+    async def get_estimate_by_id(self, estimate_id: str) -> Estimate:
+        """
+        Get estimate by ID
+        """
+        logger.info(f"Fetching estimate by ID: {estimate_id}")
+
+        try:
+            estimate_doc = self.estimates_collection.find_one(
+                {"id": estimate_id}
+            )
+            if estimate_doc is None:
+                logger.warning(f"No estimate found for ID: {estimate_id}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No estimate found for ID: {estimate_id}"
+                )
+            return estimate_doc
+        except Exception as e:
+            logger.error(f"Error fetching estimate: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching estimate: {str(e)}"
+            )
+           

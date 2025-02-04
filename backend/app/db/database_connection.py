@@ -17,4 +17,5 @@ class MongoDBClient:
 # Usage
 mongo_client = MongoDBClient()
 users_collection = mongo_client.get_collection("users")
+user_login_collection=mongo_client.get_collection("userlogin")
 
