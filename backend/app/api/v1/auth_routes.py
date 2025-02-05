@@ -3,9 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 from app.models.user import UserCreate,UserResponse,Token,UserLogin
 from app.middleware.auth import hash_password,verify_password,get_current_user
-from app.db.database_connection import users_collection
+from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
+from app.log.logs import logger
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -25,8 +26,8 @@ async def User_register(user: UserCreate):
         "username": user.username,
         "email": user.email,
         "password": hashed_password,
-         "createAt": datetime.utcnow(),
-        "is_active": True
+        "createdAt": datetime.utcnow(),
+        "isActive": True
     }
     
     result = users_collection.insert_one(user_dict)
@@ -35,7 +36,7 @@ async def User_register(user: UserCreate):
         "id": str(result.inserted_id),
         "username": user.username,
         "email": user.email,
-        "createAt": user_dict["createAt"]
+        "createdAt": user_dict["createdAt"]
     }
 
 @router.post("/login", response_model=Token)
@@ -51,17 +52,55 @@ async def User_login(user: UserLogin):
         data={"sub": user_found["username"]},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    login_history = {
+        "userID": str(user_found["_id"]),
+        "login": datetime.utcnow(),
+        "logout": "",
+        "createdAt": datetime.utcnow(),
+        "updatedAt": datetime.utcnow(),
+        "createdBy": str(user_found["_id"]),
+        "updatedBy": str(user_found["_id"])
+    }
+    user_login_collection.insert_one(login_history)
+
+    return {
+        "accessToken": access_token,
+        "tokenType": "bearer",
+        "userID": str(user_found["_id"]),
+        "username": user_found["username"],
+        "email": user_found["email"]
+    }
 @router.post("/logout")
 async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
-    """
-    User logout endpoint that invalidates the JWT token
-    """
     try:
-        # Clear the token cookie if using cookies
-        response.delete_cookie(key="access_token")
-        return {"message": "Logout successful"}
+        current_time = datetime.utcnow()
+        latest_login = user_login_collection.find_one(
+            {"userID": str(current_user["_id"]), "logout": ""},
+            sort=[("createdAt", -1)]
+        )
+        
+        if latest_login:
+            # Update the logout time
+            update_result=user_login_collection.update_one(
+                {"_id": latest_login["_id"]},
+                {
+                    "$set": {
+                        "logout": current_time,
+                        "updatedAt": current_time,
+                        "updatedBy": str(current_user["_id"])
+                    }
+                }
+            )
+            if update_result.modified_count == 1:
+                return {"message": "User logged out successfully"}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to update logout time")
+        else:
+            raise HTTPException(status_code=404, detail="Login record not found")
+        
     except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Error during logout"
