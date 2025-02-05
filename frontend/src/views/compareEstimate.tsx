@@ -1,209 +1,219 @@
 import React, { useState } from 'react';
-import {
-  Container,
-  Grid,
-  Paper,
-  Title,
-  TextInput,
-  Button,
-  Table,
-  Group,
-  Text,
-  Space,
-  Card,
-  SimpleGrid,
-  Box,
-  useMantineTheme,
-} from '@mantine/core';
-import { Dropzone, MIME_TYPES } from '@mantine/dropzone';
-import { Chart } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title as ChartTitle, Tooltip, Legend } from 'chart.js';
-import { IconUpload, IconX, IconFileSpreadsheet } from '@tabler/icons-react';
+import { Card, List, Table, Text, Flex } from '@mantine/core';
+import { AgGridReact } from 'ag-grid-react';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTitle, Tooltip, Legend);
+// Define types for the JSON data
+interface SparePart {
+  partId: string;
+  desc: string;
+  qty: number;
+  unit: string;
+  price: number;
+}
 
-const CompareEstimate = () => {
-  const theme = useMantineTheme();
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [inputFields, setInputFields] = useState<string[]>(Array(10).fill(''));
-  const [report, setReport] = useState<any>(null);
+interface ManHours {
+  max: number;
+  min: number;
+  avg: number;
+  est: number;
+}
 
-  const handleFileUpload = (files: File[]) => {
-    const file = files[0];
-    if (file) {
-      // Process the Excel file and extract tasks
-      // setTasks(extractedTasks);
-    }
-  };
+interface Task {
+  sourceTask: string;
+  desciption: string;
+  mhs: ManHours;
+  spareParts: SparePart[];
+}
 
-  const handleGenerateReport = () => {
-    // Generate report logic
-    // setReport(generatedReport);
-  };
+interface FindingDetail {
+  logItem: string;
+  desciption: string;
+  mhs: ManHours;
+  spareParts: SparePart[];
+}
 
-  const handleInputChange = (index: number, value: string) => {
-    const newInputFields = [...inputFields];
-    newInputFields[index] = value;
-    setInputFields(newInputFields);
-  };
+interface Finding {
+  taskId: string;
+  details: FindingDetail[];
+}
 
-  const sparePartsCostData = {
-    labels: ['Min', 'Max'],
-    datasets: [
-      {
-        label: 'Spare Parts Cost',
-        data: [report?.sparePartsCost.min || 0, report?.sparePartsCost.max || 0],
-        backgroundColor: [theme.colors.blue[6], theme.colors.pink[6]],
-        borderColor: [theme.colors.blue[6], theme.colors.pink[6]],
-        borderWidth: 1,
-      },
-    ],
+interface FindingsWiseSectionProps {
+  tasks: Task[];
+  findings: Finding[];
+}
+
+const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findings }) => {
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<FindingDetail | null>(null);
+
+  // Get findings for the selected task
+  const getFindingsForTask = (taskId: string) => {
+    return findings.find((finding) => finding.taskId === taskId)?.details || [];
   };
 
   return (
-    <Container size="xl" py="md">
-      <Title order={1} mb="md">Excel Upload and Report Generation</Title>
-
-      <Grid>
-        {/* Excel Upload Section with Drag-and-Drop */}
-        <Grid.Col span={4}>
-          <Paper p="md" shadow="sm">
-            <Title order={2} mb="md">Upload Excel</Title>
-            <Dropzone
-              onDrop={handleFileUpload}
-              accept={[MIME_TYPES.xlsx, MIME_TYPES.xls]}
-              maxSize={5 * 1024 ** 2} // 5 MB
+    <Flex gap="md" p="md">
+      {/* Left Section: Tasks List */}
+      <Card withBorder shadow="sm" style={{ width: '25%' }}>
+        <Text size="lg" fw={700} mb="md">Tasks List</Text>
+        {/* <List> */}
+          {tasks.map((task, taskIndex) => (
+            <Card
+              key={taskIndex}
+              onClick={() => {
+                setSelectedTask(task);
+                setSelectedFinding(null); // Reset selected finding when task changes
+              }}
+              style={{ cursor: 'pointer', padding: '8px', backgroundColor: selectedTask?.sourceTask === task.sourceTask ? '#f0f0f0' : 'transparent' }}
             >
-              <Group justify="center" gap="xl" style={{ minHeight: 120, pointerEvents: 'none' }}>
-                <Dropzone.Accept>
-                  <IconUpload size={50} color={theme.colors.blue[6]} />
-                </Dropzone.Accept>
-                <Dropzone.Reject>
-                  <IconX size={50} color={theme.colors.red[6]} />
-                </Dropzone.Reject>
-                <Dropzone.Idle>
-                  <IconFileSpreadsheet size={50} color={theme.colors.gray[6]} />
-                </Dropzone.Idle>
-                <div>
-                  <Text size="xl" inline>Drag and drop an Excel file here</Text>
-                  <Text size="sm" color="dimmed" inline mt={7}>File should not exceed 5 MB</Text>
-                </div>
-              </Group>
-            </Dropzone>
-          </Paper>
-        </Grid.Col>
+              {task.sourceTask}
+            </Card>
+          ))}
+        {/* </List> */}
+      </Card>
 
-        {/* Task List */}
-        <Grid.Col span={8}>
-          <Paper p="md" shadow="sm">
-            <Title order={2} mb="md">Task List</Title>
+      {/* Middle Section: Task-wise Findings */}
+      <Card withBorder shadow="sm" style={{ width: '35%' }}>
+        <Text size="lg" fw={700} mb="md">Findings for {selectedTask?.sourceTask || 'Selected Task'}</Text>
+        {selectedTask ? (
+          <List>
+            {getFindingsForTask(selectedTask.sourceTask).map((finding, findingIndex) => (
+              <List.Item
+                key={findingIndex}
+                onClick={() => setSelectedFinding(finding)}
+                style={{ cursor: 'pointer', padding: '8px', backgroundColor: selectedFinding?.logItem === finding.logItem ? '#f0f0f0' : 'transparent' }}
+              >
+                <Text fw={500}>Finding {findingIndex + 1}</Text>
+                <Text size="sm">Log Item: {finding.logItem}</Text>
+                <Text size="sm">Description: {finding.desciption}</Text>
+              </List.Item>
+            ))}
+          </List>
+        ) : (
+          <Text>Select a task to view findings.</Text>
+        )}
+      </Card>
+
+      {/* Right Section: Selected Finding Details */}
+      <Card withBorder shadow="sm" style={{ width: '40%' }}>
+        <Text size="lg" fw={700} mb="md">Finding Details</Text>
+        {selectedFinding ? (
+          <>
+            <Text>Log Item: {selectedFinding.logItem}</Text>
+            <Text>Description: {selectedFinding.desciption}</Text>
+            <Text>Man Hours:</Text>
             <Table>
               <thead>
                 <tr>
-                  <th>Task Name</th>
-                  <th>Description</th>
-                  <th>Status</th>
+                  <th>Min</th>
+                  <th>Max</th>
+                  <th>Avg</th>
+                  <th>Est</th>
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task, index) => (
-                  <tr key={index}>
-                    <td>{task.name}</td>
-                    <td>{task.description}</td>
-                    <td>{task.status}</td>
+                <tr>
+                  <td>{selectedFinding.mhs.min}</td>
+                  <td>{selectedFinding.mhs.max}</td>
+                  <td>{selectedFinding.mhs.avg}</td>
+                  <td>{selectedFinding.mhs.est}</td>
+                </tr>
+              </tbody>
+            </Table>
+            <Text>Spare Parts:</Text>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Part ID</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedFinding.spareParts.map((part, partIndex) => (
+                  <tr key={partIndex}>
+                    <td>{part.partId}</td>
+                    <td>{part.desc}</td>
+                    <td>{part.qty}</td>
+                    <td>{part.unit}</td>
+                    <td>{part.price}</td>
                   </tr>
                 ))}
               </tbody>
             </Table>
-          </Paper>
-        </Grid.Col>
-      </Grid>
-
-      {/* Input Fields */}
-      <Grid mt="md">
-        {inputFields.map((value, index) => (
-          <Grid.Col key={index} span={2}>
-            <TextInput
-              label={`Input ${index + 1}`}
-              value={value}
-              onChange={(e) => handleInputChange(index, e.target.value)}
-            />
-          </Grid.Col>
-        ))}
-      </Grid>
-
-      {/* Generate Button */}
-      <Group justify="center" mt="md">
-        <Button onClick={handleGenerateReport}>Generate Report</Button>
-      </Group>
-
-      {/* Overall Report */}
-      {report && (
-        <Box mt="md">
-          <Title order={2} mb="md">Overall Report</Title>
-          <SimpleGrid cols={2} spacing="md">
-            <Card shadow="sm">
-              <Title order={3}>Total TAT and Value</Title>
-              <Text>Total TAT: {report.totalTat}</Text>
-              <Text>Total Value: {report.totalValue}</Text>
-            </Card>
-            <Card shadow="sm">
-              <Title order={3}>Man Hours</Title>
-              <Text>Min: {report.manHours.min}</Text>
-              <Text>Max: {report.manHours.max}</Text>
-              <Text>Avg: {report.manHours.avg}</Text>
-            </Card>
-          </SimpleGrid>
-
-          <Space h="md" />
-
-          <Card shadow="sm">
-            <Title order={3}>Total Spares Used</Title>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Part Name</th>
-                  <th>Description</th>
-                  <th>Quantity</th>
-                  <th>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.sparesUsed.map((spare: any, index: number) => (
-                  <tr key={index}>
-                    <td>{spare.partName}</td>
-                    <td>{spare.description}</td>
-                    <td>{spare.quantity}</td>
-                    <td>{spare.cost}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
-
-          <Space h="md" />
-
-          <Grid>
-            <Grid.Col span={6}>
-              <Card shadow="sm">
-                <Title order={3}>Spare Parts Cost (Min, Max)</Title>
-                <Box>
-                  <Chart type="bar" data={sparePartsCostData} />
-                </Box>
-              </Card>
-            </Grid.Col>
-            <Grid.Col span={6}>
-              <Card shadow="sm">
-                <Title order={3}>Capping Values</Title>
-                <Text>Capping Man Hours: {report.cappingManHours}</Text>
-                <Text>Capping Unbilled Cost: {report.cappingUnbilledCost}</Text>
-              </Card>
-            </Grid.Col>
-          </Grid>
-        </Box>
-      )}
-    </Container>
+          </>
+        ) : (
+          <Text>Select a finding to view details.</Text>
+        )}
+      </Card>
+    </Flex>
   );
 };
+
+// Sample JSON data
+const jsonData = {
+  tasks: [
+    {
+      sourceTask: "255000-16-1",
+      desciption: "CARGO COMPARTMENTS\n\nDETAILED INSPECTION OF DIVIDER NETS, DOOR NETS AND\nNET ATTACHMENT POINTS\n\nNOTE:\nTHE NUMBER OF AFFECTED ZONES MAY VARY ACCORDING TO",
+      mhs: { max: 2, min: 2, avg: 2, est: 1.38 },
+      spareParts: [],
+    },
+    {
+      sourceTask: "256241-05-1",
+      desciption: "DOOR ESCAPE SLIDE\n\nCLEAN DOOR GIRT BAR FITTING STOP LEVERS\n\nNOTE:\nTASK IS NOT APPLICABLE FOR DEACTIVATED PASSENGER/CREW\nDOORS.",
+      mhs: { max: 2, min: 2, avg: 2, est: 0.92 },
+      spareParts: [
+        { partId: "LOTOXANE", desc: "NON AQUEOUS CLEANER-GENERAL", qty: 0.1, unit: "LTR", price: 0 },
+      ],
+    },
+    {
+      sourceTask: "200435-01-1 (LH)",
+      desciption: "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
+      mhs: { max: 4, min: 4, avg: 4, est: 0.73 },
+      spareParts: [],
+    },
+  ],
+  findings: [
+    {
+      taskId: "200435-01-1 (LH)",
+      details: [
+        {
+          logItem: "HMV23/000211/0324/24",
+          desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+          mhs: { max: 2, min: 2, avg: 2, est: 4 },
+          spareParts: [],
+        },
+      ],
+    },
+  ],
+};
+
+const CompareEstimate = () => (
+  <div style={{ padding: '20px' }}>
+    <Text size="xl" fw={700} mb="md">Findings Wise</Text>
+    <FindingsWiseSection tasks={jsonData.tasks} findings={jsonData.findings} />
+    <div
+className="ag-theme-alpine"
+style={{
+    width: "100%",
+    height: "300px", // Set fixed height for AgGrid
+    overflow: "hidden",
+}}
+>
+<AgGridReact
+    pagination
+    paginationPageSize={10}
+    // domLayout="autoHeight" // Ensures height adjusts dynamically
+    rowData={[]}
+    columnDefs={[
+        
+    ]}
+/>
+</div> 
+  </div>
+);
 
 export default CompareEstimate;

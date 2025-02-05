@@ -4,6 +4,8 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import '@mantine/core/styles.css';
 import '@mantine/charts/styles.css';
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-alpine.css";
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import MainRoutes from './routes/routes';
