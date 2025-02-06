@@ -2,6 +2,7 @@ from fastapi import HTTPException,Depends,Security
 from app.pyjwt.jwt import verify_token
 from fastapi.security import OAuth2PasswordBearer,HTTPBearer,HTTPAuthorizationCredentials
 import bcrypt
+import re
 from app.db.database_connection import users_collection
 
 security = HTTPBearer()
@@ -13,6 +14,11 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
+def validate_password(password: str) -> bool:
+    """Checks if the password meets security criteria."""
+    pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$"
+    return bool(re.match(pattern, password))
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     try:

@@ -34,7 +34,7 @@ class PyObjectId:
     
 # get all estimates
 class Estimate(BaseModel):
-    id: str
+    estID: str
     description: str=""
     createdBy: str=""
     createdAt: datetime|None=None
@@ -86,7 +86,7 @@ class AggregatedFindings(BaseModel):
    
 #estimate response schema
 class EstimateResponse(BaseModel):
-    id: str
+    estID: str
     description: str = ""
     tasks: List[TaskDetailsWithParts] = []
     aggregatedTasks: Optional[AggregatedTasks] = None
@@ -104,3 +104,5 @@ class EstimateResponse(BaseModel):
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
     }
+class MyModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
