@@ -4,7 +4,7 @@ from fastapi import HTTPException,Depends
 import logging
 from app.middleware.auth import get_current_user
 from typing import List
-from datetime import datetime
+from datetime import datetime,timezone
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -93,7 +93,7 @@ class TaskService:
             estimates = []
             for estimate in estimates_cursor:
                 estimates.append(Estimate(
-                    id=str(estimate["_id"]),
+                    estID=str(estimate["estID"]),
                     description=estimate.get("description", ""),
                     createdBy=estimate.get("createdBy",""),
                     createdAt=estimate.get("createdAt"),
@@ -115,7 +115,7 @@ class TaskService:
         """
         logger.info("Creating new estimate")
         try:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
 
             processed_tasks = []
             total_task_mhs=0
@@ -207,13 +207,13 @@ class TaskService:
             description = await self._get_estimate_description(estimate_request.tasks)
             logger.info(f'description at task level: {description}')
             estimate_doc = {
-                "id":estimate_id,
+                "estID":estimate_id,
                 "description": description,
-                "tasks": [task.dict() for task in processed_tasks],
-                "aggregatedTasks": aggregated_tasks.dict(),
-                "findings": [finding.dict() for finding in findings_list],
-                "aggregatedFindingsByTask": [agg.dict() for agg in aggregated_findings_by_task],
-                "aggregatedFindings": aggregated_findings.dict(),
+                "tasks": [task.model_dump() for task in processed_tasks],
+                "aggregatedTasks": aggregated_tasks.model_dump(),
+                "findings": [finding.model_dump() for finding in findings_list],
+                "aggregatedFindingsByTask": [agg.model_dump() for agg in aggregated_findings_by_task],
+                "aggregatedFindings": aggregated_findings.model_dump(),
                 "userID":current_user["_id"],
                 "createdAt": current_time,
                 "lastUpdated": current_time,
@@ -225,7 +225,7 @@ class TaskService:
 
             result = self.estimates_collection.insert_one(estimate_doc)
             response = EstimateResponse(
-                id=estimate_id,
+                estID=estimate_id,
                 description=description,
                 tasks=processed_tasks,
                 aggregatedTasks=aggregated_tasks,
@@ -312,28 +312,37 @@ class TaskService:
     async def _generate_estimate_id(self) -> str:
         logger.info("Generating estimate ID")
         try:
-            logger.info("finding count of estimates")
-            count = self.estimates_collection.count_documents({})
+            logger.info("Finding count of estimates")
+            count = self.estimates_collection.count_documents({})  # Await count
             logger.info(f"Count of estimates: {count}")
+
             if count == 0:
-                print("No estimates found, starting with EST-001")
+                logger.info("No estimates found, starting with EST-001")
                 return "EST-001"
+
+        # Fetch the last inserted estimate
             last_estimate = self.estimates_collection.find_one(
                 {},
-                sort=[("createdAt",-1)],
-                projection={"id":1}
+                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                projection={"estID": 1}
             )
-            if last_estimate is None:
+
+            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+
+            if not last_estimate or "estID" not in last_estimate:
+                logger.warning("No estID found in the last estimate, defaulting to EST-001")
                 return "EST-001"
-            last_id_str = last_estimate.get("id", "EST-000")
+
+            last_id_str = last_estimate["estID"]
             last_id = int(last_id_str.split("-")[1])
             new_id = f"EST-{last_id + 1:03d}"
-            
+        
+            logger.info(f"Generated new estimate ID: {new_id}")
             return new_id
+
         except Exception as e:
             logger.error(f"Error generating estimate ID: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error generating estimate ID: {str(e)}")
-        
         # findings level spare parts
     async def get_spare_parts_findings(self, task_id: str) -> List[SpareResponse]:
         """
@@ -441,7 +450,7 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching man hours: {str(e)}"
             )
-    async def get_estimate_by_id(self, estimate_id: str) -> Estimate:
+    async def get_estimate_by_id(self, estimate_id: str) -> EstimateResponse:
         """
         Get estimate by ID
         """
@@ -449,7 +458,7 @@ class TaskService:
 
         try:
             estimate_doc = self.estimates_collection.find_one(
-                {"id": estimate_id}
+                {"estID": estimate_id}
             )
             if estimate_doc is None:
                 logger.warning(f"No estimate found for ID: {estimate_id}")

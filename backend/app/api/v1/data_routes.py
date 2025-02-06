@@ -8,6 +8,11 @@ from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 # logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
@@ -83,6 +88,7 @@ async def get_estimate_by_id(
     task_service: TaskService = Depends()
 ):
     return await task_service.get_estimate_by_id(estimate_id)
+
 excel_service = ExcelUploadService()
 @router.post("/upload/excel/")
 async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -90,3 +96,17 @@ async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depe
     Endpoint to handle Excel file uploads
     """
     return await excel_service.upload_excel(file)
+
+@router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
+@router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
+async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(get_current_user), task_service: TaskService = Depends()):
+    """
+    Download estimate as PDF
+    """
+    estimate = await task_service.get_estimate_by_id(estimate_id)
+    if not estimate:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    response = StreamingResponse(media_type="application/pdf")
+    response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
+    return response
+        
