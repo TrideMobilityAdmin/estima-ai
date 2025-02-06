@@ -1,13 +1,339 @@
-import { Title } from "@mantine/core";
+import { Card, Text, Flex, Group, Select, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge } from "@mantine/core";
+import { useState } from "../constants/GlobalImports";
+import { DatePickerInput } from "@mantine/dates";
+import { IconAlertTriangle, IconCube, IconMenuDeep, IconTool } from "@tabler/icons-react";
+import ReactApexChart from "react-apexcharts";
 
 
+export default function PartUsage() {
+    const [value, setValue] = useState<[Date | null, Date | null]>([null, null]);
 
-export default function PartUsage(){
+    const jsonData = {
+        partId: 'P12345',
+        partDescription: "Oil Filter",
+        usage: {
+            tasks: [
+                {
+                    taskId: 'ST123',
+                    taskDescription: 'Routine Engine Inspection',
+                    packages: [
+                        {
+                            packageId: "Package1",
+                            date: "2024-12-10",
+                            quantity: 3,
+                        },
+                        {
+                            packageId: "Package2",
+                            date: "2024-12-12",
+                            quantity: 1
+                        }
+                    ]
+                },
+                {
+                    taskId: 'ST124',
+                    taskDescription: 'Hydraulic System Check',
+                    packages: [
+                        {
+                            packageId: "Package1",
+                            date: "2024-12-11",
+                            quantity: 2,
+                        },
+                        {
+                            packageId: "Package2",
+                            date: "2024-12-13",
+                            quantity: 5
+                        }
+                    ]
+                }
+            ],
+            findings: [
+                {
+                    taskId: 'ST123',
+                    taskDescription: 'Routine Engine Inspection',
+                    packages: [
+                        {
+                            packageId: "Package1",
+                            finding: "Engine Check",
+                            logItem: "L001",
+                            description: "Engine oil leakage inspection",
+                            date: "2024-12-10",
+                            quantity: 2,
+                        },
+                        {
+                            packageId: "Package2",
+                            finding: "Air System",
+                            logItem: "L003",
+                            description: "Air filter replacement",
+                            date: "2024-12-12",
+                            quantity: 3
+                        }
+                    ]
+                },
+                {
+                    taskId: 'ST124',
+                    taskDescription: 'Hydraulic System Check',
+                    packages: [
+                        {
+                            packageId: "Package1",
+                            finding: "Fuel System",
+                            logItem: "L002",
+                            description: "Fuel pump inspection",
+                            date: "2024-12-11",
+                            quantity: 1,
+                        },
+                        {
+                            packageId: "Package2",
+                            finding: "Hydraulic System",
+                            logItem: "L004",
+                            description: "Hydraulic fluid refill",
+                            date: "2024-12-13",
+                            quantity: 4
+                        }
+                    ]
+                },
+            ]
+        }
+    };
+
+    const [taskSearch, setTaskSearch] = useState("");
+    const [findingSearch, setFindingSearch] = useState("");
+
+    const filteredTasks = jsonData.usage.tasks.filter((task) =>
+        task.taskId.toLowerCase().includes(taskSearch.toLowerCase())
+    );
+
+    const filteredFindings = jsonData.usage.findings.filter((finding) =>
+        finding.taskId.toLowerCase().includes(findingSearch.toLowerCase())
+    );
+
     return (
         <>
-        <Title order={4}>
-            Part Usage
-        </Title>
+            <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
+                <Group justify="flex-end">
+                    <Select
+                        size="xs"
+                        label=" Select Part Id"
+                        placeholder="Select Capping Type"
+                        data={['Part - 1', 'Part - 2', 'Part - 3', 'Part - 4']}
+                        defaultValue="Part - 1"
+                        allowDeselect
+                    />
+                    <DatePickerInput
+                        size="xs"
+                        w='18vw'
+                        type="range"
+                        label="Pick dates range"
+                        placeholder="Pick dates range"
+                        value={value}
+                        onChange={setValue}
+                    />
+                </Group>
+                <Space h='sm' />
+                <SimpleGrid cols={4}>
+                    <Card radius='md'>
+                        <Group gap='lg'>
+                            <IconCube color="#4E66DE" size='39' />
+                            <Flex direction='column'>
+                                <Text fw={500} fz='sm' c='dimmed'>
+                                    Tasks
+                                </Text>
+                                <Text fw={600} fz='h2' >
+                                    66
+                                </Text>
+                            </Flex>
+                        </Group>
+                    </Card>
+                    <Card radius='md' >
+                        <Group gap='lg'>
+                            <IconTool color="#14AE5C" size='39' />
+                            <Flex direction='column'>
+                                <Text fw={500} fz='sm' c='dimmed'>
+                                    Tasks Parts Quantity
+                                </Text>
+                                <Text fw={600} fz='h2' >
+                                    145
+                                </Text>
+                            </Flex>
+                        </Group>
+                    </Card>
+                    <Card radius='md' >
+                        <Group gap='lg'>
+                            <IconAlertTriangle color="#EE0D10" size='39' />
+                            <Flex direction='column'>
+                                <Text fw={500} fz='sm' c='dimmed'>
+                                    Findings
+                                </Text>
+                                <Text fw={600} fz='h2' >
+                                    44
+                                </Text>
+                            </Flex>
+                        </Group>
+                    </Card>
+                    <Card radius='md'>
+                        <Group gap='lg'>
+                            <IconMenuDeep color="#9F6BED" size='39' />
+                            <Flex direction='column'>
+                                <Text fw={500} fz='sm' c='dimmed'>
+                                    Findings Parts Quantity
+                                </Text>
+                                <Text fw={600} fz='h2' >
+                                    144
+                                </Text>
+                            </Flex>
+                        </Group>
+                    </Card>
+                </SimpleGrid>
+                <Space h='sm' />
+                <Grid>
+                    <Grid.Col span={8}>
+                        <Card radius='md' h='60vh'>
+                            <ReactApexChart
+                                type="area"
+                                height='100%'
+                                options={{
+                                    chart: {
+                                        type: "area",
+                                        height: "100%",
+                                        zoom: { enabled: false },
+                                    },
+                                    dataLabels: { enabled: false },
+                                    stroke: {
+                                        curve: "smooth",
+                                        width: 2, // Reduce line thickness
+                                    },
+                                    title: {
+                                        text: "Daily Trend Analysis",
+                                        align: "left",
+                                    },
+                                    grid: {
+                                        row: { colors: ["#f3f3f3", "transparent"], opacity: 0.5 },
+                                    },
+                                    xaxis: {
+                                        type: "category",
+                                        categories: ["Feb - 01", "Feb - 02", "Feb - 03", "Feb - 04", "Feb - 05", "Feb - 06"],
+                                        // title: { text: "Date" },
+                                    },
+                                    yaxis: {
+                                        // title: { text: "Count" },
+                                    },
+                                }}
+                                series={[
+                                    {
+                                        name: "Tasks",
+                                        data: [4, 10, 6, 20, 4, 9],
+                                    },
+                                    {
+                                        name: "Findings",
+                                        data: [4, 10, 6, 20, 4, 9].reverse(),
+                                    },
+                                ]}
+                            />
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={4}>
+                        <Card radius='md' h='60vh'>
+                            <ReactApexChart
+                                type="donut"
+                                height='100%'
+                                options={{
+                                    chart: {
+                                        type: "donut",
+                                    },
+                                    title: {
+                                        text: "Distribution Analysis",
+                                        align: "left",
+                                    },
+                                    plotOptions: {
+                                        pie: {
+                                            donut: {
+                                                size: "65%", // Adjusted to center the donut
+                                            },
+                                        },
+                                    },
+                                    labels: ["Tasks", "Findings"],
+                                    legend: {
+                                        position: "bottom",
+                                    },
+                                    responsive: [
+                                        {
+                                            breakpoint: 480,
+                                            options: {
+                                                chart: {
+                                                    width: 200,
+                                                },
+                                                legend: {
+                                                    position: "bottom",
+                                                },
+                                            },
+                                        },
+                                    ],
+                                }}
+                                series={[
+                                    44,
+                                    55
+                                ]}
+                            />
+                        </Card>
+                    </Grid.Col>
+                </Grid>
+                <Space h='md' />
+                <SimpleGrid cols={2}>
+                    <Card radius='md' h='90vh' style={{ overflowY: "auto" }}>
+                        <TextInput
+                            placeholder="Search Tasks..."
+                            value={taskSearch}
+                            onChange={(e) => setTaskSearch(e.currentTarget.value)}
+                            mb="md"
+                        />
+                        <Accordion variant="separated" radius="md">
+                            {filteredTasks.map((task) => (
+                                <Accordion.Item key={task.taskId} value={task.taskId}>
+                                    <Accordion.Control>{task.taskId}</Accordion.Control>
+                                    <Accordion.Panel>
+                                        {task.packages.map((pkg) => (
+                                            <Card key={pkg.packageId} p="sm" radius='md'  mt="xs" bg='#ebeced'>
+                                                <Group justify="space-between">
+                                                    <Text>Package ID: {pkg.packageId}</Text>
+                                                    <Badge color="blue">Qty: {pkg.quantity}</Badge>
+                                                </Group>
+                                                <Text size="sm">Date: {pkg.date}</Text>
+                                            </Card>
+                                        ))}
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            ))}
+                        </Accordion>
+                    </Card>
+                    <Card>
+                        <TextInput
+                            placeholder="Search Findings..."
+                            value={findingSearch}
+                            onChange={(e) => setFindingSearch(e.currentTarget.value)}
+                            mb="md"
+                        />
+                        <Accordion variant="separated" radius="md">
+                            {filteredFindings.map((finding) => (
+                                <Accordion.Item key={finding.taskId} value={finding.taskId}>
+                                    <Accordion.Control>{finding.taskId}</Accordion.Control>
+                                    <Accordion.Panel>
+                                        {finding.packages.map((pkg) => (
+                                            <Card key={pkg.packageId} p="sm" radius='md'  mt="xs" bg='#ebeced'>
+                                                <Group justify="space-between">
+                                                    <Text>{pkg.finding}</Text>
+                                                    <Badge color="red">Qty: {pkg.quantity}</Badge>
+                                                </Group>
+                                                <Text size="sm">Log Item: {pkg.logItem}</Text>
+                                                <Text size="sm">Description: {pkg.description}</Text>
+                                                <Text size="sm">Date: {pkg.date}</Text>
+                                            </Card>
+                                        ))}
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            ))}
+                        </Accordion>
+                    </Card>
+                </SimpleGrid>
+            </div>
         </>
     )
 }
