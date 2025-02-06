@@ -822,33 +822,7 @@ export default function Estimate() {
                 <Space h='xl' />
 
                 {/* <SegmentedControl color="#1A237E" bg='white' data={['Findings', 'Man Hours', 'Spare Parts']} /> */}
-
-                {/* <Card p={0} h='80vh' bg='none'>
-                    <Card p={10} bg='cyan'>
-                    <Title order={4}>
-                        Findings
-                    </Title>
-                    </Card>
-                    <Space h='xs'/>
-                    <Grid>
-                        <Grid.Col span={3}>
-                            <Card bg='none' h='100%' w='100%'>
-                                
-                            </Card>
-                        </Grid.Col>
-                        <Grid.Col span={3}>
-                            <Card bg='none' h='100%' w='100%'>
-
-                            </Card>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                            <Card h='100%' w='100%'>
-
-                            </Card>
-                        </Grid.Col>
-                    </Grid>
-
-                </Card> */}
+                
                 <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} />
 
                 <Space h='md' />
