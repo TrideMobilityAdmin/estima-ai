@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime,timezone
 
 class UserBase(BaseModel):
     username: str
@@ -11,7 +11,7 @@ class UserCreate(UserBase):
 
 class UserInDB(UserBase):
     password: bytes
-    createdAt: datetime = datetime.utcnow()
+    createdAt: datetime = datetime.now(timezone.utc)
     isActive: bool = True
 
 class UserResponse(UserBase):

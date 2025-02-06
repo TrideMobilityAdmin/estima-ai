@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends,Response
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 from app.models.user import UserCreate,UserResponse,Token,UserLogin
-from app.middleware.auth import hash_password,verify_password,get_current_user
+from app.middleware.auth import hash_password,verify_password,get_current_user,validate_password
 from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
@@ -20,13 +20,19 @@ async def User_register(user: UserCreate):
             status_code=400,
             detail="Username or email already registered"
         )
+    if not validate_password(user.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 12 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+        )
+
     
     hashed_password = hash_password(user.password)
     user_dict = {
         "username": user.username,
         "email": user.email,
         "password": hashed_password,
-        "createdAt": datetime.utcnow(),
+        "createdAt": datetime.now(timezone.utc),
         "isActive": True
     }
     
@@ -55,10 +61,10 @@ async def User_login(user: UserLogin):
     
     login_history = {
         "userID": str(user_found["_id"]),
-        "login": datetime.utcnow(),
+        "login": datetime.now(timezone.utc),
         "logout": "",
-        "createdAt": datetime.utcnow(),
-        "updatedAt": datetime.utcnow(),
+        "createdAt": datetime.now(timezone.utc),
+        "updatedAt": datetime.now(timezone.utc),
         "createdBy": str(user_found["_id"]),
         "updatedBy": str(user_found["_id"])
     }
@@ -74,7 +80,7 @@ async def User_login(user: UserLogin):
 @router.post("/logout")
 async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
     try:
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         latest_login = user_login_collection.find_one(
             {"userID": str(current_user["_id"]), "logout": ""},
             sort=[("createdAt", -1)]
