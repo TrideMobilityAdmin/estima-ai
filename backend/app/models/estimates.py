@@ -106,3 +106,11 @@ class EstimateResponse(BaseModel):
     }
 class MyModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+class ComparisonResult(BaseModel):
+    metric: str
+    estimated:str
+    actual:str
+class ComparisonResponse(BaseModel):
+    estimateID: str
+    comparisonResults:List[ComparisonResult]

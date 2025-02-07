@@ -1,6 +1,6 @@
 from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Task,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours,SkillDetail
 from statistics import mean
-from fastapi import HTTPException,Depends
+from fastapi import HTTPException,Depends,status
 import logging
 from typing import List , Dict,Optional
 import pandas as pd
@@ -213,9 +213,13 @@ class TaskService:
             )
 
                      
-            estimate_id = await self._generate_estimate_id()
-            description = await self._get_estimate_description(estimate_request.tasks)
-            logger.info(f'description at task level: {description}')
+            try:
+                estimate_id = await self._generate_estimate_id()
+                description = await self._get_estimate_description(estimate_request.tasks)
+                logger.info(f'description at task level: {description}')
+            except Exception as e: 
+                logger.error(f"Error generating estimate ID or description: {str(e)}")
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Failed to generate estimate ID or description")
             estimate_doc = {
                 "estID":estimate_id,
                 "description": description,
@@ -256,7 +260,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error creating estimate: {str(e)}")
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Error creating estimate: {str(e)}"
             )
 
@@ -352,7 +356,7 @@ class TaskService:
 
         except Exception as e:
             logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error generating estimate ID: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
         # findings level spare parts
     async def get_spare_parts_findings(self, task_id: str) -> List[SpareResponse]:
         """
@@ -460,26 +464,6 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching man hours: {str(e)}"
             )
-
-
-            
-
-    # async def _generate_description(self, tasks: List[str]) -> str:
-    #     """
-    #     Helper method to generate a description for the estimate based on tasks
-    #     """
-    #     try:
-    #         descriptions = []
-    #         for task_id in tasks:
-    #             desc = await self._get_task_description(task_id)
-    #             if desc:
-    #                 descriptions.append(desc)
-    #         return " | ".join(descriptions) if descriptions else "No descriptions available"
-    #     except Exception as e:
-    #         logger.error(f"Error generating description: {str(e)}")
-    #         return "Error generating description"
-    
-
 
     async def get_parts_usage(self, part_id: str) -> Dict:
         """

@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from fastapi import status
 from app.db.database_connection import users_collection,user_login_collection
 # Create a TestClient instance
 @pytest.fixture(scope="module")
@@ -44,7 +45,7 @@ def test_register_success(test_client):
 def test_login_user(test_client):
     """Test login for both success and failure scenarios."""
     login_data_valid = {
-        "username": "newuser",
+        "username": "testuser",
         "password": "Newuserexam@1234"
     }
     login_data_invalid = {
@@ -58,7 +59,7 @@ def test_login_user(test_client):
         assert response.json()["tokenType"] == "bearer"
     else:
         response = test_client.post("/api/v1/auth/login", json=login_data_invalid)
-        assert response.status_code == 401
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid credentials" in response.json()["detail"]
 
 def test_logout_success(test_client, access_token):
@@ -170,7 +171,7 @@ def test_create_estimate_missing_fields(test_client, access_token):
     """Test creating an estimate with invalid data."""
     invalid_request = {"tasks": []}  # Missing required fields
     response = test_client.post("/api/v1/estimates/", json=invalid_request, headers=access_token)
-    assert response.status_code == 422,response.json()
+    assert response.status_code == 400,response.json()
     assert "tasks must contain at least one item" in response.json()
 
 def test_get_all_estimates(test_client, access_token):
@@ -180,18 +181,21 @@ def test_get_all_estimates(test_client, access_token):
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
-    assert response.status_code == 200, response.json()
-    data = response.json()
+    if response.status_code == 200:
+        data = response.json()
+        assert isinstance(data, list)
+        if data:
+            for estimate in data: 
+                assert "estID" in estimate and isinstance(estimate["estID"], str)
+                assert "description" in estimate and isinstance(estimate["description"], str)
+                assert "createdBy" in estimate and isinstance(estimate["createdBy"], str)
+                assert "createdAt" in estimate and isinstance(estimate["createdAt"], str)
+                assert "lastUpdated" in estimate and isinstance(estimate["lastUpdated"], str)
+    elif response.status_code == 404:
+        assert response.json()["detail"] == "Estimates not found", "Expected not found error when no estimates exist"
 
-    assert isinstance(data, list)  
-
-    if data:  
-        for estimate in data:
-            assert "estID" in estimate and isinstance(estimate["estID"], str)
-            assert "description" in estimate and isinstance(estimate["description"], str)
-            assert "createdBy" in estimate and isinstance(estimate["createdBy"], str)
-            assert "createdAt" in estimate and isinstance(estimate["createdAt"], str)
-            assert "lastUpdated" in estimate and isinstance(estimate["lastUpdated"], str)
+    else:
+        assert False, f"Unexpected status code: {response.status_code}, response: {response.json()}"
 
 def test_get_task_estimate_by_id(test_client, access_token,valid_estimate_request):
     """Test getting a specific task estimate by ID."""

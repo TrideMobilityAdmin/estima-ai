@@ -54,7 +54,6 @@ class ExcelUploadService:
             logger.info(f"Original data types:\n{data.dtypes}")
             
             cleaned_data = data.drop_duplicates()
-            # print(f"After removing duplicates. Shape: {cleaned_data.shape}")
             
             for column in cleaned_data.columns:
                 if cleaned_data[column].dtype == 'timedelta64[ns]':

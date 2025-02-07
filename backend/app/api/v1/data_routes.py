@@ -126,7 +126,7 @@ async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depe
     """
     return await excel_service.upload_excel(file)
 
-@router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
+
 @router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
 async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(get_current_user), task_service: TaskService = Depends()):
     """
