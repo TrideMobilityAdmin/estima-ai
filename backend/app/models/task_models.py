@@ -68,3 +68,17 @@ class TaskAnalysis(BaseModel):
 
 class SkillAnalysisResponse(BaseModel):
     skillAnalysis: Dict[str, List[TaskAnalysis]]
+class MiscLaborTask(BaseModel):
+    id: str
+    description: str
+    manHours: float
+class Thresholds(BaseModel):
+    tatThreshold: float
+    manHoursThreshold: float
+
+class ConfigurationsResponse(BaseModel):
+    defaultProbability: float
+    thresholds: Thresholds
+    miscLaborTasks: List[MiscLaborTask]
+
+    

@@ -6,7 +6,7 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
+from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,ConfigurationsResponse
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
@@ -135,3 +135,10 @@ async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(g
     Download estimate as PDF
     """
     return await excel_service.download_estimate_pdf(estimate_id)
+
+@router.get("/configurations/", response_model=List[ConfigurationsResponse])
+async def get_all_configurations(
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    return await task_service.get_all_configurations()
