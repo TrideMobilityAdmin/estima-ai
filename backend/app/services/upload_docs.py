@@ -234,8 +234,7 @@ class ExcelUploadService:
         estimate_dict = await task_service.get_estimate_by_id(estimate_id)
         if not estimate_dict:
             raise HTTPException(status_code=404, detail="Estimate not found")
-
-        # Convert dictionary to EstimateResponse model
+        
         estimate = EstimateResponse(**estimate_dict)
 
         # Create a PDF buffer
@@ -245,35 +244,42 @@ class ExcelUploadService:
 
         # Helper function to draw wrapped text
         def draw_wrapped_text(x, y, text, max_width):
-            lines = []
-            words = text.split(' ')
-            current_line = ''
-            for word in words:
-                if p.stringWidth(current_line + word, 'Helvetica', 12) < max_width:
-                    current_line += word + ' '
-                else:
-                    lines.append(current_line)
-                    current_line = word + ' '
-            lines.append(current_line)
-
+            # Split the text into lines based on newline characters
+            lines = text.split('\n')
             for line in lines:
-                p.drawString(x, y, line.strip())
-                y -= 15  # Move down for the next line
-                if y < 50:  # Check if we need to create a new page
-                    p.showPage()
-                    p.setFont("Helvetica", 12)
-                    y = height - 50  # Reset y position for new page
+                # Split the line into words for wrapping
+                words = line.split(' ')
+                current_line = ''
+                for word in words:
+                    if p.stringWidth(current_line + word, 'Helvetica', 12) < max_width:
+                        current_line += word + ' '
+                    else:
+                        p.drawString(x, y, current_line.strip())  # Draw the current line and move down
+                        y -= 15  # Move down for the next line
+                        if y < 50:  # Check if we need to create a new page
+                            p.showPage()
+                            p.setFont("Helvetica", 12)
+                            y = height - 50  # Reset y position for new page
+                        current_line = word + ' '  # Start a new line with the current word
+
+                # Draw any remaining text in the current line
+                if current_line:
+                    p.drawString(x, y, current_line.strip())
+                    y -= 15  
+                    if y < 50:  # Check if we need to create a new page
+                        p.showPage()
+                        p.setFont("Helvetica", 12)
+                        y = height - 50  # Reset y position for new page
 
             return y
 
-    
         p.setFont("Helvetica", 12)
         y_position = height - 50
 
         # Add content to the PDF in structured format
         y_position = draw_wrapped_text(100, y_position, f"estID: {estimate.estID}", width - 200)
         y_position = draw_wrapped_text(100, y_position, f"description: {estimate.description}", width - 200)
-        
+
         # Add tasks
         y_position = draw_wrapped_text(100, y_position, "tasks:", width - 200)
         for task in estimate.tasks:
@@ -284,7 +290,7 @@ class ExcelUploadService:
             y_position = draw_wrapped_text(160, y_position, f"    max: {task.mhs.max}", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    avg: {task.mhs.avg}", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    est: {task.mhs.est}", width - 200)
-            
+
             if task.spareParts:
                 y_position = draw_wrapped_text(140, y_position, "  spareParts:", width - 200)
                 for spare in task.spareParts:
@@ -294,7 +300,6 @@ class ExcelUploadService:
                     y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                     y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-    
         y_position = draw_wrapped_text(100, y_position, "aggregatedTasks:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedTasks.totalMhs}", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {estimate.aggregatedTasks.totalPartsCost}", width - 200)
@@ -332,11 +337,9 @@ class ExcelUploadService:
             y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
             y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
 
-        
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {estimate.aggregatedFindings.totalPartsCost}", width - 200)
-
 
         y_position = draw_wrapped_text(100, y_position, f"createdBy: {estimate.createdBy}", width - 200)
         y_position = draw_wrapped_text(100, y_position, f"createdAt: '{estimate.createdAt.strftime('%Y-%m-%dT%H:%M:%SZ')}'", width - 200)
@@ -353,6 +356,3 @@ class ExcelUploadService:
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
-
-        
-       
