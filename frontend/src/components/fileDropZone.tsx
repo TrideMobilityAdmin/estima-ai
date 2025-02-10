@@ -90,7 +90,7 @@ export default function DropZoneExcel({
         styles={{
           
           root: {
-            height:"30vh",
+            // height:"30vh",
             borderColor: color || "#ced4da",
             borderStyle: "dashed",
             borderWidth: 2,

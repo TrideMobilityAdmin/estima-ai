@@ -1,3 +1,23 @@
+/* Custom scrollbar styling */
+.scrollable-container::-webkit-scrollbar {
+  height: 4px; /* Decrease the height (thickness) of the horizontal scrollbar */
+}
+
+.scrollable-container::-webkit-scrollbar-thumb {
+  background-color: #888; /* Color of the thumb */
+  border-radius: 10px; /* Round edges of the thumb */
+}
+
+.scrollable-container::-webkit-scrollbar-thumb:hover {
+  background-color: #555; /* Darker color when hovered */
+}
+
+.scrollable-container::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Track color */
+  border-radius: 10px; /* Round track edges */
+}
+
+
 .glass-card {
     background: rgba(255, 255, 255, 0.2); /* Semi-transparent white */
     backdrop-filter: blur(10px); /* Glass effect */

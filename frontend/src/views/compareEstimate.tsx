@@ -1,219 +1,353 @@
 import React, { useState } from 'react';
-import { Card, List, Table, Text, Flex } from '@mantine/core';
+import { Card, List, Table, Text, Flex, Title, SimpleGrid, Group, Select, Space, Button } from '@mantine/core';
 import { AgGridReact } from 'ag-grid-react';
+import DropZoneExcel from '../components/fileDropZone';
+import { IconArrowMoveRight, IconClockCheck, IconCube, IconSettingsStar, IconUsers } from '@tabler/icons-react';
+import ReactApexChart from 'react-apexcharts';
 
-// Define types for the JSON data
-interface SparePart {
-  partId: string;
-  desc: string;
-  qty: number;
-  unit: string;
-  price: number;
-}
-
-interface ManHours {
-  max: number;
-  min: number;
-  avg: number;
-  est: number;
-}
-
-interface Task {
-  sourceTask: string;
-  desciption: string;
-  mhs: ManHours;
-  spareParts: SparePart[];
-}
-
-interface FindingDetail {
-  logItem: string;
-  desciption: string;
-  mhs: ManHours;
-  spareParts: SparePart[];
-}
-
-interface Finding {
-  taskId: string;
-  details: FindingDetail[];
-}
-
-interface FindingsWiseSectionProps {
-  tasks: Task[];
-  findings: Finding[];
-}
-
-const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findings }) => {
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [selectedFinding, setSelectedFinding] = useState<FindingDetail | null>(null);
-
-  // Get findings for the selected task
-  const getFindingsForTask = (taskId: string) => {
-    return findings.find((finding) => finding.taskId === taskId)?.details || [];
+export default function CompareEstimate() {
+  const [tasks, setTasks] = useState<string[]>([]);
+  // Handle extracted tasks
+  const handleTasks = (extractedTasks: string[]) => {
+    setTasks(extractedTasks);
+    console.log("tasks :", extractedTasks);
   };
 
+  const jsonData = {
+    estimateID: "Estimate-01",
+    comparisionResult: [
+      {
+        metric: "TAT Time",
+        estimated: 10,
+        actual: 12
+      },
+      {
+        metric: "Man Hours",
+        estimated: 500,
+        actual: 540
+      },
+      {
+        metric: "Spare Cost",
+        estimated: 3000,
+        actual: 3500
+      }
+    ]
+  };
+  // Define icons and background colors based on metric name
+  const metricConfig: Record<string, { icon: JSX.Element; bg: string; unit?: string }> = {
+    "Man Hours": { icon: <IconUsers color="#4E66DE" size="39" />, bg: "#e1e6f7", unit: " Hrs" },
+    "Spare Cost": { icon: <IconSettingsStar color="#088A45" size="39" />, bg: "#e3fae8", unit: " ₹" },
+    "TAT Time": { icon: <IconClockCheck color="orange" size="39" />, bg: "#fcfbe3", unit: " Days" },
+  };
+
+   // Extract data for the bar graph
+  const categories = jsonData.comparisionResult.map((item) => item.metric);
+  const estimatedData = jsonData.comparisionResult.map((item) => item.estimated);
+  const actualData = jsonData.comparisionResult.map((item) => item.actual);
+  const differenceData = jsonData.comparisionResult.map((item) => item.actual - item.estimated);
+
+  // Extract data for the radial bar  
+const labels = jsonData.comparisionResult.map(item => item.metric);
+const series = jsonData.comparisionResult.map(item => Math.round(((item.actual-item.estimated) / item.actual) * 100));
+// const series = jsonData.comparisionResult.map((item) => {
+//   const percentage = (item.actual / item.estimated) * 100;
+//   return percentage > 100 ? 100 : Math.round(percentage); // Cap at 100%
+// });
+
   return (
-    <Flex gap="md" p="md">
-      {/* Left Section: Tasks List */}
-      <Card withBorder shadow="sm" style={{ width: '25%' }}>
-        <Text size="lg" fw={700} mb="md">Tasks List</Text>
-        {/* <List> */}
-          {tasks.map((task, taskIndex) => (
-            <Card
-              key={taskIndex}
-              onClick={() => {
-                setSelectedTask(task);
-                setSelectedFinding(null); // Reset selected finding when task changes
+    <>
+      <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
+        <SimpleGrid cols={2}>
+
+          <Card >
+            <Group justify='space-between'>
+              <Text>
+                Select Estimate
+              </Text>
+              <Select
+                size="xs"
+                w='18vw'
+                // label=" Select Estimate Id"
+                // placeholder="Select Estimate Type"
+                data={['Estimate - 1', 'Estimate - 2', 'Estimate - 3', 'Estimate - 4']}
+                defaultValue="Estimate - 1"
+                allowDeselect
+              />
+            </Group>
+
+          </Card>
+          <Card  >
+            <Group>
+              <Text>
+                Select Actual Data
+              </Text>
+              <DropZoneExcel
+                name="Excel Files"
+                changeHandler={handleTasks}
+                color="green"
+              />
+            </Group>
+          </Card>
+        </SimpleGrid>
+        <Group justify='center'>
+          <Button
+            mt='md'
+            mb='sm'
+            radius='md'
+            variant='light'
+            rightSection={<IconArrowMoveRight />}
+            color='#000087'
+          >
+            Compare
+          </Button>
+        </Group>
+        <SimpleGrid cols={3}>
+          {jsonData.comparisionResult.map(({ metric, estimated, actual }) => {
+            const difference = actual - estimated;
+            const isPositive = difference >= 0;
+            const { icon, bg, unit = "" } = metricConfig[metric] || {};
+
+            return (
+              <Card key={metric} withBorder radius="md" bg={bg} shadow="md">
+                <Group>
+                  {icon}
+                  <Text fw={500} fz="md">{metric}</Text>
+                </Group>
+                <Space h="md" />
+                <Group justify="space-between">
+                  <Flex direction="column" justify="center" align="center">
+                    <Text fw={400} fz="sm" c='gray'>Estimated</Text>
+                    <Text fw={600} fz="lg">{estimated}{unit}</Text>
+                  </Flex>
+                  <Flex direction="column" justify="center" align="center">
+                    <Text fw={400} fz="sm" c='gray'>Actual</Text>
+                    <Text fw={600} fz="lg">{actual}{unit}</Text>
+                  </Flex>
+                  <Flex direction="column" justify="center" align="center">
+                    <Text fw={400} fz="sm" c='gray'>Difference</Text>
+                    <Text fw={600} fz="lg" c={isPositive ? "#F20000" : "green"}>
+                      {difference > 0 ? `+${difference}${unit}` : `${difference}${unit}`}
+                    </Text>
+                  </Flex>
+                </Group>
+              </Card>
+            );
+          })}
+        </SimpleGrid>
+        {/* <SimpleGrid cols={3}>
+          <Card withBorder radius='md' bg='#e1e6f7' shadow='md'>
+            <Group>
+              <IconUsers color="#4E66DE" size='39' />
+              <Text fw={600} fz='md' >
+                Man Hours
+              </Text>
+            </Group>
+            <Space h='md'/>
+            <Group justify='space-between'>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Estimated
+              </Text>
+              <Text fw={600} fz='lg' >
+                500
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Actual
+              </Text>
+              <Text fw={600} fz='lg' >
+                540
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Difference
+              </Text>
+              <Text fw={600} fz='lg' c='#F20000'>
+                +40 Hrs
+              </Text>
+              </Flex>
+            </Group>
+          </Card>
+
+          <Card withBorder radius='md' bg='#e3fae8' shadow='md'>
+            <Group>
+              <IconSettingsStar color="#088A45" size='39' />
+              <Text fw={600} fz='md' >
+                Spare Parts
+              </Text>
+            </Group>
+            <Space h='md'/>
+            <Group justify='space-between'>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Estimated
+              </Text>
+              <Text fw={600} fz='lg' >
+                500
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Actual
+              </Text>
+              <Text fw={600} fz='lg' >
+                540
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Difference
+              </Text>
+              <Text fw={600} fz='lg' c='#F20000'>
+                +40 Hrs
+              </Text>
+              </Flex>
+            </Group>
+          </Card>
+
+          <Card withBorder radius='md' bg='#fcfbe3' shadow='md'>
+            <Group>
+              <IconClockCheck color="orange" size='39' />
+              <Text fw={600} fz='md' >
+                TAT Time
+              </Text>
+            </Group>
+            <Space h='md'/>
+            <Group justify='space-between'>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Estimated
+              </Text>
+              <Text fw={600} fz='lg' >
+                500
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Actual
+              </Text>
+              <Text fw={600} fz='lg' >
+                540
+              </Text>
+              </Flex>
+              <Flex direction='column' justify='center' align='center'>
+              <Text fw={400} fz='sm' >
+                Difference
+              </Text>
+              <Text fw={600} fz='lg' c='#F20000'>
+                +40 Hrs
+              </Text>
+              </Flex>
+            </Group>
+          </Card>
+        </SimpleGrid> */}
+        <Space h='md' />
+        <SimpleGrid cols={2}>
+          <Card>
+            <Title order={5}>
+              Estimated vs Actual Comparison
+            </Title>
+            <ReactApexChart
+              type="bar"
+              height={300}
+              // width={Math.max(categories.length * 80, 400)} // Dynamic width for scrolling
+              options={{
+                chart: { type: "bar", toolbar: { show: true } },
+                plotOptions: {
+                  bar: {
+                    horizontal: false,
+                    columnWidth: "50%",
+                    borderRadius: 5,
+                    borderRadiusApplication: "end",
+                  },
+                },
+                // colors: ["#4E66DE", "#F39C12"], // Blue for Estimated, Orange for Actual
+                dataLabels: { enabled: true },
+                xaxis: { categories },
+                yaxis: { title: { text: "Values" } },
+                fill: { opacity: 1 },
+                tooltip: { y: { formatter: (val: number) => `${val}` } },
+                grid: { padding: { right: 20 } },
+                legend: { position: "bottom" },
+                responsive: [
+                  {
+                    breakpoint: 600,
+                    options: { plotOptions: { bar: { columnWidth: "70%" } } },
+                  },
+                ],
               }}
-              style={{ cursor: 'pointer', padding: '8px', backgroundColor: selectedTask?.sourceTask === task.sourceTask ? '#f0f0f0' : 'transparent' }}
-            >
-              {task.sourceTask}
-            </Card>
-          ))}
-        {/* </List> */}
-      </Card>
+              series={[
+                { name: "Estimated", data: estimatedData },
+                { name: "Actual", data: actualData },
+                // { name: "Difference", data: differenceData },
+              ]}
+            />
+          </Card>
+          <Card>
+          <Title order={5}>
+              Comparison Analysis
+            </Title>
+            <ReactApexChart
+              type="radialBar"
+              height={300}
+              options={{
+                chart: {
+                  height: 390,
+                  type: 'radialBar',
+                },
+                plotOptions: {
+                  radialBar: {
+                    offsetY: 0,
+                    startAngle: 0,
+                    endAngle: 270,
+                    
+                    hollow: {
+                      margin: 5,
+                      size: '30%',
+                      background: 'transparent',
+                      image: undefined,
+                    },
+                    dataLabels: {
+                      name: {
+                        show: false,
+                      },
+                      value: {
+                        show: false,
+                      }
+                    },
+                    barLabels: {
+                      enabled: true,
+                      useSeriesColors: true,
+                      offsetX: -8,
+                      fontSize: '16px',
+                      formatter: function(seriesName, opts) {
+                        return seriesName + ":  " + opts.w.globals.series[opts.seriesIndex]
+                      },
+                    },
+                  }
+                },
+                colors: ['#1ab7ea', '#0084ff', '#39539E', '#0077B5'],
+                labels: labels,
+                responsive: [{
+                  breakpoint: 480,
+                  options: {
+                    legend: {
+                        show: false
+                    }
+                  }
+                }]
+              }}
+              series= {series}
+            />
+          </Card>
+        </SimpleGrid>
 
-      {/* Middle Section: Task-wise Findings */}
-      <Card withBorder shadow="sm" style={{ width: '35%' }}>
-        <Text size="lg" fw={700} mb="md">Findings for {selectedTask?.sourceTask || 'Selected Task'}</Text>
-        {selectedTask ? (
-          <List>
-            {getFindingsForTask(selectedTask.sourceTask).map((finding, findingIndex) => (
-              <List.Item
-                key={findingIndex}
-                onClick={() => setSelectedFinding(finding)}
-                style={{ cursor: 'pointer', padding: '8px', backgroundColor: selectedFinding?.logItem === finding.logItem ? '#f0f0f0' : 'transparent' }}
-              >
-                <Text fw={500}>Finding {findingIndex + 1}</Text>
-                <Text size="sm">Log Item: {finding.logItem}</Text>
-                <Text size="sm">Description: {finding.desciption}</Text>
-              </List.Item>
-            ))}
-          </List>
-        ) : (
-          <Text>Select a task to view findings.</Text>
-        )}
-      </Card>
 
-      {/* Right Section: Selected Finding Details */}
-      <Card withBorder shadow="sm" style={{ width: '40%' }}>
-        <Text size="lg" fw={700} mb="md">Finding Details</Text>
-        {selectedFinding ? (
-          <>
-            <Text>Log Item: {selectedFinding.logItem}</Text>
-            <Text>Description: {selectedFinding.desciption}</Text>
-            <Text>Man Hours:</Text>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Min</th>
-                  <th>Max</th>
-                  <th>Avg</th>
-                  <th>Est</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{selectedFinding.mhs.min}</td>
-                  <td>{selectedFinding.mhs.max}</td>
-                  <td>{selectedFinding.mhs.avg}</td>
-                  <td>{selectedFinding.mhs.est}</td>
-                </tr>
-              </tbody>
-            </Table>
-            <Text>Spare Parts:</Text>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Part ID</th>
-                  <th>Description</th>
-                  <th>Qty</th>
-                  <th>Unit</th>
-                  <th>Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedFinding.spareParts.map((part, partIndex) => (
-                  <tr key={partIndex}>
-                    <td>{part.partId}</td>
-                    <td>{part.desc}</td>
-                    <td>{part.qty}</td>
-                    <td>{part.unit}</td>
-                    <td>{part.price}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </>
-        ) : (
-          <Text>Select a finding to view details.</Text>
-        )}
-      </Card>
-    </Flex>
-  );
-};
+      </div>
+    </>
+  )
+}
 
-// Sample JSON data
-const jsonData = {
-  tasks: [
-    {
-      sourceTask: "255000-16-1",
-      desciption: "CARGO COMPARTMENTS\n\nDETAILED INSPECTION OF DIVIDER NETS, DOOR NETS AND\nNET ATTACHMENT POINTS\n\nNOTE:\nTHE NUMBER OF AFFECTED ZONES MAY VARY ACCORDING TO",
-      mhs: { max: 2, min: 2, avg: 2, est: 1.38 },
-      spareParts: [],
-    },
-    {
-      sourceTask: "256241-05-1",
-      desciption: "DOOR ESCAPE SLIDE\n\nCLEAN DOOR GIRT BAR FITTING STOP LEVERS\n\nNOTE:\nTASK IS NOT APPLICABLE FOR DEACTIVATED PASSENGER/CREW\nDOORS.",
-      mhs: { max: 2, min: 2, avg: 2, est: 0.92 },
-      spareParts: [
-        { partId: "LOTOXANE", desc: "NON AQUEOUS CLEANER-GENERAL", qty: 0.1, unit: "LTR", price: 0 },
-      ],
-    },
-    {
-      sourceTask: "200435-01-1 (LH)",
-      desciption: "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
-      mhs: { max: 4, min: 4, avg: 4, est: 0.73 },
-      spareParts: [],
-    },
-  ],
-  findings: [
-    {
-      taskId: "200435-01-1 (LH)",
-      details: [
-        {
-          logItem: "HMV23/000211/0324/24",
-          desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-          mhs: { max: 2, min: 2, avg: 2, est: 4 },
-          spareParts: [],
-        },
-      ],
-    },
-  ],
-};
-
-const CompareEstimate = () => (
-  <div style={{ padding: '20px' }}>
-    <Text size="xl" fw={700} mb="md">Findings Wise</Text>
-    <FindingsWiseSection tasks={jsonData.tasks} findings={jsonData.findings} />
-    <div
-className="ag-theme-alpine"
-style={{
-    width: "100%",
-    height: "300px", // Set fixed height for AgGrid
-    overflow: "hidden",
-}}
->
-<AgGridReact
-    pagination
-    paginationPageSize={10}
-    // domLayout="autoHeight" // Ensures height adjusts dynamically
-    rowData={[]}
-    columnDefs={[
-        
-    ]}
-/>
-</div> 
-  </div>
-);
-
-export default CompareEstimate;
+// export default CompareEstimate;
