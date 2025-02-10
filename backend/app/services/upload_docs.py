@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import re
+from app.models.estimates import ComparisonResponse,ComparisonResult
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -13,6 +14,7 @@ class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         self.collection = self.mongo_client.get_collection("estima_input_upload")
+        self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
             # Convert to string in case of non-string field names
@@ -168,3 +170,55 @@ class ExcelUploadService:
             "records_inserted": result["inserted_count"],
             "status": "success"
         }
+    async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
+        await self.validate_excel_file(file)
+        actual_data = await self.process_excel_file(file)
+        logger.info(f"Actual data extracted: {len(actual_data)} records")
+        estimated_data = self.estimate_collection.aggregate([
+            {'$match': {'estID': estimate_id}},
+            {'$project': {
+                '_id': 0,
+                'estID': 1,
+                'estimatedManhrs': '$aggregatedTasks.totalMhs',
+                'estimatedSparePartsCost': '$aggregatedTasks.totalPartsCost'
+            }}
+        ])
+        estimated_data = list(estimated_data)
+        if not estimated_data:
+            logger.error(f"No estimate found with ID: {estimate_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No estimate found with ID: {estimate_id}"
+            )
+        estimated_data = estimated_data[0]
+        logger.info(f"Estimated data fetched: {len(estimated_data)} records")
+        # Compare actual data with estimated data
+        comparison_results = []
+        for record in actual_data:
+            if record.get('estid') == estimate_id:
+                logger.info(f"Comparing data for record: {record}")
+                comparison_results.append(ComparisonResult(
+                    metric="Man-Hours",
+                    estimated=str(estimated_data.get('estimatedManhrs', 0.0)),
+                    actual=str(record.get('manhrs',0.0))
+                ))
+                comparison_results.append(ComparisonResult(
+                    metric="Spare Cost",
+                    estimated=str(estimated_data.get('estimatedSparePartsCost', 0.0)),
+                    actual=str(record.get('sparePartsCosts',0.0))
+                ))
+                comparison_results.append(ComparisonResult(
+                    metric="TAT Time",
+                    estimated=str(estimated_data.get('estimatedTatTime', 0.0)),
+                    actual=str(record.get('tatTime',0.0))
+                ))
+        logger.info(f"Comparison results: {comparison_results}")
+        return ComparisonResponse(
+            estimateID=estimate_id,
+            comparisonResults=comparison_results
+        )
+    
+
+    
+        
+       

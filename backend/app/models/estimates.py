@@ -109,8 +109,8 @@ class MyModel(BaseModel):
 
 class ComparisonResult(BaseModel):
     metric: str
-    estimated:str
-    actual:str
+    estimated:float=0.0
+    actual:float=0.0
 class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
