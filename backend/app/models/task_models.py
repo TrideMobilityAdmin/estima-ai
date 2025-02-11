@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from typing import Optional,List,Any,Dict
+from bson import ObjectId
 
 class ManHrs(BaseModel):
     max: float
@@ -68,17 +69,6 @@ class TaskAnalysis(BaseModel):
 
 class SkillAnalysisResponse(BaseModel):
     skillAnalysis: Dict[str, List[TaskAnalysis]]
-class MiscLaborTask(BaseModel):
-    id: str
-    description: str
-    manHours: float
-class Thresholds(BaseModel):
-    tatThreshold: float
-    manHoursThreshold: float
 
-class ConfigurationsResponse(BaseModel):
-    defaultProbability: float
-    thresholds: Thresholds
-    miscLaborTasks: List[MiscLaborTask]
 
     

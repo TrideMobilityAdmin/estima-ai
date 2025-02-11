@@ -104,6 +104,26 @@ class EstimateResponse(BaseModel):
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
     }
+
+class MiscLaborTask(BaseModel):
+    id: str
+    description: str
+    manHours: float
+class Thresholds(BaseModel):
+    tatThreshold: float
+    manHoursThreshold: float
+
+class ConfigurationsResponse(BaseModel):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    defaultProbability: float
+    thresholds: Thresholds
+    miscLaborTasks: List[MiscLaborTask]
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "populate_by_name": True,
+    }
+
+
 class MyModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
