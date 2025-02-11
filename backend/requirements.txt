@@ -67,6 +67,7 @@ python-multipart==0.0.6
 pytz==2024.2
 PyYAML==6.0.2
 pyzmq==26.2.0
+reportlab==4.3.0
 requests==2.32.3
 rsa==4.9
 setuptools==75.8.0
