@@ -6,10 +6,11 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,ConfigurationsResponse
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse
+from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
+from app.services.configurations import ConfigurationService
 
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
@@ -136,9 +137,24 @@ async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(g
     """
     return await excel_service.download_estimate_pdf(estimate_id)
 
+config_service = ConfigurationService()
 @router.get("/configurations/", response_model=List[ConfigurationsResponse])
 async def get_all_configurations(
-    current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
+    current_user: dict = Depends(get_current_user)
 ):
-    return await task_service.get_all_configurations()
+    return await config_service.get_all_configurations()
+
+@router.post("/configurations/", response_model=ConfigurationsResponse, status_code=201)
+async def create_configurations(
+    config_req: ConfigurationsResponse,
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.create_configurations(config_req)
+
+@router.put("/configurations/{config_id}", response_model=ConfigurationsResponse)
+async def update_configurations(
+    config_id: str,
+    config_req: ConfigurationsResponse,
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.update_configurations(config_id, config_req)

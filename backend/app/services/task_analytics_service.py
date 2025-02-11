@@ -1,7 +1,6 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,ConfigurationsResponse,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
 from statistics import mean
 from fastapi import HTTPException,Depends,status
-import logging
 from typing import List , Dict,Optional
 import pandas as pd
 from app.middleware.auth import get_current_user
@@ -40,7 +39,7 @@ class TaskService:
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
-        self.configurations_collection=self.mongo_client.get_collection("configurations")
+        
 
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -767,24 +766,4 @@ class TaskService:
                 detail=f"Error fetching estimate: {str(e)}"
             )
            
-    async def get_all_configurations(self) -> ConfigurationsResponse:
-        """
-        Get all configurations from the database
-        """
-        logger.info("Fetching all configurations")
-
-        try:
-            configurations_cursor = self.configurations_collection.find()
-
-            ConfigurationsResponse = []
-            for config in configurations_cursor:
-                ConfigurationsResponse.append(config)
-            logger.info(f"Found {len(ConfigurationsResponse)} configurations")
-            return ConfigurationsResponse
-
-        except Exception as e:
-            logger.error(f"Error fetching configurations: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching configurations: {str(e)}"
-            )
+    
