@@ -46,7 +46,12 @@ class EstimateRequest(BaseModel):
      operator: str
      aircraftAge: int 
      aircraftFlightHours: int 
-     aircraftFlightCycles: int 
+     aircraftFlightCycles: int
+class ValidRequest(BaseModel):
+     tasks: List[str]
+class ValidTasks(BaseModel):
+    taskid: str
+    status: bool
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""
@@ -61,6 +66,7 @@ class SpareResponse(BaseModel):
     qty: float = 0.0
     unit: str = ""
     price: float = 0.0
+
 
 class Details(FindingsManHoursModel):
     spareParts: List[SpareResponse] = []

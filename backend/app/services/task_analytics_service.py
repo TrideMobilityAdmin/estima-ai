@@ -7,6 +7,7 @@ from app.middleware.auth import get_current_user
 from typing import List
 from datetime import datetime
 from fastapi import UploadFile, File
+from app.models.estimates import ValidTasks,ValidRequest
 from datetime import datetime,timezone
 from app.models.estimates import (
     Estimate,
@@ -44,7 +45,7 @@ class TaskService:
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
         
-
+    
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
         Get man hours statistics for a specific source task
@@ -122,7 +123,38 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching estimates: {str(e)}"
             )
+    async def validate_tasks(self, estimate_request: ValidRequest, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        """
+        try:
+            task_ids = estimate_request.tasks
 
+            # Query MongoDB to check which tasks exist
+            existing_tasks_list = self.taskdescription_collection.find(
+                {"Task": {"$in": task_ids}}, {"_id": 0, "Task": 1}
+            )
+
+            # Convert cursor to list
+            existing_tasks_list = list(existing_tasks_list)  # Ensure it's a list
+
+            # Convert list to a set for faster lookups
+            existing_tasks = list(doc["Task"] for doc in existing_tasks_list)
+
+            # Prepare the response list
+            validated_tasks = [
+                ValidTasks(taskid=task, status=(task in existing_tasks))
+                for task in task_ids
+            ]
+
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
         Create a new estimate based on the provided tasks and parameters.
