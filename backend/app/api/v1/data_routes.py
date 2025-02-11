@@ -82,17 +82,31 @@ async def get_parts_usage(
     """
     parts_usage=await task_service.get_parts_usage(part_id)
     logging.info("Parts usage data: %s", parts_usage)
-    print(parts_usage)
     return parts_usage
 
 @router.get("/api/v1/skills/analysis")
 async def get_skills_analysis(
-    Source_Tasks:str = Query(..., description="source task"),
+    source_tasks: List[str] = Query(..., 
+        description="List of source tasks to analyze",
+        example=["task1", "task2"],
+    ),
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    skills_analysis = await task_service.get_skills_analysis(Source_Tasks)
-
+    """
+    Endpoint to analyze skills based on a list of source tasks.
+    
+    Args:
+        source_tasks: List of task identifiers to analyze
+        current_user: Current authenticated user
+        task_service: Injected task service dependency
+    
+    Returns:
+        Analysis results for the provided tasks
+    """
+    # Pass the entire list to the service method
+    skills_analysis = await task_service.get_skills_analysis(source_tasks)
+    
     return skills_analysis
 
 
