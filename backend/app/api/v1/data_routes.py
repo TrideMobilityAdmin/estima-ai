@@ -71,7 +71,7 @@ async def get_all_estimates(
 #     return await task_service.get_spare_parts_findings(task_id)
 
 
-@router.get("/api/v1/parts/usage")
+@router.get("/parts/usage")
 
 async def get_parts_usage(
     part_id: str,
@@ -85,7 +85,7 @@ async def get_parts_usage(
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
 
-@router.get("/api/v1/skills/analysis")
+@router.get("/skills/analysis")
 async def get_skills_analysis(
     source_tasks: List[str] = Query(..., 
         description="List of source tasks to analyze",
