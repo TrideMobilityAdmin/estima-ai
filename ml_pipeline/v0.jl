@@ -230,9 +230,39 @@ function partqty(partval)
 end
 
 # ╔═╡ b551b485-ac7b-4d86-a250-8af10bf69767
+begin
+gtc_ref = zeros(Int,nrow(task_clusters))
 function first_stc(cid)
-	findfirst(!=(0), coom[cid,:])
+	return findfirst(!=(0), coom[cid,:] .* gtc_ref)
 end
+end
+
+# ╔═╡ 3fef27ff-55db-44c4-b4a1-25572ce893c0
+g_tasks=select(filter(:pkg3 => ==("HMV240000780624"), mltask), "task-#","description")
+
+# ╔═╡ 900ed26e-cf0c-4d29-8baa-3c7735f7e13d
+task_stef1(g_tasks)
+
+# ╔═╡ 3a58f8af-46e9-4db2-881e-83da7bdcaa85
+function lol(df)
+	cluster_assignments = fill(0, nrow(df))
+	for i in 1:nrow(df)
+    	embedding = df.stef[i]
+		for j in 1:nrow(task_clusters)
+			if cosine_similarity(embedding, task_clusters.avg_emb[j]) ≥ 0.9
+				cluster_assignments[i] = task_clusters.cluster_id[j]
+				break
+        	end
+		end
+	end
+	df.cluster = cluster_assignments
+end
+
+# ╔═╡ 0c4ff4e1-1f19-42a8-9207-ae049083e536
+lol(g_tasks)
+
+# ╔═╡ 9935423e-c4c0-46cc-84be-a1f473d996af
+gtc_ref[sort(unique(g_tasks.cluster))] .= 1
 
 # ╔═╡ 14ee0ec9-4639-4b4b-8877-d4a7719dd974
 begin
@@ -262,33 +292,90 @@ end
 # ╔═╡ c3c77232-ae53-47d8-827b-958321de070a
 stc_pred
 
-# ╔═╡ b074d3a2-8635-4f67-b953-679ee7ba2948
-pkg=mltask[108,:pkg3]
-
-# ╔═╡ 3fef27ff-55db-44c4-b4a1-25572ce893c0
-g_tasks=select(filter(:pkg3 => ==("HMV240000780624"), mltask), :description)
-
-# ╔═╡ 900ed26e-cf0c-4d29-8baa-3c7735f7e13d
-task_stef1(g_tasks)
-
 # ╔═╡ bb02d57c-e08f-4e0f-a651-2a7c5fd77c40
 g_tasks
 
-# ╔═╡ 3a58f8af-46e9-4db2-881e-83da7bdcaa85
-for i in 1:nrow(g_tasks)
-    embedding = g_tasks.stef[i]
-	g_tasks.cluster = Vector{Union{Missing, Int64}}(missing, nrow(g_tasks))
-    # Check similarity with existing clusters
-    for j in 1:nrow(task_clusters)
-        if cosine_similarity(embedding, task_clusters.avg_emb[j]) ≥ 0.7
-            g_tasks.cluster[i] = task_clusters.cluster_id[j]
-            break
-        end
-    end
+# ╔═╡ ff797d2d-ed11-4092-acad-995a74d96efd
+mltask[108,:].pkg3
+
+# ╔═╡ 604f2be9-9464-45f5-96bd-45cbc00c0b98
+pkgs = CSV.read("/home/vc/convex-heuristics/tride-mobility/trials/data10/csvs/pkgs.csv", DataFrame)
+
+# ╔═╡ afd18e8b-eb1c-456c-b4e4-72736aabdba5
+inp_pkg_df=filter("package-#" => ==(pkg), pkgs)
+
+# ╔═╡ d0b8d1be-e260-41f7-a912-0c61a8897671
+gts=select(filter(:pkg3 => ==("HMV240000780624"), mltask), "task-#","description")
+
+# ╔═╡ a9d29438-fc8f-4ab7-9440-56b98b979bc5
+CSV.write("./v0data/source_tasks_input.csv", gts)
+
+# ╔═╡ 4ba18768-200f-4e42-a1e5-db36f39fc5d9
+CSV.write("./v0data/pkg_input.csv", inp_pkg_df)
+
+# ╔═╡ 2f6450c8-66e7-42e4-8769-a2f0f65050af
+out_g=select(g_tasks,"task-#","description","cluster")
+
+# ╔═╡ 5d00c4e6-20cb-4141-acb1-af0b5657d7ad
+out_stc_vec=filter(row -> row.cluster_id in unique(out_g.cluster), stc_pred)
+
+# ╔═╡ 850c8e02-98e5-47b6-baf0-8959d4128603
+out_disc_vec=filter(row -> row.stc_id !== nothing, disc_pred)
+
+# ╔═╡ 99652691-62fb-4fd0-8cdd-d3de3a2159aa
+fin_vec = DataFrame(task_cat = Vector{String}(),
+					max_mh = Vector{Float64}(),
+					min_mh = Vector{Float64}(),
+					avg_mh = Vector{Float64}(),
+					est_mh = Vector{Float64}(),
+					exp_cons = Vector{Vector{Float64}}())
+
+# ╔═╡ a4db7279-a0dc-4cbd-8c21-21edaef2e8d7
+out_g_fin=innerjoin(select(g_tasks,"task-#","description","cluster"), out_stc_vec, on = "cluster" => "cluster_id")
+
+# ╔═╡ def6247c-d1d3-40ce-930a-f9024e1de9d8
+push!(fin_vec, ("source-tasks", 
+				sum(out_g_fin.max_mh), 
+				sum(out_g_fin.min_mh),
+				sum(out_g_fin.avg_mh),
+				sum(out_g_fin.est_mh),
+				reduce(.+, out_g_fin.exp_cons)))
+
+# ╔═╡ 517f4a06-63ee-426e-abbd-6f22f66fff82
+push!(fin_vec, ("discrepancies", 
+				sum(out_disc_vec.max_mh), 
+				0,
+				sum(out_disc_vec.prob .* out_disc_vec.avg_mh),
+				sum(out_disc_vec.prob .* out_disc_vec.est_mh),
+				reduce(.+, [out_disc_vec.prob[i] * out_disc_vec.exp_cons[i] for i in eachindex(out_disc_vec.cluster_id)])))
+
+# ╔═╡ 6a82c71d-308b-433a-b2df-7d0d733cc9ec
+push!(fin_vec, ("total", 
+				sum(fin_vec.max_mh), 
+				sum(fin_vec.min_mh),
+				sum(fin_vec.avg_mh),
+				sum(fin_vec.est_mh),
+				reduce(.+, fin_vec.exp_cons)))
+
+# ╔═╡ d15333e9-2c5b-4c4f-97e4-6a0d41beaa2b
+begin
+	CSV.write("./v0data/source_tasks_output.csv", out_g_fin)
+	CSV.write("./v0data/stc_vec_output.csv", out_stc_vec)
+	CSV.write("./v0data/disc_vec_output.csv", out_disc_vec)
+	CSV.write("./v0data/fin_vec_output.csv", fin_vec)
 end
 
-# ╔═╡ 0c4ff4e1-1f19-42a8-9207-ae049083e536
-g_tasks
+# ╔═╡ 419c93cf-e872-4594-b421-a2210f5e4d9a
+CSV.write("./v0data/parts.csv", parts)
+
+# ╔═╡ 07358cc3-1271-4964-9b0b-92345f7a0128
+pkg="HMV24/000078/0624"
+
+# ╔═╡ b074d3a2-8635-4f67-b953-679ee7ba2948
+# ╠═╡ disabled = true
+#=╠═╡
+pkg=mltask[108,:pkg3]
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2492,15 +2579,33 @@ version = "1.4.1+2"
 # ╠═0ecd171a-b189-4223-839c-74fdaf37cdc3
 # ╠═2cf42f04-b11c-41be-aa53-5a243e72c0ad
 # ╠═b551b485-ac7b-4d86-a250-8af10bf69767
+# ╠═3fef27ff-55db-44c4-b4a1-25572ce893c0
+# ╠═900ed26e-cf0c-4d29-8baa-3c7735f7e13d
+# ╠═3a58f8af-46e9-4db2-881e-83da7bdcaa85
+# ╠═0c4ff4e1-1f19-42a8-9207-ae049083e536
+# ╠═9935423e-c4c0-46cc-84be-a1f473d996af
 # ╠═14ee0ec9-4639-4b4b-8877-d4a7719dd974
 # ╠═1b9f90f4-c7ad-4240-a681-fd34f1a6b6a0
 # ╠═63d37a35-6406-4c2f-a6bf-85acffb77833
 # ╠═c3c77232-ae53-47d8-827b-958321de070a
 # ╠═b074d3a2-8635-4f67-b953-679ee7ba2948
-# ╠═3fef27ff-55db-44c4-b4a1-25572ce893c0
-# ╠═900ed26e-cf0c-4d29-8baa-3c7735f7e13d
 # ╠═bb02d57c-e08f-4e0f-a651-2a7c5fd77c40
-# ╠═3a58f8af-46e9-4db2-881e-83da7bdcaa85
-# ╠═0c4ff4e1-1f19-42a8-9207-ae049083e536
+# ╠═ff797d2d-ed11-4092-acad-995a74d96efd
+# ╠═604f2be9-9464-45f5-96bd-45cbc00c0b98
+# ╠═07358cc3-1271-4964-9b0b-92345f7a0128
+# ╠═afd18e8b-eb1c-456c-b4e4-72736aabdba5
+# ╠═d0b8d1be-e260-41f7-a912-0c61a8897671
+# ╠═a9d29438-fc8f-4ab7-9440-56b98b979bc5
+# ╠═4ba18768-200f-4e42-a1e5-db36f39fc5d9
+# ╠═2f6450c8-66e7-42e4-8769-a2f0f65050af
+# ╠═5d00c4e6-20cb-4141-acb1-af0b5657d7ad
+# ╠═850c8e02-98e5-47b6-baf0-8959d4128603
+# ╠═99652691-62fb-4fd0-8cdd-d3de3a2159aa
+# ╠═a4db7279-a0dc-4cbd-8c21-21edaef2e8d7
+# ╠═def6247c-d1d3-40ce-930a-f9024e1de9d8
+# ╠═517f4a06-63ee-426e-abbd-6f22f66fff82
+# ╠═6a82c71d-308b-433a-b2df-7d0d733cc9ec
+# ╠═d15333e9-2c5b-4c4f-97e4-6a0d41beaa2b
+# ╠═419c93cf-e872-4594-b421-a2210f5e4d9a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
