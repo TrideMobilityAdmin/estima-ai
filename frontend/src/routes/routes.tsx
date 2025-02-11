@@ -5,7 +5,7 @@ import Estimate from "../views/estimate";
 import CompareEstimate from "../views/compareEstimate";
 import PartUsage from "../views/partUsage";
 import SkillRequirement from "../views/skillRequirement";
-import Configuration from "../views/configuration";
+import ExpertInsights from "../views/expertInsights";
 
 const MainRoutes = () => {
   return (
@@ -16,7 +16,7 @@ const MainRoutes = () => {
         <Route path="/home/compare-estimate" element={<CompareEstimate />} />
         <Route path="/home/part-usage" element={<PartUsage />} />
         <Route path="/home/skill-requirement" element={<SkillRequirement />} />
-        <Route path="/home/configuration" element={<Configuration />} />
+        <Route path="/home/expert-insights" element={<ExpertInsights />} />
       </Route>
     </Routes>
   );
@@ -54,7 +54,7 @@ export default MainRoutes;
 //                    <Route path="/home/compare-estimate" element={<CompareEstimate />} />
 //                    <Route path="/home/part-usage" element={<PartUsage />} />
 //                    <Route path="/home/skill-requirement" element={<SkillRequirement />} />
-//                    <Route path="/home/configuration" element={<Configuration />} />
+//                    <Route path="/home/expert-insights" element={<Configuration />} />
 //                 </Route>
 //             </Route>
 //         </Routes>

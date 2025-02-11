@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -10,9 +10,20 @@ import "ag-grid-community/styles/ag-theme-alpine.css";
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import MainRoutes from './routes/routes';
+import { useNavigate } from './constants/GlobalImports';
 
 function App() {
-  const [count, setCount] = useState(0)
+  // const [count, setCount] = useState(0);
+  // const navigate = useNavigate();
+
+  // useEffect(() => {
+  //   const storedToken = sessionStorage.getItem("token");
+  //   console.log("🔄 Loading token from sessionStorage:", storedToken);  // Debug
+
+  //   if (!storedToken) {
+  //     navigate("/login");  // Redirect if no token
+  //   }
+  // }, []);
 
   return (
     // <>

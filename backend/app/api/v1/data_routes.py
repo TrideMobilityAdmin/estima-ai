@@ -7,7 +7,7 @@ import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -172,3 +172,11 @@ async def update_configurations(
     current_user: dict = Depends(get_current_user)
 ):
     return await config_service.update_configurations(config_id, config_req)
+@router.post("/validate",response_model=List[ValidTasks])
+async def validate_tasks(
+    estimate_request: ValidRequest,
+     current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    print("validate_tasks")
+    return await task_service.validate_tasks(estimate_request,current_user)

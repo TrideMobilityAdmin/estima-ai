@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta,timezone,UTC
+from datetime import datetime, timedelta,timezone
+UTC=timezone.utc
 from typing import Optional
 from app.config.config import settings
 import jwt as pyjwt
