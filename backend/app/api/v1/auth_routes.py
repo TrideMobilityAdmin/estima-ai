@@ -7,6 +7,7 @@ from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
 from app.log.logs import logger
+from bson import ObjectId   
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -22,7 +23,7 @@ async def User_register(user: UserCreate):
         )
     if not validate_password(user.password):
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Password must be at least 12 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
         )
 
@@ -50,7 +51,7 @@ async def User_login(user: UserLogin):
     user_found = users_collection.find_one({"username": user.username})
     if not user_found or not verify_password(user.password, user_found["password"]):
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
         )
     
@@ -77,6 +78,8 @@ async def User_login(user: UserLogin):
         "username": user_found["username"],
         "email": user_found["email"]
     }
+
+
 @router.post("/logout")
 async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
     try:
@@ -101,7 +104,7 @@ async def User_logout(response: Response, current_user: dict = Depends(get_curre
             if update_result.modified_count == 1:
                 return {"message": "User logged out successfully"}
             else:
-                raise HTTPException(status_code=500, detail="Failed to update logout time")
+                raise HTTPException(status_code=400, detail="Failed to update logout time")
         else:
             raise HTTPException(status_code=404, detail="Login record not found")
         
@@ -111,3 +114,20 @@ async def User_logout(response: Response, current_user: dict = Depends(get_curre
             status_code=500,
             detail="Error during logout"
         )
+@router.get("/user/{user_id}", response_model=UserResponse)
+async def get_user_by_id(user_id: str,current_user: dict = Depends(get_current_user)):
+    """
+    Get user details by ID
+    """
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
+    user_found = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user_found:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": str(user_found["_id"]),
+        "username": user_found["username"],
+        "email": user_found["email"],
+        "createdAt": user_found.get("createdAt")
+    }

@@ -46,7 +46,12 @@ class EstimateRequest(BaseModel):
      operator: str
      aircraftAge: int 
      aircraftFlightHours: int 
-     aircraftFlightCycles: int 
+     aircraftFlightCycles: int
+class ValidRequest(BaseModel):
+     tasks: List[str]
+class ValidTasks(BaseModel):
+    taskid: str
+    status: bool
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""
@@ -61,6 +66,7 @@ class SpareResponse(BaseModel):
     qty: float = 0.0
     unit: str = ""
     price: float = 0.0
+
 
 class Details(FindingsManHoursModel):
     spareParts: List[SpareResponse] = []
@@ -104,5 +110,33 @@ class EstimateResponse(BaseModel):
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
     }
+
+class MiscLaborTask(BaseModel):
+    id: str
+    description: str
+    manHours: float
+class Thresholds(BaseModel):
+    tatThreshold: float
+    manHoursThreshold: float
+
+class ConfigurationsResponse(BaseModel):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    defaultProbability: float
+    thresholds: Thresholds
+    miscLaborTasks: List[MiscLaborTask]
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "populate_by_name": True,
+    }
+
+
 class MyModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+class ComparisonResult(BaseModel):
+    metric: str
+    estimated:float=0.0
+    actual:float=0.0
+class ComparisonResponse(BaseModel):
+    estimateID: str
+    comparisonResults:List[ComparisonResult]

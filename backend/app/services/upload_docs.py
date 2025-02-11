@@ -4,15 +4,23 @@ import pandas as pd
 import numpy as np
 import json
 import re
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
 from app.db.database_connection import MongoDBClient
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from app.services.task_analytics_service import TaskService
 
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         self.collection = self.mongo_client.get_collection("estima_input_upload")
+        self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
             # Convert to string in case of non-string field names
@@ -54,7 +62,6 @@ class ExcelUploadService:
             logger.info(f"Original data types:\n{data.dtypes}")
             
             cleaned_data = data.drop_duplicates()
-            # print(f"After removing duplicates. Shape: {cleaned_data.shape}")
             
             for column in cleaned_data.columns:
                 if cleaned_data[column].dtype == 'timedelta64[ns]':
@@ -169,3 +176,183 @@ class ExcelUploadService:
             "records_inserted": result["inserted_count"],
             "status": "success"
         }
+    async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
+        await self.validate_excel_file(file)
+        actual_data = await self.process_excel_file(file)
+        logger.info(f"Actual data extracted: {len(actual_data)} records")
+        estimated_data = self.estimate_collection.aggregate([
+            {'$match': {'estID': estimate_id}},
+            {'$project': {
+                '_id': 0,
+                'estID': 1,
+                'estimatedManhrs': '$aggregatedTasks.totalMhs',
+                'estimatedSparePartsCost': '$aggregatedTasks.totalPartsCost'
+            }}
+        ])
+        estimated_data = list(estimated_data)
+        if not estimated_data:
+            logger.error(f"No estimate found with ID: {estimate_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No estimate found with ID: {estimate_id}"
+            )
+        estimated_data = estimated_data[0]
+        logger.info(f"Estimated data fetched: {len(estimated_data)} records")
+        # Compare actual data with estimated data
+        comparison_results = []
+        for record in actual_data:
+            if record.get('estid') == estimate_id:
+                logger.info(f"Comparing data for record: {record}")
+                comparison_results.append(ComparisonResult(
+                    metric="Man-Hours",
+                    estimated=str(estimated_data.get('estimatedManhrs', 0.0)),
+                    actual=str(record.get('manhrs',0.0))
+                ))
+                comparison_results.append(ComparisonResult(
+                    metric="Spare Cost",
+                    estimated=str(estimated_data.get('estimatedSparePartsCost', 0.0)),
+                    actual=str(record.get('sparePartsCosts',0.0))
+                ))
+                comparison_results.append(ComparisonResult(
+                    metric="TAT Time",
+                    estimated=str(estimated_data.get('estimatedTatTime', 0.0)),
+                    actual=str(record.get('tatTime',0.0))
+                ))
+        logger.info(f"Comparison results: {comparison_results}")
+        return ComparisonResponse(
+            estimateID=estimate_id,
+            comparisonResults=comparison_results
+        )
+    
+
+    async def download_estimate_pdf(self,estimate_id: str)-> StreamingResponse:
+        """
+        Download estimate as PDF
+        """
+        logger.info(f"Fetching estimate with ID: {estimate_id}")
+        task_service = TaskService()
+        estimate_dict = await task_service.get_estimate_by_id(estimate_id)
+        if not estimate_dict:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        
+        estimate = EstimateResponse(**estimate_dict)
+
+        # Create a PDF buffer
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+
+        # Helper function to draw wrapped text
+        def draw_wrapped_text(x, y, text, max_width):
+            # Split the text into lines based on newline characters
+            lines = text.split('\n')
+            for line in lines:
+                # Split the line into words for wrapping
+                words = line.split(' ')
+                current_line = ''
+                for word in words:
+                    if p.stringWidth(current_line + word, 'Helvetica', 12) < max_width:
+                        current_line += word + ' '
+                    else:
+                        p.drawString(x, y, current_line.strip())  # Draw the current line and move down
+                        y -= 15  # Move down for the next line
+                        if y < 50:  # Check if we need to create a new page
+                            p.showPage()
+                            p.setFont("Helvetica", 12)
+                            y = height - 50  # Reset y position for new page
+                        current_line = word + ' '  # Start a new line with the current word
+
+                # Draw any remaining text in the current line
+                if current_line:
+                    p.drawString(x, y, current_line.strip())
+                    y -= 15  
+                    if y < 50:  # Check if we need to create a new page
+                        p.showPage()
+                        p.setFont("Helvetica", 12)
+                        y = height - 50  # Reset y position for new page
+
+            return y
+
+        p.setFont("Helvetica", 12)
+        y_position = height - 50
+
+        # Add content to the PDF in structured format
+        y_position = draw_wrapped_text(100, y_position, f"estID: {estimate.estID}", width - 200)
+        y_position = draw_wrapped_text(100, y_position, f"description: {estimate.description}", width - 200)
+
+        # Add tasks
+        y_position = draw_wrapped_text(100, y_position, "tasks:", width - 200)
+        for task in estimate.tasks:
+            y_position = draw_wrapped_text(120, y_position, f"- sourceTask: {task.sourceTask}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"  desc: {task.desciption}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
+            y_position = draw_wrapped_text(160, y_position, f"    min: {task.mhs.min}", width - 200)
+            y_position = draw_wrapped_text(160, y_position, f"    max: {task.mhs.max}", width - 200)
+            y_position = draw_wrapped_text(160, y_position, f"    avg: {task.mhs.avg}", width - 200)
+            y_position = draw_wrapped_text(160, y_position, f"    est: {task.mhs.est}", width - 200)
+
+            if task.spareParts:
+                y_position = draw_wrapped_text(140, y_position, "  spareParts:", width - 200)
+                for spare in task.spareParts:
+                    y_position = draw_wrapped_text(160, y_position, f"- partId: {spare.partId}", width - 200)
+                    y_position = draw_wrapped_text(160, y_position, f"  desc: {spare.desc}", width - 200)
+                    y_position = draw_wrapped_text(160, y_position, f"  qty: {spare.qty}", width - 200)
+                    y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
+                    y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
+
+        y_position = draw_wrapped_text(100, y_position, "aggregatedTasks:", width - 200)
+        y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedTasks.totalMhs}", width - 200)
+        y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {estimate.aggregatedTasks.totalPartsCost}", width - 200)
+
+        # Add findings
+        y_position = draw_wrapped_text(100, y_position, "findings:", width - 200)
+        for finding in estimate.findings:
+            y_position = draw_wrapped_text(120, y_position, f"- taskId: {finding.taskId}", width - 200)
+            y_position = draw_wrapped_text(120, y_position, "  details:", width - 200)
+            for detail in finding.details:
+                y_position = draw_wrapped_text(140, y_position, f"- logItem: {detail.logItem}", width - 200)
+                y_position = draw_wrapped_text(140, y_position, f"  desc: {detail.desciption}", width - 200)
+                y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
+                y_position = draw_wrapped_text(160, y_position, f"    min: {detail.mhs.min}", width - 200)
+                y_position = draw_wrapped_text(160, y_position, f"    max: {detail.mhs.max}", width - 200)
+                y_position = draw_wrapped_text(160, y_position, f"    avg: {detail.mhs.avg}", width - 200)
+                y_position = draw_wrapped_text(160, y_position, f"    est: {detail.mhs.est}", width - 200)
+
+                if detail.spareParts:
+                    y_position = draw_wrapped_text(140, y_position, "  spareParts:", width - 200)
+                    for spare in detail.spareParts:
+                        y_position = draw_wrapped_text(160, y_position, f"- partId: {spare.partId}", width - 200)
+                        y_position = draw_wrapped_text(160, y_position, f"  desc: {spare.desc}", width - 200)
+                        y_position = draw_wrapped_text(160, y_position, f"  qty: {spare.qty}", width - 200)
+                        y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
+                        y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
+
+        y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
+        for aggregated_finding in estimate.aggregatedFindingsByTask:
+            y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
+            y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
+            y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
+
+        y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
+        y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
+        y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {estimate.aggregatedFindings.totalPartsCost}", width - 200)
+
+        y_position = draw_wrapped_text(100, y_position, f"createdBy: {estimate.createdBy}", width - 200)
+        y_position = draw_wrapped_text(100, y_position, f"createdAt: '{estimate.createdAt.strftime('%Y-%m-%dT%H:%M:%SZ')}'", width - 200)
+        y_position = draw_wrapped_text(100, y_position, f"lastUpdated: '{estimate.lastUpdated.strftime('%Y-%m-%dT%H:%M:%SZ')}'", width - 200)
+
+        p.showPage()
+        p.save()
+
+        # Move the buffer position to the beginning
+        buffer.seek(0)
+
+        # Create a StreamingResponse with the PDF content
+        logger.info("Creating PDF response")
+        response = StreamingResponse(buffer, media_type="application/pdf")
+        response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
+        return response

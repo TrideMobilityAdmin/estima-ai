@@ -7,15 +7,11 @@ import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
-from fastapi.responses import StreamingResponse
-from io import BytesIO
-from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-# logger = logging.getLogger(__name__)
+from app.services.configurations import ConfigurationService
+
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
@@ -75,7 +71,7 @@ async def get_all_estimates(
 #     return await task_service.get_spare_parts_findings(task_id)
 
 
-@router.get("/api/v1/parts/usage")
+@router.get("/parts/usage")
 
 async def get_parts_usage(
     part_id: str,
@@ -87,17 +83,31 @@ async def get_parts_usage(
     """
     parts_usage=await task_service.get_parts_usage(part_id)
     logging.info("Parts usage data: %s", parts_usage)
-    print(parts_usage)
     return parts_usage
 
-@router.get("/api/v1/skills/analysis")
+@router.get("/skills/analysis")
 async def get_skills_analysis(
-    Source_Tasks:str = Query(..., description="source task"),
+    source_tasks: List[str] = Query(..., 
+        description="List of source tasks to analyze",
+        example=["task1", "task2"],
+    ),
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    skills_analysis = await task_service.get_skills_analysis(Source_Tasks)
-
+    """
+    Endpoint to analyze skills based on a list of source tasks.
+    
+    Args:
+        source_tasks: List of task identifiers to analyze
+        current_user: Current authenticated user
+        task_service: Injected task service dependency
+    
+    Returns:
+        Analysis results for the provided tasks
+    """
+    # Pass the entire list to the service method
+    skills_analysis = await task_service.get_skills_analysis(source_tasks)
+    
     return skills_analysis
 
 
@@ -126,16 +136,47 @@ async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depe
     """
     return await excel_service.upload_excel(file)
 
+@router.post("/estimates/{estimate_id}/compare",response_model=ComparisonResponse)
+async def compare_estimates(estimate_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """
+    Compare uploaded Excel file with existing estimate
+    """
+    return await excel_service.compare_estimates(estimate_id, file)
+
+
 @router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
-@router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
-async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(get_current_user), task_service: TaskService = Depends()):
+async def download_estimate_pdf(estimate_id: str, current_user: dict = Depends(get_current_user)):
     """
     Download estimate as PDF
     """
-    estimate = await task_service.get_estimate_by_id(estimate_id)
-    if not estimate:
-        raise HTTPException(status_code=404, detail="Estimate not found")
-    response = StreamingResponse(media_type="application/pdf")
-    response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
-    return response
-        
+    return await excel_service.download_estimate_pdf(estimate_id)
+
+config_service = ConfigurationService()
+@router.get("/configurations/", response_model=List[ConfigurationsResponse])
+async def get_all_configurations(
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.get_all_configurations()
+
+@router.post("/configurations/", response_model=ConfigurationsResponse, status_code=201)
+async def create_configurations(
+    config_req: ConfigurationsResponse,
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.create_configurations(config_req)
+
+@router.put("/configurations/{config_id}", response_model=ConfigurationsResponse)
+async def update_configurations(
+    config_id: str,
+    config_req: ConfigurationsResponse,
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.update_configurations(config_id, config_req)
+@router.post("/validate",response_model=List[ValidTasks])
+async def validate_tasks(
+    estimate_request: ValidRequest,
+     current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    print("validate_tasks")
+    return await task_service.validate_tasks(estimate_request,current_user)

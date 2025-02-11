@@ -1,13 +1,13 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Task,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours,SkillDetail
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
 from statistics import mean
-from fastapi import HTTPException,Depends
-import logging
+from fastapi import HTTPException,Depends,status
 from typing import List , Dict,Optional
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
 from datetime import datetime
 from fastapi import UploadFile, File
+from app.models.estimates import ValidTasks,ValidRequest
 from datetime import datetime,timezone
 from app.models.estimates import (
     Estimate,
@@ -17,6 +17,10 @@ from app.models.estimates import (
     AggregatedTasks,
     SpareParts,
     SpareResponse,
+    Details,
+    FindingsDetailsWithParts,
+    AggregatedFindingsByTask,
+    AggregatedFindings,
     Details,
     FindingsDetailsWithParts,
     AggregatedFindingsByTask,
@@ -40,7 +44,8 @@ class TaskService:
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
-
+        
+    
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
         Get man hours statistics for a specific source task
@@ -118,7 +123,38 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching estimates: {str(e)}"
             )
+    async def validate_tasks(self, estimate_request: ValidRequest, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        """
+        try:
+            task_ids = estimate_request.tasks
 
+            # Query MongoDB to check which tasks exist
+            existing_tasks_list = self.taskdescription_collection.find(
+                {"Task": {"$in": task_ids}}, {"_id": 0, "Task": 1}
+            )
+
+            # Convert cursor to list
+            existing_tasks_list = list(existing_tasks_list)  # Ensure it's a list
+
+            # Convert list to a set for faster lookups
+            existing_tasks = list(doc["Task"] for doc in existing_tasks_list)
+
+            # Prepare the response list
+            validated_tasks = [
+                ValidTasks(taskid=task, status=(task in existing_tasks))
+                for task in task_ids
+            ]
+
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
         Create a new estimate based on the provided tasks and parameters.
@@ -213,9 +249,13 @@ class TaskService:
             )
 
                      
-            estimate_id = await self._generate_estimate_id()
-            description = await self._get_estimate_description(estimate_request.tasks)
-            logger.info(f'description at task level: {description}')
+            try:
+                estimate_id = await self._generate_estimate_id()
+                description = await self._get_estimate_description(estimate_request.tasks)
+                logger.info(f'description at task level: {description}')
+            except Exception as e: 
+                logger.error(f"Error generating estimate ID or description: {str(e)}")
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Failed to generate estimate ID or description")
             estimate_doc = {
                 "estID":estimate_id,
                 "description": description,
@@ -256,7 +296,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error creating estimate: {str(e)}")
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Error creating estimate: {str(e)}"
             )
 
@@ -352,7 +392,7 @@ class TaskService:
 
         except Exception as e:
             logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error generating estimate ID: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
         # findings level spare parts
     async def get_spare_parts_findings(self, task_id: str) -> List[SpareResponse]:
         """
@@ -462,7 +502,8 @@ class TaskService:
             )
 
 
-            
+            logger.error(f"Error fetching task description: {str(e)}")
+            return {"id": "", "description": ""}
 
     # async def _generate_description(self, tasks: List[str]) -> str:
     #     """
@@ -620,24 +661,20 @@ class TaskService:
             return None
         
 
-    async def get_skills_analysis(self, source_tasks: str) :
+    async def get_skills_analysis(self, source_tasks: list[str]):
         """
-        Analyzes skills required for tasks from an uploaded Excel file.
+        Analyzes skills required for multiple tasks.
         Returns required skills and man-hours at both task and findings levels.
+        
+        Args:
+            source_tasks: List of task IDs to analyze
         """
         try:
-            """
-            # Ensure source_tasks is a list of strings
-            if not isinstance(source_tasks, list) or not all(isinstance(task, str) for task in source_tasks):
-                logger.error("Invalid source_tasks format. Expected a list of strings.")
-                return None
-            """
-
-            logger.info(f"Extracted Source Tasks: {source_tasks}")
+            logger.info(f"Analyzing skills for tasks: {source_tasks}")
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": source_tasks}},
+                {"$match": {"Task": {"$in": source_tasks}}},  # Modified to use $in operator
                 {
                     "$group": {
                         "_id": "$Task",
@@ -658,7 +695,7 @@ class TaskService:
 
             # MongoDB pipeline for sub-task findings
             sub_tasks_skill_pipeline = [
-                {"$match": {"SourceTaskDiscrep": source_tasks}},
+                {"$match": {"SourceTaskDiscrep": {"$in": source_tasks}}},  # Modified to use $in operator
                 {
                     "$group": {
                         "_id": "$SourceTaskDiscrep",
@@ -679,39 +716,11 @@ class TaskService:
             # Execute MongoDB queries
             task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
-            logger.info(f"the skill analysis of Source Tasks: {task_skill_results} and {sub_task_skill_results}")
             
-            """
-
+            logger.info(f"Retrieved skill analysis for tasks: {task_skill_results}")
+            logger.info(f"Retrieved skill analysis for sub-tasks: {sub_task_skill_results}")
 
             # Process results into response format
-            tasks = [
-                TaskAnalysis(
-                    taskId=task["_id"],
-                    taskDescription=task.get("taskDescription", ""),
-                    skills=[SkillDetail(**skill) for skill in task["skills"]]
-                )
-                for task in task_skill_results
-            ]
-
-            findings = [
-                TaskAnalysis(
-                    taskId=sub_task["_id"],
-                    skills=[SkillDetail(**skill) for skill in sub_task["skills"]]
-                )
-                for sub_task in sub_task_skill_results
-            ]
-            logger.info(f"the processed skill analysis of Source Tasks:{tasks} and {findings}")
-
-            # Construct final response
-            response = SkillAnalysisResponse(
-                skillAnalysis={
-                    "tasks": tasks,
-                    "findings": findings
-                }
-            )
-            """
-        # Convert results into required format (as a dictionary)
             tasks = [
                 {
                     "taskId": task["_id"],
@@ -741,9 +750,10 @@ class TaskService:
                 for sub_task in sub_task_skill_results
             ]
 
-            logger.info(f"Processed skill analysis for Source Tasks: {tasks} and Findings: {findings}")
+            logger.info(f"Processed skill analysis for tasks: {tasks}")
+            logger.info(f"Processed skill analysis for findings: {findings}")
 
-            # Construct final response as a dictionary
+            # Construct final response
             response = {
                 "skillAnalysis": {
                     "tasks": tasks,
@@ -755,8 +765,7 @@ class TaskService:
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return {"error": "An error occurred while processing the request."}
-
+            return {"error": f"An error occurred while processing the request: {str(e)}"}
 
     async def get_estimate_by_id(self, estimate_id: str) -> EstimateResponse:
         """
@@ -782,3 +791,4 @@ class TaskService:
                 detail=f"Error fetching estimate: {str(e)}"
             )
            
+    
