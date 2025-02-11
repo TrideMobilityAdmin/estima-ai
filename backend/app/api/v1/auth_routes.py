@@ -7,6 +7,7 @@ from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
 from app.log.logs import logger
+from bson import ObjectId   
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -77,6 +78,8 @@ async def User_login(user: UserLogin):
         "username": user_found["username"],
         "email": user_found["email"]
     }
+
+
 @router.post("/logout")
 async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
     try:
@@ -111,3 +114,20 @@ async def User_logout(response: Response, current_user: dict = Depends(get_curre
             status_code=500,
             detail="Error during logout"
         )
+@router.get("/user/{user_id}", response_model=UserResponse)
+async def get_user_by_id(user_id: str,current_user: dict = Depends(get_current_user)):
+    """
+    Get user details by ID
+    """
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
+    user_found = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user_found:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": str(user_found["_id"]),
+        "username": user_found["username"],
+        "email": user_found["email"],
+        "createdAt": user_found.get("createdAt")
+    }
