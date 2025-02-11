@@ -28,6 +28,9 @@ import {
 } from "../constants/GlobalImports";
 import flightBg  from '../../public/airCraft8.jpg'
 import { Overlay } from "@mantine/core";
+import { entityID, roleID, userID, userToken } from "../components/tokenJotai";
+import { clearAuthState, saveAuthData } from "../main";
+import { getUserLogin_Url } from "../api/apiUrls";
 
 // const validCredentials = [
 //   { email: "gmr@evrides.live", password: "gmr@evrides" },
@@ -36,7 +39,7 @@ import { Overlay } from "@mantine/core";
 // ];
 
 type LoginInput = {
-  email: string;
+  username: string;
   password: string;
 };
 
@@ -44,9 +47,6 @@ function Login() {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
 
-  const form = useForm({
-    initialValues: { email: "", password: "" },
-  });
 
   // const verify = (values: LoginInput) => {
   //   const isValid = validCredentials.some(
@@ -66,63 +66,77 @@ function Login() {
   //     return () => clearTimeout(timer);
   //   }
   // }, [errorMessage]);
-  // const form = useForm<any>({
-  //   initialValues: {
-  //     email: "",
-  //     password: "",
-  //   },
-  // });
-  // const [token, setToken] = useAtom(userToken);
-  // const [userId, setUserID] = useAtom(userID);
+  const form = useForm<any>({
+    initialValues: {
+      username: "",
+      password: "",
+    },
+  });
+  const [token, setToken] = useAtom(userToken);
+  const [userId, setUserID] = useAtom(userID);
   // const [roleId, setRoleID] = useAtom(roleID);
   // const [entityId, setEntityID] = useAtom(entityID);
-  // const login = async (values: LoginInput) => {
-  //   try {
-  //     const response = await axios.post(getUserLogin_Url, {
-  //       email: values.email,
-  //       password: values.password,
-  //     });
+  const login = async (values: LoginInput) => {
+    try {
+      const response = await axios.post(getUserLogin_Url, {
+        username: values.username,
+        password: values.password,
+      });
 
-  //     const { token, userID, roleID, entityID } = response.data;
+      const { 
+        accessToken, 
+        userID, 
+        // roleID, 
+        // entityID 
+      } = response.data;
 
-  //     if (response.status === 200) {
-  //       // Save user details and token
-  //       setToken(token);
-  //       setUserID(userID);
-  //       setRoleID(roleID);
-  //       setEntityID(entityID);
+      // console.log("responese login >>>>",response.data)
+      if (response.status === 200) {
+        // Save user details and token
+        setToken(accessToken);
+        setUserID(userID);
+        // setRoleID(roleID);
+        // setEntityID(entityID);
 
-  //       sessionStorage.setItem("token", token);
-  //       sessionStorage.setItem("userID", userID);
-  //       sessionStorage.setItem("roleID", roleID);
-  //       sessionStorage.setItem("entityID", entityID);
+        sessionStorage.setItem("token", accessToken);
+        sessionStorage.setItem("userID", userID);
+        // sessionStorage.setItem("roleID", roleID);
+        // sessionStorage.setItem("entityID", entityID);
+// Verify that the token is stored
+const storedToken = sessionStorage.getItem("token");
+console.log("✅ Token stored in sessionStorage:", storedToken);  
+        saveAuthData({ token, status: "authenticated" });
 
-  //       saveAuthData({ token, status: "authenticated" });
+        showNotification({
+          title: "Login Successful",
+          message: "Welcome to EstimaAI",
+          color: "green",
+          style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        });
+        
+        // Redirect to dashboard
+        navigate("/home");
+        // window.location.reload();
+      } else {
+        throw new Error("Invalid credentials or server error");
+      }
+    } catch (error: any) {
+      clearAuthState();
+      console.log("errorrrrr", error);
+      const errorMessage =
+        error.response?.data?.responseMsg || "Something went wrong!";
 
-  //       showNotification({
-  //         title: "Login Successful",
-  //         message: "Welcome to Smart Trolley dashboard",
-  //         color: "green",
-  //       });
-  //       // Redirect to dashboard
-  //       navigate("/home/tracking");
-  //       window.location.reload();
-  //     } else {
-  //       throw new Error("Invalid credentials or server error");
-  //     }
-  //   } catch (error: any) {
-  //     clearAuthState();
-  //     console.log("errorrrrr", error);
-  //     const errorMessage =
-  //       error.response?.data?.responseMsg || "Something went wrong!";
+      showNotification({
+        title: "Login Failed",
+        message: errorMessage,
+        color: "red",
+        style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      });
+    }
+  };
 
-  //     showNotification({
-  //       title: "Login Failed",
-  //       message: errorMessage,
-  //       color: "red",
-  //     });
-  //   }
-  // };
+  // console.log("token.....",token);
+  // console.log("userId.....",userId);
 
   return (
     <div
@@ -175,7 +189,7 @@ function Login() {
           }}
         >
           <form
-            // onSubmit={form.onSubmit((values) => login(values))}
+            onSubmit={form.onSubmit((values) => login(values))}
           >
             <Flex align='center' justify='center' direction='column'>
             <Title ta="center" >
@@ -189,10 +203,10 @@ function Login() {
             
 
             <TextInput
-              label="Email address"
+              label="Username"
               placeholder="hello@gmail.com"
               size="md"
-              {...form.getInputProps("email")}
+              {...form.getInputProps("username")}
             />
             <PasswordInput
               label="Password"
@@ -202,14 +216,14 @@ function Login() {
               {...form.getInputProps("password")}
             />
             <Checkbox label="Keep me logged in" mt="xl" size="md" />
-            <Button onClick={()=>{ navigate("/home")}}  type="submit" bg="#000DB4" fullWidth mt="xl" size="md">
+            <Button type="submit" bg="#000DB4" fullWidth mt="xl" size="md">
               Login
             </Button>
           </form>
         </Paper>
       </Flex>
 
-      {errorMessage && (
+      {/* {errorMessage && (
         <Notification
           color="red"
           onClose={() => setErrorMessage("")}
@@ -224,7 +238,7 @@ function Login() {
         >
           {errorMessage}
         </Notification>
-      )}
+      )} */}
     </div>
   );
 }

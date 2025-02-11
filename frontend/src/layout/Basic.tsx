@@ -11,7 +11,7 @@ export default function Basic() {
     { link: '/home/compare-estimate', label: 'COMPARE ESTIMATE' },
     { link: '/home/part-usage', label: 'PART USAGE' },
     { link: '/home/skill-requirement', label: 'SKILL REQUIREMENT' },
-    { link: '/home/configuration', label: 'CONFIGURATION' },
+    { link: '/home/expert-insights', label: 'CONFIGURATION' },
   ];
 
 
