@@ -7,7 +7,7 @@ import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -107,7 +107,13 @@ async def post_skills_analysis(
     
     return skills_analysis
 
-
+@router.post("/estimate_status",response_model=EstimateStatus)
+async def estimate_status(
+    estimate_request: EstimateRequest,
+     current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+     return await task_service.estimate_status(estimate_request,current_user)
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 async def create_estimate(
     estimate_request: EstimateRequest,
