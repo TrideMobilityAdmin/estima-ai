@@ -4,9 +4,13 @@ import { DatePickerInput } from "@mantine/dates";
 import { IconAlertTriangle, IconCube, IconMenuDeep, IconTool } from "@tabler/icons-react";
 import ReactApexChart from "react-apexcharts";
 import '../App.css';
+// import { useApiPartUsage } from "../api/services/partUsageService";
 
 export default function PartUsage() {
+    // const { getPartUsage } = useApiPartUsage();
     const [value, setValue] = useState<[Date | null, Date | null]>([null, null]);
+
+
 
     const jsonData = {
         partId: 'P12345',

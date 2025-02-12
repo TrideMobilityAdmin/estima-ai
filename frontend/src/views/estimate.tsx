@@ -1,5 +1,5 @@
 // import { Grid, Title } from "@mantine/core";
-import { List, SegmentedControl, Select } from "@mantine/core";
+import { List, LoadingOverlay, SegmentedControl, Select } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
     Badge,
@@ -30,6 +30,7 @@ import {
     showNotification,
     Table,
     useEffect,
+    useForm,
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
@@ -37,17 +38,132 @@ import { IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconError404
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { useApi } from "../api/services/estimateSrvice";
+
 export default function Estimate() {
+    const { postEstimateReport, validateTasks } = useApi();
     const [scrolledTable, setScrolledTable] = useState(false);
     const [tasks, setTasks] = useState<string[]>([]);
+    const [estimateReportData, setEstReportData] = useState<any>(null);
+    const [loading, setLoading] = useState(false); // Add loading state
+    const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Handle file upload (for Excel parsing)
     const handleFiles = (files: File[]) => {
         console.log("Uploaded files:", files);
     };
-    // Handle extracted tasks
-    const handleTasks = (extractedTasks: string[]) => {
+
+    //  Extracted tasks are passed to validation API
+    const handleTasks = async (extractedTasks: string[]) => {
+        setIsLoading(true);
         setTasks(extractedTasks);
-        console.log("tasks :", extractedTasks);
+
+        console.log("Extracted Tasks:", extractedTasks);
+        const response = await validateTasks(extractedTasks);
+        setValidatedTasks(response);
+        setIsLoading(false);
+
+        const invalidTasks = response?.filter((task) => task?.status === false);
+        if (invalidTasks.length > 0) {
+            showNotification({
+                title: "Tasks Not Available!",
+                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to generate Estimate.`,
+                color: "orange",
+                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            });
+        }
+    }
+
+    // Form initialization
+    const form = useForm({
+        initialValues: {
+            probability: "",
+            operator: "",
+            aircraftAge: "",
+            aircraftFlightHours: "",
+            aircraftFlightCycles: "",
+        },
+
+        validate: {
+            probability: (value) => (value.trim() ? null : "Probability is required"),
+            operator: (value) => (value.trim() ? null : "Operator is required"),
+            aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
+            aircraftFlightHours: (value) => (value.trim() ? null : "Flight Hours are required"),
+            aircraftFlightCycles: (value) => (value.trim() ? null : "Flight Cycles are required"),
+        },
+    });
+
+    // Handle Submit
+    const handleSubmit = async () => {
+        const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
+
+        if (!form.isValid()) {
+            form.validate();
+            return;
+        }
+
+        if (tasks.length === 0) {
+            showNotification({
+                title: "Error",
+                message: "Tasks are required",
+                color: "red",
+                style: { position: "fixed", top: 20, right: 20, zIndex: 1000 },
+            });
+            return;
+        }
+
+        if (validTasks.length === 0) {
+            showNotification({
+                title: "Error",
+                message: "No valid tasks available to estimate the report.",
+                color: "red",
+                style: { position: "fixed", top: 20, right: 20, zIndex: 1000 },
+            });
+            return;
+        }
+
+        const requestData = {
+            tasks: validTasks,
+            probability: Number(form.values.probability),
+            operator: form.values.operator,
+            aircraftAge: Number(form.values.aircraftAge),
+            aircraftFlightHours: Number(form.values.aircraftFlightHours),
+            aircraftFlightCycles: Number(form.values.aircraftFlightCycles),
+        };
+
+        console.log("Submitting data:", requestData);
+
+        try {
+            setLoading(true);
+            const response = await postEstimateReport(requestData);
+            console.log("API Response:", response);
+
+            if (response) {
+                setEstReportData(response);
+                showNotification({
+                    title: "Success",
+                    message: "Estimate report submitted successfully!",
+                    color: "green",
+                });
+            }
+        } catch (error) {
+            showNotification({
+                title: "Submission Failed",
+                message: "An error occurred while submitting the estimate report.",
+                color: "red",
+            });
+            console.error("API Error:", error);
+        } finally {
+            setLoading(false);
+        }
     };
+
+
+    useEffect(() => {
+        console.log("Updated UI response:", estimateReportData);
+    }, [estimateReportData]);
+    console.log("response UI >>>>", estimateReportData);
 
     const [downloading, setDownloading] = useState(false);
     const handleDownloadPDF = async () => {
@@ -430,6 +546,14 @@ export default function Estimate() {
 
                     <Grid.Col span={5}>
                         <Card withBorder h='50vh' radius='md'>
+
+                            <LoadingOverlay
+                                visible={isLoading}
+                                zIndex={1000}
+                                overlayProps={{ radius: 'sm', blur: 2 }}
+                                loaderProps={{ color: 'indigo', type: 'bars' }}
+                            />
+
                             <Group mb='xs'>
                                 <Text size="md" fw={500}>
                                     Tasks
@@ -452,17 +576,17 @@ export default function Estimate() {
                                 offsetScrollbars
                                 scrollHideDelay={1}
                             >
-                                {tasks.length > 0 ? (
+                                {validatedTasks?.length > 0 ? (
                                     <SimpleGrid cols={4}>
-                                        {tasks.map((task, index) => (
+                                        {validatedTasks?.map((task, index) => (
                                             <Badge
                                                 key={index}
-                                                color="blue"
+                                                color={task?.status === false ? "red" : "blue"}
                                                 variant="light"
                                                 radius='sm'
                                                 style={{ margin: "0.25em" }}
                                             >
-                                                {task}
+                                                {task?.taskid}
                                             </Badge>
                                         ))}
                                     </SimpleGrid>
@@ -494,35 +618,35 @@ export default function Estimate() {
                                         leftSection={<MdPin />}
                                         placeholder="Ex:50"
                                         label="Probability"
-                                    //   {...form.getInputProps("probability")}
+                                        {...form.getInputProps("probability")}
                                     />
                                     <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Indigo, AirIndia"
                                         label="Operator"
-                                    //   {...form.getInputProps("assetOwner")}
+                                        {...form.getInputProps("operator")}
                                     />
                                     <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Ex:50"
                                         label="Aircraft Age"
-                                    //   {...form.getInputProps("assetOwner")}
+                                        {...form.getInputProps("aircraftAge")}
                                     />
                                     <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Ex:50"
                                         label="Flight Cycles"
-                                    //   {...form.getInputProps("assetOwner")}
+                                        {...form.getInputProps("aircraftFlightCycles")}
                                     />
                                     <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Ex:50"
                                         label="Flight Hours"
-                                    //   {...form.getInputProps("assetOwner")}
+                                        {...form.getInputProps("aircraftFlightHours")}
                                     />
 
                                     <Text size="md" fw={500}>
@@ -582,6 +706,7 @@ export default function Estimate() {
 
                 <Group justify="center" pt='sm' pb='sm'>
                     <Button
+                        onClick={handleSubmit}
                         variant="gradient"
                         gradient={{ from: 'indigo', to: 'cyan', deg: 90 }}
                         // variant="filled"
@@ -822,7 +947,7 @@ export default function Estimate() {
                 <Space h='xl' />
 
                 {/* <SegmentedControl color="#1A237E" bg='white' data={['Findings', 'Man Hours', 'Spare Parts']} /> */}
-                
+
                 <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} />
 
                 <Space h='md' />
@@ -1280,10 +1405,10 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     return (
         <Card withBorder p={0} h="90vh" bg="none">
             <Card p={10} c='white' bg='#124076'>
-                        <Title order={4}>
-                            Preload
-                        </Title>
-                    </Card>
+                <Title order={4}>
+                    Preload
+                </Title>
+            </Card>
             <Space h="xs" />
             <Grid h="100%">
                 {/* Left Section: Tasks List */}
@@ -1432,16 +1557,16 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                         Spare Parts
                                     </Text>
                                     <div
-                                                className="ag-theme-alpine"
-                                                style={{
-                                                    width: "100%",
-                                                    border: "none",
-                                                    height: "100%",
+                                        className="ag-theme-alpine"
+                                        style={{
+                                            width: "100%",
+                                            border: "none",
+                                            height: "100%",
 
-                                                }}
-                                            >
-                                                <style>
-                                                    {`
+                                        }}
+                                    >
+                                        <style>
+                                            {`
 /* Remove the borders and grid lines */
 .ag-theme-alpine .ag-root-wrapper, 
 .ag-theme-alpine .ag-root-wrapper-body,
@@ -1462,61 +1587,61 @@ box-shadow: none !important; /* Remove any box shadow */
 border-bottom: none;
 }
 `}
-                                                </style>
-                                                <AgGridReact
-                                                    pagination
-                                                    paginationPageSize={10}
-                                                    domLayout="autoHeight" // Ensures height adjusts dynamically
-                                                    rowData={selectedTask?.spareParts || []}
-                                                    columnDefs={[
-                                                        {
-                                                            field: "partId",
-                                                            headerName: "Part ID",
-                                                            sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1
-                                                        },
-                                                        {
-                                                            field: "desc",
-                                                            headerName: "Part Desc",
-                                                            sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1
-                                                        },
-                                                        {
-                                                            field: "qty",
-                                                            headerName: "Qty",
-                                                            sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1
-                                                        },
-                                                        {
-                                                            field: "unit",
-                                                            headerName: "Unit",
-                                                            sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1
-                                                        },
-                                                        {
-                                                            field: "price",
-                                                            headerName: "Price($)",
-                                                            sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1
-                                                        },
-                                                    ]}
-                                                />
-                                            </div>
+                                        </style>
+                                        <AgGridReact
+                                            pagination
+                                            paginationPageSize={10}
+                                            domLayout="autoHeight" // Ensures height adjusts dynamically
+                                            rowData={selectedTask?.spareParts || []}
+                                            columnDefs={[
+                                                {
+                                                    field: "partId",
+                                                    headerName: "Part ID",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "desc",
+                                                    headerName: "Part Desc",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "qty",
+                                                    headerName: "Qty",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "unit",
+                                                    headerName: "Unit",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "price",
+                                                    headerName: "Price($)",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                            ]}
+                                        />
+                                    </div>
                                 </>
                             ) : (
                                 <Text>Select a task to view details.</Text>

@@ -46,7 +46,7 @@ const Landing: React.FC = () => {
     "/home/compare-estimate": bgCompareEstimate,
     "/home/part-usage": bgPartUsage,
     "/home/skill-requirement": bgSkillRequirement,
-    "/home/configuration": bgConfiguration,
+    "/home/expert-insights": bgConfiguration,
   };
 
   // Determine active background image
@@ -139,7 +139,7 @@ const Landing: React.FC = () => {
             { link: "/home/compare-estimate", label: "COMPARE ESTIMATE" },
             { link: "/home/part-usage", label: "PART USAGE" },
             { link: "/home/skill-requirement", label: "SKILL REQUIREMENT" },
-            { link: "/home/configuration", label: "CONFIGURATION" },
+            { link: "/home/expert-insights", label: "EXPERT INSIGHTS" },
           ].map((link) => (
             <Button
               key={link.label}
@@ -334,7 +334,7 @@ export default Landing;
 //     "/home/compare-estimate": bgCompareEstimate,
 //     "/home/part-usage": bgPartUsage,
 //     "/home/skill-requirement": bgSkillRequirement,
-//     "/home/configuration": bgConfiguration,
+//     "/home/expert-insights": bgConfiguration,
 //   };
 
 //   // Determine active background image
@@ -345,7 +345,7 @@ export default Landing;
 //     { link: "/home/compare-estimate", label: "COMPARE ESTIMATE" },
 //     { link: "/home/part-usage", label: "PART USAGE" },
 //     { link: "/home/skill-requirement", label: "SKILL REQUIREMENT" },
-//     { link: "/home/configuration", label: "CONFIGURATION" },
+//     { link: "/home/expert-insights", label: "CONFIGURATION" },
 //   ];
 
 //   return (
@@ -610,7 +610,7 @@ export default Landing;
 //     "/home/compare-estimate": bgCompareEstimate,
 //     "/home/part-usage": bgPartUsage,
 //     "/home/skill-requirement": bgSkillRequirement,
-//     "/home/configuration": bgConfiguration,
+//     "/home/expert-insights": bgConfiguration,
 //   };
 
 //   // Determine active background image
@@ -621,7 +621,7 @@ export default Landing;
 //     { link: "/home/compare-estimate", label: "COMPARE ESTIMATE" },
 //     { link: "/home/part-usage", label: "PART USAGE" },
 //     { link: "/home/skill-requirement", label: "SKILL REQUIREMENT" },
-//     { link: "/home/configuration", label: "CONFIGURATION" },
+//     { link: "/home/expert-insights", label: "CONFIGURATION" },
 //   ];
 
 //   return (
