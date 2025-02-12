@@ -40,6 +40,8 @@ class Estimate(BaseModel):
     createdAt: datetime|None=None
     lastUpdated: datetime|None=None
 # create estimate
+
+
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
@@ -89,7 +91,9 @@ class AggregatedFindingsByTask(BaseModel):
 class AggregatedFindings(BaseModel):
     totalMhs: float = 0.0
     totalPartsCost: float = 0.0
-   
+class EstimateStatus(BaseModel):
+    estID:str
+    status:str
 #estimate response schema
 class EstimateResponse(BaseModel):
     estID: str

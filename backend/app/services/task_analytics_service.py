@@ -7,7 +7,7 @@ from app.middleware.auth import get_current_user
 from typing import List
 from datetime import datetime
 from fastapi import UploadFile, File
-from app.models.estimates import ValidTasks,ValidRequest
+from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 from app.models.estimates import (
     Estimate,
@@ -44,6 +44,7 @@ class TaskService:
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
+        self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
         
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -155,6 +156,23 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
+    async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
+        """
+        Create a estimate status based on the provided tasks and parameters.
+        """
+        try:
+            estimate_id = await self._generate_estimateid()
+            estimate_status_doc = {
+                "estID": estimate_id,
+                "status":"Initiated"
+            }
+            self.estimates_status_collection.insert_one(estimate_status_doc)
+            response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
+            return response
+        except Exception as e:
+            logger.error(f"Error creating estimate status: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
+
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
         Create a new estimate based on the provided tasks and parameters.
@@ -794,4 +812,37 @@ class TaskService:
                 detail=f"Error fetching estimate: {str(e)}"
             )
            
-    
+    async def _generate_estimateid(self) -> str:
+        logger.info("Generating estimate ID")
+        try:
+            logger.info("Finding count of estimates")
+            count = self.estimates_status_collection.count_documents({})  # Await count
+            logger.info(f"Count of estimates: {count}")
+
+            if count == 0:
+                logger.info("No estimates found, starting with EST-001")
+                return "EST-001"
+
+        # Fetch the last inserted estimate
+            last_estimate = self.estimates_status_collection.find_one(
+                {},
+                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                projection={"estID": 1}
+            )
+
+            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+
+            if not last_estimate or "estID" not in last_estimate:
+                logger.warning("No estID found in the last estimate, defaulting to EST-001")
+                return "EST-001"
+
+            last_id_str = last_estimate["estID"]
+            last_id = int(last_id_str.split("-")[1])
+            new_id = f"EST-{last_id + 1:03d}"
+        
+            logger.info(f"Generated new estimate ID: {new_id}")
+            return new_id
+
+        except Exception as e:
+            logger.error(f"Error generating estimate ID: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
