@@ -39,10 +39,10 @@ import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { useApi } from "../api/services/estimateSrvice";
-import { getEstimateReport_Url } from "../api/apiUrls";
+import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 
 export default function Estimate() {
-    const { postEstimateReport, validateTasks } = useApi();
+    const { postEstimateReport, validateTasks, downloadEstimatePdf } = useApi();
     const [scrolledTable, setScrolledTable] = useState(false);
     const [tasks, setTasks] = useState<string[]>([]);
     const [estimateReportData, setEstReportData] = useState<any>(null);
@@ -162,59 +162,120 @@ export default function Estimate() {
         }
     };
 
-
     useEffect(() => {
         console.log("Updated UI response:", estimateReportData);
     }, [estimateReportData]);
     console.log("response UI >>>>", estimateReportData);
 
     const [downloading, setDownloading] = useState(false);
-    const handleDownloadPDF = async () => {
-        setDownloading(true); // Start loading
-        try {
-            const response = await axios.get(
-                    `${getEstimateReport_Url}/${estimateId}/download`,
-                // "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
-                {
-                    responseType: "blob", // Ensure the response is a Blob (binary data)
-                }
-            );
 
-            // Create a Blob URL for the PDF file
-            const blob = new Blob([response.data], { type: "application/pdf" });
-            const url = window.URL.createObjectURL(blob);
 
-            // Create a link element to trigger the download
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = "Estimate.pdf"; // Name for the downloaded file
-            document.body.appendChild(link);
-            link.click();
+    const handleDownload = () => {
+        downloadEstimatePdf(estimateId);
+    }
+    // const handleDownloadPDF = async () => {
+    //     setDownloading(true);
+    //     try {
+    //         // Set proper headers for the request
+    //         const config = {
+    //             responseType: 'blob' as const,
+    //             headers: {
+    //                 'Accept': 'application/pdf',
+    //                 // Add any authentication headers if needed
+    //                 // 'Authorization': `Bearer ${yourAuthToken}`
+    //             }
+    //         };
+    
+    //         const response = await axios.get(
+    //             `${getEstimateReport_Url}${estimateId}/download`,
+    //             config
+    //         );
+    
+    //         // Check if the response is actually a PDF
+    //         const contentType = response.headers['content-type'];
+    //         if (!contentType || !contentType.includes('application/pdf')) {
+    //             throw new Error('Received invalid content type from server');
+    //         }
+    
+    //         // Create blob and download
+    //         const blob = new Blob([response.data], { type: 'application/pdf' });
+            
+    //         // Verify blob size
+    //         if (blob.size < 100) { // Arbitrary small size to check if we got a valid PDF
+    //             throw new Error('Received invalid PDF data');
+    //         }
+    
+    //         const url = window.URL.createObjectURL(blob);
+    //         const link = document.createElement('a');
+    //         link.href = url;
+    //         link.download = `Estimate-${estimateId}.pdf`;
+            
+    //         document.body.appendChild(link);
+    //         link.click();
+            
+    //         // Cleanup
+    //         document.body.removeChild(link);
+    //         window.URL.revokeObjectURL(url);
+    
+    //         showNotification({
+    //             title: 'Download Successful',
+    //             message: 'Your PDF has been downloaded successfully!',
+    //             color: 'green',
+    //         });
+    //     } catch (error) {
+    //         console.error('Error downloading PDF:', error);
+            
+    //         // More detailed error message
+    //         let errorMessage = 'There was an error downloading the PDF. ';
+    //         if (axios.isAxiosError(error)) {
+    //             if (error.response) {
+    //                 if (error.response.status === 401) {
+    //                     errorMessage += 'Authentication required.';
+    //                 } else if (error.response.status === 404) {
+    //                     errorMessage += 'PDF file not found.';
+    //                 } else {
+    //                     errorMessage += `Server returned status ${error.response.status}.`;
+    //                 }
+    //             } else if (error.request) {
+    //                 errorMessage += 'No response received from server.';
+    //             } else {
+    //                 errorMessage += 'Request setup failed.';
+    //             }
+    //         }
+    
+    //         showNotification({
+    //             title: 'Download Failed',
+    //             message: errorMessage,
+    //             color: 'red',
+    //         });
+    //     } finally {
+    //         setDownloading(false);
+    //     }
+    // };
 
-            // Cleanup
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            // Show success notification
-            showNotification({
-                title: "Download Successful",
-                message: "Your PDF has been downloaded successfully!",
-                color: "green",
-            });
-        } catch (error) {
-            console.error("Error downloading PDF:", error);
-
-            // Show error notification
-            showNotification({
-                title: "Download Failed",
-                message: "There was an error downloading the PDF.",
-                color: "red",
-            });
-        } finally {
-            setDownloading(false); // End loading
-        }
-    };
-
+    // const downloadPdf = async () => {
+    //     try {
+    //       const response = await axios.get(`${getEstimateReport_Url}${estimateId}/download`, {
+    //         responseType: 'blob', // Important: Set response type to blob
+    //       });
+    
+    //       // Create a blob URL for the PDF
+    //       const url = window.URL.createObjectURL(new Blob([response.data]));
+    //       const link = document.createElement('a');
+    //       link.href = url;
+    //       link.setAttribute('download', `${estimateId}.pdf`); // Set the filename
+    
+    //       // Append to the body and trigger the download
+    //       document.body.appendChild(link);
+    //       link.click();
+    //       link.remove();
+    
+    //       // Clean up the URL object
+    //       window.URL.revokeObjectURL(url);
+    //     } catch (error) {
+    //       console.error('Error downloading PDF:', error);
+    //     }
+    //   };
     const parts = [
         {
             partName: "Nut",
@@ -770,7 +831,7 @@ export default function Estimate() {
                         color="#1bb343"
                         leftSection={<MdPictureAsPdf size={14} />}
                         rightSection={<MdOutlineFileDownload size={14} />}
-                        onClick={handleDownloadPDF}
+                        onClick={handleDownload}
                         loading={downloading}
                     >
                         {downloading ? "Downloading..." : "Download Estimate"}
