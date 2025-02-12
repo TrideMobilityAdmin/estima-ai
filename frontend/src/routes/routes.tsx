@@ -9,24 +9,24 @@ import ExpertInsights from "../views/expertInsights";
 import { useEffect } from "react";
 
 const MainRoutes = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
+  // const location = useLocation();
+  // const navigate = useNavigate();
 
-  useEffect(() => {
-    // Prevent navigating back to restricted pages after logout
-    if (location.pathname === "/") {
-      window.history.pushState(null, "", window.location.href);
-      window.addEventListener("popstate", () => {
-        window.history.pushState(null, "", window.location.href);
-      });
-    }
+  // useEffect(() => {
+  //   // Prevent navigating back to restricted pages after logout
+  //   if (location.pathname === "/") {
+  //     window.history.pushState(null, "", window.location.href);
+  //     window.addEventListener("popstate", () => {
+  //       window.history.pushState(null, "", window.location.href);
+  //     });
+  //   }
 
-    return () => {
-      window.removeEventListener("popstate", () => {
-        window.history.pushState(null, "", window.location.href);
-      });
-    };
-  }, [location]);
+  //   return () => {
+  //     window.removeEventListener("popstate", () => {
+  //       window.history.pushState(null, "", window.location.href);
+  //     });
+  //   };
+  // }, [location]);
   return (
     <Routes>
       <Route path="/" element={<Login />} />

@@ -1,38 +1,29 @@
-# Use Node.js Alpine version
+# Build stage
 FROM node:lts-alpine AS build
 
-# Disable Corepack if it's causing issues
-ENV COREPACK_ENABLE=0
+# Set environment for pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-# Set npm registry to avoid network issues
-RUN npm config set registry https://registry.npmjs.org
+# Increase memory allocation for TypeScript compilation
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
-# Manually install PNPM instead of using Corepack
-RUN npm install -g pnpm@8.15.5
-
-# Install dependencies with force flag to recreate lockfile
-RUN pnpm install --no-frozen-lockfile
-
-# Copy rest of the project files
+# Copy the rest of the app and build
 COPY . .
-
-# Build the project
 RUN pnpm run build
 
-# Use Nginx as the final container
-FROM nginx:alpine AS production
+# Production stage
+FROM nginx:alpine AS stage
+COPY --from=build /app/dist/ /usr/share/nginx/html
+COPY --from=build /app/nginx.conf /etc/nginx/nginx.conf
 
-# Copy the built files
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Expose port 80
 EXPOSE 80
-
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
