@@ -141,6 +141,45 @@ export const useApi = () => {
     }
   };
 
+  // New function to download the PDF
+  const downloadEstimatePdf = async (estimateId: string) => {
+    try {
+      const response = await axiosInstance.get(`${getEstimateReport_Url}${estimateId}/download`, {
+        responseType: 'blob', // Important: Set response type to blob
+      });
 
-  return { postEstimateReport, validateTasks, getAllEstimates,uploadFile };
+      if (response.status === 200) {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${estimateId}.pdf`); // Set the filename
+
+        // Append to the body and trigger the download
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        // Clean up the URL object
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to download PDF, status code:', response.status);
+      }
+    } catch (error: any) {
+      console.error('Error downloading PDF:', error.response ? error.response.data : error.message);
+      
+      // Handle session expiration
+      if (error.response?.data?.detail === 'Invalid authentication credentials') {
+        handleSessionExpired();
+      }
+
+      showNotification({
+        title: 'Download Failed',
+        message: error.response?.data?.message || 'Failed to download PDF',
+        color: 'red',
+      });
+    }
+  };
+
+
+  return { postEstimateReport, validateTasks, getAllEstimates,uploadFile, downloadEstimatePdf};
 };
