@@ -38,7 +38,8 @@ EXPOSE 80
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
 
 
-# # Build stage
+
+# Build stage
 # FROM node:lts-alpine AS build
 
 # # Set environment for pnpm
