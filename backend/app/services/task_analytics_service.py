@@ -564,7 +564,7 @@ class TaskService:
                                 "partDescription": "$PartDescription",
                                 "packages": [
                                     {
-                                        "packageId": "$Folder_Name",
+                                        "packageId": "$Package",
                                         "quantity": "$RequestedQty"
                                     }
                                 ]
