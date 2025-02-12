@@ -8,3 +8,4 @@ export const getValidateTasks_Url = '/validate';
 export const getEstimateReport_Url = '/estimates/';
 export const getPartUsage_Url = '/parts/usage';
 export const getSkillReq_Url = '/skills/analysis';
+export const getSkill = '/skills/analysis';
