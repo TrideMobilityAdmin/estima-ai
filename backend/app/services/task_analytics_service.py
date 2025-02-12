@@ -274,6 +274,8 @@ class TaskService:
             }
 
             result = self.estimates_collection.insert_one(estimate_doc)
+            download_link = f"/estimates/{estimate_id}/download"
+            
             response = EstimateResponse(
                 estID=estimate_id,
                 description=description,
@@ -287,7 +289,8 @@ class TaskService:
                 lastUpdated=current_time,
                 createdBy=estimate_doc["createdBy"],
                 updatedBy=estimate_doc["updatedBy"],
-                originalFilename=description
+                originalFilename=description,
+                downloadEstimate=download_link
 
             )
 
@@ -561,7 +564,7 @@ class TaskService:
                                 "partDescription": "$PartDescription",
                                 "packages": [
                                     {
-                                        "packageId": "$Folder_Name",
+                                        "packageId": "$Package",
                                         "quantity": "$RequestedQty"
                                     }
                                 ]

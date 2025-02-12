@@ -69,6 +69,9 @@ class TaskAnalysis(BaseModel):
 
 class SkillAnalysisResponse(BaseModel):
     skillAnalysis: Dict[str, List[TaskAnalysis]]
+    
+class SkillsAnalysisRequest(BaseModel):
+    source_tasks: List[str]
 
 
     

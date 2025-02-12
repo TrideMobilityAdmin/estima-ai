@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import re
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -235,7 +235,7 @@ class ExcelUploadService:
         if not estimate_dict:
             raise HTTPException(status_code=404, detail="Estimate not found")
         
-        estimate = EstimateResponse(**estimate_dict)
+        estimate = DownloadResponse(**estimate_dict)
 
         # Create a PDF buffer
         buffer = BytesIO()
