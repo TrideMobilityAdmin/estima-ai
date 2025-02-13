@@ -50,6 +50,7 @@ class EstimateRequest(BaseModel):
      aircraftFlightHours: int 
      aircraftFlightCycles: int
      
+     
      def to_dict(self):
         return {
             "tasks":self.tasks,
@@ -177,3 +178,4 @@ class ComparisonResult(BaseModel):
 class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
+
