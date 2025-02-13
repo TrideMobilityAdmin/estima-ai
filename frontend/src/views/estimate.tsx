@@ -822,9 +822,15 @@ export default function Estimate() {
                 />
 
                 <Group justify="space-between">
-                    <Title order={4}>
-                        Overall Estimate Report : {estimateReportData?.estID || "-"}
+                    <Group>
+                    <Title order={4} c='gray'>
+                        Overall Estimate Report :
                     </Title>
+                    <Title order={4}>
+                        {estimateReportData?.estID || "-"}
+                    </Title>
+                    </Group>
+                    
                      <Button
                         size="xs"
                         variant="filled"

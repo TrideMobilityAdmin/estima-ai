@@ -1,4 +1,4 @@
-import { Card, Group, SimpleGrid, Title, Text, ScrollArea, Badge, Button, Divider, Box, Flex, Space, Accordion, Progress, TextInput, LoadingOverlay } from "@mantine/core";
+import { Card, Group, SimpleGrid, Title, Text, ScrollArea, Badge, Button, Divider, Box, Flex, Space, Accordion, Progress, TextInput, LoadingOverlay, Center } from "@mantine/core";
 import { useState } from "react";
 import DropZoneExcel from "../components/fileDropZone";
 import { MdLensBlur, MdOutlineArrowForward } from "react-icons/md";
@@ -7,11 +7,13 @@ import ReactApexChart from "react-apexcharts";
 import { useApi } from "../api/services/estimateSrvice";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
 import { showNotification } from "@mantine/notifications";
+import { ApexOptions } from 'apexcharts';
+import SkillsDonutChart from "../components/skillsDonut";
 
 export default function SkillRequirement() {
     const { validateTasks } = useApi();
     const { getSkillAnalysis } = useApiSkillAnalysis();
-    
+
     const [tasks, setTasks] = useState<string[]>([]);
     const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +24,7 @@ export default function SkillRequirement() {
     const handleFiles = (files: File[]) => {
         console.log("Uploaded files:", files);
     };
-    
+
     //  Extracted tasks are passed to validation API
     const handleTasks = async (extractedTasks: string[]) => {
         setIsLoading(true);
@@ -85,7 +87,7 @@ export default function SkillRequirement() {
                     title: "Successful!",
                     message: "Skill Analysis generated!",
                     color: "green",
-                    
+
                 });
             }
         } catch (error) {
@@ -100,19 +102,19 @@ export default function SkillRequirement() {
         }
     };
 
-    const totalTaskSkills = skillAnalysisData?.skillAnalysis?.tasks?.reduce((acc : any, task : any) => acc + task?.skills?.length, 0);
-    const totalFindingSkills = skillAnalysisData?.skillAnalysis.findings?.reduce((acc : any, finding : any) => acc + finding?.skills?.length, 0);
+    const totalTaskSkills = skillAnalysisData?.skillAnalysis?.tasks?.reduce((acc: any, task: any) => acc + task?.skills?.length, 0);
+    const totalFindingSkills = skillAnalysisData?.skillAnalysis.findings?.reduce((acc: any, finding: any) => acc + finding?.skills?.length, 0);
 
     // Function to calculate total avg time
-const calculateTotalAvgTime = (items : any) => {
-    return items?.reduce((total : any, item : any) => {
-        return total + item?.skills?.reduce((sum : any, skill : any) => sum + skill.manHours.avg, 0);
-    }, 0);
-};
+    const calculateTotalAvgTime = (items: any) => {
+        return items?.reduce((total: any, item: any) => {
+            return total + item?.skills?.reduce((sum: any, skill: any) => sum + skill.manHours.avg, 0);
+        }, 0);
+    };
 
-// Calculate total avg time for tasks and findings
-const totalAvgTimeTasks = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks);
-const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings);
+    // Calculate total avg time for tasks and findings
+    const totalAvgTimeTasks = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks);
+    const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings);
 
     // const jsonData = {
     //     "skillAnalysis": {
@@ -238,199 +240,220 @@ const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnaly
     //     }
     // };
 
+
+    const chartConfig: ApexOptions = {
+        chart: {
+            background: 'transparent',
+            type: 'donut',
+        },
+        title: {
+            text: 'Skill Distribution',
+            align: 'center',
+            style: {
+                fontSize: '16px',
+                fontWeight: 500,
+            },
+        },
+        plotOptions: {
+            pie: {
+                donut: {
+                    size: '65%',
+                    labels: {
+                        show: true,
+                        value: {
+                            show: true,
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            formatter: (val: any) => `${val?.toFixed(1)}%`,
+                        },
+                        total: {
+                            show: true,
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            formatter: (w: any) => {
+                                const total = w?.globals?.seriesTotals?.reduce((a: number, b: number) => a + b, 0);
+                                return `${total?.toFixed(1)} hrs`;
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (val: number) => `${val?.toFixed(1)}%`,
+            style: {
+                fontSize: '14px',
+                fontWeight: 600,
+            },
+        },
+        legend: {
+            position: 'bottom',
+            fontSize: '14px',
+        },
+        stroke: {
+            width: 0,
+        },
+        tooltip: {
+            enabled: true,
+            y: {
+                formatter: (val: number) => `${val?.toFixed(1)} hrs`,
+            },
+        },
+    };
+
+
     const TaskAccordion = ({ data }: { data: any[] }) => {
         const [taskSearch, setTaskSearch] = useState("");
         const filteredTasks = data?.filter((task) =>
             task.taskId.toLowerCase().includes(taskSearch.toLowerCase())
         );
+
         return (
             <>
-            <TextInput
-                placeholder="Search Tasks by Task ID"
-                mb="sm"
-                value={taskSearch}
-                onChange={(event) => setTaskSearch(event.currentTarget.value)}
-            />
-            <Accordion variant="separated" defaultValue={data?.length > 0 ? data[0]?.taskId : undefined}>
-                {filteredTasks?.map((task) => (
-                    <Accordion.Item key={task.taskId} value={task.taskId}>
-                        <Accordion.Control>
-                            <Group>
-                                <IconCube color="#4E66DE"/>
-                            {task.taskId}
-                            </Group>
-                            
-                        </Accordion.Control>
-                        <Accordion.Panel>
-                            <ScrollArea h={300} scrollHideDelay={0}>
-                            <Group justify="center" w="100%">
-                            <ReactApexChart
-                            type="donut"
-                            height={250} 
-                            width={250}
-                            
-                            options={{
-                                chart: {
-                                    type: "donut",
-                                },
-                                title: {
-                                    text: `Skill Distribution`,
-                                    align: "center",
-                                },
-                                plotOptions: {
-                                    pie: {
-                                        donut: {
-                                            size: "65%",
-                                        },
-                                    },
-                                },
-                                labels: task?.skills?.map((skill : any) => skill?.skill),
-                                legend: {
-                                    position: "bottom",
-                                },
-                                responsive: [
-                                    {
-                                        breakpoint: 200,
-                                        options: {
-                                            chart: {
-                                                width: 100,
-                                            },
-                                            legend: {
-                                                position: "bottom",
-                                            },
-                                        },
-                                    },
-                                ],
-                            }}
-                            series={task.skills.map((skill : any) => skill?.manHours?.avg)}
-                        />
-                            </Group>
-                            
-                                {task?.skills?.map((skill: any) => (
-                                    // <div key={skill.skill} style={{ marginBottom: 10 }}>
-                                    <Card key={skill.skill} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
-                                        <Text size="sm" fw={500}>{skill.skill}</Text>
-                                        <Group justify="space-between">
-                                            <Text fz="xs" c="green" fw={700}>
-                                                {skill?.manHours.min} Hr
-                                            </Text>
-                                            <Text fz="xs" c="yellow" fw={700}>
-                                                {skill?.manHours.avg} Hr
-                                            </Text>
-                                            <Text fz="xs" c="red" fw={700}>
-                                                {skill?.manHours.max} Hr
-                                            </Text>
-                                        </Group>
-                                        <Progress.Root>
-                                            <Progress.Section value={skill?.manHours.min * 100} color="green" />
-                                            <Progress.Section value={skill?.manHours.avg * 100} color="yellow" />
-                                            <Progress.Section value={skill?.manHours.max * 100} color="red" />
-                                        </Progress.Root>
-                                    </Card>
-                                    // </div>
-                                ))}
-                            </ScrollArea>
-                        </Accordion.Panel>
-                    </Accordion.Item>
-                ))}
-            </Accordion>
+                <TextInput
+                    placeholder="Search Tasks by Task ID"
+                    mb="sm"
+                    value={taskSearch}
+                    onChange={(event) => setTaskSearch(event.currentTarget.value)}
+                />
+                <Accordion variant="separated" defaultValue={data?.length > 0 ? data[0]?.taskId : undefined}>
+                    {filteredTasks?.map((task) => (
+                        
+                        <Accordion.Item key={task.taskId} value={task.taskId}>
+                            <Accordion.Control>
+                                <Group>
+                                    <IconCube color="#4E66DE" />
+                                    {task.taskId}
+                                </Group>
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                                <ScrollArea h={400} scrollHideDelay={0}>
+                                    <Box p="md">
+                                    <SkillsDonutChart task={task} />
+                                        {/* <Center mb="lg">
+                                            <div style={{ width: 300, height: 300 }}>
+                                                {task?.skills?.length ? (
+                                                    <ReactApexChart
+                                                        type="donut"
+                                                        height={300}
+                                                        width={300}
+                                                        options={chartConfig}
+                                                        labels={task?.skills?.map((skill: any) => skill?.skill || "Unknown Skill")} // Ensure labels match series
+                                                        series={task?.skills
+                                                            ?.map((skill: any) => skill?.manHours?.avg)
+                                                            ?.filter((val: any) => typeof val === "number" && !isNaN(val))} // Remove invalid values
+                                                    />
+                                                ) : (
+                                                    <Text>No data available</Text>
+                                                )}
+                                            </div>
+                                        </Center> */}
+
+                                        {task?.skills?.map((skill: any) => (
+                                            <Card key={skill.skill} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
+                                                <Text size="sm" fw={500}>{skill.skill}</Text>
+                                                <Group justify="space-between">
+                                                    <Text fz="xs" c="green" fw={700}>
+                                                        Min {skill?.manHours.min} Hr
+                                                    </Text>
+                                                    <Text fz="xs" c="yellow" fw={700}>
+                                                        Avg {skill?.manHours.avg} Hr
+                                                    </Text>
+                                                    <Text fz="xs" c="red" fw={700}>
+                                                        Max {skill?.manHours.max} Hr
+                                                    </Text>
+                                                </Group>
+                                                <Progress.Root>
+                                                    <Progress.Section value={skill?.manHours.min * 100} color="green" />
+                                                    <Progress.Section value={skill?.manHours.avg * 100} color="yellow" />
+                                                    <Progress.Section value={skill?.manHours.max * 100} color="red" />
+                                                </Progress.Root>
+                                            </Card>
+                                        ))}
+                                    </Box>
+                                </ScrollArea>
+                            </Accordion.Panel>
+                        </Accordion.Item>
+                    ))}
+                </Accordion>
             </>
         );
     };
+
     const FindingAccordion = ({ data }: { data: any[] }) => {
         const [findingSearch, setFindingSearch] = useState("");
         const filteredFindings = data?.filter((finding) =>
             finding.taskId.toLowerCase().includes(findingSearch.toLowerCase())
         );
+
         return (
             <>
-            <TextInput
-                placeholder="Search Tasks by Task ID"
-                mb="sm"
-                value={findingSearch}
-                onChange={(event) => setFindingSearch(event.currentTarget.value)}
-            />
-            <Accordion variant="separated" defaultValue={data?.length > 0 ? data[0]?.taskId : undefined}>
-                {filteredFindings?.map((task) => (
-                    <Accordion.Item key={task.taskId} value={task.taskId}>
-                        <Accordion.Control>
-                        <Group>
-                                <IconAlertTriangle color="#4E66DE"/>
-                            {task.taskId}
-                            </Group>
-                        </Accordion.Control>
-                        <Accordion.Panel>
-                            <ScrollArea h={300} scrollHideDelay={0}>
-                                <Group justify="center" w="100%">
-                                <ReactApexChart
-                            type="donut"
-                            height={250} 
-                            width={250}
-                            options={{
-                                chart: {
-                                    type: "donut",
-                                },
-                                title: {
-                                    text: `Skill Distribution`,
-                                    align: "center",
-                                },
-                                plotOptions: {
-                                    pie: {
-                                        donut: {
-                                            size: "65%",
-                                        },
-                                    },
-                                },
-                                labels: task?.skills?.map((skill : any) => skill?.skill),
-                                legend: {
-                                    position: "bottom",
-                                },
-                                responsive: [
-                                    {
-                                        breakpoint: 200,
-                                        options: {
-                                            chart: {
-                                                width: 100,
-                                            },
-                                            legend: {
-                                                position: "bottom",
-                                            },
-                                        },
-                                    },
-                                ],
-                            }}
-                            series={task?.skills?.map((skill : any) => skill?.manHours?.avg)}
-                        />
+                <TextInput
+                    placeholder="Search Tasks by Task ID"
+                    mb="sm"
+                    value={findingSearch}
+                    onChange={(event) => setFindingSearch(event.currentTarget.value)}
+                />
+                <Accordion variant="separated" defaultValue={data?.length > 0 ? data[0]?.taskId : undefined}>
+                    {filteredFindings?.map((task) => (
+                        <Accordion.Item key={task?.taskId} value={task?.taskId}>
+                            <Accordion.Control>
+                                <Group>
+                                    <IconAlertTriangle color="#4E66DE" />
+                                    {task?.taskId}
                                 </Group>
-                            
-                                {task?.skills?.map((skill: any) => (
-                                    // <div key={skill.skill} style={{ marginBottom: 10 }}>
-                                    <Card key={skill.skill} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
-                                        <Text size="sm" fw={500}>{skill.skill}</Text>
-                                        <Group justify="space-between">
-                                            <Text fz="xs" c="green" fw={700}>
-                                                {skill?.manHours?.min} Hr
-                                            </Text>
-                                            <Text fz="xs" c="yellow" fw={700}>
-                                                {skill?.manHours?.avg} Hr
-                                            </Text>
-                                            <Text fz="xs" c="red" fw={700}>
-                                                {skill?.manHours?.max} Hr
-                                            </Text>
-                                        </Group>
-                                        <Progress.Root>
-                                            <Progress.Section value={skill?.manHours?.min * 100} color="green" />
-                                            <Progress.Section value={skill?.manHours?.avg * 100} color="yellow" />
-                                            <Progress.Section value={skill?.manHours?.max * 100} color="red" />
-                                        </Progress.Root>
-                                    </Card>
-                                    // </div>
-                                ))}
-                            </ScrollArea>
-                        </Accordion.Panel>
-                    </Accordion.Item>
-                ))}
-            </Accordion>
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                                <ScrollArea h={400} scrollHideDelay={0}>
+                                    <Box p="md">
+                                    <SkillsDonutChart task={task} />
+                                        {/* <Center mb="lg">
+                                            <div style={{ width: 300, height: 300 }}>
+                                                {task?.skills?.length ? (
+                                                    <ReactApexChart
+                                                        type="donut"
+                                                        height={300}
+                                                        width={300}
+                                                        options={chartConfig}
+                                                        labels={task?.skills?.map((skill: any) => skill?.name || "Unknown Skill")} // Ensure labels match series
+                                                        series={task?.skills
+                                                            ?.map((skill: any) => skill?.manHours?.avg)
+                                                            ?.filter((val: any) => typeof val === "number" && !isNaN(val))} // Remove invalid values
+                                                    />
+                                                ) : (
+                                                    <Text>No data available</Text>
+                                                )}
+                                            </div>
+                                        </Center> */}
+
+                                        {task?.skills?.map((skill: any) => (
+                                            <Card key={skill.skill} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
+                                                <Text size="sm" fw={500}>{skill?.skill || "Unknown"}</Text>
+                                                <Group justify="space-between">
+                                                    <Text fz="xs" c="green" fw={700}>
+                                                        Min {skill?.manHours?.min} Hr
+                                                    </Text>
+                                                    <Text fz="xs" c="yellow" fw={700}>
+                                                        Avg {skill?.manHours?.avg} Hr
+                                                    </Text>
+                                                    <Text fz="xs" c="red" fw={700}>
+                                                        Max {skill?.manHours?.max} Hr
+                                                    </Text>
+                                                </Group>
+                                                <Progress.Root>
+                                                    <Progress.Section value={skill?.manHours?.min * 100} color="green" />
+                                                    <Progress.Section value={skill?.manHours?.avg * 100} color="yellow" />
+                                                    <Progress.Section value={skill?.manHours?.max * 100} color="red" />
+                                                </Progress.Root>
+                                            </Card>
+                                        ))}
+                                    </Box>
+                                </ScrollArea>
+                            </Accordion.Panel>
+                        </Accordion.Item>
+                    ))}
+                </Accordion>
             </>
         );
     };
@@ -457,8 +480,8 @@ const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnaly
                     </Card>
 
                     <Card withBorder h='50vh' radius='md'>
-                    <Group justify="space-between">
-                    <LoadingOverlay
+                        <Group justify="space-between">
+                            <LoadingOverlay
                                 visible={isLoading}
                                 zIndex={1000}
                                 overlayProps={{ radius: 'sm', blur: 2 }}
@@ -471,32 +494,32 @@ const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnaly
                                 {
                                     validatedTasks.length > 0 ? (
                                         <Badge ta='center' color="indigo" size="md" radius="lg">
-                                            {validatedTasks?.filter((ele) => ele.status === true)?.length || 0} 
+                                            {validatedTasks?.filter((ele) => ele.status === true)?.length || 0}
                                         </Badge>
                                     ) : (
                                         <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
-                                         0
-                                         </Badge>
+                                            0
+                                        </Badge>
                                     )
                                 }
                             </Group>
                             <Group mb='xs' align="center">
                                 <Text size="md" fw={500}>
-                                Tasks Not-Available
+                                    Tasks Not-Available
                                 </Text>
                                 {
                                     validatedTasks?.length > 0 ? (
                                         <Badge ta='center' color="red" size="md" radius="lg">
-                                            {validatedTasks?.filter((ele) => ele.status === false)?.length || 0} 
+                                            {validatedTasks?.filter((ele) => ele.status === false)?.length || 0}
                                         </Badge>
                                     ) : (
                                         <Badge variant="light" ta='center' color="red" size="md" radius="lg">
-                                         0
-                                         </Badge>
+                                            0
+                                        </Badge>
                                     )
                                 }
                             </Group>
-                            </Group>
+                        </Group>
                         <ScrollArea
                             style={{
                                 flex: 1, // Take remaining space for scrollable area
@@ -529,7 +552,7 @@ const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnaly
                 </SimpleGrid>
                 <Group justify="center" pt='sm' pb='sm'>
                     <Button
-                    onClick={handleSubmit}
+                        onClick={handleSubmit}
                         variant="gradient"
                         gradient={{ from: 'violet', to: 'blue', deg: 0 }}
                         // variant="filled"
@@ -592,7 +615,7 @@ const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnaly
                                     Findings
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                {skillAnalysisData?.skillAnalysis?.findings?.length || 0}
+                                    {skillAnalysisData?.skillAnalysis?.findings?.length || 0}
                                 </Text>
                             </Flex>
                             <IconAlertTriangle color="red" size='39' />
