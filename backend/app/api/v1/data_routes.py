@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
-from typing import List, Optional
+from typing import List, Optional,Dict, Any
 from fastapi import APIRouter, Depends, Query
 from app.middleware.auth import get_current_user
 import logging
 from typing import List
+import shutil
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
 from app.models.estimates import Estimate,EstimateResponseSchema, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
@@ -186,3 +188,26 @@ async def validate_tasks(
     print("validate_tasks")
     return await task_service.validate_tasks(estimate_request,current_user)
 
+@router.post("/upload-estimate/")
+async def upload_estimate(
+    estimate_request: str = Form(...),
+    file: UploadFile = File(...)
+) -> Dict[str, Any]:
+    
+    try:
+        estimate_request_data = EstimateRequest.parse_raw(estimate_request)
+        print("Request received successfully")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
+
+    return await excel_service.upload_estimate(estimate_request_data, file)
+
+
+# @router.post("/uploadfile/")
+# async def create_upload_file(file: UploadFile = File(...)):
+#     # Save uploaded file to a directory
+#     with open(f"uploaded_files/{file.filename}", "wb") as buffer:
+#         shutil.copyfileobj(file.file, buffer)
+#     #return await excel_service.upload_estimate(estimate_request_data, file)
+#     return {"filename": file.filename}

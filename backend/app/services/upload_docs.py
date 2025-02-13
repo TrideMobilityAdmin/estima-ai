@@ -5,9 +5,12 @@ import numpy as np
 import json
 import re
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse, EstimateResponseSchema
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
+import hashlib
+import base64
 from app.db.database_connection import MongoDBClient
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -244,11 +247,13 @@ class ExcelUploadService:
         result = self.save_to_mongodb(json_data)
         
         return {
+            "estID":json_data["estID"],
             "message": "File uploaded and processed successfully",
             "filename": file.filename,
             "records_inserted": result["inserted_count"],
             "status": "success"
         }
+    
     async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
         await self.validate_excel_file(file)
         actual_data = await self.process_excel_file(file)
@@ -468,3 +473,71 @@ class ExcelUploadService:
     async def get_all_estimates_status(self) -> List[EstimateResponseSchema]:
             estimates = self.collection.find({}, {"estID": 1, "upload_timestamp": 1, "status": 1, "_id": 0})
             return [EstimateResponseSchema(**estimate) for estimate in estimates]
+        
+    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
+        print("estimaterequest",estimate_request)
+        await self.validate_excel_file(file)
+        
+        # Process the uploaded file
+        json_data = await self.process_file(file)
+        taskUniqHash = generate_sha256_hash_from_json(json_data)
+        print("jsondata",json_data["estID"])
+        print("Hash of Estima",taskUniqHash)
+
+        
+        # Generate an estimate ID
+        estimate_id = await self._generate_estimateid()
+        print("estimateId from generate_estimate",estimate_id)
+        
+        # Prepare the data to be inserted into the new collection
+        data_to_insert = {
+            "estID": estimate_id,
+            "estima_hash":taskUniqHash,
+            "tasks": estimate_request.tasks,
+            "probability": estimate_request.probability,
+            "operator": estimate_request.operator,
+            "aircraftAge": estimate_request.aircraftAge,
+            "aircraftFlightHours": estimate_request.aircraftFlightHours,
+            "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
+            **json_data  # Include the processed data from the file
+        }
+        
+        # Insert the combined data into a separate collection
+        insert_result = self.mongo_client.get_collection("estimate_file_upload").insert_one(data_to_insert) 
+        logger.info("Length of document inserted")
+        
+        # Prepare the response
+        response = {
+            "estID": estimate_id,
+            "estimaHash":taskUniqHash,
+            "status": "success",
+            "msg": "File and estimated data inserted successfully",
+            "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+        }
+        
+        return response
+    
+
+def convert_hash_to_ack_id(hash_hex: str) -> str:
+    # Convert the hex hash to bytes
+    hash_bytes = bytes.fromhex(hash_hex)
+    # Encode the bytes to a Base64 string
+    base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')
+    # Trim or pad the Base64 string to get a shorter ack ID
+    ack_id = base64_string[:16]  # Example: Taking the first 16 characters
+    return ack_id
+
+def generate_sha256_hash_from_json(json_data: dict) -> str:
+    # Convert JSON data to a string
+    json_string = json.dumps(json_data, sort_keys=True, default=datetime_to_str)    # Create a SHA-256 hash object
+    hash_object = hashlib.sha256()
+    # Encode the JSON string to bytes and update the hash object
+    hash_object.update(json_string.encode('utf-8'))
+    # Get the hexadecimal representation of the hash
+    hash_hex = hash_object.hexdigest()
+    return convert_hash_to_ack_id(hash_hex)
+
+def datetime_to_str(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError("Object of type 'datetime' is not JSON serializable")

@@ -51,6 +51,16 @@ class EstimateRequest(BaseModel):
      aircraftFlightCycles: int
      
      
+     def to_dict(self):
+        return {
+            "probability": self.probability,
+            "operator": self.operator,
+            "aircraftAge": self.aircraftAge,
+            "aircraftFlightHours": self.aircraftFlightHours,  # Convert datetime to ISO format
+            "aircraftFlightCycles": self.aircraftFlightCycles  # Convert datetime to ISO format
+
+        }
+
 class ValidRequest(BaseModel):
      tasks: List[str]
 class ValidTasks(BaseModel):
