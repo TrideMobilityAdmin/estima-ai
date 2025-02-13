@@ -52,6 +52,7 @@ class EstimateRequest(BaseModel):
      
      def to_dict(self):
         return {
+            "tasks":self.tasks,
             "probability": self.probability,
             "operator": self.operator,
             "aircraftAge": self.aircraftAge,

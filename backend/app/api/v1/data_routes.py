@@ -115,13 +115,13 @@ async def estimate_status(
     task_service: TaskService = Depends()
 ):
      return await task_service.estimate_status(estimate_request,current_user)
-@router.post("/estimates/", response_model=EstimateResponse, status_code=201)
-async def create_estimate(
-    estimate_request: EstimateRequest,
-     current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
-):
-    return await task_service.create_estimate(estimate_request,current_user)
+# @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
+# async def create_estimate(
+#     estimate_request: EstimateRequest,
+#      current_user: dict = Depends(get_current_user),
+#     task_service: TaskService = Depends()
+# ):
+#     return await task_service.create_estimate(estimate_request,current_user)
 
 
 @router.get("/estimates/{estimate_id}", response_model=EstimateResponse)
@@ -133,12 +133,12 @@ async def get_estimate_by_id(
     return await task_service.get_estimate_by_id(estimate_id)
 
 excel_service = ExcelUploadService()
-@router.post("/upload/excel/")
-async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    """
-    Endpoint to handle Excel file uploads
-    """
-    return await excel_service.upload_excel(file)
+# @router.post("/upload/excel/")
+# async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+#     """
+#     Endpoint to handle Excel file uploads
+#     """
+#     return await excel_service.upload_excel(file)
 
 @router.post("/estimates/{estimate_id}/compare",response_model=ComparisonResponse)
 async def compare_estimates(estimate_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -193,18 +193,10 @@ async def upload_estimate(
     
     try:
         estimate_request_data = EstimateRequest.parse_raw(estimate_request)
-        print("Request received successfully")
+        logger.info("Request received successfully")
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
 
     return await excel_service.upload_estimate(estimate_request_data, file)
 
-
-# @router.post("/uploadfile/")
-# async def create_upload_file(file: UploadFile = File(...)):
-#     # Save uploaded file to a directory
-#     with open(f"uploaded_files/{file.filename}", "wb") as buffer:
-#         shutil.copyfileobj(file.file, buffer)
-#     #return await excel_service.upload_estimate(estimate_request_data, file)
-#     return {"filename": file.filename}

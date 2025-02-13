@@ -22,7 +22,8 @@ class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("estima_input_upload")
-        self.collection=self.mongo_client.get_collection("estima_input")
+        # self.collection=self.mongo_client.get_collection("estima_input")
+        self.collection=self.mongo_client.get_collection("estimate_file_upload")
         self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
@@ -166,7 +167,6 @@ class ExcelUploadService:
             content = await file.read()
             file_extension = file.filename.split('.')[-1].lower()  # Get the file extension
 
-            # Determine the appropriate engine based on the file extension
             if file_extension in ['xls', 'xlsx', 'xlsm']:
                 excel_data = pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
             elif file_extension == 'csv':
@@ -185,31 +185,29 @@ class ExcelUploadService:
 
             # Clean the data
             cleaned_data = self.clean_data(excel_data)
-
-            # Initialize lists to hold all tasks and descriptions
             all_tasks = []
             all_descriptions = []
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
 
-            estimate_id = await self._generate_estimateid()
+            # estimate_id = await self._generate_estimateid()
             for index, row in cleaned_data.iterrows():
-                task_number = row.get('task-#')  # Adjust the column name as necessary
-                description = row.get('description')  # Adjust the column name as necessary
+                task_number = row.get('task-#')  
+                description = row.get('description')  
 
                 if task_number:
                     all_tasks.append(task_number)
                 if description:
                     all_descriptions.append(description)
 
-            # Create a single document with all tasks and descriptions
             processed_record = {
-                "estID":estimate_id,
+                # "estID":estimate_id,
                 "task": all_tasks,
                 "description": all_descriptions,
                 # "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
                 "upload_timestamp": current_time,
                 "original_filename": file.filename,
                 "createdAt": current_time,
+                "updatedAt":current_time,
                 "status":"Initiated"
             }
 
@@ -223,33 +221,33 @@ class ExcelUploadService:
                 status_code=500,
                 detail=f"Error processing Excel file: {str(e)}"
             )
-    def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            result = self.collection.insert_one(data)
-            return {
-                "status": "success",
-                "inserted_count": str(result.inserted_id),
-                "message": "Data successfully saved to database"
-            }
-        except Exception as e:
-            logger.error(f"MongoDB insertion error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error: {str(e)}"
-            )
+    # def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    #     try:
+    #         result = self.collection.insert_one(data)
+    #         return {
+    #             "status": "success",
+    #             "inserted_count": str(result.inserted_id),
+    #             "message": "Data successfully saved to database"
+    #         }
+    #     except Exception as e:
+    #         logger.error(f"MongoDB insertion error: {str(e)}")
+    #         raise HTTPException(
+    #             status_code=500,
+    #             detail=f"Database error: {str(e)}"
+    #         )
 
-    async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
-        await self.validate_excel_file(file)
-        json_data = await self.process_file(file)
-        result = self.save_to_mongodb(json_data)
+    # async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
+    #     await self.validate_excel_file(file)
+    #     json_data = await self.process_file(file)
+    #     result = self.save_to_mongodb(json_data)
         
-        return {
-            "estID":json_data["estID"],
-            "message": "File uploaded and processed successfully",
-            "filename": file.filename,
-            "records_inserted": result["inserted_count"],
-            "status": "success"
-        }
+    #     return {
+    #         "estID":json_data["estID"],
+    #         "message": "File uploaded and processed successfully",
+    #         "filename": file.filename,
+    #         "records_inserted": result["inserted_count"],
+    #         "status": "success"
+    #     }
     
     async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
         await self.validate_excel_file(file)
@@ -467,42 +465,36 @@ class ExcelUploadService:
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
     
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
-        print("estimaterequest",estimate_request)
+        
+        logger.info(f"estimate_request: {estimate_request}")
         await self.validate_excel_file(file)
         
-        # Process the uploaded file
         json_data = await self.process_file(file)
-        taskUniqHash = generate_sha256_hash_from_json(json_data)
-        print("jsondata",json_data["estID"])
-        print("Hash of Estima",taskUniqHash)
+        logger.info("json data came")
 
+        taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
+        logger.info(f"Hash of Estima: {taskUniqHash}")
         
-        # Generate an estimate ID
-        estimate_id = await self._generate_estimateid()
-        print("estimateId from generate_estimate",estimate_id)
-        
-        # Prepare the data to be inserted into the new collection
         data_to_insert = {
-            "estID": estimate_id,
-            "estima_hash":taskUniqHash,
-            "tasks": estimate_request.tasks,
+            **json_data,
+            "estID":taskUniqHash,
+            # "tasks": estimate_request.tasks,
             "probability": estimate_request.probability,
             "operator": estimate_request.operator,
             "aircraftAge": estimate_request.aircraftAge,
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
-            **json_data  # Include the processed data from the file
+              
         }
         
-        # Insert the combined data into a separate collection
-        insert_result = self.mongo_client.get_collection("estimate_file_upload").insert_one(data_to_insert) 
+       
+        insert_result = self.collection.insert_one(data_to_insert) 
         logger.info("Length of document inserted")
         
-        # Prepare the response
+        
         response = {
-            "estID": estimate_id,
-            "estimaHash":taskUniqHash,
-            "status": "success",
+            "estID":taskUniqHash,
+            "status": "Initiated",
             "msg": "File and estimated data inserted successfully",
             "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
         }
@@ -511,21 +503,15 @@ class ExcelUploadService:
     
 
 def convert_hash_to_ack_id(hash_hex: str) -> str:
-    # Convert the hex hash to bytes
     hash_bytes = bytes.fromhex(hash_hex)
-    # Encode the bytes to a Base64 string
     base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')
-    # Trim or pad the Base64 string to get a shorter ack ID
-    ack_id = base64_string[:16]  # Example: Taking the first 16 characters
+    ack_id = base64_string[:16]  
     return ack_id
 
 def generate_sha256_hash_from_json(json_data: dict) -> str:
-    # Convert JSON data to a string
     json_string = json.dumps(json_data, sort_keys=True, default=datetime_to_str)    # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
-    # Encode the JSON string to bytes and update the hash object
     hash_object.update(json_string.encode('utf-8'))
-    # Get the hexadecimal representation of the hash
     hash_hex = hash_object.hexdigest()
     return convert_hash_to_ack_id(hash_hex)
 
