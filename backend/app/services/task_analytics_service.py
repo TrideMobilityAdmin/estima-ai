@@ -549,18 +549,9 @@ class TaskService:
         """
         try:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
-
-            # Convert date strings to ISODate format
-            #start_date_iso = datetime.strptime(start_date, "%d-%m-%Y")
-            #end_date_iso = datetime.strptime(end_date, "%d-%m-%Y")
-
             # Pipeline for task_parts
             task_parts_pipeline = [
-                {
-                    "$match": {
-                        "RequestedPart": part_id
-                    }
-                },
+                { "$match": { "RequestedPart": part_id } },
                 {
                     "$lookup": {
                         "from": "task_description",
@@ -569,8 +560,50 @@ class TaskService:
                         "as": "task_details"
                     }
                 },
+                { "$unwind": "$task_details" },
                 {
-                    "$unwind": "$task_details"
+                    "$addFields": {
+                        "convertedPackageId": {
+                            "$cond": {
+                                "if": { "$regexMatch": { "input": "$Package", "regex": "HMV(\\d{2})(\\d{6})(\\d{4})" } },
+                                "then": {
+                                    "$concat": [
+                                        { "$substrCP": [ "$Package", 7, 5 ] },
+                                        "/",
+                                        { "$substrCP": [ "$Package", 12, 6 ] },
+                                        "/",
+                                        { "$substrCP": [ "$Package", 18, 4 ] }
+                                    ]
+                                },
+                                "else": "$Package"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "aircraft_details",
+                        "let": { "convertedPackage": "$convertedPackageId" },
+                        "pipeline": [
+                            {
+                                "$match": { "$expr": { "$eq": [ "$Package", "$$convertedPackage" ] } }
+                            },
+                            { "$project": { "IssueDate": 1, "_id": 0 } }
+                        ],
+                        "as": "aircraft_info"
+                    }
+                },
+                { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
+                {
+                    "$addFields": {
+                        "effectiveDate": {
+                            "$cond": {
+                                "if": { "$ifNull": [ "$aircraft_info.IssueDate", "false" ] },
+                                "then": "$aircraft_info.IssueDate",
+                                "else": { "$toDate": "$IssueDate" }
+                            }
+                        }
+                    }
                 },
                 {
                     "$group": {
@@ -579,109 +612,115 @@ class TaskService:
                             "$push": {
                                 "taskId": "$Task",
                                 "taskDescription": "$task_details.Description",
-                                "partDescription": "$PartDescription",
                                 "packages": [
                                     {
                                         "packageId": "$Package",
+                                        "date": "$effectiveDate",
                                         "quantity": "$RequestedQty"
                                     }
                                 ]
                             }
                         }
                     }
-                }
+                },
+                { "$project": { "convertedPackageId": 0, "aircraft_info": 0, "effectiveDate": 0 } }
             ]
-
-
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-                {"$match": {"IssuedPart": part_id}},
-                {"$group": {
-                    "_id": "$IssuedPart",
-                    "findings": {
-                        "$push": {
-                            "taskId": "$Task",
-                            "taskDescription": "$TaskDescription",
-                            "packageId": "$Package",
-                            "date": "$IssueDate",
-                            "quantity": "$UsedQty",
-                            "stockStatus": "$StockStatus",
-                            "priceUSD": "$BillableValueUSD"
-                        }
+            { "$match": { "IssuedPart": part_id } },
+            {
+                "$lookup": {
+                "from": "aircraft_details",
+                "let": { "package": "$Package" },
+                "pipeline": [
+                    {
+                    "$match": {
+                        "$expr": { "$eq": [ "$Package", "$$package" ] }
                     }
-                }}
-            ]
-            """            # Execute pipelines
-            task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
-            sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-
-            logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
-
-            if not task_parts_result and not sub_task_parts_result:
-                logger.warning(f"No parts usage found for part_id: {part_id}")
-                return None
-
-            # Parse results into data models
-            tasks = [
-                Task(
-                    taskId=t["taskId"],
-                    taskDescription=t["taskDescription"],
-                    partDescription=t["partDescription"],
-                    packages=[Package(**pkg) for pkg in t["packages"]]
-                )
-                for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
-            ]
-
-            findings = [
-                Finding(
-                    taskId=f["taskId"],
-                    taskDescription=f["taskDescription"],
-                    packageId=f["packageId"],
-                    date=f["date"],
-                    quantity=f["quantity"],
-                    stockStatus=f.get("stockStatus"),
-                    priceUSD=f.get("priceUSD")
-                )
-                for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
-            ]
-
-            # Construct final response
-            response = PartsUsageResponse(
-                partId=part_id,
-                partDescription=tasks[0].partDescription if tasks else "",
-                usage=Usage(tasks=tasks, findings=findings)
-            )
-            logger.info(f"the response is {response}")
-
-            return task_parts_result"""
-            
+                    }
+                ],
+                "as": "aircraft_info"
+                }
+            },
+            { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
+            {
+                "$addFields": {
+                "effectiveDate": {
+                    "$ifNull": [ "$aircraft_info.IssueDate", "$IssueDate" ]
+                }
+                }
+            },
+            {
+                "$group": {
+                "_id": "$IssuedPart",
+                "findings": {
+                    "$push": {
+                    "taskId": "$Task",
+                    "taskDescription": "$TaskDescription",
+                    "packages": [
+                        {
+                        "packageId": "$Package",
+                        "finding": "$Finding",
+                        "logItem": "$LogItem",
+                        "description": "$Description",
+                        "date": "$effectiveDate",
+                        "quantity": "$UsedQty"
+                        }
+                    ]
+                    }
+                }
+                }
+            },
+                { "$project": { "effectiveDate": 0 } } 
+                ]
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-            logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
-
+            logger.info(f"Results of task_parts: {task_parts_result}")
+            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}")
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {}
-
             # Construct final output
             output = {
                 "partId": part_id,
-                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("PartDescription", "") if task_parts_result else "",
+                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("partDescription", "") if task_parts_result else "",
                 "usage": {
-                "tasks": task_parts_result[0]["tasks"] if task_parts_result else [],
-                "findings": sub_task_parts_result[0]["findings"] if sub_task_parts_result else []
+                    "tasks": [
+                        {
+                            "taskId": t["taskId"],
+                            "taskDescription": t["taskDescription"],
+                            "packages": [
+                                {"packageId": pkg["packageId"], "date": pkg["date"], "quantity": pkg["quantity"]}
+                                for pkg in t.get("packages", [])
+                            ]
+                        }
+                        for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
+                    ],
+                    "findings": [
+                        {
+                            "taskId": f["taskId"],
+                            "taskDescription": f["taskDescription"],
+                            "packages": [
+                                {
+                                            "packageId": pkg["packageId"],
+                                            "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
+                                            "logItem": pkg.get("logItem", ""),  # Use .get() to avoid KeyError
+                                            "description": pkg.get("description", ""),  # Use .get() to avoid KeyError
+                                            "date": pkg["date"],
+                                            "quantity": pkg["quantity"]
+                    }
+                                for pkg in f.get("packages", [])
+                            ]
+                        }
+                        for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
+                    ]
+                }
             }
-            }
-
-
             return output
-
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
             return None
-        
-
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
         Analyzes skills required for multiple tasks.

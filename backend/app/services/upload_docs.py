@@ -19,7 +19,8 @@ from app.services.task_analytics_service import TaskService
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
-        self.collection = self.mongo_client.get_collection("estima_input_upload")
+        # self.collection = self.mongo_client.get_collection("estima_input_upload")
+        self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
@@ -49,10 +50,10 @@ class ExcelUploadService:
                 detail="No file provided"
             )
             
-        if not file.filename.endswith(('.xls', '.xlsx', '.xlsm')):
+        if not file.filename.endswith(('.xls', '.xlsx', '.xlsm','.csv')):
             raise HTTPException(
                 status_code=400,
-                detail="Invalid file type. Only .xls, .xlsx, and .xlsm files are allowed"
+                detail="Invalid file type. Only .xls, .xlsx, .csv,and .xlsm files are allowed"
             )
 
     def clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -90,8 +91,17 @@ class ExcelUploadService:
     async def process_excel_file(self, file: UploadFile) -> List[Dict[Any, Any]]:
         try:
             content = await file.read()
-            excel_data = pd.read_excel(io.BytesIO(content))
-            
+
+            file_extension = file.filename.split('.')[-1].lower()  
+            if file_extension in ['xls', 'xlsx', 'xlsm']:
+                excel_data = pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+            elif file_extension == 'csv':
+                excel_data = pd.read_csv(io.BytesIO(content))
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type. Only .xls, .xlsx, .xlsm, and .csv files are allowed"
+                )   
             if excel_data.empty:
                 raise HTTPException(
                     status_code=400,
@@ -149,13 +159,74 @@ class ExcelUploadService:
                 status_code=500,
                 detail=f"Error processing Excel file: {str(e)}"
             )
-
-    def save_to_mongodb(self, data: List[Dict[Any, Any]]) -> Dict[str, Any]:
+    async def process_file(self, file: UploadFile) -> Dict[str, Any]:
         try:
-            result = self.collection.insert_many(data)
+            content = await file.read()
+            file_extension = file.filename.split('.')[-1].lower()  # Get the file extension
+
+            # Determine the appropriate engine based on the file extension
+            if file_extension in ['xls', 'xlsx', 'xlsm']:
+                excel_data = pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+            elif file_extension == 'csv':
+                excel_data = pd.read_csv(io.BytesIO(content))
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type. Only .xls, .xlsx, .xlsm, and .csv files are allowed"
+                )
+
+            if excel_data.empty:
+                raise HTTPException(
+                    status_code=400,
+                    detail="The Excel file contains no data"
+                )
+
+            # Clean the data
+            cleaned_data = self.clean_data(excel_data)
+
+            # Initialize lists to hold all tasks and descriptions
+            all_tasks = []
+            all_descriptions = []
+            current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+
+            estimate_id = await self._generate_estimateid()
+            for index, row in cleaned_data.iterrows():
+                task_number = row.get('task-#')  # Adjust the column name as necessary
+                description = row.get('description')  # Adjust the column name as necessary
+
+                if task_number:
+                    all_tasks.append(task_number)
+                if description:
+                    all_descriptions.append(description)
+
+            # Create a single document with all tasks and descriptions
+            processed_record = {
+                "estID":estimate_id,
+                "task": all_tasks,
+                "description": all_descriptions,
+                # "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
+                "upload_timestamp": current_time,
+                "original_filename": file.filename,
+                "createdAt": current_time,
+                "status":"Initiated"
+            }
+
+            # Log the processed record
+            logger.info(f"Processed record: {processed_record}")
+
+            return processed_record  # Return the single document
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing Excel file: {str(e)}"
+            )
+    def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            result = self.collection.insert_one(data)
             return {
                 "status": "success",
-                "inserted_count": len(result.inserted_ids),
+                "inserted_count": str(result.inserted_id),
                 "message": "Data successfully saved to database"
             }
         except Exception as e:
@@ -167,7 +238,7 @@ class ExcelUploadService:
 
     async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
         await self.validate_excel_file(file)
-        json_data = await self.process_excel_file(file)
+        json_data = await self.process_file(file)
         result = self.save_to_mongodb(json_data)
         
         return {
@@ -356,3 +427,38 @@ class ExcelUploadService:
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
+    async def _generate_estimateid(self) -> str:
+        logger.info("Generating estimate ID")
+        try:
+            logger.info("Finding count of estimates")
+            count = self.collection.count_documents({})  # Await count
+            logger.info(f"Count of estimates: {count}")
+
+            if count == 0:
+                logger.info("No estimates found, starting with EST-001")
+                return "EST-001"
+
+        # Fetch the last inserted estimate
+            last_estimate = self.collection.find_one(
+                {},
+                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                projection={"estID": 1}
+            )
+
+            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+
+            if not last_estimate or "estID" not in last_estimate:
+                logger.warning("No estID found in the last estimate, defaulting to EST-001")
+                return "EST-001"
+
+            last_id_str = last_estimate["estID"]
+            last_id = int(last_id_str.split("-")[1])
+            new_id = f"EST-{last_id + 1:03d}"
+        
+            logger.info(f"Generated new estimate ID: {new_id}")
+            return new_id
+
+        except Exception as e:
+            logger.error(f"Error generating estimate ID: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
+    
