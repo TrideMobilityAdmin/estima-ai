@@ -204,10 +204,11 @@ class ExcelUploadService:
                 "estID":estimate_id,
                 "task": all_tasks,
                 "description": all_descriptions,
-                "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
+                # "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
                 "upload_timestamp": current_time,
                 "original_filename": file.filename,
-                "createdAt": current_time
+                "createdAt": current_time,
+                "status":"Initiated"
             }
 
             # Log the processed record
@@ -460,3 +461,4 @@ class ExcelUploadService:
         except Exception as e:
             logger.error(f"Error generating estimate ID: {str(e)}")
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
+    
