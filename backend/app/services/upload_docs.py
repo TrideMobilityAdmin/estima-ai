@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import re
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse, EstimateResponseSchema
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -15,12 +15,14 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
+from app.models.estimates import EstimateRequest
 
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("estima_input_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
+        self.estimate=self.mongo_client.get_collection("create_estimate")
         self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
@@ -462,3 +464,7 @@ class ExcelUploadService:
             logger.error(f"Error generating estimate ID: {str(e)}")
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
     
+    
+    async def get_all_estimates_status(self) -> List[EstimateResponseSchema]:
+            estimates = self.collection.find({}, {"estID": 1, "upload_timestamp": 1, "status": 1, "_id": 0})
+            return [EstimateResponseSchema(**estimate) for estimate in estimates]

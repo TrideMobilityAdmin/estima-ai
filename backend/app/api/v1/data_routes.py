@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File
+from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File, Form
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
@@ -7,11 +7,11 @@ import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
+from app.models.estimates import Estimate,EstimateResponseSchema, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
-
+import json
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
@@ -175,6 +175,8 @@ async def update_configurations(
     current_user: dict = Depends(get_current_user)
 ):
     return await config_service.update_configurations(config_id, config_req)
+
+
 @router.post("/validate",response_model=List[ValidTasks])
 async def validate_tasks(
     estimate_request: ValidRequest,
@@ -183,3 +185,4 @@ async def validate_tasks(
 ):
     print("validate_tasks")
     return await task_service.validate_tasks(estimate_request,current_user)
+

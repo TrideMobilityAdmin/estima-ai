@@ -49,6 +49,8 @@ class EstimateRequest(BaseModel):
      aircraftAge: int 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
+     
+     
 class ValidRequest(BaseModel):
      tasks: List[str]
 class ValidTasks(BaseModel):
@@ -165,3 +167,4 @@ class ComparisonResult(BaseModel):
 class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
+
