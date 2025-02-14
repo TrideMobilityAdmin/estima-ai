@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import re
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse, EstimateResponseSchema
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
@@ -469,9 +469,7 @@ class ExcelUploadService:
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
     
     
-    async def get_all_estimates_status(self) -> List[EstimateResponseSchema]:
-            estimates = self.collection.find({}, {"estID": 1, "upload_timestamp": 1, "status": 1, "_id": 0})
-            return [EstimateResponseSchema(**estimate) for estimate in estimates]
+
         
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
         
