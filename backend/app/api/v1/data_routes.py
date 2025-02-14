@@ -9,7 +9,7 @@ from typing import List
 import shutil
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate,EstimateResponseSchema, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
