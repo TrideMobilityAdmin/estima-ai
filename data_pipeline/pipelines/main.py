@@ -10,13 +10,17 @@ import os
 
 import yaml
 from pathlib import Path
+from logs.Log_config import setup_logging
+
+# Initialize logger
+logger = setup_logging()
 
 # `cwd`: current directory is straightforward
 cwd = Path.cwd()
 dir = os.path.dirname(__file__)
 
 # Load config.yaml
-def load_config(config_path="config.yaml"):
+def load_config(config_path='D:/Projects/gmr-mro/estima-ai/data_pipeline/config.yaml'):
     """Load configuration from YAML file."""
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
@@ -34,6 +38,7 @@ async def main():
         db = await connect_to_database(db_uri, db_name)
         if db is None:
             print("Failed to connect to database")
+            logger.error("Failed to connect to database")
             return
         
 
@@ -59,8 +64,10 @@ async def main():
                     print(f"Error processing {collection_name}: {collection_error}")
 
         print("Process completed")
+        logger.info("Process completed")
     except Exception as e:
         print(f"Unexpected error in main: {e}")
+        logger.error(f"Unexpected error in main: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())

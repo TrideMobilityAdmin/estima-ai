@@ -6,7 +6,7 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel
+from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
@@ -85,31 +85,27 @@ async def get_parts_usage(
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
 
-@router.get("/skills/analysis")
-async def get_skills_analysis(
-    source_tasks: List[str] = Query(..., 
-        description="List of source tasks to analyze",
-        example=["task1", "task2"],
-    ),
+@router.post("/skills/analysis")
+async def post_skills_analysis(
+    request: SkillsAnalysisRequest,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     """
     Endpoint to analyze skills based on a list of source tasks.
-    
+
     Args:
-        source_tasks: List of task identifiers to analyze
+        request: Request body containing the list of task identifiers to analyze
         current_user: Current authenticated user
         task_service: Injected task service dependency
-    
+
     Returns:
         Analysis results for the provided tasks
     """
     # Pass the entire list to the service method
-    skills_analysis = await task_service.get_skills_analysis(source_tasks)
+    skills_analysis = await task_service.get_skills_analysis(request.source_tasks)
     
     return skills_analysis
-
 
 @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 async def create_estimate(

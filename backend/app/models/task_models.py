@@ -2,6 +2,7 @@ from pydantic import BaseModel,Field
 from typing import Optional,List,Any,Dict
 from bson import ObjectId
 
+
 class ManHrs(BaseModel):
     max: float
     min: float
@@ -69,6 +70,10 @@ class TaskAnalysis(BaseModel):
 
 class SkillAnalysisResponse(BaseModel):
     skillAnalysis: Dict[str, List[TaskAnalysis]]
+    
+class SkillsAnalysisRequest(BaseModel):
+    source_tasks: List[str]
+
 
 
     
