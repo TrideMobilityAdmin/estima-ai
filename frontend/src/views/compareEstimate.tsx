@@ -6,6 +6,7 @@ import { IconArrowMoveRight, IconClockCheck, IconCube, IconSettingsStar, IconUse
 import ReactApexChart from 'react-apexcharts';
 import { useApi } from '../api/services/estimateSrvice';
 import UploadDropZoneExcel from '../components/uploadExcelFile';
+import { showNotification } from '@mantine/notifications';
 
 export default function CompareEstimate() {
   const { getAllEstimates, uploadFile } = useApi();
@@ -34,22 +35,65 @@ export default function CompareEstimate() {
 
   console.log("all estimates>>>", estimates);
 
-  // Handle file selection from DropZoneExcel
-  const handleFileChange = (files: any) => {
-    // DropZoneExcel component already provides the files array
-    if (files && files.length > 0) {
-      setSelectedFile(files[0]);
-      console.log("✅ File Selected:", files[0].name);
+  // // Handle file selection from DropZoneExcel
+  // const handleFileChange = (files: any) => {
+  //   // DropZoneExcel component already provides the files array
+  //   if (files && files.length > 0) {
+  //     setSelectedFile(files[0]);
+  //     console.log("✅ File Selected:", files[0].name);
+  //   } else {
+  //     setSelectedFile(null);
+  //     console.log("❌ No file selected");
+  //   }
+  // };
+
+  // // Handle upload
+  // const handleUpload = async () => {
+  //   if (!selectedFile) {
+  //     console.log("Current file state:", selectedFile);
+  //     alert("Please select a file first!");
+  //     return;
+  //   }
+
+  //   if (!selectedEstID) {
+  //     alert("Please select an Estimate ID first!");
+  //     return;
+  //   }
+
+  //   try {
+  //     console.log("Uploading file:", selectedFile.name);
+  //     console.log("Selected Estimate ID:", selectedEstID);
+
+  //     // Create FormData and append file
+  //     const formData = new FormData();
+  //     formData.append('file', selectedFile);
+
+  //     // Call the upload API
+  //     const response = await uploadFile(selectedFile, selectedEstID);
+
+  //     if (response) {
+  //       console.log("Upload successful:", response);
+  //       setCompareEstimatedData(response?.data);
+  //       // Reset the form
+  //       setSelectedFile(null);
+  //       setSelectedEstID('');
+  //     }
+  //   } catch (error) {
+  //     console.error("Upload failed:", error);
+  //     alert("Failed to upload file. Please try again.");
+  //   }
+  // };
+  const handleFileChange = (file: File | null) => {
+    setSelectedFile(file);
+    if (file) {
+      console.log("✅ File Selected:", file.name);
     } else {
-      setSelectedFile(null);
       console.log("❌ No file selected");
     }
   };
 
-  // Handle upload
   const handleUpload = async () => {
     if (!selectedFile) {
-      console.log("Current file state:", selectedFile);
       alert("Please select a file first!");
       return;
     }
@@ -63,25 +107,34 @@ export default function CompareEstimate() {
       console.log("Uploading file:", selectedFile.name);
       console.log("Selected Estimate ID:", selectedEstID);
 
-      // Create FormData and append file
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append("file", selectedFile);
 
-      // Call the upload API
       const response = await uploadFile(selectedFile, selectedEstID);
 
       if (response) {
         console.log("Upload successful:", response);
+        // Reset file and ID after successful upload
         setCompareEstimatedData(response?.data);
-        // Reset the form
         setSelectedFile(null);
-        setSelectedEstID('');
+        setSelectedEstID("");
+
+        // if(compareEstimatedData?.comparisionResults?.length < 0){
+        //   showNotification({
+        //     title: "No data found!",
+        //     message: "No Data For this comparision",
+        //     color: "orange",
+        //     style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        //   });
+        // }
+
       }
     } catch (error) {
       console.error("Upload failed:", error);
       alert("Failed to upload file. Please try again.");
     }
   };
+
 
   console.log("comapre ui rsp>>>>", compareEstimatedData);
 
