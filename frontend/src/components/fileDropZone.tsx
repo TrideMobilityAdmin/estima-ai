@@ -21,7 +21,7 @@ export default function DropZoneExcel({
   name,
   changeHandler,
   color,
-}: DropZoneExcelProps) {
+}: any) {
   const [files, setFiles] = useState<File[]>([]);
 
   // Read the Excel file and extract tasks
@@ -84,6 +84,8 @@ export default function DropZoneExcel({
           "application/vnd.ms-excel",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           ".xlsm",
+          ".xls",
+          ".xlsx"
         ]} // Accept only Excel files
         onDrop={handleDrop}
         multiple={false} // Allow only one file at a time

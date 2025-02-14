@@ -7,7 +7,7 @@ from app.middleware.auth import get_current_user
 from typing import List
 from datetime import datetime
 from fastapi import UploadFile, File
-from app.models.estimates import ValidTasks,ValidRequest
+from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
 from app.models.estimates import (
@@ -45,15 +45,8 @@ class TaskService:
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
         self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
-    
-
-
-    def convert_package_id(package_id: str) -> str:
-        match = re.search(r'HMV(\d{2})(\d{6})(\d{4})', package_id)
-        if match:
-            return f"HMV{match.group(1)}/{match.group(2)}/{match.group(3)}"
-        return package_id  # Return original if pattern doesn't match
-            
+        self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
+        
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -164,6 +157,23 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
+    async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
+        """
+        Create a estimate status based on the provided tasks and parameters.
+        """
+        try:
+            estimate_id = await self._generate_estimateid()
+            estimate_status_doc = {
+                "estID": estimate_id,
+                "status":"Initiated"
+            }
+            self.estimates_status_collection.insert_one(estimate_status_doc)
+            response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
+            return response
+        except Exception as e:
+            logger.error(f"Error creating estimate status: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
+
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
         Create a new estimate based on the provided tasks and parameters.
@@ -283,6 +293,8 @@ class TaskService:
             }
 
             result = self.estimates_collection.insert_one(estimate_doc)
+            download_link = f"/estimates/{estimate_id}/download"
+            
             response = EstimateResponse(
                 estID=estimate_id,
                 description=description,
@@ -296,7 +308,8 @@ class TaskService:
                 lastUpdated=current_time,
                 createdBy=estimate_doc["createdBy"],
                 updatedBy=estimate_doc["updatedBy"],
-                originalFilename=description
+                originalFilename=description,
+                downloadEstimate=download_link
 
             )
 
@@ -536,7 +549,6 @@ class TaskService:
         """
         try:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
-
             # Pipeline for task_parts
             task_parts_pipeline = [
                 { "$match": { "RequestedPart": part_id } },
@@ -581,7 +593,7 @@ class TaskService:
                         "as": "aircraft_info"
                     }
                 },
-                { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": "true" } },
+                { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
                 {
                     "$addFields": {
                         "effectiveDate": {
@@ -613,7 +625,6 @@ class TaskService:
                 },
                 { "$project": { "convertedPackageId": 0, "aircraft_info": 0, "effectiveDate": 0 } }
             ]
-
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
             { "$match": { "IssuedPart": part_id } },
@@ -631,7 +642,7 @@ class TaskService:
                 "as": "aircraft_info"
                 }
             },
-            { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": true } },
+            { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
             {
                 "$addFields": {
                 "effectiveDate": {
@@ -652,7 +663,7 @@ class TaskService:
                         "finding": "$Finding",
                         "logItem": "$LogItem",
                         "description": "$Description",
-                        "date": "$effectiveDate", 
+                        "date": "$effectiveDate",
                         "quantity": "$UsedQty"
                         }
                     ]
@@ -660,24 +671,22 @@ class TaskService:
                 }
                 }
             },
-                { "$project": { "effectiveDate": 0 } } // Remove the temporary field
+                { "$project": { "effectiveDate": 0 } } 
                 ]
-
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-            logger.info(f"Results of parts usage for part_id: {task_parts_result} and {sub_task_parts_result}")
-
+            logger.info(f"Results of task_parts: {task_parts_result}")
+            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}")
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {}
-
             # Construct final output
             output = {
                 "partId": part_id,
                 "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("partDescription", "") if task_parts_result else "",
-                "Usage": {
-                    "Tasks": [
+                "usage": {
+                    "tasks": [
                         {
                             "taskId": t["taskId"],
                             "taskDescription": t["taskDescription"],
@@ -688,19 +697,19 @@ class TaskService:
                         }
                         for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
                     ],
-                    "Findings": [
+                    "findings": [
                         {
                             "taskId": f["taskId"],
                             "taskDescription": f["taskDescription"],
                             "packages": [
                                 {
-                                    "packageId": pkg["packageId"],
-                                    "finding": pkg["finding"],
-                                    "logItem": pkg["logItem"],
-                                    "description": pkg["description"],
-                                    "date": pkg["date"],
-                                    "quantity": pkg["quantity"]
-                                }
+                                            "packageId": pkg["packageId"],
+                                            "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
+                                            "logItem": pkg.get("logItem", ""),  # Use .get() to avoid KeyError
+                                            "description": pkg.get("description", ""),  # Use .get() to avoid KeyError
+                                            "date": pkg["date"],
+                                            "quantity": pkg["quantity"]
+                    }
                                 for pkg in f.get("packages", [])
                             ]
                         }
@@ -708,14 +717,10 @@ class TaskService:
                     ]
                 }
             }
-
             return output
-
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
             return None
-
-
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
         Analyzes skills required for multiple tasks.
@@ -846,4 +851,37 @@ class TaskService:
                 detail=f"Error fetching estimate: {str(e)}"
             )
            
-    
+    async def _generate_estimateid(self) -> str:
+        logger.info("Generating estimate ID")
+        try:
+            logger.info("Finding count of estimates")
+            count = self.estimates_status_collection.count_documents({})  # Await count
+            logger.info(f"Count of estimates: {count}")
+
+            if count == 0:
+                logger.info("No estimates found, starting with EST-001")
+                return "EST-001"
+
+        # Fetch the last inserted estimate
+            last_estimate = self.estimates_status_collection.find_one(
+                {},
+                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                projection={"estID": 1}
+            )
+
+            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+
+            if not last_estimate or "estID" not in last_estimate:
+                logger.warning("No estID found in the last estimate, defaulting to EST-001")
+                return "EST-001"
+
+            last_id_str = last_estimate["estID"]
+            last_id = int(last_id_str.split("-")[1])
+            new_id = f"EST-{last_id + 1:03d}"
+        
+            logger.info(f"Generated new estimate ID: {new_id}")
+            return new_id
+
+        except Exception as e:
+            logger.error(f"Error generating estimate ID: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")

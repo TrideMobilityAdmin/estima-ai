@@ -40,6 +40,8 @@ class Estimate(BaseModel):
     createdAt: datetime|None=None
     lastUpdated: datetime|None=None
 # create estimate
+
+
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
@@ -47,6 +49,19 @@ class EstimateRequest(BaseModel):
      aircraftAge: int 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
+     
+     
+     def to_dict(self):
+        return {
+            "tasks":self.tasks,
+            "probability": self.probability,
+            "operator": self.operator,
+            "aircraftAge": self.aircraftAge,
+            "aircraftFlightHours": self.aircraftFlightHours,  # Convert datetime to ISO format
+            "aircraftFlightCycles": self.aircraftFlightCycles  # Convert datetime to ISO format
+
+        }
+
 class ValidRequest(BaseModel):
      tasks: List[str]
 class ValidTasks(BaseModel):
@@ -89,9 +104,32 @@ class AggregatedFindingsByTask(BaseModel):
 class AggregatedFindings(BaseModel):
     totalMhs: float = 0.0
     totalPartsCost: float = 0.0
-   
+class EstimateStatus(BaseModel):
+    estID:str
+    status:str
 #estimate response schema
 class EstimateResponse(BaseModel):
+    estID: str
+    description: str = ""
+    tasks: List[TaskDetailsWithParts] = []
+    aggregatedTasks: Optional[AggregatedTasks] = None
+
+    findings:List[FindingsDetailsWithParts]=[]
+    aggregatedFindingsByTask:List[AggregatedFindingsByTask]=None
+    aggregatedFindings:Optional[AggregatedFindings]=None
+    userID: PyObjectId = Field(alias="user_id")
+    createdBy: str = "Unknown"
+    createdAt:  datetime
+    lastUpdated:  datetime
+    updatedBy:  PyObjectId = Field(alias="updated_by")
+    originalFilename: str = ""
+    downloadEstimate: str
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "populate_by_name": True,
+    }
+
+class DownloadResponse(BaseModel):
     estID: str
     description: str = ""
     tasks: List[TaskDetailsWithParts] = []
@@ -140,3 +178,4 @@ class ComparisonResult(BaseModel):
 class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
+

@@ -39,12 +39,14 @@ import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { useApi } from "../api/services/estimateSrvice";
+import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 
 export default function Estimate() {
-    const { postEstimateReport, validateTasks } = useApi();
+    const { postEstimateReport, validateTasks, downloadEstimatePdf } = useApi();
     const [scrolledTable, setScrolledTable] = useState(false);
     const [tasks, setTasks] = useState<string[]>([]);
     const [estimateReportData, setEstReportData] = useState<any>(null);
+    const [estimateId, setEstimateId] = useState<string>("");
     const [loading, setLoading] = useState(false); // Add loading state
     const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -141,6 +143,7 @@ export default function Estimate() {
 
             if (response) {
                 setEstReportData(response);
+                setEstimateId(response?.estID);
                 showNotification({
                     title: "Success",
                     message: "Estimate report submitted successfully!",
@@ -159,58 +162,120 @@ export default function Estimate() {
         }
     };
 
-
     useEffect(() => {
         console.log("Updated UI response:", estimateReportData);
     }, [estimateReportData]);
     console.log("response UI >>>>", estimateReportData);
 
     const [downloading, setDownloading] = useState(false);
-    const handleDownloadPDF = async () => {
-        setDownloading(true); // Start loading
-        try {
-            const response = await axios.get(
-                "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
-                {
-                    responseType: "blob", // Ensure the response is a Blob (binary data)
-                }
-            );
 
-            // Create a Blob URL for the PDF file
-            const blob = new Blob([response.data], { type: "application/pdf" });
-            const url = window.URL.createObjectURL(blob);
 
-            // Create a link element to trigger the download
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = "Estimate.pdf"; // Name for the downloaded file
-            document.body.appendChild(link);
-            link.click();
+    const handleDownload = () => {
+        downloadEstimatePdf(estimateId);
+    }
+    // const handleDownloadPDF = async () => {
+    //     setDownloading(true);
+    //     try {
+    //         // Set proper headers for the request
+    //         const config = {
+    //             responseType: 'blob' as const,
+    //             headers: {
+    //                 'Accept': 'application/pdf',
+    //                 // Add any authentication headers if needed
+    //                 // 'Authorization': `Bearer ${yourAuthToken}`
+    //             }
+    //         };
+    
+    //         const response = await axios.get(
+    //             `${getEstimateReport_Url}${estimateId}/download`,
+    //             config
+    //         );
+    
+    //         // Check if the response is actually a PDF
+    //         const contentType = response.headers['content-type'];
+    //         if (!contentType || !contentType.includes('application/pdf')) {
+    //             throw new Error('Received invalid content type from server');
+    //         }
+    
+    //         // Create blob and download
+    //         const blob = new Blob([response.data], { type: 'application/pdf' });
+            
+    //         // Verify blob size
+    //         if (blob.size < 100) { // Arbitrary small size to check if we got a valid PDF
+    //             throw new Error('Received invalid PDF data');
+    //         }
+    
+    //         const url = window.URL.createObjectURL(blob);
+    //         const link = document.createElement('a');
+    //         link.href = url;
+    //         link.download = `Estimate-${estimateId}.pdf`;
+            
+    //         document.body.appendChild(link);
+    //         link.click();
+            
+    //         // Cleanup
+    //         document.body.removeChild(link);
+    //         window.URL.revokeObjectURL(url);
+    
+    //         showNotification({
+    //             title: 'Download Successful',
+    //             message: 'Your PDF has been downloaded successfully!',
+    //             color: 'green',
+    //         });
+    //     } catch (error) {
+    //         console.error('Error downloading PDF:', error);
+            
+    //         // More detailed error message
+    //         let errorMessage = 'There was an error downloading the PDF. ';
+    //         if (axios.isAxiosError(error)) {
+    //             if (error.response) {
+    //                 if (error.response.status === 401) {
+    //                     errorMessage += 'Authentication required.';
+    //                 } else if (error.response.status === 404) {
+    //                     errorMessage += 'PDF file not found.';
+    //                 } else {
+    //                     errorMessage += `Server returned status ${error.response.status}.`;
+    //                 }
+    //             } else if (error.request) {
+    //                 errorMessage += 'No response received from server.';
+    //             } else {
+    //                 errorMessage += 'Request setup failed.';
+    //             }
+    //         }
+    
+    //         showNotification({
+    //             title: 'Download Failed',
+    //             message: errorMessage,
+    //             color: 'red',
+    //         });
+    //     } finally {
+    //         setDownloading(false);
+    //     }
+    // };
 
-            // Cleanup
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            // Show success notification
-            showNotification({
-                title: "Download Successful",
-                message: "Your PDF has been downloaded successfully!",
-                color: "green",
-            });
-        } catch (error) {
-            console.error("Error downloading PDF:", error);
-
-            // Show error notification
-            showNotification({
-                title: "Download Failed",
-                message: "There was an error downloading the PDF.",
-                color: "red",
-            });
-        } finally {
-            setDownloading(false); // End loading
-        }
-    };
-
+    // const downloadPdf = async () => {
+    //     try {
+    //       const response = await axios.get(`${getEstimateReport_Url}${estimateId}/download`, {
+    //         responseType: 'blob', // Important: Set response type to blob
+    //       });
+    
+    //       // Create a blob URL for the PDF
+    //       const url = window.URL.createObjectURL(new Blob([response.data]));
+    //       const link = document.createElement('a');
+    //       link.href = url;
+    //       link.setAttribute('download', `${estimateId}.pdf`); // Set the filename
+    
+    //       // Append to the body and trigger the download
+    //       document.body.appendChild(link);
+    //       link.click();
+    //       link.remove();
+    
+    //       // Clean up the URL object
+    //       window.URL.revokeObjectURL(url);
+    //     } catch (error) {
+    //       console.error('Error downloading PDF:', error);
+    //     }
+    //   };
     const parts = [
         {
             partName: "Nut",
@@ -270,248 +335,248 @@ export default function Estimate() {
         }
     ];
 
-    const jsonData = {
-        tasks: [
-            {
-                sourceTask: "255000-16-1",
-                desciption: "CARGO COMPARTMENTS\n\nDETAILED INSPECTION OF DIVIDER NETS, DOOR NETS AND\nNET ATTACHMENT POINTS\n\nNOTE:\nTHE NUMBER OF AFFECTED ZONES MAY VARY ACCORDING TO",
-                mhs: { max: 2, min: 2, avg: 2, est: 1.38 },
-                spareParts: [
-                    {
-                        partId: "Nut",
-                        desc: "POO1",
-                        qty: "6",
-                        unit: "",
-                        price: "20"
-                    },
-                    {
-                        partId: "Foam Tape",
-                        desc: "POO2",
-                        qty: "2",
-                        unit: "",
-                        price: "80"
-                    },
-                    {
-                        partId: "Blind Rivet",
-                        desc: "POO3",
-                        qty: "1",
-                        unit: "",
-                        price: "40"
-                    },
-                    {
-                        partId: "Selant",
-                        desc: "POO4",
-                        qty: "4",
-                        unit: "",
-                        price: "20"
-                    },
-                    {
-                        partId: "Nut",
-                        desc: "POO1",
-                        qty: "6",
-                        unit: "",
-                        price: "20"
-                    },
-                    {
-                        partId: "Foam Tape",
-                        desc: "POO2",
-                        qty: "2",
-                        unit: "",
-                        price: "80"
-                    },
-                    {
-                        partId: "Blind Rivet",
-                        desc: "POO3",
-                        qty: "1",
-                        unit: "",
-                        price: "40"
-                    },
-                    {
-                        partId: "Selant",
-                        desc: "POO4",
-                        qty: "4",
-                        unit: "",
-                        price: "20"
-                    }
-                ],
-            },
-            {
-                sourceTask: "256241-05-1",
-                desciption: "DOOR ESCAPE SLIDE\n\nCLEAN DOOR GIRT BAR FITTING STOP LEVERS\n\nNOTE:\nTASK IS NOT APPLICABLE FOR DEACTIVATED PASSENGER/CREW\nDOORS.",
-                mhs: { max: 2, min: 2, avg: 2, est: 0.92 },
-                spareParts: [
-                    { partId: "LOTOXANE", desc: "NON AQUEOUS CLEANER-GENERAL", qty: 0.1, unit: "LTR", price: 0 },
-                ],
-            },
-            {
-                sourceTask: "200435-01-1 (LH)",
-                desciption: "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
-                mhs: { max: 4, min: 4, avg: 4, est: 0.73 },
-                spareParts: [],
-            },
-        ],
-        findings: [
-            {
-                taskId: "200435-01-1 (LH)",
-                details: [
-                    {
-                        logItem: "HMV23/000211/0324/24",
-                        probability: '66',
-                        desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-                        mhs: { max: 2, min: 2, avg: 2, est: 4 },
-                        spareParts: [
-                            {
-                                partId: "Nut",
-                                desc: "POO1",
-                                qty: "6",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Foam Tape",
-                                desc: "POO2",
-                                qty: "2",
-                                unit: "",
-                                price: "80"
-                            },
-                            {
-                                partId: "Blind Rivet",
-                                desc: "POO3",
-                                qty: "1",
-                                unit: "",
-                                price: "40"
-                            },
-                            {
-                                partId: "Selant",
-                                desc: "POO4",
-                                qty: "4",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Nut",
-                                desc: "POO1",
-                                qty: "6",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Foam Tape",
-                                desc: "POO2",
-                                qty: "2",
-                                unit: "",
-                                price: "80"
-                            },
-                            {
-                                partId: "Blind Rivet",
-                                desc: "POO3",
-                                qty: "1",
-                                unit: "",
-                                price: "40"
-                            },
-                            {
-                                partId: "Selant",
-                                desc: "POO4",
-                                qty: "4",
-                                unit: "",
-                                price: "20"
-                            }
-                        ],
-                    },
-                    {
-                        logItem: "HMV23/000211/25",
-                        probability: '44',
-                        desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-                        mhs: { max: 2, min: 2, avg: 2, est: 4 },
-                        spareParts: [],
-                    },
-                    {
-                        logItem: "HMV23/000211/6",
-                        probability: '46',
-                        desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-                        mhs: { max: 2, min: 2, avg: 2, est: 4 },
-                        spareParts: [
-                            {
-                                partId: "Nut",
-                                desc: "POO1",
-                                qty: "6",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Foam Tape",
-                                desc: "POO2",
-                                qty: "2",
-                                unit: "",
-                                price: "80"
-                            },
-                            {
-                                partId: "Blind Rivet",
-                                desc: "POO3",
-                                qty: "1",
-                                unit: "",
-                                price: "40"
-                            },
-                            {
-                                partId: "Selant",
-                                desc: "POO4",
-                                qty: "4",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Nut",
-                                desc: "POO1",
-                                qty: "6",
-                                unit: "",
-                                price: "20"
-                            },
-                            {
-                                partId: "Foam Tape",
-                                desc: "POO2",
-                                qty: "2",
-                                unit: "",
-                                price: "80"
-                            },
-                            {
-                                partId: "Blind Rivet",
-                                desc: "POO3",
-                                qty: "1",
-                                unit: "",
-                                price: "40"
-                            },
-                            {
-                                partId: "Selant",
-                                desc: "POO4",
-                                qty: "4",
-                                unit: "",
-                                price: "20"
-                            }
-                        ],
-                    },
-                    {
-                        logItem: "HMV23/000211/26",
-                        probability: '64',
-                        desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-                        mhs: { max: 2, min: 2, avg: 2, est: 4 },
-                        spareParts: [],
-                    },
-                ],
-            },
-            {
-                taskId: "255000-16-1",
-                details: [
-                    {
-                        logItem: "HMV23/000211/0324/24",
-                        probability: '66',
-                        desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-                        mhs: { max: 2, min: 2, avg: 2, est: 4 },
-                        spareParts: [],
-                    }
-                ],
-            },
-        ],
-    };
+    // const jsonData = {
+    //     tasks: [
+    //         {
+    //             sourceTask: "255000-16-1",
+    //             desciption: "CARGO COMPARTMENTS\n\nDETAILED INSPECTION OF DIVIDER NETS, DOOR NETS AND\nNET ATTACHMENT POINTS\n\nNOTE:\nTHE NUMBER OF AFFECTED ZONES MAY VARY ACCORDING TO",
+    //             mhs: { max: 2, min: 2, avg: 2, est: 1.38 },
+    //             spareParts: [
+    //                 {
+    //                     partId: "Nut",
+    //                     desc: "POO1",
+    //                     qty: "6",
+    //                     unit: "",
+    //                     price: "20"
+    //                 },
+    //                 {
+    //                     partId: "Foam Tape",
+    //                     desc: "POO2",
+    //                     qty: "2",
+    //                     unit: "",
+    //                     price: "80"
+    //                 },
+    //                 {
+    //                     partId: "Blind Rivet",
+    //                     desc: "POO3",
+    //                     qty: "1",
+    //                     unit: "",
+    //                     price: "40"
+    //                 },
+    //                 {
+    //                     partId: "Selant",
+    //                     desc: "POO4",
+    //                     qty: "4",
+    //                     unit: "",
+    //                     price: "20"
+    //                 },
+    //                 {
+    //                     partId: "Nut",
+    //                     desc: "POO1",
+    //                     qty: "6",
+    //                     unit: "",
+    //                     price: "20"
+    //                 },
+    //                 {
+    //                     partId: "Foam Tape",
+    //                     desc: "POO2",
+    //                     qty: "2",
+    //                     unit: "",
+    //                     price: "80"
+    //                 },
+    //                 {
+    //                     partId: "Blind Rivet",
+    //                     desc: "POO3",
+    //                     qty: "1",
+    //                     unit: "",
+    //                     price: "40"
+    //                 },
+    //                 {
+    //                     partId: "Selant",
+    //                     desc: "POO4",
+    //                     qty: "4",
+    //                     unit: "",
+    //                     price: "20"
+    //                 }
+    //             ],
+    //         },
+    //         {
+    //             sourceTask: "256241-05-1",
+    //             desciption: "DOOR ESCAPE SLIDE\n\nCLEAN DOOR GIRT BAR FITTING STOP LEVERS\n\nNOTE:\nTASK IS NOT APPLICABLE FOR DEACTIVATED PASSENGER/CREW\nDOORS.",
+    //             mhs: { max: 2, min: 2, avg: 2, est: 0.92 },
+    //             spareParts: [
+    //                 { partId: "LOTOXANE", desc: "NON AQUEOUS CLEANER-GENERAL", qty: 0.1, unit: "LTR", price: 0 },
+    //             ],
+    //         },
+    //         {
+    //             sourceTask: "200435-01-1 (LH)",
+    //             desciption: "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
+    //             mhs: { max: 4, min: 4, avg: 4, est: 0.73 },
+    //             spareParts: [],
+    //         },
+    //     ],
+    //     findings: [
+    //         {
+    //             taskId: "200435-01-1 (LH)",
+    //             details: [
+    //                 {
+    //                     logItem: "HMV23/000211/0324/24",
+    //                     probability: '66',
+    //                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+    //                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
+    //                     spareParts: [
+    //                         {
+    //                             partId: "Nut",
+    //                             desc: "POO1",
+    //                             qty: "6",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Foam Tape",
+    //                             desc: "POO2",
+    //                             qty: "2",
+    //                             unit: "",
+    //                             price: "80"
+    //                         },
+    //                         {
+    //                             partId: "Blind Rivet",
+    //                             desc: "POO3",
+    //                             qty: "1",
+    //                             unit: "",
+    //                             price: "40"
+    //                         },
+    //                         {
+    //                             partId: "Selant",
+    //                             desc: "POO4",
+    //                             qty: "4",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Nut",
+    //                             desc: "POO1",
+    //                             qty: "6",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Foam Tape",
+    //                             desc: "POO2",
+    //                             qty: "2",
+    //                             unit: "",
+    //                             price: "80"
+    //                         },
+    //                         {
+    //                             partId: "Blind Rivet",
+    //                             desc: "POO3",
+    //                             qty: "1",
+    //                             unit: "",
+    //                             price: "40"
+    //                         },
+    //                         {
+    //                             partId: "Selant",
+    //                             desc: "POO4",
+    //                             qty: "4",
+    //                             unit: "",
+    //                             price: "20"
+    //                         }
+    //                     ],
+    //                 },
+    //                 {
+    //                     logItem: "HMV23/000211/25",
+    //                     probability: '44',
+    //                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+    //                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
+    //                     spareParts: [],
+    //                 },
+    //                 {
+    //                     logItem: "HMV23/000211/6",
+    //                     probability: '46',
+    //                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+    //                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
+    //                     spareParts: [
+    //                         {
+    //                             partId: "Nut",
+    //                             desc: "POO1",
+    //                             qty: "6",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Foam Tape",
+    //                             desc: "POO2",
+    //                             qty: "2",
+    //                             unit: "",
+    //                             price: "80"
+    //                         },
+    //                         {
+    //                             partId: "Blind Rivet",
+    //                             desc: "POO3",
+    //                             qty: "1",
+    //                             unit: "",
+    //                             price: "40"
+    //                         },
+    //                         {
+    //                             partId: "Selant",
+    //                             desc: "POO4",
+    //                             qty: "4",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Nut",
+    //                             desc: "POO1",
+    //                             qty: "6",
+    //                             unit: "",
+    //                             price: "20"
+    //                         },
+    //                         {
+    //                             partId: "Foam Tape",
+    //                             desc: "POO2",
+    //                             qty: "2",
+    //                             unit: "",
+    //                             price: "80"
+    //                         },
+    //                         {
+    //                             partId: "Blind Rivet",
+    //                             desc: "POO3",
+    //                             qty: "1",
+    //                             unit: "",
+    //                             price: "40"
+    //                         },
+    //                         {
+    //                             partId: "Selant",
+    //                             desc: "POO4",
+    //                             qty: "4",
+    //                             unit: "",
+    //                             price: "20"
+    //                         }
+    //                     ],
+    //                 },
+    //                 {
+    //                     logItem: "HMV23/000211/26",
+    //                     probability: '64',
+    //                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+    //                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
+    //                     spareParts: [],
+    //                 },
+    //             ],
+    //         },
+    //         {
+    //             taskId: "255000-16-1",
+    //             details: [
+    //                 {
+    //                     logItem: "HMV23/000211/0324/24",
+    //                     probability: '66',
+    //                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
+    //                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
+    //                     spareParts: [],
+    //                 }
+    //             ],
+    //         },
+    //     ],
+    // };
 
     return (
         <>
@@ -554,20 +619,41 @@ export default function Estimate() {
                                 loaderProps={{ color: 'indigo', type: 'bars' }}
                             />
 
-                            <Group mb='xs'>
+                            <Group justify="space-between">
+                            <Group mb='xs' align="center" >
                                 <Text size="md" fw={500}>
-                                    Tasks
+                                    Tasks Available
                                 </Text>
                                 {
-                                    tasks.length > 0 ? (
-                                        <Badge color="indigo" size="md" radius="sm">
-                                            {tasks?.length}
+                                    validatedTasks.length > 0 ? (
+                                        <Badge ta='center' color="indigo" size="md" radius="lg">
+                                            {validatedTasks?.filter((ele) => ele.status === true)?.length || 0} 
                                         </Badge>
                                     ) : (
-                                        <></>
+                                        <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
+                                         0
+                                         </Badge>
                                     )
                                 }
                             </Group>
+                            <Group mb='xs' align="center">
+                                <Text size="md" fw={500}>
+                                Tasks Not-Available
+                                </Text>
+                                {
+                                    validatedTasks.length > 0 ? (
+                                        <Badge ta='center' color="red" size="md" radius="lg">
+                                            {validatedTasks?.filter((ele) => ele.status === false)?.length || 0} 
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="light" ta='center' color="red" size="md" radius="lg">
+                                         0
+                                         </Badge>
+                                    )
+                                }
+                            </Group>
+                            </Group>
+                            
                             <ScrollArea
                                 style={{
                                     flex: 1, // Take remaining space for scrollable area
@@ -581,7 +667,7 @@ export default function Estimate() {
                                         {validatedTasks?.map((task, index) => (
                                             <Badge
                                                 key={index}
-                                                color={task?.status === false ? "red" : "blue"}
+                                                color={task?.status === false ? "pink" : "blue"}
                                                 variant="light"
                                                 radius='sm'
                                                 style={{ margin: "0.25em" }}
@@ -719,7 +805,10 @@ export default function Estimate() {
                     </Button>
                 </Group>
 
-                <Divider
+                {/* {
+                    validatedTasks?.length > 0 && estimateReportData ? (
+                        <> */}
+                        <Divider
                     variant="dashed"
                     labelPosition="center"
                     color={"gray"}
@@ -733,17 +822,23 @@ export default function Estimate() {
                 />
 
                 <Group justify="space-between">
-                    <Title order={4}>
-                        Overall Estimate Report
+                    <Group>
+                    <Title order={4} c='gray'>
+                        Overall Estimate Report :
                     </Title>
-                    <Button
+                    <Title order={4}>
+                        {estimateReportData?.estID || "-"}
+                    </Title>
+                    </Group>
+                    
+                     <Button
                         size="xs"
                         variant="filled"
                         color="#1bb343"
                         leftSection={<MdPictureAsPdf size={14} />}
                         rightSection={<MdOutlineFileDownload size={14} />}
-                        onClick={handleDownloadPDF}
-                        loading={downloading} // Mantine built-in downloading effect
+                        onClick={handleDownload}
+                        loading={downloading}
                     >
                         {downloading ? "Downloading..." : "Download Estimate"}
                     </Button>
@@ -948,11 +1043,20 @@ export default function Estimate() {
 
                 {/* <SegmentedControl color="#1A237E" bg='white' data={['Findings', 'Man Hours', 'Spare Parts']} /> */}
 
-                <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} />
+                {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
+                <FindingsWiseSection tasks={estimateReportData?.tasks} findings={estimateReportData?.findings} />
 
                 <Space h='md' />
-                <PreloadWiseSection tasks={jsonData?.tasks} />
+                {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
+                <PreloadWiseSection tasks={estimateReportData?.tasks} />
 
+                        {/* </>
+                    ) : (
+                        <></>
+                    )
+                } */}
+
+                    
             </div>
         </>
     )
@@ -1013,20 +1117,20 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
     };
 
     // Filter tasks based on search query
-    const filteredTasks = tasks.filter((task) =>
+    const filteredTasks = tasks?.filter((task) =>
         task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
     );
 
     // Filter findings based on search query
     const filteredFindings = selectedTask
-        ? getFindingsForTask(selectedTask.sourceTask).filter((finding) =>
+        ? getFindingsForTask(selectedTask.sourceTask)?.filter((finding) =>
             finding.logItem.toLowerCase().includes(findingSearch.toLowerCase())
         )
         : [];
 
     // Select the first task and its first finding by default
     useEffect(() => {
-        if (tasks.length > 0) {
+        if (tasks?.length > 0) {
             const firstTask = tasks[0];
             setSelectedTask(firstTask);
             const firstTaskFindings = getFindingsForTask(firstTask.sourceTask);
@@ -1076,7 +1180,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                     }}
                                 >
                                     <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                        {filteredTasks.map((task, taskIndex) => (
+                                        {filteredTasks?.map((task, taskIndex) => (
                                             <Badge
                                                 fullWidth
                                                 key={taskIndex}
@@ -1135,7 +1239,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                     <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
                                         {
                                             selectedTask ? (
-                                                filteredFindings.map((finding, findingIndex) => (
+                                                filteredFindings?.map((finding, findingIndex) => (
                                                     <Badge
                                                         fullWidth
                                                         key={findingIndex}
@@ -1243,7 +1347,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Min</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min} hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min ||0} hr</Text>
                                                         </Flex>
                                                         <IconClockDown color="green" size='25' />
                                                     </Group>
@@ -1252,7 +1356,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Max</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockUp color="red" size='25' />
                                                     </Group>
@@ -1261,7 +1365,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Average</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCode color="orange" size='25' />
                                                     </Group>
@@ -1270,7 +1374,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Estimated</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCheck color="indigo" size='25' />
                                                     </Group>
@@ -1390,13 +1494,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const [taskSearch, setTaskSearch] = useState<string>('');
 
     // Filter tasks based on search query
-    const filteredTasks = tasks.filter((task) =>
+    const filteredTasks = tasks?.filter((task) =>
         task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
     );
 
     // Select the first task by default
     useEffect(() => {
-        if (tasks.length > 0) {
+        if (tasks?.length > 0) {
             setSelectedTask(tasks[0]);
         }
     }, [tasks]);
@@ -1439,7 +1543,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                 scrollbarWidth: 'thin',
                             }}
                         >
-                            {filteredTasks.map((task, taskIndex) => (
+                            {filteredTasks?.map((task, taskIndex) => (
                                 <Badge
                                     fullWidth
                                     key={taskIndex}
@@ -1518,7 +1622,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             <Group justify="space-between" align="start">
                                                 <Flex direction='column'>
                                                     <Text fz='xs'>Min</Text>
-                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.min} hr</Text>
+                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.min || 0} hr</Text>
                                                 </Flex>
                                                 <IconClockDown color="green" size='25' />
                                             </Group>
@@ -1527,7 +1631,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             <Group justify="space-between" align="start">
                                                 <Flex direction='column'>
                                                     <Text fz='xs'>Max</Text>
-                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.max} Hr</Text>
+                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.max || 0} Hr</Text>
                                                 </Flex>
                                                 <IconClockUp color="red" size='25' />
                                             </Group>
@@ -1536,7 +1640,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             <Group justify="space-between" align="start">
                                                 <Flex direction='column'>
                                                     <Text fz='xs'>Average</Text>
-                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg} Hr</Text>
+                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg || 0} Hr</Text>
                                                 </Flex>
                                                 <IconClockCode color="orange" size='25' />
                                             </Group>
@@ -1545,7 +1649,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             <Group justify="space-between" align="start">
                                                 <Flex direction='column'>
                                                     <Text fz='xs'>Estimated</Text>
-                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.est} Hr</Text>
+                                                    <Text fz='xl' fw={600}>{selectedTask?.mhs?.est || 0} Hr</Text>
                                                 </Flex>
                                                 <IconClockCheck color="indigo" size='25' />
                                             </Group>

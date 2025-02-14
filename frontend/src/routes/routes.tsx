@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Login from "../layout/Login";
 import Landing from "../components/landing";
 import Estimate from "../views/estimate";
@@ -6,8 +6,27 @@ import CompareEstimate from "../views/compareEstimate";
 import PartUsage from "../views/partUsage";
 import SkillRequirement from "../views/skillRequirement";
 import ExpertInsights from "../views/expertInsights";
+import { useEffect } from "react";
 
 const MainRoutes = () => {
+  // const location = useLocation();
+  // const navigate = useNavigate();
+
+  // useEffect(() => {
+  //   // Prevent navigating back to restricted pages after logout
+  //   if (location.pathname === "/") {
+  //     window.history.pushState(null, "", window.location.href);
+  //     window.addEventListener("popstate", () => {
+  //       window.history.pushState(null, "", window.location.href);
+  //     });
+  //   }
+
+  //   return () => {
+  //     window.removeEventListener("popstate", () => {
+  //       window.history.pushState(null, "", window.location.href);
+  //     });
+  //   };
+  // }, [location]);
   return (
     <Routes>
       <Route path="/" element={<Login />} />

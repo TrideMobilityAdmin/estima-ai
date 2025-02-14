@@ -75,5 +75,4 @@ class SkillsAnalysisRequest(BaseModel):
     source_tasks: List[str]
 
 
-
     
