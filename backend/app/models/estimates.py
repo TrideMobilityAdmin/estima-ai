@@ -137,7 +137,7 @@ class DownloadResponse(BaseModel):
     aggregatedTasks: Optional[AggregatedTasks] = None
 
     findings:List[FindingsDetailsWithParts]=[]
-    aggregatedFindingsByTask:List[AggregatedFindingsByTask]=None
+    # aggregatedFindingsByTask:List[AggregatedFindingsByTask]=None
     aggregatedFindings:Optional[AggregatedFindings]=None
     userID: PyObjectId = Field(alias="user_id")
     createdBy: str = "Unknown"

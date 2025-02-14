@@ -303,11 +303,13 @@ class ExcelUploadService:
         """
         logger.info(f"Fetching estimate with ID: {estimate_id}")
         task_service = TaskService()
-        estimate_dict = await task_service.get_estimate_by_id(estimate_id)
+        estimate_dict = task_service.get_estimate_by_id(estimate_id)
+        logger.info("estimate_dict: %s",estimate_dict)
         if not estimate_dict:
             raise HTTPException(status_code=404, detail="Estimate not found")
         
         estimate = DownloadResponse(**estimate_dict)
+        logger.info("estimate from download response:%s",estimate)
 
         # Create a PDF buffer
         buffer = BytesIO()
@@ -356,7 +358,8 @@ class ExcelUploadService:
         y_position = draw_wrapped_text(100, y_position, "tasks:", width - 200)
         for task in estimate.tasks:
             y_position = draw_wrapped_text(120, y_position, f"- sourceTask: {task.sourceTask}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"  desc: {task.desciption}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"  desc: {task.description}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"  cluster: {task.cluster}", width - 200)
             y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    min: {task.mhs.min}", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    max: {task.mhs.max}", width - 200)
@@ -384,6 +387,7 @@ class ExcelUploadService:
             for detail in finding.details:
                 y_position = draw_wrapped_text(140, y_position, f"- logItem: {detail.logItem}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, f"  desc: {detail.desciption}", width - 200)
+                y_position = draw_wrapped_text(140, y_position, f"  prob: {detail.prob}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
                 y_position = draw_wrapped_text(160, y_position, f"    min: {detail.mhs.min}", width - 200)
                 y_position = draw_wrapped_text(160, y_position, f"    max: {detail.mhs.max}", width - 200)
@@ -399,15 +403,15 @@ class ExcelUploadService:
                         y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                         y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-        y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
-        for aggregated_finding in estimate.aggregatedFindingsByTask:
-            y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
-            y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
-            y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
+        # y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
+        # for aggregated_finding in estimate.aggregatedFindingsByTask:
+        #     y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
 
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
@@ -428,6 +432,7 @@ class ExcelUploadService:
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
+    
     async def _generate_estimateid(self) -> str:
         logger.info("Generating estimate ID")
         try:
@@ -483,6 +488,7 @@ class ExcelUploadService:
             "probability": estimate_request.probability,
             "operator": estimate_request.operator,
             "aircraftAge": estimate_request.aircraftAge,
+            "aircraftRegNo":estimate_request.aircraftRegNo,
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
               

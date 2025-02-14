@@ -882,7 +882,7 @@ class TaskService:
                 raise HTTPException(status_code=404, detail="Estimate not found")
 
             # Return the first document
-            logger.info("fetched data from estimates collection")
+            logger.info("fetched data from estimates collection: %s",result)
             return result[0]
 
         except Exception as e:

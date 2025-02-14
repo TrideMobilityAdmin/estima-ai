@@ -17,6 +17,7 @@ class TaskManHoursModel(BaseModel):
 class FindingsManHoursModel(BaseModel):
     logItem: str
     desciption: str
+    prob:float
     mhs :ManHrs
 
 
