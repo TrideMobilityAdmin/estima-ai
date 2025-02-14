@@ -9,7 +9,7 @@ from typing import List
 import shutil
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate,EstimateResponseSchema, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -109,13 +109,13 @@ async def post_skills_analysis(
     
     return skills_analysis
 
-@router.post("/estimate_status",response_model=EstimateStatus)
-async def estimate_status(
-    estimate_request: EstimateRequest,
-     current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
-):
-     return await task_service.estimate_status(estimate_request,current_user)
+# @router.post("/estimate_status",response_model=EstimateStatus)
+# async def estimate_status(
+#     estimate_request: EstimateRequest,
+#      current_user: dict = Depends(get_current_user),
+#     task_service: TaskService = Depends()
+# ):
+#      return await task_service.estimate_status(estimate_request,current_user)
 # @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 # async def create_estimate(
 #     estimate_request: EstimateRequest,
@@ -202,4 +202,10 @@ async def upload_estimate(
         raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
 
     return await excel_service.upload_estimate(estimate_request_data, file)
+
+@router.get("/estimate_file_status",response_model=List[EstimateStatusResponse])
+async def get_estimate_status(
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.estimate_status()
 

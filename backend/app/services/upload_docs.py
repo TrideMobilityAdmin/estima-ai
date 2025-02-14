@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import re
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse, EstimateResponseSchema
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -25,8 +24,9 @@ class ExcelUploadService:
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("estima_input_upload")
         # self.collection=self.mongo_client.get_collection("estima_input")
-        self.collection=self.mongo_client.get_collection("estimate_file_upload")
+        self.estima_collection=self.mongo_client.get_collection("estimate_file_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
+        self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
@@ -468,10 +468,6 @@ class ExcelUploadService:
             logger.error(f"Error generating estimate ID: {str(e)}")
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
     
-    
-    async def get_all_estimates_status(self) -> List[EstimateResponseSchema]:
-            estimates = self.collection.find({}, {"estID": 1, "upload_timestamp": 1, "status": 1, "_id": 0})
-            return [EstimateResponseSchema(**estimate) for estimate in estimates]
         
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
         
@@ -497,7 +493,7 @@ class ExcelUploadService:
         }
         
        
-        insert_result = self.collection.insert_one(data_to_insert) 
+        insert_result = self.estima_collection.insert_one(data_to_insert) 
         logger.info("Length of document inserted")
         
         
@@ -510,6 +506,67 @@ class ExcelUploadService:
         
         return response
     
+    
+    async def estimate_status(self) -> List[EstimateStatusResponse]:
+        """
+        Get all estimate status documents from the estimates_file_upload collection
+        """
+        logger.info("Fetching all estimates")
+
+        # Define the aggregation pipeline
+        pipeline = [
+            {
+                '$lookup': {
+                    'from': 'estimate_file_upload',
+                    'localField': 'estID',
+                    'foreignField': 'estID',
+                    'as': 'estimate'
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$estimate'
+                }
+            },
+            {
+                '$addFields': {
+                    'totalMhs': {
+                        '$add': [
+                            '$aggregatedTasks.totalMhs', 
+                            '$aggregatedFindings.totalMhs'
+                        ]
+                    },
+                    'totalPartsCost': {
+                        '$add': [
+                            '$aggregatedTasks.totalPartsCost', 
+                            '$aggregatedFindings.totalPartsCost'
+                        ]
+                    }
+                }
+            },
+            {
+                '$project': {
+                    '_id': 0,
+                    'estID': 1,
+                    'tasks': '$estimate.task',
+                    'aircraftRegNo': '$estimate.aircraftRegNo',
+                    'status': '$estimate.status',
+                    'totalMhs': 1,
+                    'totalPartsCost': 1
+                }
+            }
+        ]
+
+        
+        results = self.estimate_output.aggregate(pipeline).to_list(length=None)
+
+        # Convert results to EstimateStatusResponse objects
+        response = [EstimateStatusResponse(**result) for result in results]
+
+        return response
+        
+
+
 
 def convert_hash_to_ack_id(hash_hex: str) -> str:
     hash_bytes = bytes.fromhex(hash_hex)
@@ -528,3 +585,5 @@ def datetime_to_str(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
     raise TypeError("Object of type 'datetime' is not JSON serializable")
+
+    

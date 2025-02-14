@@ -49,6 +49,7 @@ class EstimateRequest(BaseModel):
      aircraftAge: int 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
+     aircraftRegNo:str
      
      
      def to_dict(self):
@@ -178,4 +179,13 @@ class ComparisonResult(BaseModel):
 class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
+
+class EstimateStatusResponse(BaseModel):
+    estID:str
+    tasks: List[str]
+    totalMhs:float
+    totalPartsCost:float
+    status:str
+    aircraftRegNo:str
+
 
