@@ -9,6 +9,7 @@ from datetime import datetime
 from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
+import re
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -541,7 +542,6 @@ class TaskService:
     #         logger.error(f"Error generating description: {str(e)}")
     #         return "Error generating description"
     
-
 
     async def get_parts_usage(self, part_id: str) -> Dict:
         """

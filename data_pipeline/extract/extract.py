@@ -2,9 +2,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import pandas as pd
 import yaml
+from logs.Log_config import setup_logging
+
+# Initialize logger
+logger = setup_logging()
 
 # Load config.yaml
-def load_config(config_path="config.yaml"):
+def load_config(config_path='D:/Projects/gmr-mro/estima-ai/data_pipeline/config.yaml'):
     """Load configuration from YAML file."""
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
@@ -22,6 +26,7 @@ async def connect_to_database(db_uri, db_name):
         return db
     except Exception as e:
         print(f"❌ Error connecting to MongoDB: {e}")
+        logger.error(f"Error connecting to MongoDB: {e}")
         return None
     
 def detect_header_row(df, max_rows=3):
@@ -50,7 +55,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
         
         config = load_config()  # Load once to avoid multiple reads
 
-        def read_and_process_file(file_path, sheet_name, folder_name,prefix):
+        def read_and_process_file(file_path, sheet_name, folder_name):
             """Read and process an individual Excel file."""
             df = pd.read_excel(file_path, engine="openpyxl", sheet_name=sheet_name)
             #print(f"Processing file: {file_path}")
@@ -71,9 +76,10 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
                 if missing_cols:
                     print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-
+                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
                 if extra_cols:
                     print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
 
                 # Remove duplicate columns before reindexing
                 df = df.loc[:, ~df.columns.duplicated()].copy()
@@ -84,7 +90,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
                 # Now add any missing columns (using the final mapped column names)
                 expected_columns = list(sub_task_parts_column_mappings.values())
                 missing_columns = [col for col in expected_columns if col not in df.columns]
-                #print(f"Missing columns: {missing_columns}")
+
 
                 # Add missing columns with None values
                 for col in missing_columns:
@@ -98,13 +104,24 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
                 
             elif sheet_name == "HMV" or sheet_name[:2] == "20":
                 
-                df.columns = df.columns.astype(str)
+                df.columns = df.columns.astype(str).str.strip()  # Strip spaces from column names
                 #df.columns = df.columns.str.replace(r'[^\w]', '', regex=True).str.strip()
                 df = df.reset_index(drop=True)
-                df["year"] = folder_name
+                
                 aircraft_details_column_mappings = config["aircraft_details_column_mappings"]
                 df = df.loc[:, ~df.columns.duplicated()].copy()
-                aircraft_details_columns=config["aircraft_details_columns"]
+                aircraft_details_columns = [col.strip() for col in config["aircraft_details_columns"]]
+                                # Ensure correct columns
+                missing_cols = set(aircraft_details_columns) - set(df.columns)
+                #print(f"Missing columns: {missing_cols}")
+                extra_cols = set(df.columns) - set(aircraft_details_columns)
+                if missing_cols:
+                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                if extra_cols:
+                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                df["year"] = folder_name
 
 
                 # First rename the columns that exist
@@ -125,11 +142,24 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
                 df = df[list(aircraft_details_column_mappings.values())]
                 
             elif sheet_name == 'mlttable':
-                df.columns = df.iloc[0].astype(str)
+                df.columns = df.iloc[0].astype(str).str.strip()
                 df = df[1:].reset_index(drop=True)
                 df["package"] = folder_name  # Add folder name as a column
                 df = df.loc[:, ~df.columns.duplicated()].copy()
                 task_parts_columns_mappings = config["task_parts_columns_mappings"]
+                task_parts_columns=config["task_parts_columns"]
+                # Ensure correct columns
+                missing_cols = set(task_parts_columns) - set(df.columns)
+                
+                #print(f"Missing columns: {missing_cols}")
+                extra_cols = set(df.columns) - set(task_parts_columns)
+                if missing_cols:
+                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                if extra_cols:
+                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                
                 # First rename the columns that exist
                 df.rename(columns={k: v for k, v in task_parts_columns_mappings.items() if k in df.columns}, inplace=True)
 
@@ -150,14 +180,19 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
                 
             elif sheet_name == 'mltaskmlsec1':
-                header_row_idx = detect_header_row(df)
-                df.columns = df.iloc[header_row_idx ].astype(str)
-                
-                df = df[header_row_idx :].reset_index(drop=True)
-                
+                df.columns = df.iloc[0].astype(str).str.strip()
+                df = df[1:].reset_index(drop=True)
                 df = df.loc[:, ~df.columns.duplicated()].copy()
                 task_description_columns=config["task_description_columns"]
                 task_description_columns_mappings=config["task_description_columns_mappings"]
+                missing_cols = set(task_description_columns) - set(df.columns)
+                extra_cols = set(df.columns) - set(task_description_columns)
+                if missing_cols:
+                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                if extra_cols:
+                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
                 df["package"] = folder_name
                 df.rename(columns={k: v for k, v in task_description_columns_mappings.items() if k in df.columns}, inplace=True)
 
@@ -182,6 +217,14 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
                 df = df.loc[:, ~df.columns.duplicated()].copy()
                 sub_task_description_columns=config["sub_task_description_columns"]
                 sub_task_description_columns_mappings=config["sub_task_description_columns_mappings"]
+                missing_cols = set(sub_task_description_columns) - set(df.columns)
+                extra_cols = set(df.columns) - set(sub_task_description_columns)
+                if missing_cols:
+                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                if extra_cols:
+                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
                 df["package"] = folder_name
                 df.rename(columns={k: v for k, v in sub_task_description_columns_mappings.items() if k in df.columns}, inplace=True)
 
@@ -234,7 +277,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
                             all_sheets_data = []  # Store data from all valid sheets
 
                             for sheet_name in valid_sheets:
-                                df = read_and_process_file(file_path, sheet_name, folder_name, prefix)
+                                df = read_and_process_file(file_path, sheet_name, folder_name)
 
                                 if df is not None and not df.empty:
                                     df.reset_index(drop=True, inplace=True)
@@ -254,12 +297,12 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
 
         # Collecting data
-        aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
+        #aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
         #task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1',data_path)
         #task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
         #sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1',data_path)
         #sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name,['PRICING',"Sheet1",'sheet1',"Pricing"],data_path)
-        return aircraft_details,pd.DataFrame(),pd.DataFrame(), pd.DataFrame(),pd.DataFrame()
+        return pd.DataFrame(),task_description,pd.DataFrame(), pd.DataFrame(),pd.DataFrame()
 
         #return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts
     except Exception as e:

@@ -1,6 +1,13 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
+#Data files
+# Ignore all files inside the Data/ directory
+Data/
+
+
+##Data Directory
+Data/
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

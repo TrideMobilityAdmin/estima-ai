@@ -1,9 +1,9 @@
 database:
-  uri: "mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl"
-  database: "gmr-mro-test-5y"
+  uri: "mongodb://admin:admin123@10.100.3.13:27017/"
+  database: "gmr-mro-staging"
 
 excel_files:
-  data_path: "/path/to/excel/files"
+  data_path: "D:/Projects/gmr-mro/Data"
 
 
 aircraft_details_columns:
@@ -23,17 +23,6 @@ aircraft_details_columns:
   - "Start date"
   - "End date"
   - "TAT"
-aircraft_details_columns_2023:
-  - "Customer Order #"
-  - "Customer Name"
-  - "Package #"
-  - "Aircraft Reg #"
-  - "Aircraft Model"
-  - "A/C AGE 2024"
-  - "Release Tracking #"
-  - "Issue Date"
-  - "Package Details"
-  - "Type of Check"
 
 
 task_parts_columns:
@@ -372,18 +361,6 @@ aircraft_details_column_mappings:
   "TAT": "turnaround_time"
   "year": "year"
 
-aircraft_details_column_mappings_2023:
-  "Customer Order #": "customer_order_number"
-  "Customer Name": "customer_name"
-  "Package #": "package_number"
-  "Aircraft Reg #": "aircraft_registration_number"
-  "Aircraft Model": "aircraft_model"
-  "A/C AGE 2024": "aircraft_age_2024"
-  "Release Tracking #": "release_tracking_number"
-  "Issue Date": "issue_date"
-  "Package Details": "package_details"
-  "Type of Check": "type_of_check"
-  "year": "year"
 
 
 
