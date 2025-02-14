@@ -304,12 +304,13 @@ class ExcelUploadService:
         logger.info(f"Fetching estimate with ID: {estimate_id}")
         task_service = TaskService()
         estimate_dict = task_service.get_estimate_by_id(estimate_id)
-        logger.info("estimate_dict: %s",estimate_dict)
+        
+        logger.info(f"timate_dict: {estimate_dict}")
         if not estimate_dict:
             raise HTTPException(status_code=404, detail="Estimate not found")
         
         estimate = DownloadResponse(**estimate_dict)
-        logger.info("estimate from download response:%s",estimate)
+        # logger.info("estimate from download response:%s",estimate)
 
         # Create a PDF buffer
         buffer = BytesIO()
