@@ -27,6 +27,22 @@ export const useApiPartUsage = () => {
     const getPartUsage = async (partId: string): Promise<any[]> => {
         try {
             const response = await axiosInstance.get(`${getPartUsage_Url}?part_id=${partId}`);
+            // if(response.data !== null){
+            //   showNotification({
+            //     title: "Successful!",
+            //     message: "Part Usage Generated",
+            //     color: "green",
+            //     style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            //   });
+            // }else{
+            //   showNotification({
+            //     title: "Not Found!",
+            //     message: "No Part Found, Try another Id",
+            //     color: "green",
+            //     style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            //   });
+            // }
+            
             return response.data;
         } catch (error:any) {
             console.error("Task Validation API Error:", error);
