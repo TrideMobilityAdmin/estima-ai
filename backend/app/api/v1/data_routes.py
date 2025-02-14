@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File
+from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
-from typing import List, Optional
+from typing import List, Optional,Dict, Any
 from fastapi import APIRouter, Depends, Query
 from app.middleware.auth import get_current_user
 import logging
 from typing import List
+import shutil
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
-
+import json
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
@@ -107,37 +109,37 @@ async def post_skills_analysis(
     
     return skills_analysis
 
-@router.post("/estimate_status",response_model=EstimateStatus)
-async def estimate_status(
-    estimate_request: EstimateRequest,
-     current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
-):
-     return await task_service.estimate_status(estimate_request,current_user)
-@router.post("/estimates/", response_model=EstimateResponse, status_code=201)
-async def create_estimate(
-    estimate_request: EstimateRequest,
-     current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
-):
-    return await task_service.create_estimate(estimate_request,current_user)
+# @router.post("/estimate_status",response_model=EstimateStatus)
+# async def estimate_status(
+#     estimate_request: EstimateRequest,
+#      current_user: dict = Depends(get_current_user),
+#     task_service: TaskService = Depends()
+# ):
+#      return await task_service.estimate_status(estimate_request,current_user)
+# @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
+# async def create_estimate(
+#     estimate_request: EstimateRequest,
+#      current_user: dict = Depends(get_current_user),
+#     task_service: TaskService = Depends()
+# ):
+#     return await task_service.create_estimate(estimate_request,current_user)
 
 
-@router.get("/estimates/{estimate_id}", response_model=EstimateResponse)
+@router.get("/estimates/{estimate_id}")
 async def get_estimate_by_id(
     estimate_id: str,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    return await task_service.get_estimate_by_id(estimate_id)
+    return  task_service.get_estimate_by_id(estimate_id)
 
 excel_service = ExcelUploadService()
-@router.post("/upload/excel/")
-async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    """
-    Endpoint to handle Excel file uploads
-    """
-    return await excel_service.upload_excel(file)
+# @router.post("/upload/excel/")
+# async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+#     """
+#     Endpoint to handle Excel file uploads
+#     """
+#     return await excel_service.upload_excel(file)
 
 @router.post("/estimates/{estimate_id}/compare",response_model=ComparisonResponse)
 async def compare_estimates(estimate_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -175,6 +177,8 @@ async def update_configurations(
     current_user: dict = Depends(get_current_user)
 ):
     return await config_service.update_configurations(config_id, config_req)
+
+
 @router.post("/validate",response_model=List[ValidTasks])
 async def validate_tasks(
     estimate_request: ValidRequest,
@@ -183,3 +187,26 @@ async def validate_tasks(
 ):
     print("validate_tasks")
     return await task_service.validate_tasks(estimate_request,current_user)
+
+@router.post("/upload-estimate/")
+async def upload_estimate(
+    estimate_request: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    file: UploadFile = File(...)
+) -> Dict[str, Any]:
+    
+    try:
+        estimate_request_data = EstimateRequest.parse_raw(estimate_request)
+        logger.info("Request received successfully")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
+
+    return await excel_service.upload_estimate(estimate_request_data, file)
+
+@router.get("/estimate_file_status",response_model=List[EstimateStatusResponse])
+async def get_estimate_status(
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.estimate_status()
+

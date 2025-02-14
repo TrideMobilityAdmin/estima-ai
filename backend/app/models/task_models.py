@@ -2,6 +2,7 @@ from pydantic import BaseModel,Field
 from typing import Optional,List,Any,Dict
 from bson import ObjectId
 
+
 class ManHrs(BaseModel):
     max: float
     min: float
@@ -11,10 +12,12 @@ class ManHrs(BaseModel):
 class TaskManHoursModel(BaseModel):
     sourceTask: str
     desciption: str
+    cluster:int
     mhs :ManHrs
 class FindingsManHoursModel(BaseModel):
     logItem: str
     desciption: str
+    prob:float
     mhs :ManHrs
 
 

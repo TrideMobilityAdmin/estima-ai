@@ -1,7 +1,7 @@
 from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
 from statistics import mean
 from fastapi import HTTPException,Depends,status
-from typing import List , Dict,Optional
+from typing import List , Dict,Optional,Any
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
@@ -9,6 +9,7 @@ from datetime import datetime
 from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
+import re
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -33,7 +34,7 @@ class TaskService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("spares-costing")
-        self.estimates_collection = self.mongo_client.get_collection("estimates")
+        self.estimates_collection = self.mongo_client.get_collection("estima_output")
         self.task_spareparts_collection=self.mongo_client.get_collection("task_parts")
         # self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
@@ -522,27 +523,6 @@ class TaskService:
                 detail=f"Error fetching man hours: {str(e)}"
             )
 
-
-            logger.error(f"Error fetching task description: {str(e)}")
-            return {"id": "", "description": ""}
-
-    # async def _generate_description(self, tasks: List[str]) -> str:
-    #     """
-    #     Helper method to generate a description for the estimate based on tasks
-    #     """
-    #     try:
-    #         descriptions = []
-    #         for task_id in tasks:
-    #             desc = await self._get_task_description(task_id)
-    #             if desc:
-    #                 descriptions.append(desc)
-    #         return " | ".join(descriptions) if descriptions else "No descriptions available"
-    #     except Exception as e:
-    #         logger.error(f"Error generating description: {str(e)}")
-    #         return "Error generating description"
-    
-
-
     async def get_parts_usage(self, part_id: str) -> Dict:
         """
         Get parts usage for a specific part_id within a date range.
@@ -827,61 +807,84 @@ class TaskService:
             logger.error(f"Error fetching skills analysis: {str(e)}")
             return {"error": f"An error occurred while processing the request: {str(e)}"}
 
-    async def get_estimate_by_id(self, estimate_id: str) -> EstimateResponse:
+   
+
+    def get_estimate_by_id(self, estimate_id: str) -> Dict[str, Any]:
         """
-        Get estimate by ID
+        Get estimate by ID with filtered findings based on probability comparison
+        Returns raw aggregation result directly from MongoDB
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
 
         try:
-            estimate_doc = self.estimates_collection.find_one(
-                {"estID": estimate_id}
-            )
-            if estimate_doc is None:
-                logger.warning(f"No estimate found for ID: {estimate_id}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No estimate found for ID: {estimate_id}"
-                )
-            return estimate_doc
+            # Define the aggregation pipeline
+            pipeline = [
+                {'$match': {'estID': estimate_id}},  # Matching string ID
+                {'$lookup': {
+                    'from': 'estimate_file_upload',
+                    'localField': 'estID',
+                    'foreignField': 'estID',
+                    'as': 'estimate'
+                }},
+                {'$unwind': {'path': '$estimate', 'preserveNullAndEmptyArrays': True}},
+                {'$addFields': {
+                    'filteredFindings': {
+                        '$filter': {
+                            'input': {'$ifNull': ['$findings', []]},
+                            'as': 'finding',
+                            'cond': {
+                                '$gt': [
+                                    {'$max': {
+                                        '$map': {
+                                            'input': {'$ifNull': ['$$finding.details', []]},
+                                            'as': 'detail',
+                                            'in': {'$ifNull': ['$$detail.prob', 0]}
+                                        }
+                                    }},
+                                    {'$ifNull': ['$estimate.probability', 0]}
+                                ]
+                            }
+                        }
+                    }
+                }},
+                {'$project': {
+                    '_id': {'$toString': '$_id'},
+                    'estID': 1,
+                    'description': 1,
+                    'tasks': {
+                        '$map': {
+                            'input': '$tasks',
+                            'as': 'task',
+                            'in':{
+                                '$mergeObjects': [
+                                    '$$task',
+                                     {'_id': '$$REMOVE'}  
+                                ]
+                            }
+                        }
+                    },
+                    'aggregatedTasks': 1,
+                    'findings': '$filteredFindings',
+                    'aggregatedFindings': 1,
+                    'originalFilename': 1,
+                    'userID': {'$toString': '$userID'},
+                    'createdAt': 1,
+                    'lastUpdated': 1,
+                    'createdBy': 1,
+                    'updatedBy': {'$toString': '$updatedBy'}
+                }}
+            ]
+
+            # Execute aggregation and get first result
+            result = list(self.estimates_collection.aggregate(pipeline))
+            if not result:
+                logger.warning(f"No estimate found with ID: {estimate_id}")
+                raise HTTPException(status_code=404, detail="Estimate not found")
+
+            # Return the first document
+            logger.warning(f"estimated collection fetched: {result}")
+            return result[0]
+
         except Exception as e:
-            logger.error(f"Error fetching estimate: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching estimate: {str(e)}"
-            )
-           
-    async def _generate_estimateid(self) -> str:
-        logger.info("Generating estimate ID")
-        try:
-            logger.info("Finding count of estimates")
-            count = self.estimates_status_collection.count_documents({})  # Await count
-            logger.info(f"Count of estimates: {count}")
-
-            if count == 0:
-                logger.info("No estimates found, starting with EST-001")
-                return "EST-001"
-
-        # Fetch the last inserted estimate
-            last_estimate = self.estimates_status_collection.find_one(
-                {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
-                projection={"estID": 1}
-            )
-
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
-
-            if not last_estimate or "estID" not in last_estimate:
-                logger.warning("No estID found in the last estimate, defaulting to EST-001")
-                return "EST-001"
-
-            last_id_str = last_estimate["estID"]
-            last_id = int(last_id_str.split("-")[1])
-            new_id = f"EST-{last_id + 1:03d}"
-        
-            logger.info(f"Generated new estimate ID: {new_id}")
-            return new_id
-
-        except Exception as e:
-            logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
+            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

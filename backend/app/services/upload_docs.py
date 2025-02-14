@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 import json
 import re
-from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
+import hashlib
+import base64
 from app.db.database_connection import MongoDBClient
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -15,12 +17,17 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
+from app.models.estimates import EstimateRequest
 
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("estima_input_upload")
+        # self.collection=self.mongo_client.get_collection("estima_input")
+        self.estima_collection=self.mongo_client.get_collection("estimate_file_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
+        self.estimate_output=self.mongo_client.get_collection("estima_output")
+        self.estimate=self.mongo_client.get_collection("create_estimate")
         self.estimate_collection=self.mongo_client.get_collection("estimates")
     def clean_field_name(self, field_name: str) -> str:
         try:
@@ -164,7 +171,6 @@ class ExcelUploadService:
             content = await file.read()
             file_extension = file.filename.split('.')[-1].lower()  # Get the file extension
 
-            # Determine the appropriate engine based on the file extension
             if file_extension in ['xls', 'xlsx', 'xlsm']:
                 excel_data = pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
             elif file_extension == 'csv':
@@ -183,70 +189,65 @@ class ExcelUploadService:
 
             # Clean the data
             cleaned_data = self.clean_data(excel_data)
-
-            # Initialize lists to hold all tasks and descriptions
             all_tasks = []
             all_descriptions = []
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
 
-            estimate_id = await self._generate_estimateid()
             for index, row in cleaned_data.iterrows():
-                task_number = row.get('task-#')  # Adjust the column name as necessary
-                description = row.get('description')  # Adjust the column name as necessary
+                task_number = row.get('task-#')  
+                description = row.get('description')  
 
                 if task_number:
                     all_tasks.append(task_number)
                 if description:
                     all_descriptions.append(description)
 
-            # Create a single document with all tasks and descriptions
             processed_record = {
-                "estID":estimate_id,
                 "task": all_tasks,
                 "description": all_descriptions,
-                # "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
                 "upload_timestamp": current_time,
                 "original_filename": file.filename,
                 "createdAt": current_time,
+                "updatedAt":current_time,
                 "status":"Initiated"
             }
-
-            # Log the processed record
             logger.info(f"Processed record: {processed_record}")
 
-            return processed_record  # Return the single document
+            return processed_record  
 
         except Exception as e:
             raise HTTPException(
                 status_code=500,
                 detail=f"Error processing Excel file: {str(e)}"
             )
-    def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            result = self.collection.insert_one(data)
-            return {
-                "status": "success",
-                "inserted_count": str(result.inserted_id),
-                "message": "Data successfully saved to database"
-            }
-        except Exception as e:
-            logger.error(f"MongoDB insertion error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database error: {str(e)}"
-            )
+    # def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    #     try:
+    #         result = self.collection.insert_one(data)
+    #         return {
+    #             "status": "success",
+    #             "inserted_count": str(result.inserted_id),
+    #             "message": "Data successfully saved to database"
+    #         }
+    #     except Exception as e:
+    #         logger.error(f"MongoDB insertion error: {str(e)}")
+    #         raise HTTPException(
+    #             status_code=500,
+    #             detail=f"Database error: {str(e)}"
+    #         )
 
-    async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
-        await self.validate_excel_file(file)
-        json_data = await self.process_file(file)
-        result = self.save_to_mongodb(json_data)
+    # async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
+    #     await self.validate_excel_file(file)
+    #     json_data = await self.process_file(file)
+    #     result = self.save_to_mongodb(json_data)
         
-        return {
-            "message": "File uploaded and processed successfully",
-            "filename": file.filename,
-            "records_inserted": result["inserted_count"],
-            "status": "success"
-        }
+    #     return {
+    #         "estID":json_data["estID"],
+    #         "message": "File uploaded and processed successfully",
+    #         "filename": file.filename,
+    #         "records_inserted": result["inserted_count"],
+    #         "status": "success"
+    #     }
+    
     async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
         await self.validate_excel_file(file)
         actual_data = await self.process_excel_file(file)
@@ -302,11 +303,14 @@ class ExcelUploadService:
         """
         logger.info(f"Fetching estimate with ID: {estimate_id}")
         task_service = TaskService()
-        estimate_dict = await task_service.get_estimate_by_id(estimate_id)
+        estimate_dict = task_service.get_estimate_by_id(estimate_id)
+        
+        logger.info(f"timate_dict: {estimate_dict}")
         if not estimate_dict:
             raise HTTPException(status_code=404, detail="Estimate not found")
         
         estimate = DownloadResponse(**estimate_dict)
+        # logger.info("estimate from download response:%s",estimate)
 
         # Create a PDF buffer
         buffer = BytesIO()
@@ -355,7 +359,8 @@ class ExcelUploadService:
         y_position = draw_wrapped_text(100, y_position, "tasks:", width - 200)
         for task in estimate.tasks:
             y_position = draw_wrapped_text(120, y_position, f"- sourceTask: {task.sourceTask}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"  desc: {task.desciption}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"  desc: {task.description}", width - 200)
+            y_position = draw_wrapped_text(140, y_position, f"  cluster: {task.cluster}", width - 200)
             y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    min: {task.mhs.min}", width - 200)
             y_position = draw_wrapped_text(160, y_position, f"    max: {task.mhs.max}", width - 200)
@@ -383,6 +388,7 @@ class ExcelUploadService:
             for detail in finding.details:
                 y_position = draw_wrapped_text(140, y_position, f"- logItem: {detail.logItem}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, f"  desc: {detail.desciption}", width - 200)
+                y_position = draw_wrapped_text(140, y_position, f"  prob: {detail.prob}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
                 y_position = draw_wrapped_text(160, y_position, f"    min: {detail.mhs.min}", width - 200)
                 y_position = draw_wrapped_text(160, y_position, f"    max: {detail.mhs.max}", width - 200)
@@ -398,15 +404,15 @@ class ExcelUploadService:
                         y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                         y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-        y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
-        for aggregated_finding in estimate.aggregatedFindingsByTask:
-            y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
-            y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
-            y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
-            y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
+        # y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
+        # for aggregated_finding in estimate.aggregatedFindingsByTask:
+        #     y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
 
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
@@ -427,6 +433,7 @@ class ExcelUploadService:
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
+    
     async def _generate_estimateid(self) -> str:
         logger.info("Generating estimate ID")
         try:
@@ -461,4 +468,123 @@ class ExcelUploadService:
         except Exception as e:
             logger.error(f"Error generating estimate ID: {str(e)}")
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
+    
+    
+  
+    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
+        
+        logger.info(f"estimate_request: {estimate_request}")
+        await self.validate_excel_file(file)
+        
+        json_data = await self.process_file(file)
+        logger.info("json data came")
+
+        taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
+        logger.info(f"Hash of Estima: {taskUniqHash}")
+        
+        data_to_insert = {
+            **json_data,
+            "estID":taskUniqHash,
+            # "tasks": estimate_request.tasks,
+            "probability": estimate_request.probability,
+            "operator": estimate_request.operator,
+            "aircraftAge": estimate_request.aircraftAge,
+            "aircraftRegNo":estimate_request.aircraftRegNo,
+            "aircraftFlightHours": estimate_request.aircraftFlightHours,
+            "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
+              
+        }
+        
+       
+        insert_result = self.estima_collection.insert_one(data_to_insert) 
+        logger.info("Length of document inserted")
+        
+        
+        response = {
+            "estID":taskUniqHash,
+            "status": "Initiated",
+            "msg": "File and estimated data inserted successfully",
+            "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+        }
+        
+        return response
+    
+    
+    async def estimate_status(self) -> List[EstimateStatusResponse]:
+        """
+        Get all estimate status documents from the estimates_file_upload collection
+        """
+        logger.info("Fetching all estimates")
+
+        # Define the aggregation pipeline
+        pipeline = [
+            {
+                '$lookup': {
+                    'from': 'estimate_file_upload',
+                    'localField': 'estID',
+                    'foreignField': 'estID',
+                    'as': 'estimate'
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$estimate'
+                }
+            },
+            {
+                '$addFields': {
+                    'totalMhs': {
+                        '$add': [
+                            '$aggregatedTasks.totalMhs', 
+                            '$aggregatedFindings.totalMhs'
+                        ]
+                    },
+                    'totalPartsCost': {
+                        '$add': [
+                            '$aggregatedTasks.totalPartsCost', 
+                            '$aggregatedFindings.totalPartsCost'
+                        ]
+                    }
+                }
+            },
+            {
+                '$project': {
+                    '_id': 0,
+                    'estID': 1,
+                    'tasks': '$estimate.task',
+                    'aircraftRegNo': '$estimate.aircraftRegNo',
+                    'status': '$estimate.status',
+                    'totalMhs': 1,
+                    'totalPartsCost': 1,
+                    'createdAt': '$estimate.createdAt'
+                }
+            }
+        ]
+
+        
+        results = self.estimate_output.aggregate(pipeline).to_list(length=None)
+
+        response = [EstimateStatusResponse(**result) for result in results]
+
+        return response
+    
+
+def convert_hash_to_ack_id(hash_hex: str) -> str:
+    hash_bytes = bytes.fromhex(hash_hex)
+    base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')
+    ack_id = base64_string[:16]  
+    return ack_id
+
+def generate_sha256_hash_from_json(json_data: dict) -> str:
+    json_string = json.dumps(json_data, sort_keys=True, default=datetime_to_str)    # Create a SHA-256 hash object
+    hash_object = hashlib.sha256()
+    hash_object.update(json_string.encode('utf-8'))
+    hash_hex = hash_object.hexdigest()
+    return convert_hash_to_ack_id(hash_hex)
+
+def datetime_to_str(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError("Object of type 'datetime' is not JSON serializable")
+
     
