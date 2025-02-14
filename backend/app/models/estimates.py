@@ -187,5 +187,25 @@ class EstimateStatusResponse(BaseModel):
     totalPartsCost:float
     status:str
     aircraftRegNo:str
+    createdAt:datetime
 
+class EstimateIDResponse(BaseModel):
+    estID: str
+    description: str = ""
+    tasks: List[TaskDetailsWithParts] = []
+    aggregatedTasks: Optional[AggregatedTasks] = None
 
+    findings:List[FindingsDetailsWithParts]=[]
+    # aggregatedFindingsByTask:List[AggregatedFindingsByTask]=None
+    aggregatedFindings:Optional[AggregatedFindings]=None
+    userID: PyObjectId = Field(alias="user_id")
+    createdBy: str = "Unknown"
+    createdAt:  datetime
+    lastUpdated:  datetime
+    updatedBy:  PyObjectId = Field(alias="updated_by")
+    originalFilename: str = ""
+    
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "populate_by_name": True,
+    }

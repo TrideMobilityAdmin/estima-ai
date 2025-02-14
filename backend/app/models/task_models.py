@@ -12,6 +12,7 @@ class ManHrs(BaseModel):
 class TaskManHoursModel(BaseModel):
     sourceTask: str
     desciption: str
+    cluster:int
     mhs :ManHrs
 class FindingsManHoursModel(BaseModel):
     logItem: str

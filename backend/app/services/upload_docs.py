@@ -193,7 +193,6 @@ class ExcelUploadService:
             all_descriptions = []
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
 
-            # estimate_id = await self._generate_estimateid()
             for index, row in cleaned_data.iterrows():
                 task_number = row.get('task-#')  
                 description = row.get('description')  
@@ -204,21 +203,17 @@ class ExcelUploadService:
                     all_descriptions.append(description)
 
             processed_record = {
-                # "estID":estimate_id,
                 "task": all_tasks,
                 "description": all_descriptions,
-                # "probability": cleaned_data['probability'].iloc[0] if not cleaned_data['probability'].empty else None,
                 "upload_timestamp": current_time,
                 "original_filename": file.filename,
                 "createdAt": current_time,
                 "updatedAt":current_time,
                 "status":"Initiated"
             }
-
-            # Log the processed record
             logger.info(f"Processed record: {processed_record}")
 
-            return processed_record  # Return the single document
+            return processed_record  
 
         except Exception as e:
             raise HTTPException(
@@ -469,8 +464,7 @@ class ExcelUploadService:
             raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
     
     
-
-        
+  
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
         
         logger.info(f"estimate_request: {estimate_request}")
@@ -554,7 +548,8 @@ class ExcelUploadService:
                     'aircraftRegNo': '$estimate.aircraftRegNo',
                     'status': '$estimate.status',
                     'totalMhs': 1,
-                    'totalPartsCost': 1
+                    'totalPartsCost': 1,
+                    'createdAt': '$estimate.createdAt'
                 }
             }
         ]
@@ -562,13 +557,10 @@ class ExcelUploadService:
         
         results = self.estimate_output.aggregate(pipeline).to_list(length=None)
 
-        # Convert results to EstimateStatusResponse objects
         response = [EstimateStatusResponse(**result) for result in results]
 
         return response
-        
-
-
+    
 
 def convert_hash_to_ack_id(hash_hex: str) -> str:
     hash_bytes = bytes.fromhex(hash_hex)

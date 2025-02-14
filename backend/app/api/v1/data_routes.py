@@ -125,13 +125,13 @@ async def post_skills_analysis(
 #     return await task_service.create_estimate(estimate_request,current_user)
 
 
-@router.get("/estimates/{estimate_id}", response_model=EstimateResponse)
+@router.get("/estimates/{estimate_id}")
 async def get_estimate_by_id(
     estimate_id: str,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    return await task_service.get_estimate_by_id(estimate_id)
+    return  task_service.get_estimate_by_id(estimate_id)
 
 excel_service = ExcelUploadService()
 # @router.post("/upload/excel/")
@@ -191,6 +191,7 @@ async def validate_tasks(
 @router.post("/upload-estimate/")
 async def upload_estimate(
     estimate_request: str = Form(...),
+    current_user: dict = Depends(get_current_user),
     file: UploadFile = File(...)
 ) -> Dict[str, Any]:
     
