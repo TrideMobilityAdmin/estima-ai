@@ -28,7 +28,7 @@ class ExcelUploadService:
         self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
-        self.estimate_collection=self.mongo_client.get_collection("estimates")
+       
     def clean_field_name(self, field_name: str) -> str:
         try:
             # Convert to string in case of non-string field names
@@ -252,7 +252,7 @@ class ExcelUploadService:
         await self.validate_excel_file(file)
         actual_data = await self.process_excel_file(file)
         logger.info(f"Actual data extracted: {len(actual_data)} records")
-        estimated_data = self.estimate_collection.aggregate([
+        estimated_data = self.estimate_output.aggregate([
             {'$match': {'estID': estimate_id}},
             {'$project': {
                 '_id': 0,
