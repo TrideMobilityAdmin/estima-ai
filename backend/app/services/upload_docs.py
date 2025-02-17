@@ -310,7 +310,7 @@ class ExcelUploadService:
             raise HTTPException(status_code=404, detail="Estimate not found")
         
         estimate = DownloadResponse(**estimate_dict)
-        # logger.info("estimate from download response:%s",estimate)
+        logger.info(f"Estimate from download response: {estimate}")
 
         # Create a PDF buffer
         buffer = BytesIO()
@@ -329,13 +329,13 @@ class ExcelUploadService:
                     if p.stringWidth(current_line + word, 'Helvetica', 12) < max_width:
                         current_line += word + ' '
                     else:
-                        p.drawString(x, y, current_line.strip())  # Draw the current line and move down
-                        y -= 15  # Move down for the next line
-                        if y < 50:  # Check if we need to create a new page
+                        p.drawString(x, y, current_line.strip())  
+                        y -= 15  
+                        if y < 50:  
                             p.showPage()
                             p.setFont("Helvetica", 12)
-                            y = height - 50  # Reset y position for new page
-                        current_line = word + ' '  # Start a new line with the current word
+                            y = height - 50  
+                        current_line = word + ' '  
 
                 # Draw any remaining text in the current line
                 if current_line:
@@ -387,7 +387,7 @@ class ExcelUploadService:
             y_position = draw_wrapped_text(120, y_position, "  details:", width - 200)
             for detail in finding.details:
                 y_position = draw_wrapped_text(140, y_position, f"- logItem: {detail.logItem}", width - 200)
-                y_position = draw_wrapped_text(140, y_position, f"  desc: {detail.desciption}", width - 200)
+                y_position = draw_wrapped_text(140, y_position, f"  desc: {detail.description}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, f"  prob: {detail.prob}", width - 200)
                 y_position = draw_wrapped_text(140, y_position, "  mhs:", width - 200)
                 y_position = draw_wrapped_text(160, y_position, f"    min: {detail.mhs.min}", width - 200)
@@ -421,6 +421,7 @@ class ExcelUploadService:
         y_position = draw_wrapped_text(100, y_position, f"createdBy: {estimate.createdBy}", width - 200)
         y_position = draw_wrapped_text(100, y_position, f"createdAt: '{estimate.createdAt.strftime('%Y-%m-%dT%H:%M:%SZ')}'", width - 200)
         y_position = draw_wrapped_text(100, y_position, f"lastUpdated: '{estimate.lastUpdated.strftime('%Y-%m-%dT%H:%M:%SZ')}'", width - 200)
+        y_position = draw_wrapped_text(100, y_position, f"updatedBy: {estimate.updatedBy}", width - 200)
 
         p.showPage()
         p.save()
@@ -519,50 +520,62 @@ class ExcelUploadService:
         # Define the aggregation pipeline
         pipeline = [
             {
-                '$lookup': {
-                    'from': 'estimate_file_upload',
-                    'localField': 'estID',
-                    'foreignField': 'estID',
-                    'as': 'estimate'
-                }
-            },
-            {
-                '$unwind': {
-                    'path': '$estimate'
-                }
-            },
-            {
-                '$addFields': {
-                    'totalMhs': {
-                        '$add': [
-                            '$aggregatedTasks.totalMhs', 
-                            '$aggregatedFindings.totalMhs'
+        '$lookup': {
+            'from': 'estima_output', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$addFields': {
+            'totalMhs': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalMhs', 0
                         ]
-                    },
-                    'totalPartsCost': {
-                        '$add': [
-                            '$aggregatedTasks.totalPartsCost', 
-                            '$aggregatedFindings.totalPartsCost'
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalMhs', 0
                         ]
                     }
-                }
-            },
-            {
-                '$project': {
-                    '_id': 0,
-                    'estID': 1,
-                    'tasks': '$estimate.task',
-                    'aircraftRegNo': '$estimate.aircraftRegNo',
-                    'status': '$estimate.status',
-                    'totalMhs': 1,
-                    'totalPartsCost': 1,
-                    'createdAt': '$estimate.createdAt'
-                }
+                ]
+            }, 
+            'totalPartsCost': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalPartsCost', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalPartsCost', 0
+                        ]
+                    }
+                ]
             }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'tasks': '$task', 
+            'aircraftRegNo': '$aircraftRegNo', 
+            'status': '$status', 
+            'totalMhs': 1, 
+            'totalPartsCost': 1, 
+            'createdAt': '$createdAt'
+        }
+    }
         ]
 
         
-        results = self.estimate_output.aggregate(pipeline).to_list(length=None)
+        results = self.estima_collection.aggregate(pipeline).to_list(length=None)
 
         response = [EstimateStatusResponse(**result) for result in results]
 
