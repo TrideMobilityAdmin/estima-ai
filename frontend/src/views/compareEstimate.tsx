@@ -6,14 +6,16 @@ import { IconArrowMoveRight, IconClockCheck, IconCube, IconSettingsStar, IconUse
 import ReactApexChart from 'react-apexcharts';
 import { useApi } from '../api/services/estimateSrvice';
 import UploadDropZoneExcel from '../components/uploadExcelFile';
+import { showNotification } from '@mantine/notifications';
 
 export default function CompareEstimate() {
-  const { getAllEstimates,uploadFile } = useApi();
+  const { getAllEstimates, uploadFile } = useApi();
 
-  
+
   const [estimates, setEstimates] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedEstID, setSelectedEstID] = useState<string | null>(null);
+  const [selectedUniqueID, setSelectedUniqueID] = useState<string | null>(null); 
   const [selectedFile, setSelectedFile] = useState<any>();
   const [compareEstimatedData, setCompareEstimatedData] = useState<any>();
 
@@ -31,24 +33,67 @@ export default function CompareEstimate() {
     fetchEstimates();
   }, []);
 
-  console.log("all estimates>>>",estimates);
+  console.log("all estimates>>>", estimates);
 
-  // Handle file selection from DropZoneExcel
-  const handleFileChange = (files :any) => {
-    // DropZoneExcel component already provides the files array
-    if (files && files.length > 0) {
-      setSelectedFile(files[0]);
-      console.log("✅ File Selected:", files[0].name);
+  // // Handle file selection from DropZoneExcel
+  // const handleFileChange = (files: any) => {
+  //   // DropZoneExcel component already provides the files array
+  //   if (files && files.length > 0) {
+  //     setSelectedFile(files[0]);
+  //     console.log("✅ File Selected:", files[0].name);
+  //   } else {
+  //     setSelectedFile(null);
+  //     console.log("❌ No file selected");
+  //   }
+  // };
+
+  // // Handle upload
+  // const handleUpload = async () => {
+  //   if (!selectedFile) {
+  //     console.log("Current file state:", selectedFile);
+  //     alert("Please select a file first!");
+  //     return;
+  //   }
+
+  //   if (!selectedEstID) {
+  //     alert("Please select an Estimate ID first!");
+  //     return;
+  //   }
+
+  //   try {
+  //     console.log("Uploading file:", selectedFile.name);
+  //     console.log("Selected Estimate ID:", selectedEstID);
+
+  //     // Create FormData and append file
+  //     const formData = new FormData();
+  //     formData.append('file', selectedFile);
+
+  //     // Call the upload API
+  //     const response = await uploadFile(selectedFile, selectedEstID);
+
+  //     if (response) {
+  //       console.log("Upload successful:", response);
+  //       setCompareEstimatedData(response?.data);
+  //       // Reset the form
+  //       setSelectedFile(null);
+  //       setSelectedEstID('');
+  //     }
+  //   } catch (error) {
+  //     console.error("Upload failed:", error);
+  //     alert("Failed to upload file. Please try again.");
+  //   }
+  // };
+  const handleFileChange = (file: File | null) => {
+    setSelectedFile(file);
+    if (file) {
+      console.log("✅ File Selected:", file.name);
     } else {
-      setSelectedFile(null);
       console.log("❌ No file selected");
     }
   };
 
-  // Handle upload
   const handleUpload = async () => {
     if (!selectedFile) {
-      console.log("Current file state:", selectedFile);
       alert("Please select a file first!");
       return;
     }
@@ -61,30 +106,39 @@ export default function CompareEstimate() {
     try {
       console.log("Uploading file:", selectedFile.name);
       console.log("Selected Estimate ID:", selectedEstID);
-      
-      // Create FormData and append file
-      const formData = new FormData();
-      formData.append('file', selectedFile);
 
-      // Call the upload API
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
       const response = await uploadFile(selectedFile, selectedEstID);
-      
+
       if (response) {
         console.log("Upload successful:", response);
+        // Reset file and ID after successful upload
         setCompareEstimatedData(response?.data);
-        // Reset the form
         setSelectedFile(null);
-        setSelectedEstID('');
+        setSelectedEstID("");
+
+        // if(compareEstimatedData?.comparisionResults?.length < 0){
+        //   showNotification({
+        //     title: "No data found!",
+        //     message: "No Data For this comparision",
+        //     color: "orange",
+        //     style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        //   });
+        // }
+
       }
     } catch (error) {
       console.error("Upload failed:", error);
       alert("Failed to upload file. Please try again.");
     }
   };
-  
-  console.log("comapre ui rsp>>>>",compareEstimatedData);
 
-  
+
+  console.log("comapre ui rsp>>>>", compareEstimatedData);
+
+
   const [manHours, setManHours] = useState<any | null>(null);
   const [spareCost, setSpareCost] = useState<any | null>(null);
   const [tatTime, setTatTime] = useState<any | null>(null);
@@ -94,17 +148,17 @@ export default function CompareEstimate() {
     if (compareEstimatedData?.comparisonResults) {
       setManHours(
         compareEstimatedData?.comparisonResults.find(
-          (result : any) => result.metric === "Man-Hours"
+          (result: any) => result.metric === "Man-Hours"
         ) || null
       );
       setSpareCost(
         compareEstimatedData?.comparisonResults.find(
-          (result : any) => result.metric === "Spare Cost"
+          (result: any) => result.metric === "Spare Cost"
         ) || null
       );
       setTatTime(
         compareEstimatedData?.comparisonResults.find(
-          (result : any) => result.metric === "TAT Time"
+          (result: any) => result.metric === "TAT Time"
         ) || null
       );
     }
@@ -118,24 +172,24 @@ export default function CompareEstimate() {
 
   // Prepare data for bar chart
   const categories = compareEstimatedData?.comparisonResults.map(
-    (result : any) => result.metric
+    (result: any) => result.metric
   ) || [];
-  
+
   const estimatedData = compareEstimatedData?.comparisonResults.map(
-    (result : any) => result.estimated
+    (result: any) => result.estimated
   ) || [];
-  
+
   const actualData = compareEstimatedData?.comparisonResults.map(
-    (result : any) => result.actual
+    (result: any) => result.actual
   ) || [];
 
   // Prepare data for radial chart
   const series = compareEstimatedData?.comparisonResults.map(
-    (result : any) => (((result.actual - result.estimated) / result.actual) * 100 || 0).toFixed(1)
+    (result: any) => (((result.actual - result.estimated) / result.actual) * 100 || 0).toFixed(1)
   ) || [];
 
   const labels = compareEstimatedData?.comparisonResults.map(
-    (result : any) => result.metric
+    (result: any) => result.metric
   ) || [];
 
 
@@ -175,19 +229,19 @@ export default function CompareEstimate() {
   //   "TAT Time": { icon: <IconClockCheck color="orange" size="39" />, bg: "#fcfbe3", unit: " Days" },
   // };
 
-   // Extract data for the bar graph
+  // Extract data for the bar graph
   // const categories = jsonData.comparisionResult.map((item) => item.metric);
   // const estimatedData = jsonData.comparisionResult.map((item) => item.estimated);
   // const actualData = jsonData.comparisionResult.map((item) => item.actual);
   // const differenceData = jsonData.comparisionResult.map((item) => item.actual - item.estimated);
 
   // Extract data for the radial bar  
-// const labels = jsonData.comparisionResult.map(item => item.metric);
-// const series = jsonData.comparisionResult.map(item => Math.round(((item.actual-item.estimated) / item.actual) * 100));
-// const series = jsonData.comparisionResult.map((item) => {
-//   const percentage = (item.actual / item.estimated) * 100;
-//   return percentage > 100 ? 100 : Math.round(percentage); // Cap at 100%
-// });
+  // const labels = jsonData.comparisionResult.map(item => item.metric);
+  // const series = jsonData.comparisionResult.map(item => Math.round(((item.actual-item.estimated) / item.actual) * 100));
+  // const series = jsonData.comparisionResult.map((item) => {
+  //   const percentage = (item.actual / item.estimated) * 100;
+  //   return percentage > 100 ? 100 : Math.round(percentage); // Cap at 100%
+  // });
 
   return (
     <>
@@ -200,18 +254,27 @@ export default function CompareEstimate() {
                 Select Estimate
               </Text>
               <Select
-      size="xs"
-      w="18vw"
-      label="Select Estimate ID"
-      placeholder="Select Estimate ID"
-      data={estimates?.map((estimate) => ({
-        value: estimate.estID,
-        label: estimate.estID,
-      }))} // Populate dropdown dynamically
-      value={selectedEstID}
-      onChange={(value) => setSelectedEstID(value)}
-      allowDeselect
-    />
+    size="xs"
+    w="18vw"
+    label="Select Estimate ID"
+    placeholder="Select Estimate ID"
+    data={estimates?.map((estimate, index) => ({
+      value: `${estimate.estID}_${index}`, // Unique value
+      label: estimate.estID, // Displayed text
+    }))}
+    value={selectedUniqueID} // Bind to unique ID
+    onChange={(value) => {
+      if (value) {
+        const [estID] = value.split("_"); // Extract the original estID
+        setSelectedEstID(estID);
+        setSelectedUniqueID(value); // Ensure UI updates even if duplicate
+      } else {
+        setSelectedEstID(null);
+        setSelectedUniqueID(null);
+      }
+    }}
+    allowDeselect
+  />
             </Group>
 
           </Card>
@@ -226,8 +289,8 @@ export default function CompareEstimate() {
         </SimpleGrid>
         <Group justify='center'>
           <Button
-          onClick={handleUpload} 
-          // disabled={!selectedFile || !selectedEstID}
+            onClick={handleUpload}
+            // disabled={!selectedFile || !selectedEstID}
             mt='md'
             mb='sm'
             radius='md'
@@ -239,7 +302,7 @@ export default function CompareEstimate() {
           </Button>
         </Group>
         {/* <SimpleGrid cols={3}> */}
-          {/* {jsonData.comparisionResult.map(({ metric, estimated, actual }) => {
+        {/* {jsonData.comparisionResult.map(({ metric, estimated, actual }) => {
             const difference = actual - estimated;
             const isPositive = difference >= 0;
             const { icon, bg, unit = "" } = metricConfig[metric] || {};
@@ -270,7 +333,7 @@ export default function CompareEstimate() {
               </Card>
             );
           })} */}
-          {/* {compareEstimatedData?.comparisionResults.map(({ metric, estimated, actual } : any) => {
+        {/* {compareEstimatedData?.comparisionResults.map(({ metric, estimated, actual } : any) => {
         const difference = actual - estimated;
         return (
           <Card key={metric} withBorder radius='md' bg={bgMap[metric]} shadow='md'>
@@ -300,177 +363,177 @@ export default function CompareEstimate() {
       })} */}
         {/* </SimpleGrid> */}
         <SimpleGrid cols={3}>
-        <Card withBorder radius="md" bg="#e1e6f7" shadow="md">
-          <Group>
-            <IconUsers color="#4E66DE" size={39} />
-            <Text fw={600} fz="md">Man Hours</Text>
-          </Group>
-          <Space h="md" />
-          <Group justify="space-between">
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Estimated</Text>
-              <Text fw={600} fz="lg">{manHours?.estimated || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Actual</Text>
-              <Text fw={600} fz="lg">{manHours?.actual || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Difference</Text>
-              <Text 
-                fw={600} 
-                fz="lg" 
-                c={Number(calculateDifference(manHours)) >= 0 ? '#F20000' : '#088A45'}
-              >
-                {calculateDifference(manHours)} Hrs
-              </Text>
-            </Flex>
-          </Group>
-        </Card>
+          <Card withBorder radius="md" bg="#e1e6f7" shadow="md">
+            <Group>
+              <IconUsers color="#4E66DE" size={39} />
+              <Text fw={600} fz="md">Man Hours</Text>
+            </Group>
+            <Space h="md" />
+            <Group justify="space-between">
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Estimated</Text>
+                <Text fw={600} fz="lg">{manHours?.estimated || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Actual</Text>
+                <Text fw={600} fz="lg">{manHours?.actual || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Difference</Text>
+                <Text
+                  fw={600}
+                  fz="lg"
+                  c={Number(calculateDifference(manHours)) >= 0 ? '#F20000' : '#088A45'}
+                >
+                  {calculateDifference(manHours)} Hrs
+                </Text>
+              </Flex>
+            </Group>
+          </Card>
 
-        <Card withBorder radius="md" bg="#e3fae8" shadow="md">
-          <Group>
-            <IconSettingsStar color="#088A45" size={39} />
-            <Text fw={600} fz="md">Spare Parts</Text>
-          </Group>
-          <Space h="md" />
-          <Group justify="space-between">
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Estimated</Text>
-              <Text fw={600} fz="lg">{spareCost?.estimated || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Actual</Text>
-              <Text fw={600} fz="lg">{spareCost?.actual || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Difference</Text>
-              <Text 
-                fw={600} 
-                fz="lg" 
-                c={Number(calculateDifference(spareCost)) >= 0 ? '#F20000' : '#088A45'}
-              >
-                {calculateDifference(spareCost)} $
-              </Text>
-            </Flex>
-          </Group>
-        </Card>
+          <Card withBorder radius="md" bg="#e3fae8" shadow="md">
+            <Group>
+              <IconSettingsStar color="#088A45" size={39} />
+              <Text fw={600} fz="md">Spare Parts</Text>
+            </Group>
+            <Space h="md" />
+            <Group justify="space-between">
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Estimated</Text>
+                <Text fw={600} fz="lg">{spareCost?.estimated || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Actual</Text>
+                <Text fw={600} fz="lg">{spareCost?.actual || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Difference</Text>
+                <Text
+                  fw={600}
+                  fz="lg"
+                  c={Number(calculateDifference(spareCost)) >= 0 ? '#F20000' : '#088A45'}
+                >
+                  {calculateDifference(spareCost)} $
+                </Text>
+              </Flex>
+            </Group>
+          </Card>
 
-        <Card withBorder radius="md" bg="#fcfbe3" shadow="md">
-          <Group>
-            <IconClockCheck color="orange" size={39} />
-            <Text fw={600} fz="md">TAT Time</Text>
-          </Group>
-          <Space h="md" />
-          <Group justify="space-between">
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Estimated</Text>
-              <Text fw={600} fz="lg">{tatTime?.estimated || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Actual</Text>
-              <Text fw={600} fz="lg">{tatTime?.actual || 0}</Text>
-            </Flex>
-            <Flex direction="column" justify="center" align="center">
-              <Text fw={400} fz="sm">Difference</Text>
-              <Text 
-                fw={600} 
-                fz="lg" 
-                c={Number(calculateDifference(tatTime)) >= 0 ? '#F20000' : '#088A45'}
-              >
-                {calculateDifference(tatTime)} Hrs
-              </Text>
-            </Flex>
-          </Group>
-        </Card>
-      </SimpleGrid>
+          <Card withBorder radius="md" bg="#fcfbe3" shadow="md">
+            <Group>
+              <IconClockCheck color="orange" size={39} />
+              <Text fw={600} fz="md">TAT Time</Text>
+            </Group>
+            <Space h="md" />
+            <Group justify="space-between">
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Estimated</Text>
+                <Text fw={600} fz="lg">{tatTime?.estimated || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Actual</Text>
+                <Text fw={600} fz="lg">{tatTime?.actual || 0}</Text>
+              </Flex>
+              <Flex direction="column" justify="center" align="center">
+                <Text fw={400} fz="sm">Difference</Text>
+                <Text
+                  fw={600}
+                  fz="lg"
+                  c={Number(calculateDifference(tatTime)) >= 0 ? '#F20000' : '#088A45'}
+                >
+                  {calculateDifference(tatTime)} Hrs
+                </Text>
+              </Flex>
+            </Group>
+          </Card>
+        </SimpleGrid>
         <Space h='md' />
         <SimpleGrid cols={2}>
-        <Card>
-          <Title order={5}>Estimated vs Actual Comparison</Title>
-          <ReactApexChart
-            type="bar"
-            height={300}
-            options={{
-              chart: { type: "bar", toolbar: { show: true } },
-              plotOptions: {
-                bar: {
-                  horizontal: false,
-                  columnWidth: "50%",
-                  borderRadius: 5,
-                  borderRadiusApplication: "end",
+          <Card>
+            <Title order={5}>Estimated vs Actual Comparison</Title>
+            <ReactApexChart
+              type="bar"
+              height={300}
+              options={{
+                chart: { type: "bar", toolbar: { show: true } },
+                plotOptions: {
+                  bar: {
+                    horizontal: false,
+                    columnWidth: "50%",
+                    borderRadius: 5,
+                    borderRadiusApplication: "end",
+                  },
                 },
-              },
-              dataLabels: { enabled: true },
-              xaxis: { categories },
-              yaxis: { title: { text: "Values" } },
-              fill: { opacity: 1 },
-              tooltip: { y: { formatter: (val: number) => `${val}` } },
-              grid: { padding: { right: 20 } },
-              legend: { position: "bottom" },
-              responsive: [
-                {
-                  breakpoint: 600,
-                  options: { plotOptions: { bar: { columnWidth: "70%" } } },
-                },
-              ],
-            }}
-            series={[
-              { name: "Estimated", data: estimatedData },
-              { name: "Actual", data: actualData },
-            ]}
-          />
-        </Card>
+                dataLabels: { enabled: true },
+                xaxis: { categories },
+                yaxis: { title: { text: "Values" } },
+                fill: { opacity: 1 },
+                tooltip: { y: { formatter: (val: number) => `${val}` } },
+                grid: { padding: { right: 20 } },
+                legend: { position: "bottom" },
+                responsive: [
+                  {
+                    breakpoint: 600,
+                    options: { plotOptions: { bar: { columnWidth: "70%" } } },
+                  },
+                ],
+              }}
+              series={[
+                { name: "Estimated", data: estimatedData },
+                { name: "Actual", data: actualData },
+              ]}
+            />
+          </Card>
 
-        <Card>
-          <Title order={5}>Comparison Analysis</Title>
-          <ReactApexChart
-            type="radialBar"
-            height={300}
-            options={{
-              chart: {
-                height: 390,
-                type: 'radialBar',
-              },
-              plotOptions: {
-                radialBar: {
-                  offsetY: 0,
-                  startAngle: 0,
-                  endAngle: 270,
-                  hollow: {
-                    margin: 5,
-                    size: '30%',
-                    background: 'transparent',
-                    image: undefined,
-                  },
-                  dataLabels: {
-                    name: { show: false },
-                    value: { show: false }
-                  },
-                  barLabels: {
-                    enabled: true,
-                    useSeriesColors: true,
-                    offsetX: -8,
-                    fontSize: '16px',
-                    formatter: function(seriesName, opts) {
-                      return seriesName + ":  " + opts.w.globals.series[opts.seriesIndex]
+          <Card>
+            <Title order={5}>Comparison Analysis</Title>
+            <ReactApexChart
+              type="radialBar"
+              height={300}
+              options={{
+                chart: {
+                  height: 390,
+                  type: 'radialBar',
+                },
+                plotOptions: {
+                  radialBar: {
+                    offsetY: 0,
+                    startAngle: 0,
+                    endAngle: 270,
+                    hollow: {
+                      margin: 5,
+                      size: '30%',
+                      background: 'transparent',
+                      image: undefined,
                     },
-                  },
-                }
-              },
-              colors: ['#1ab7ea', '#0084ff', '#39539E'],
-              labels: labels,
-              responsive: [{
-                breakpoint: 480,
-                options: {
-                  legend: { show: false }
-                }
-              }]
-            }}
-            series={series}
-          />
-        </Card>
-      </SimpleGrid>
+                    dataLabels: {
+                      name: { show: false },
+                      value: { show: false }
+                    },
+                    barLabels: {
+                      enabled: true,
+                      useSeriesColors: true,
+                      offsetX: -8,
+                      fontSize: '16px',
+                      formatter: function (seriesName, opts) {
+                        return seriesName + ":  " + opts.w.globals.series[opts.seriesIndex]
+                      },
+                    },
+                  }
+                },
+                colors: ['#1ab7ea', '#0084ff', '#39539E'],
+                labels: labels,
+                responsive: [{
+                  breakpoint: 480,
+                  options: {
+                    legend: { show: false }
+                  }
+                }]
+              }}
+              series={series}
+            />
+          </Card>
+        </SimpleGrid>
         {/* <SimpleGrid cols={2}>
           <Card>
             <Title order={5}>
@@ -578,7 +641,7 @@ export default function CompareEstimate() {
 }
 
 
-function uploadFile(selectedFile: File, selectedEstimateID: any) {
-  throw new Error('Function not implemented.');
-}
-// export default CompareEstimate;
+// function uploadFile(selectedFile: File, selectedEstimateID: any) {
+//   throw new Error('Function not implemented.');
+// }
+// // export default CompareEstimate;

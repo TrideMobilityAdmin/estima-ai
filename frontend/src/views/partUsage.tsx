@@ -179,7 +179,7 @@ export default function PartUsage() {
                             <IconTool color="#14AE5C" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Tasks Parts Quantity
+                                    Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalTaskQuantity(partUsageData?.usage?.tasks) || 0}
@@ -205,10 +205,10 @@ export default function PartUsage() {
                             <IconMenuDeep color="#9F6BED" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Findings Parts Quantity
+                                 Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                    {calculateTotalFindingQuantity(partUsageData?.usage?.findings)}
+                                    {calculateTotalFindingQuantity(partUsageData?.usage?.findings) || 0}
                                 </Text>
                             </Flex>
                         </Group>

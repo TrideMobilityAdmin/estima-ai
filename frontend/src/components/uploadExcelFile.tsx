@@ -3,22 +3,25 @@ import { Dropzone } from "@mantine/dropzone";
 import { useState } from "react";
 import { MdClose, MdFilePresent, MdUploadFile } from "react-icons/md";
 
-const UploadDropZoneExcel = ( {name, changeHandler, color} : any ) => {
-  const [files, setFiles] = useState([]);
+interface UploadDropZoneExcelProps {
+  name: string;
+  changeHandler: (file: File | null) => void;
+  color?: string;
+}
 
-  const handleDrop = (newFiles :any) => {
-    setFiles(newFiles);
-    // Call the parent's change handler with the new files
-    changeHandler(newFiles);
+const UploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZoneExcelProps) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleDrop = (newFiles: File[]) => {
+    if (newFiles.length > 0) {
+      setSelectedFile(newFiles[0]); // Only store the first file
+      changeHandler(newFiles[0]); // Pass single file to parent
+    }
   };
 
-  const removeFile = (index :any) => {
-    setFiles((prevFiles: any) => {
-      const updatedFiles = prevFiles.filter((_ :any, i :any) => i !== index);
-      // Update parent component
-      changeHandler(updatedFiles);
-      return updatedFiles;
-    });
+  const removeFile = () => {
+    setSelectedFile(null);
+    changeHandler(null);
   };
 
   return (
@@ -32,9 +35,7 @@ const UploadDropZoneExcel = ( {name, changeHandler, color} : any ) => {
           '.xlsx'
         ]}
         styles={{
-          
           root: {
-            // height:"30vh",
             borderColor: color || "#ced4da",
             borderStyle: "dashed",
             borderWidth: 2,
@@ -57,36 +58,18 @@ const UploadDropZoneExcel = ( {name, changeHandler, color} : any ) => {
         </div>
       </Dropzone>
 
-      {files.length > 0 && (
+      {selectedFile && (
         <div className="mt-4">
-          <Flex gap="md" justify="center" align="center" direction="row">
-            {files?.map((file :any, index :any) => (
-              <Paper
-              key={index}
-              withBorder
-              shadow="xs"
-              radius="md"
-              p="sm"
-              style={{
-                display: "flex",
-                gap: "0.5em",
-                minWidth: "150px",
-              }}
-                >
-                <MdFilePresent size={24} color="#1a73e8" />
-                <Text size="sm" lineClamp={1}>
-                  {file.name}
-                </Text>
-                <ActionIcon
-                  onClick={() => removeFile(index)}
-                  color="red"
-                  variant="transparent"
-                  // className="text-red-500 hover:text-red-700"
-                >
-                  <MdClose size={16} />
-                </ActionIcon>
-              </Paper>
-            ))}
+          <Flex gap="md" justify="center" align="center">
+            <Paper withBorder shadow="xs" radius="md" p="sm" style={{ display: "flex", gap: "0.5em", minWidth: "150px" }}>
+              <MdFilePresent size={24} color="#1a73e8" />
+              <Text size="sm" lineClamp={1}>
+                {selectedFile.name}
+              </Text>
+              <ActionIcon onClick={removeFile} color="red" variant="transparent">
+                <MdClose size={16} />
+              </ActionIcon>
+            </Paper>
           </Flex>
         </div>
       )}
