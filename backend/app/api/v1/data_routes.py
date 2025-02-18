@@ -7,6 +7,7 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 import shutil
+from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
@@ -77,13 +78,15 @@ async def get_all_estimates(
 
 async def get_parts_usage(
     part_id: str,
+    startDate:datetime,
+    endDate:datetime,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     """
     Get  parts usage for a part_id.
     """
-    parts_usage=await task_service.get_parts_usage(part_id)
+    parts_usage=await task_service.get_parts_usage(part_id,startDate,endDate)
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
 
