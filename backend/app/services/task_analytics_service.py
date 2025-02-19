@@ -723,6 +723,11 @@ class TaskService:
     }
                 ]
             sub_task_aircraft_details = [
+                {
+        '$match': {
+            'IssuedPart': '4200A200-6'
+        }
+    },
             {
                 '$lookup': {
                     'from': "aircraft_details",
