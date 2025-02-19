@@ -188,29 +188,24 @@ class ExcelUploadService:
                 )
 
             # Clean the data
+            cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
+            excel_data.rename(columns=cleaned_columns, inplace=True)
             cleaned_data = self.clean_data(excel_data)
-            all_tasks = []
-            all_descriptions = []
+            processed_record = {}
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+            
+            
+            for column in cleaned_data.columns:
+                column_values = cleaned_data[column].dropna().tolist()
+                processed_record[column] = column_values
 
-            for index, row in cleaned_data.iterrows():
-                task_number = row.get('task-#')  
-                description = row.get('description')  
-
-                if task_number:
-                    all_tasks.append(task_number)
-                if description:
-                    all_descriptions.append(description)
-
-            processed_record = {
-                "task": all_tasks,
-                "description": all_descriptions,
-                "upload_timestamp": current_time,
-                "original_filename": file.filename,
-                "createdAt": current_time,
-                "updatedAt":current_time,
-                "status":"Initiated"
-            }
+            processed_record.update({
+            "upload_timestamp": current_time,
+            "original_filename": file.filename,
+            "createdAt": current_time,
+            "updatedAt": current_time,
+            "status": "Initiated"
+        })
             logger.info(f"Processed record: {processed_record}")
 
             return processed_record  
