@@ -722,11 +722,83 @@ class TaskService:
         }
     }
                 ]
+            sub_task_aircraft_details = [
+            {
+                '$lookup': {
+                    'from': "aircraft_details",
+                    'localField': "Package",
+                    'foreignField': "Package",
+                    'as': "aircraft"
+                }
+            },
+            {
+                '$unwind': {
+                    'path': "$aircraft",
+                    'preserveNullAndEmptyArrays': True
+                }
+            },
+            {
+                '$facet': {
+                    'aircraftModels': [
+                        {
+                            '$group': {
+                                '_id': "$aircraft.AircraftModel",
+                                'count': {
+                                    '$sum': 1
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                '_id': 0,
+                                'aircraftModel': {
+                            '$ifNull': [
+                                '$_id', ''
+                            ]
+                        }, 
+                                'count': 1
+                            }
+                        }
+                    ],
+                    'statusCodes': [
+                        {
+                            '$group': {
+                                '_id': "$StockStatus",
+                                'count': {
+                                    '$sum': 1
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                '_id': 0,
+                                'stockStatus': {
+                            '$ifNull': [
+                                '$_id', ''
+                            ]
+                        }, 
+                                'count': 1
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                '$project': {
+                    'aircraftModel': "$aircraftModels",
+                    'stockStatusCode': "$statusCodes"
+                }
+            }
+        ]
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
+            sub_task_aircraft_details_result = list(self.subtaskparts_collection.aggregate(sub_task_aircraft_details))
+
             logger.info(f"Results of task_parts: {task_parts_result}\n")
             logger.info(f"Results of sub_task_parts: {sub_task_parts_result}\n")
+            logger.info(f"Results of aircraft_details: {sub_task_aircraft_details_result}\n")
+
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
@@ -764,7 +836,13 @@ class TaskService:
                         }
                         for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
                     ]
+                },
+
+                "aircraftDetails": {
+                    "aircraftModels": sub_task_aircraft_details_result[0].get("aircraftModel", []) if sub_task_aircraft_details_result else [],
+                    "stockStatusCodes": sub_task_aircraft_details_result[0].get("stockStatusCode", []) if sub_task_aircraft_details_result else []
                 }
+            
             }
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
@@ -785,7 +863,7 @@ class TaskService:
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"Task": {"$in": source_tasks}}},  
                 {
                     "$group": {
                         "_id": "$Task",
@@ -871,12 +949,13 @@ class TaskService:
                     "findings": findings
                 }
             }
-
-            return response
+            return response 
+            # return {"data": response, "response": {"statusCode": 200, "message": "skill_analysis processed successfully"}}
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
             return {"error": f"An error occurred while processing the request: {str(e)}"}
+            # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
    
 
