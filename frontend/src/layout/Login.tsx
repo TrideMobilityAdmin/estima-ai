@@ -46,7 +46,7 @@ type LoginInput = {
 function Login() {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
-
+  const [isLoading, setIsLoading] = useState(false);
 
   // const verify = (values: LoginInput) => {
   //   const isValid = validCredentials.some(
@@ -77,6 +77,7 @@ function Login() {
   // const [roleId, setRoleID] = useAtom(roleID);
   // const [entityId, setEntityID] = useAtom(entityID);
   const login = async (values: LoginInput) => {
+    setIsLoading(true);
     try {
       const response = await axios.post(getUserLogin_Url, {
         username: values.username,
@@ -113,14 +114,16 @@ console.log("✅ Token stored in sessionStorage:", storedToken);
           color: "green",
           style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
         });
-        
+        setIsLoading(false);
         // Redirect to dashboard
         navigate("/home");
         // window.location.reload();
       } else {
+        setIsLoading(false);
         throw new Error("Invalid credentials or server error");
       }
     } catch (error: any) {
+      setIsLoading(false);
       clearAuthState();
       console.log("errorrrrr", error);
       const errorMessage =
@@ -216,7 +219,7 @@ console.log("✅ Token stored in sessionStorage:", storedToken);
               {...form.getInputProps("password")}
             />
             <Checkbox label="Keep me logged in" mt="xl" size="md" />
-            <Button type="submit" bg="#000DB4" fullWidth mt="xl" size="md">
+            <Button loading={isLoading} type="submit" bg="#000DB4" fullWidth mt="xl" size="md">
               Login
             </Button>
           </form>

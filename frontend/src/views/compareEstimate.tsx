@@ -7,15 +7,16 @@ import ReactApexChart from 'react-apexcharts';
 import { useApi } from '../api/services/estimateSrvice';
 import UploadDropZoneExcel from '../components/uploadExcelFile';
 import { showNotification } from '@mantine/notifications';
+import { showAppNotification } from '../components/showNotificationGlobally';
 
 export default function CompareEstimate() {
-  const { getAllEstimates, uploadFile } = useApi();
+  const { getAllEstimates, compareUploadFile } = useApi();
 
 
   const [estimates, setEstimates] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedEstID, setSelectedEstID] = useState<string | null>(null);
-  const [selectedUniqueID, setSelectedUniqueID] = useState<string | null>(null); 
+  const [selectedUniqueID, setSelectedUniqueID] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<any>();
   const [compareEstimatedData, setCompareEstimatedData] = useState<any>();
 
@@ -110,23 +111,12 @@ export default function CompareEstimate() {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await uploadFile(selectedFile, selectedEstID);
+      const response = await compareUploadFile(selectedFile, selectedEstID);
 
       if (response) {
         console.log("Upload successful:", response);
         // Reset file and ID after successful upload
         setCompareEstimatedData(response?.data);
-        setSelectedFile(null);
-        setSelectedEstID("");
-
-        // if(compareEstimatedData?.comparisionResults?.length < 0){
-        //   showNotification({
-        //     title: "No data found!",
-        //     message: "No Data For this comparision",
-        //     color: "orange",
-        //     style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
-        //   });
-        // }
 
       }
     } catch (error) {
@@ -176,11 +166,11 @@ export default function CompareEstimate() {
   ) || [];
 
   const estimatedData = compareEstimatedData?.comparisonResults.map(
-    (result: any) => result.estimated
+    (result: any) => result.estimated?.toFixed(2)
   ) || [];
 
   const actualData = compareEstimatedData?.comparisonResults.map(
-    (result: any) => result.actual
+    (result: any) => result.actual?.toFixed(2)
   ) || [];
 
   // Prepare data for radial chart
@@ -254,27 +244,28 @@ export default function CompareEstimate() {
                 Select Estimate
               </Text>
               <Select
-    size="xs"
-    w="18vw"
-    label="Select Estimate ID"
-    placeholder="Select Estimate ID"
-    data={estimates?.map((estimate, index) => ({
-      value: `${estimate.estID}_${index}`, // Unique value
-      label: estimate.estID, // Displayed text
-    }))}
-    value={selectedUniqueID} // Bind to unique ID
-    onChange={(value) => {
-      if (value) {
-        const [estID] = value.split("_"); // Extract the original estID
-        setSelectedEstID(estID);
-        setSelectedUniqueID(value); // Ensure UI updates even if duplicate
-      } else {
-        setSelectedEstID(null);
-        setSelectedUniqueID(null);
-      }
-    }}
-    allowDeselect
-  />
+                size="xs"
+                w="18vw"
+                label="Select Estimate ID"
+                searchable
+                placeholder="Select Estimate ID"
+                data={estimates?.map((estimate, index) => ({
+                  value: `${estimate.estID}_${index}`, // Unique value
+                  label: estimate.estID, // Displayed text
+                }))}
+                value={selectedUniqueID} // Bind to unique ID
+                onChange={(value) => {
+                  if (value) {
+                    const [estID] = value.split("_"); // Extract the original estID
+                    setSelectedEstID(estID);
+                    setSelectedUniqueID(value); // Ensure UI updates even if duplicate
+                  } else {
+                    setSelectedEstID(null);
+                    setSelectedUniqueID(null);
+                  }
+                }}
+                allowDeselect
+              />
             </Group>
 
           </Card>
@@ -372,11 +363,11 @@ export default function CompareEstimate() {
             <Group justify="space-between">
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Estimated</Text>
-                <Text fw={600} fz="lg">{manHours?.estimated || 0}</Text>
+                <Text fw={600} fz="lg">{manHours?.estimated?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Actual</Text>
-                <Text fw={600} fz="lg">{manHours?.actual || 0}</Text>
+                <Text fw={600} fz="lg">{manHours?.actual?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Difference</Text>
@@ -400,11 +391,11 @@ export default function CompareEstimate() {
             <Group justify="space-between">
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Estimated</Text>
-                <Text fw={600} fz="lg">{spareCost?.estimated || 0}</Text>
+                <Text fw={600} fz="lg">{spareCost?.estimated?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Actual</Text>
-                <Text fw={600} fz="lg">{spareCost?.actual || 0}</Text>
+                <Text fw={600} fz="lg">{spareCost?.actual?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Difference</Text>
@@ -428,11 +419,11 @@ export default function CompareEstimate() {
             <Group justify="space-between">
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Estimated</Text>
-                <Text fw={600} fz="lg">{tatTime?.estimated || 0}</Text>
+                <Text fw={600} fz="lg">{tatTime?.estimated?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Actual</Text>
-                <Text fw={600} fz="lg">{tatTime?.actual || 0}</Text>
+                <Text fw={600} fz="lg">{tatTime?.actual?.toFixed(2) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Difference</Text>
@@ -449,7 +440,7 @@ export default function CompareEstimate() {
         </SimpleGrid>
         <Space h='md' />
         <SimpleGrid cols={2}>
-          <Card>
+          {/* <Card>
             <Title order={5}>Estimated vs Actual Comparison</Title>
             <ReactApexChart
               type="bar"
@@ -532,6 +523,115 @@ export default function CompareEstimate() {
               }}
               series={series}
             />
+          </Card> */}
+
+          <Card>
+            <Title order={5}>Estimated vs Actual Comparison</Title>
+            <ReactApexChart
+              type="line"
+              height={350}
+              options={{
+                chart: { 
+                  toolbar: { 
+                    show: true 
+                  } 
+                },
+                stroke: { 
+                  width: [0, 3] 
+                }, // Bar has width 0, Line has width 3
+                plotOptions: { 
+                  bar: { 
+                    columnWidth: "40%", 
+                    borderRadius: 5 ,
+                    borderRadiusApplication: "end",
+                  } 
+                },
+                // dataLabels: { enabled: true },
+                xaxis: { categories },
+                yaxis: [
+                  {
+                    title: { text: "Estimated (Bar)" },
+                    labels: { formatter: (val: number) => `${val.toFixed(2)}` },
+                  },
+                  {
+                    opposite: true,
+                    title: { text: "Actual (Line)" },
+                    labels: { formatter: (val: number) => `${val.toFixed(2)}` },
+                  },
+                ],
+                tooltip: { shared: true },
+                grid: { padding: { right: 20 } },
+                legend: { position: "bottom" },
+              }}
+              series={[
+                { name: "Estimated", type: "bar", data: estimatedData },
+                { name: "Actual", type: "line", data: actualData },
+              ]}
+            />
+
+          </Card>
+          <Card>
+            <Title order={5}>Comparison Analysis</Title>
+            <ReactApexChart
+              type="bar"
+              height={350}
+              options={{
+                chart: {
+                  type: "bar",
+                  height: 300,
+                },
+                plotOptions: {
+                  bar: {
+                    horizontal: true, // Horizontal bars
+                    barHeight: "40%",
+                    distributed: false,
+                    columnWidth: "40%",
+                    borderRadius: 5,
+                    borderRadiusApplication: "end",
+                    colors: {
+                      ranges: [
+                        {
+                          from: -10000, // Negative values
+                          to: -0.01,
+                          color: "#FF4D4D", // Red for negative values
+                        },
+                        {
+                          from: 0,
+                          to: 10000, // Positive values
+                          color: "#28C76F", // Green for positive values
+                        },
+                      ],
+                    },
+                  },
+                },
+                dataLabels: {
+                  enabled: true,
+                  formatter: (val: number) => `${val.toFixed(1)}%`, // Display percentage values
+                  style: {
+                    fontSize: "12px",
+                  },
+                },
+                xaxis: {
+                  categories: labels, // Labels for bars
+                  title: {
+                    text: "Deviation (%)",
+                  },
+                },
+                yaxis: {
+                  title: {
+                    text: "Metrics",
+                  },
+                },
+                tooltip: {
+                  enabled: true,
+                  y: {
+                    formatter: (val: number) => `${val.toFixed(1)}%`,
+                  },
+                }
+              }}
+              series={[{ data: series }]}
+            />
+
           </Card>
         </SimpleGrid>
         {/* <SimpleGrid cols={2}>

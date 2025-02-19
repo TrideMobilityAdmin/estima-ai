@@ -32,7 +32,8 @@ const UploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZoneExcel
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           '.xlsm',
           '.xls',
-          '.xlsx'
+          '.xlsx',
+          ".csv"
         ]}
         styles={{
           root: {

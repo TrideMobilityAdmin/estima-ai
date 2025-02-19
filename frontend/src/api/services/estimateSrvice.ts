@@ -1,3 +1,4 @@
+import { showAppNotification } from "../../components/showNotificationGlobally";
 import { getEstimateReport_Url, getEstimateStatus_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
@@ -29,6 +30,7 @@ export const useApi = () => {
       color: "red",
       style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
     });
+    showAppNotification("error", "Session Expired!", "Your session has expired. Please log in again.");
 
     // Clear authentication tokens (modify as needed)
     localStorage.removeItem("authToken");
@@ -210,53 +212,53 @@ export const useApi = () => {
   };
 
   // New function to upload a file with Estimate ID
-  const uploadFile = async (file: any, selectedEstID: any) => {
+  const compareUploadFile = async (file: any, selectedEstID: any) => {
     if (!file || !selectedEstID) {
-      console.error('Missing required parameters:', { file, selectedEstID });
-      return null;
+        console.error("Missing required parameters:", { file, selectedEstID });
+        return null;
     }
 
     // Create FormData
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     try {
-      // Make the API call with the file in FormData and estimateId in URL
-      const response = await axiosInstance.post(
-        `${getEstimateReport_Url}${selectedEstID}/compare`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+        // Make the API call with the file in FormData and estimateId in URL
+        const response = await axiosInstance.post(
+            `${getEstimateReport_Url}${selectedEstID}/compare`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        console.log("✅ Upload successful:", response.data);
+
+        // Checking if `comparisonResults` array exists and has data
+        if (response?.data?.comparisonResults && response.data.comparisonResults.length > 0) {
+            showAppNotification("success", "Comparison Success!", "Estimate Compared Successfully");
+        } else {
+            showAppNotification("error", "No Data!", "No data found, try another file.");
         }
-      );
 
-      console.log('✅ Upload successful:', response.data);
-      showNotification({
-        title: 'Success!',
-        message: 'File uploaded successfully',
-        color: 'green',
-      });
-
-      return response;
+        return response;
     } catch (error: any) {
-      console.error('❌ Upload failed:', error);
+        console.error("❌ Upload failed:", error);
 
-      // Handle session expiration
-      if (error.response?.data?.detail === 'Invalid authentication credentials') {
-        handleSessionExpired();
-      }
+        // Handle session expiration
+        if (error.response?.data?.detail === "Invalid authentication credentials") {
+            handleSessionExpired();
+        }
 
-      showNotification({
-        title: 'Upload Failed',
-        message: error.response?.data?.message || 'Failed to upload file',
-        color: 'red',
-      });
+        // Show error notification for API failure
+        showAppNotification("error", "Upload Failed!", `${error.response?.data?.message || "Failed to upload file, please try again."}`);
 
-      throw error;
+        throw error;
     }
-  };
+};
+
 
   // New function to download the PDF
   const downloadEstimatePdf = async (estimateId: string) => {
@@ -287,13 +289,18 @@ export const useApi = () => {
       // Handle session expiration
       if (error.response?.data?.detail === 'Invalid authentication credentials') {
         handleSessionExpired();
+      } else if (error.response?.data?.detail?.includes("Internal server error")) {
+        showAppNotification("warning", "Internal Server Error!", "Failed, try again...");
+      } else {
+        showAppNotification("error", "Failed!", "Download Failed, try again...");
       }
 
-      showNotification({
-        title: 'Download Failed',
-        message: error.response?.data?.message || 'Failed to download PDF',
-        color: 'red',
-      });
+      // showNotification({
+      //   title: 'Download Failed',
+      //   message: error.response?.data?.message || 'Failed to download PDF',
+      //   color: 'red',
+      //   style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      // });
     }
   };
 
@@ -305,7 +312,7 @@ export const useApi = () => {
     postEstimateReport, 
     validateTasks, 
     getAllEstimates, 
-    uploadFile, 
+    compareUploadFile, 
     downloadEstimatePdf 
   };
 };
