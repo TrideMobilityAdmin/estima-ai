@@ -50,13 +50,13 @@ end
 # ╔═╡ b7607b45-79c0-444b-ae45-307d802f2ef2
 begin
 	pkg = CSV.read("./input/pkg_input.csv", DataFrame)
-	g_tasks = CSV.read("./input/source_tasks_input.csv", DataFrame)
+	g_tasks = CSV.read("./input/task_cluster_data.csv", DataFrame)
 end
 
 # ╔═╡ 0868ef4b-61db-44b8-8439-da56416ab641
 begin
-	task_clusters=load("./trainings/task_clusters.jld2")["task_clusters"]
-	disc_clusters=load("./trainings/disc_clusters.jld2")["disc_clusters"]
+	task_clusters=load("./trainings/task_clusters.jld2")["taskc"]
+	disc_clusters=load("./trainings/disc_clusters.jld2")["discc"]
 	part_price=load("./trainings/part_price.jld2")["part_price"]
 	coom=load("./trainings/coom.jld2")["coom"]
 	lexicon=load("./trainings/lexicon.jld2")["lexicon"]
@@ -69,13 +69,8 @@ function cluster_given_tasks(df,training_outcomes)
 	df.stef=apply_embeddings(df, :description, training_outcomes)
 	cluster_assignments = fill(0, nrow(df))
 	for i in 1:nrow(df)
-    	embedding = df.stef[i]
-		for j in 1:nrow(task_clusters)
-			if cosine_similarity(embedding, task_clusters.avg_emb[j]) ≥ 0.9
-				cluster_assignments[i] = task_clusters.cluster_id[j]
-				break
-        	end
-		end
+		j=argmax(cosine_similarity.(Ref(df.stef[i]), task_clusters.avg_emb))
+		cluster_assignments[i] = task_clusters.cluster_id[j]
 	end
 	df.cluster = cluster_assignments
 end
@@ -111,11 +106,12 @@ begin
 		stc_pred.avg_mh=round.(mean.(task_clusters.amh), digits=1)
 		stc_pred.est_mh=round.(median.(task_clusters.amh), digits=1)
 		stc_pred.exp_cons=partqty.(mean.(task_clusters.avg_emb))
+		stc_pred
 	end
 	out_g=select(g_tasks,"task-#","description","cluster")
 	out_stc_vec=filter(row -> row.cluster_id in unique(out_g.cluster), stc_pred)
 	out_disc_vec=filter(row -> row.stc_id !== nothing, disc_pred)
-	out_g_fin=innerjoin(select(g_tasks,"task-#","description","cluster"), out_stc_vec, on = "cluster" => "cluster_id")
+	out_g_fin=leftjoin(select(g_tasks,"task-#","description","cluster"), out_stc_vec, on = "cluster" => "cluster_id")
 	begin
 		fin_vec = DataFrame(task_cat = Vector{String}(),
 					max_mh = Vector{Float64}(),
@@ -149,9 +145,6 @@ begin
 		CSV.write("./vec_output/fin_vec_output.csv", fin_vec)
 	end
 end
-
-# ╔═╡ 9dafeff9-6f86-408e-b2ad-43b8b22c9a1a
-
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -813,6 +806,5 @@ version = "17.4.0+2"
 # ╠═b7607b45-79c0-444b-ae45-307d802f2ef2
 # ╠═0868ef4b-61db-44b8-8439-da56416ab641
 # ╠═7e0c6992-7901-4ec7-9e5c-3320b4740006
-# ╠═9dafeff9-6f86-408e-b2ad-43b8b22c9a1a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
