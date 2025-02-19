@@ -90,7 +90,7 @@ end
 begin
 	gtc_ref = zeros(Int,nrow(task_clusters))
 	cluster_given_tasks(g_tasks,(lexicon=lexicon,idf=idf,training_embeddings=training_embeddings))
-	gtc_ref[sort(unique(g_tasks.cluster))] .= 1
+	gtc_ref[sort(unique(filter(!iszero, g_tasks.cluster)))] .= 1
 	function first_stc(cid)
 		return findfirst(!=(0), coom[cid,:] .* gtc_ref)
 	end
