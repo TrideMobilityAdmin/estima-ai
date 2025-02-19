@@ -10,6 +10,7 @@ from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
+from collections import defaultdict
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -136,19 +137,12 @@ class TaskService:
             existing_tasks_list = self.taskdescription_collection.find(
                 {"Task": {"$in": task_ids}}, {"_id": 0, "Task": 1}
             )
-
-            # Convert cursor to list
-            existing_tasks_list = list(existing_tasks_list)  # Ensure it's a list
-
-            # Convert list to a set for faster lookups
+            existing_tasks_list = list(existing_tasks_list)  
             existing_tasks = list(doc["Task"] for doc in existing_tasks_list)
-
-            # Prepare the response list
             validated_tasks = [
                 ValidTasks(taskid=task, status=(task in existing_tasks))
                 for task in task_ids
             ]
-
             return validated_tasks
 
         except Exception as e:
@@ -523,7 +517,8 @@ class TaskService:
                 detail=f"Error fetching man hours: {str(e)}"
             )
 
-    async def get_parts_usage(self, part_id: str) -> Dict:
+    async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
         Get parts usage for a specific part_id within a date range.
         """
@@ -531,140 +526,292 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline = [
-                { "$match": { "RequestedPart": part_id } },
                 {
-                    "$lookup": {
-                        "from": "task_description",
-                        "localField": "Task",
-                        "foreignField": "Task",
-                        "as": "task_details"
-                    }
-                },
-                { "$unwind": "$task_details" },
+        '$match': {
+            'RequestedPart': part_id
+        }
+    }, {
+        '$lookup': {
+            'from': 'task_description', 
+            'let': {
+                'convertedPackage': '$Package'
+            }, 
+            'pipeline': [
                 {
-                    "$addFields": {
-                        "convertedPackageId": {
-                            "$cond": {
-                                "if": { "$regexMatch": { "input": "$Package", "regex": "HMV(\\d{2})(\\d{6})(\\d{4})" } },
-                                "then": {
-                                    "$concat": [
-                                        { "$substrCP": [ "$Package", 7, 5 ] },
-                                        "/",
-                                        { "$substrCP": [ "$Package", 12, 6 ] },
-                                        "/",
-                                        { "$substrCP": [ "$Package", 18, 4 ] }
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$Package', '$$convertedPackage'
                                     ]
-                                },
-                                "else": "$Package"
-                            }
+                                }, {
+                                    '$gte': [
+                                        '$ActualStartDate', startDate
+                                    ]
+                                }, {
+                                    '$lt': [
+                                        '$ActualEndDate', endDate
+                                    ]
+                                }
+                            ]
                         }
                     }
-                },
-                {
-                    "$lookup": {
-                        "from": "aircraft_details",
-                        "let": { "convertedPackage": "$convertedPackageId" },
-                        "pipeline": [
-                            {
-                                "$match": { "$expr": { "$eq": [ "$Package", "$$convertedPackage" ] } }
-                            },
-                            { "$project": { "IssueDate": 1, "_id": 0 } }
-                        ],
-                        "as": "aircraft_info"
+                }, {
+                    '$project': {
+                        'ActualStartDate': 1, 
+                        'Description': 1, 
+                        '_id': 0
                     }
-                },
-                { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
-                {
-                    "$addFields": {
-                        "effectiveDate": {
-                            "$cond": {
-                                "if": { "$ifNull": [ "$aircraft_info.IssueDate", "false" ] },
-                                "then": "$aircraft_info.IssueDate",
-                                "else": { "$toDate": "$IssueDate" }
-                            }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$group': {
+            '_id': '$RequestedPart', 
+            'partDescription': {
+                '$first': '$PartDescription'
+            }, 
+            'tasks': {
+                '$push': {
+                    'taskId': '$Task', 
+                    'taskDescription': '$task_info.Description', 
+                    'packages': [
+                        {
+                            'packageId': '$Package', 
+                            'date': '$task_info.ActualStartDate', 
+                            'quantity': '$RequestedQty'
                         }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$RequestedPart",
-                        "tasks": {
-                            "$push": {
-                                "taskId": "$Task",
-                                "taskDescription": "$task_details.Description",
-                                "packages": [
-                                    {
-                                        "packageId": "$Package",
-                                        "date": "$effectiveDate",
-                                        "quantity": "$RequestedQty"
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                { "$project": { "convertedPackageId": 0, "aircraft_info": 0, "effectiveDate": 0 } }
+                    ]
+                }
+            }
+        }
+    }, {
+        '$project': {
+            'convertedPackageId': 0, 
+            'aircraft_info': 0, 
+            'effectiveDate': 0
+        }
+    }
             ]
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-            { "$match": { "IssuedPart": part_id } },
             {
-                "$lookup": {
-                "from": "aircraft_details",
-                "let": { "package": "$Package" },
-                "pipeline": [
+        '$match': {
+            'IssuedPart': part_id
+        }
+    }, {
+        '$lookup': {
+            'from': 'sub_task_description', 
+            'let': {
+                'convertedPackage': {
+                    '$cond': {
+                        'if': {
+                            '$regexMatch': {
+                                'input': '$Package', 
+                                'regex': 'HMV(\\d{2})(\\d{6})(\\d{4})'
+                            }
+                        }, 
+                        'then': {
+                            '$concat': [
+                                {
+                                    '$substrCP': [
+                                        '$Package', 7, 5
+                                    ]
+                                }, '/', {
+                                    '$substrCP': [
+                                        '$Package', 12, 6
+                                    ]
+                                }, '/', {
+                                    '$substrCP': [
+                                        '$Package', 18, 4
+                                    ]
+                                }
+                            ]
+                        }, 
+                        'else': '$Package'
+                    }
+                }
+            }, 
+            'pipeline': [
+                {
+                    '$project': {
+                        'convertedPackage': '$$convertedPackage', 
+                        'ActualStartDate': 1, 
+                        'ActualEndDate': 1, 
+                        'SourceTaskDiscrep': 1, 
+                        'LogItem': 1, 
+                        '_id': 0
+                    }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
                     {
-                    "$match": {
-                        "$expr": { "$eq": [ "$Package", "$$package" ] }
+                        '$eq': [
+                            '$task_info.convertedPackage', '$Package'
+                        ]
+                    }, {
+                        '$gte': [
+                            '$task_info.ActualStartDate', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.ActualEndDate', endDate
+                        ]
                     }
+                ]
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'task_description', 
+            'localField': 'task_info.SourceTaskDiscrep', 
+            'foreignField': 'Task', 
+            'as': 'task_desc', 
+            'pipeline': [
+                {
+                    '$project': {
+                        'Description': 1, 
+                        '_id': 0
                     }
-                ],
-                "as": "aircraft_info"
                 }
-            },
-            { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
-            {
-                "$addFields": {
-                "effectiveDate": {
-                    "$ifNull": [ "$aircraft_info.IssueDate", "$IssueDate" ]
-                }
-                }
-            },
-            {
-                "$group": {
-                "_id": "$IssuedPart",
-                "findings": {
-                    "$push": {
-                    "taskId": "$Task",
-                    "taskDescription": "$TaskDescription",
-                    "packages": [
+            ]
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_desc', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$group': {
+            '_id': '$IssuedPart', 
+            'findings': {
+                '$push': {
+                    'taskId': '$Task', 
+                    'taskDescription': '$task_desc.Description', 
+                    'packages': [
                         {
-                        "packageId": "$Package",
-                        "finding": "$Finding",
-                        "logItem": "$LogItem",
-                        "description": "$Description",
-                        "date": "$effectiveDate",
-                        "quantity": "$UsedQty"
+                            'packageId': '$Package', 
+                            'logItem': '$task_info.LogItem', 
+                            'description': '$TaskDescription', 
+                            'date': '$task_info.ActualStartDate', 
+                            'quantity': '$UsedQty'
                         }
                     ]
-                    }
                 }
+            }
+        }
+    }, {
+        '$project': {
+            'effectiveDate': 0
+        }
+    }
+                ]
+            sub_task_aircraft_details = [
+                {
+        '$match': {
+            'IssuedPart': '4200A200-6'
+        }
+    },
+            {
+                '$lookup': {
+                    'from': "aircraft_details",
+                    'localField': "Package",
+                    'foreignField': "Package",
+                    'as': "aircraft"
                 }
             },
-                { "$project": { "effectiveDate": 0 } } 
-                ]
+            {
+                '$unwind': {
+                    'path': "$aircraft",
+                    'preserveNullAndEmptyArrays': True
+                }
+            },
+            {
+                '$facet': {
+                    'aircraftModels': [
+                        {
+                            '$group': {
+                                '_id': "$aircraft.AircraftModel",
+                                'count': {
+                                    '$sum': 1
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                '_id': 0,
+                                'aircraftModel': {
+                            '$ifNull': [
+                                '$_id', ''
+                            ]
+                        }, 
+                                'count': 1
+                            }
+                        }
+                    ],
+                    'statusCodes': [
+                        {
+                            '$group': {
+                                '_id': "$StockStatus",
+                                'count': {
+                                    '$sum': 1
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                '_id': 0,
+                                'stockStatus': {
+                            '$ifNull': [
+                                '$_id', ''
+                            ]
+                        }, 
+                                'count': 1
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                '$project': {
+                    'aircraftModel': "$aircraftModels",
+                    'stockStatusCode': "$statusCodes"
+                }
+            }
+        ]
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-            logger.info(f"Results of task_parts: {task_parts_result}")
-            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}")
+            sub_task_aircraft_details_result = list(self.subtaskparts_collection.aggregate(sub_task_aircraft_details))
+
+            logger.info(f"Results of task_parts: {task_parts_result}\n")
+            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}\n")
+            logger.info(f"Results of aircraft_details: {sub_task_aircraft_details_result}\n")
+
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
-                return {}
+                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
             # Construct final output
             output = {
                 "partId": part_id,
-                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("partDescription", "") if task_parts_result else "",
+                "partDescription": task_parts_result[0].get("partDescription", "") if task_parts_result else "",
                 "usage": {
                     "tasks": [
                         {
@@ -684,7 +831,7 @@ class TaskService:
                             "packages": [
                                 {
                                             "packageId": pkg["packageId"],
-                                            "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
+                                            # "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
                                             "logItem": pkg.get("logItem", ""),  # Use .get() to avoid KeyError
                                             "description": pkg.get("description", ""),  # Use .get() to avoid KeyError
                                             "date": pkg["date"],
@@ -695,12 +842,42 @@ class TaskService:
                         }
                         for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
                     ]
+                },
+
+                "aircraftDetails": {
+                    "aircraftModels": sub_task_aircraft_details_result[0].get("aircraftModel", []) if sub_task_aircraft_details_result else [],
+                    "stockStatusCodes": sub_task_aircraft_details_result[0].get("stockStatusCode", []) if sub_task_aircraft_details_result else []
                 }
+                
+            
             }
-            return output
+
+            date_qty = defaultdict(lambda: {"tasksqty": 0, "findingsqty": 0})
+            logger.info("Processing tasks to calculate date-wise quantities.")
+            for task in output["usage"]["tasks"]:
+                logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
+                for pkg in task["packages"]:
+                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
+                    logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
+            # Process findings
+            logger.info("Processing findings to calculate date-wise quantities.")
+            for finding in output["usage"]["findings"]:
+                logger.info(f"Processing finding: {finding['taskId']} - {finding['taskDescription']}")
+                for pkg in finding["packages"]:
+                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
+                    logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+            output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
+            logger.info(f"Final date-wise quantities: {output['dateWiseQty']}")
+
+
+            return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
-            return None
+            return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
+    
+    
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
         Analyzes skills required for multiple tasks.
@@ -714,7 +891,7 @@ class TaskService:
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"Task": {"$in": source_tasks}}},  
                 {
                     "$group": {
                         "_id": "$Task",
@@ -800,12 +977,13 @@ class TaskService:
                     "findings": findings
                 }
             }
-
-            return response
+            return response 
+            # return {"data": response, "response": {"statusCode": 200, "message": "skill_analysis processed successfully"}}
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
             return {"error": f"An error occurred while processing the request: {str(e)}"}
+            # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
    
 

@@ -149,11 +149,15 @@ class DownloadResponse(BaseModel):
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
     }
-
+class SparePart(BaseModel):
+    partID:str
+    quantity:float
 class MiscLaborTask(BaseModel):
-    id: str
-    description: str
+    taskID: str
+    taskDescription: str
     manHours: float
+    spareParts:List[SparePart]
+    skill:str
 class Thresholds(BaseModel):
     tatThreshold: float
     manHoursThreshold: float
@@ -163,6 +167,7 @@ class ConfigurationsResponse(BaseModel):
     defaultProbability: float
     thresholds: Thresholds
     miscLaborTasks: List[MiscLaborTask]
+
     model_config = {
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
