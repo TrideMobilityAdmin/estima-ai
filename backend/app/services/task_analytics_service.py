@@ -10,6 +10,7 @@ from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
+from collections import defaultdict
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -847,8 +848,30 @@ class TaskService:
                     "aircraftModels": sub_task_aircraft_details_result[0].get("aircraftModel", []) if sub_task_aircraft_details_result else [],
                     "stockStatusCodes": sub_task_aircraft_details_result[0].get("stockStatusCode", []) if sub_task_aircraft_details_result else []
                 }
+                
             
             }
+
+            date_qty = defaultdict(lambda: {"tasksqty": 0, "findingsqty": 0})
+            logger.info("Processing tasks to calculate date-wise quantities.")
+            for task in output["usage"]["tasks"]:
+                logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
+                for pkg in task["packages"]:
+                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
+                    logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
+            # Process findings
+            logger.info("Processing findings to calculate date-wise quantities.")
+            for finding in output["usage"]["findings"]:
+                logger.info(f"Processing finding: {finding['taskId']} - {finding['taskDescription']}")
+                for pkg in finding["packages"]:
+                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
+                    logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+            output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
+            logger.info(f"Final date-wise quantities: {output['dateWiseQty']}")
+
+
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
             logger.error(f"Error fetching parts usage: {str(e)}")
