@@ -35,7 +35,7 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconStatusChange } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconStatusChange } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -1105,7 +1105,7 @@ border-bottom: none;
                                                             }}
                                                        
                                                     >
-                                                        <IconListDetails />
+                                                        <IconListCheck />
                                                     </ActionIcon>
                                                 </Tooltip>
                                                 <Tooltip label="Get Estimate">
@@ -1149,14 +1149,9 @@ border-bottom: none;
                                                         onClick={(values: any) => {
                                                             setProbOpened(true);
                                                             setSelectedEstimateIdProbability(val?.data?.estID);
-                                                            // setSelectedDownloadEstimateId(val?.data?.estID);
-                                                            // handleDownload(val?.data?.estID);
-                                                            // setAction("edit");
-                                                            // setOpened(true);
-                                                            // form.setValues(val?.data);
                                                         }}
                                                     >
-                                                        <IconStatusChange />
+                                                        <IconChartArcs3 />
                                                     </ActionIcon>
                                                 </Tooltip>
                                             </Group>
