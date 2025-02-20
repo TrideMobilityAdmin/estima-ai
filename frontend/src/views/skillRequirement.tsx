@@ -1003,7 +1003,7 @@ export default function SkillRequirement() {
                 <SimpleGrid cols={2}>
                     <Card withBorder className="h-screen">
                         <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                            <Text className="font-semibold text-lg mb-4">Skill - Tasks</Text>
+                            <Text className="font-semibold text-lg mb-4">Skill - MPD</Text>
                             <SkillTaskAccordion data={skillAnalysisData?.skillAnalysis.tasks} />
                         </ScrollArea>
                     </Card>
@@ -1018,7 +1018,7 @@ export default function SkillRequirement() {
                 <SimpleGrid cols={2}>
                     <Card withBorder h='85vh' shadow="sm">
                         <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                            <Text fw={600} size="lg" mb="sm">Tasks</Text>
+                            <Text fw={600} size="lg" mb="sm">MPD</Text>
                             <TaskAccordion data={skillAnalysisData?.skillAnalysis.tasks} />
                         </ScrollArea>
                     </Card>

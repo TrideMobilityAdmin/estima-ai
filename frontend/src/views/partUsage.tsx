@@ -476,7 +476,7 @@ export default function PartUsage() {
                 <SimpleGrid cols={2}>
                     <Card>
                     <Title order={5} c='dimmed'>
-                            Tasks - Packages & Qty
+                            MPD - Packages & Qty
                         </Title>
                         <Card
                         style={{
@@ -672,7 +672,7 @@ export default function PartUsage() {
                 <SimpleGrid cols={2}>
                     <Card radius='md' h='95vh' style={{ overflowY: "auto" }}>
                         <Title order={5}>
-                            Tasks
+                            MPD
                         </Title>
 
 
