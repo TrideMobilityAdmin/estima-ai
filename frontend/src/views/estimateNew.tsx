@@ -35,14 +35,14 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListDetails, IconLoader, IconMinimize, IconReport } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconStatusChange } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { useApi } from "../api/services/estimateSrvice";
 import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
-import robotGif from "../../public/giphy.gif";
+import robotGif from "../../public/7efs.gif";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -54,9 +54,11 @@ dayjs.extend(timezone);
 export default function EstimateNew() {
     const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf } = useApi();
     const [opened, setOpened] = useState(false);
+    const [probOpened, setProbOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
     const [selectedDownloadEstimateId, setSelectedDownloadEstimateId] = useState<any>();
     const [selectedEstimateIdReport, setSelectedEstimateIdReport] = useState<any>();
+    const [selectedEstimateIdProbability, setSelectedEstimateIdProbability] = useState<any>();
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
     const [rfqSubmissionResponse, setRfqSubmissionResponse] = useState<any>(null);
@@ -287,6 +289,66 @@ export default function EstimateNew() {
         downloadEstimatePdf(id);
     }
 
+    const probabilityData = {
+        "estId": "1234",
+        "probData":[
+            {
+                prob : 0,
+                totalManHrs : 500,
+                totalSparesCost : 3000
+            },
+            {
+                prob : 0.1,
+                totalManHrs : 490,
+                totalSparesCost :2900
+            },
+            {
+                prob : 0.2,
+                totalManHrs : 450,
+                totalSparesCost : 2800
+            },
+            {
+                prob : 0.3,
+                totalManHrs : 430,
+                totalSparesCost : 2700
+            },
+            {
+                prob : 0.4,
+                totalManHrs : 410,
+                totalSparesCost : 2600
+            },
+            {
+                prob : 0.5,
+                totalManHrs : 390,
+                totalSparesCost : 2500
+            },
+            {
+                prob : 0.6,
+                totalManHrs : 370,
+                totalSparesCost : 2400
+            },
+            {
+                prob : 0.7,
+                totalManHrs : 350,
+                totalSparesCost : 2300
+            },
+            {
+                prob : 0.8,
+                totalManHrs : 320,
+                totalSparesCost : 2200
+            },
+            {
+                prob : 0.9,
+                totalManHrs : 310,
+                totalSparesCost : 2100
+            },
+            {
+                prob : 1.0,
+                totalManHrs : 300,
+                totalSparesCost : 2000
+            },
+        ]
+    }
 
     // const handleSubmit = async () => {
     //     // const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
@@ -348,7 +410,6 @@ export default function EstimateNew() {
     // }, [estimateReportData]);
     // console.log("response UI >>>>", estimateReportData);
 
-
     return (
         <>
             <Modal
@@ -367,8 +428,8 @@ export default function EstimateNew() {
                 styles={{
                     // content: { backgroundColor: "#e8f5e9" }, // Light green shade
                     // header: { backgroundColor: "#e0f2f1" }, // Slightly different green for header
-                    content: { backgroundColor: "#d4e1fc" },
-                    header: { backgroundColor: "#a4bef5" },
+                    // content: { backgroundColor: "#d4e1fc" },
+                    header: { backgroundColor: "#d4e1fc" },
                 }}
             >
                 {rfqSubmissionResponse && (
@@ -532,6 +593,47 @@ export default function EstimateNew() {
 
 
             </Modal>
+            <Modal
+            opened={probOpened}
+            onClose={() => {
+                setProbOpened(false);
+                //   form.reset();
+            }}
+            size={800}
+            title={
+                <>
+                <Group>
+                <Title order={4} c='dimmed'>
+                        Probability wise Details 
+                    </Title>
+                    <Title order={4} >
+                        {selectedEstimateIdProbability}
+                    </Title>
+                </Group>
+                    
+                </>
+            }
+            >
+                <Group p={10}>
+                <AreaChart
+      h={350}
+      data={probabilityData?.probData || []}
+      dataKey="prob"
+      withLegend
+      withTooltip
+       xAxisLabel="Probability"
+      yAxisLabel="Value"
+      series={[
+        { name: 'totalManHrs', color: 'green.6' },
+        { name: 'totalSparesCost', color: 'blue.6' },
+      ]}
+      curveType="linear"
+    />
+                </Group>
+           
+            </Modal>
+
+
             <div style={{ padding: 70 }}>
                 <Grid grow gutter="xs">
                     <Grid.Col span={3}>
@@ -1003,7 +1105,7 @@ border-bottom: none;
                                                             }}
                                                        
                                                     >
-                                                        <IconListDetails />
+                                                        <IconListCheck />
                                                     </ActionIcon>
                                                 </Tooltip>
                                                 <Tooltip label="Get Estimate">
@@ -1036,6 +1138,20 @@ border-bottom: none;
                                                         }}
                                                     >
                                                         <IconDownload />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                                <Tooltip label="Probability Details">
+                                                    <ActionIcon
+                                                        size={20}
+                                                        color="rgba(156, 104, 0, 1)"
+                                                        variant="light"
+                                                        disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                                        onClick={(values: any) => {
+                                                            setProbOpened(true);
+                                                            setSelectedEstimateIdProbability(val?.data?.estID);
+                                                        }}
+                                                    >
+                                                        <IconChartArcs3 />
                                                     </ActionIcon>
                                                 </Tooltip>
                                             </Group>
@@ -1664,7 +1780,7 @@ border-bottom: none;
                                                     columnDefs={[
                                                         {
                                                             field: "partId",
-                                                            headerName: "Part ID",
+                                                            headerName: "Part Num",
                                                             sortable: true,
                                                             filter: true,
                                                             floatingFilter: true,
@@ -1673,7 +1789,7 @@ border-bottom: none;
                                                         },
                                                         {
                                                             field: "desc",
-                                                            headerName: "Part Desc",
+                                                            headerName: "Description",
                                                             sortable: true,
                                                             filter: true,
                                                             floatingFilter: true,
@@ -1748,7 +1864,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
         <Card withBorder p={0} h="90vh" bg="none">
             <Card p={10} c='white' bg='#124076'>
                 <Title order={4}>
-                    Preload
+                    MPD
                 </Title>
             </Card>
             <Card withBorder p={0} h="80vh" bg="none">
@@ -1941,7 +2057,7 @@ border-bottom: none;
                                                 columnDefs={[
                                                     {
                                                         field: "partId",
-                                                        headerName: "Part ID",
+                                                        headerName: "Part Num",
                                                         sortable: true,
                                                         filter: true,
                                                         floatingFilter: true,
@@ -1950,7 +2066,7 @@ border-bottom: none;
                                                     },
                                                     {
                                                         field: "desc",
-                                                        headerName: "Part Desc",
+                                                        headerName: "Description                                                            ",
                                                         sortable: true,
                                                         filter: true,
                                                         floatingFilter: true,

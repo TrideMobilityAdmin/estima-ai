@@ -196,6 +196,35 @@ export default function PartUsage() {
                     />
                 </Group>
                 <Space h='sm' />
+                <Grid>
+                    <Grid.Col span={4}>
+                    <Card>
+                        <Group>
+                        <Text  fw='500' c='dimmed'>
+                        Part Id - 
+                    </Text>
+                    <Text fw='600'>
+                        {partUsageData?.partId || validatedPartId}
+                    </Text>
+                        </Group>
+                    
+                </Card>
+                    </Grid.Col>
+                    <Grid.Col span={8}>
+                    <Card>
+                    <Group>
+                        <Text  fw='500' c='dimmed'>
+                        Description - 
+                    </Text>
+                    <Text fw='600'>
+                        {partUsageData?.partDescription || "-"}
+                    </Text>
+                        </Group>
+                </Card>
+                    </Grid.Col>
+                </Grid>
+                
+                <Space h='sm' />
                 <SimpleGrid cols={4}>
                     <Card radius='md'>
                         <Group gap='lg'>
@@ -476,7 +505,7 @@ export default function PartUsage() {
                 <SimpleGrid cols={2}>
                     <Card>
                     <Title order={5} c='dimmed'>
-                            Tasks - Packages & Qty
+                            MPD - Packages & Qty
                         </Title>
                         <Card
                         style={{
@@ -672,7 +701,7 @@ export default function PartUsage() {
                 <SimpleGrid cols={2}>
                     <Card radius='md' h='95vh' style={{ overflowY: "auto" }}>
                         <Title order={5}>
-                            Tasks
+                            MPD
                         </Title>
 
 

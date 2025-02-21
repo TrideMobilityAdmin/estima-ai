@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getEstimateReport_Url, getEstimateStatus_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateReport_Url, getEstimateStatus_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -301,6 +301,22 @@ export const useApi = () => {
       //   color: 'red',
       //   style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       // });
+    }
+  };
+
+
+  const getAllDataExpertInsights = async () => {
+    try {
+      const response = await axiosInstance.get(getConfigurations_Url);
+      console.log("✅ API Response all expert inssights:", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
     }
   };
 
