@@ -75,6 +75,11 @@ class SkillAnalysisResponse(BaseModel):
     
 class SkillsAnalysisRequest(BaseModel):
     source_tasks: List[str]
-
-
+class EstProb(BaseModel):
+    prob:float
+    totalManhrs:float
+    totalSpareCost:float
+class ProbabilityWiseManhrsSpareCost(BaseModel):
+    estID:str
+    estProb:List[EstProb]
     

@@ -2,6 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from fastapi import status
+from fastapi import UploadFile
+import json
+from io import BytesIO
 from app.db.database_connection import users_collection,user_login_collection
 # Create a TestClient instance
 @pytest.fixture(scope="module")
@@ -148,14 +151,14 @@ def test_create_estimate(test_client, access_token, valid_estimate_request):
     assert "aggregatedFindings" in data
     assert isinstance(data["aggregatedFindings"], dict) or data["aggregatedFindings"] is None
 
-    assert "user_id" in data  # Matching alias in response schema
+    assert "user_id" in data  
     assert isinstance(data["user_id"], str)
 
     assert "createdBy" in data
     assert isinstance(data["createdBy"], str)
 
     assert "createdAt" in data
-    assert isinstance(data["createdAt"], str)  # FastAPI returns datetime as string in JSON
+    assert isinstance(data["createdAt"], str)  
 
     assert "lastUpdated" in data
     assert isinstance(data["lastUpdated"], str)
@@ -224,6 +227,54 @@ def test_get_task_estimate_by_id_not_found(test_client, access_token,invalid_est
     assert response.status_code == 404
     assert "Estimate not found" in response.json().get("detail", "")
 
+@pytest.fixture    
+def valid_estimate_request():
+    """Fixture to provide a valid estimate request."""
+    return {
+        "probability": 0.75,
+        "operator": "Operator Name",
+        "aircraftAge": 5,
+        "aircraftRegNo": "ABC123",
+        "aircraftFlightHours": 1000,
+        "aircraftFlightCycles": 500,
+    }
+@pytest.fixture
+def invalid_estimate_request():
+    """Fixture to provide an invalid estimate request."""
+    return {
+        "probability": "invalid",  
+        "operator": "Operator Name",
+        "aircraftAge": -1, 
+        "aircraftRegNo": "",  
+        "aircraftFlightHours": 1000,
+        "aircraftFlightCycles": 500,
+    }
+@pytest.mark.parametrize("estimate_request, expected_status, expected_msg", [
+    (valid_estimate_request, 200, "File and estimated data inserted successfully"),  
+    (invalid_estimate_request, 422, None), 
+])
+
+def test_upload_estimate(test_client,access_token,estimate_request, expected_status, expected_msg):
+    """Test uploading an estimate with both valid and invalid requests."""
+    file_content = b"mock content of the excel file"
+    file = UploadFile(filename="test_file.xlsx", file=BytesIO(file_content), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    # Prepare the request
+    response = test_client.post(
+        "/api/v1/estimates/upload",  
+        headers={"Authorization": f"Bearer {access_token}"},
+        data={"estimate_request": json.dumps(estimate_request)},  
+        files={"file": (file.filename, file.file, file.content_type)}  
+    )
+    assert response.status_code == expected_status, response.json()
+    
+    
+    if expected_status == 200:
+        assert "estID" in response.json()
+        assert response.json()["status"] == "Initiated"
+        assert response.json()["msg"] == expected_msg
+    else:
+        assert "detail" in response.json()  
 # def test_task_man_hours(test_client, auth_headers):
 #     """Test getting task man hours."""
 #     task_id = "255000-16-1"
