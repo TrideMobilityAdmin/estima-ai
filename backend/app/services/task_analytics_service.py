@@ -1,4 +1,4 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,ProbabilityWiseManhrsSpareCost
 from statistics import mean
 from fastapi import HTTPException,Depends,status
 from typing import List , Dict,Optional,Any
@@ -1066,3 +1066,533 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+    def get_probability_wise_manhrsspareparts(self,estimate_id:str)->ProbabilityWiseManhrsSpareCost:
+        """
+        Get estimate by ID with filtered findings based on probability comparison
+        Returns raw aggregation result directly from MongoDB
+        """
+        logger.info(f"Fetching estimate by ID: {estimate_id}")
+        try:
+            # Define the aggregation pipeline
+            pipeline = [
+            {
+                '$match': {
+                    'estID': estimate_id
+                }
+            }, {
+                '$unwind': '$findings'
+            }, {
+                '$unwind': '$findings.details'
+            }, {
+                '$facet': {
+                    'prob01': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.1
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob02': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.2
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob03': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.3
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob04': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.4
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob05': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.5
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob06': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.6
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob07': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.7
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob08': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.8
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob09': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.9
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob10': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 1.0
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }, {
+                '$project': {
+                    '_id': 0, 
+                    'estID': 'PWLFYCHAAUL99EC5', 
+                    'estProb': [
+                        {
+                            'prob': 0.1, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob01.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob01.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.2, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob02.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob02.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.3, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob03.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob03.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.4, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob04.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob04.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.5, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob05.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob05.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.6, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob06.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob06.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.7, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob07.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob07.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.8, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob08.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob08.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.9, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob09.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob09.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 1.0, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob10.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob10.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+            results = list(self.estimates_collection.aggregate(pipeline))
+            if results:
+                return ProbabilityWiseManhrsSpareCost(**results[0])
+            else:
+                raise HTTPException(status_code=404, detail="Estimate not found")
+        except Exception as e:
+            logger.error(f"Error fetching estimate: {e}")
+            raise HTTPException(status_code=500, detail="Internal Server Error")

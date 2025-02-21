@@ -68,8 +68,14 @@ class ExcelUploadService:
             logger.info("Starting data cleaning...")
             logger.info(f"Original data shape: {data.shape}")
             logger.info(f"Original data types:\n{data.dtypes}")
+            duplicates = data[data.duplicated(keep=False)]
+            if not duplicates.empty:
+                logger.info(f"Dropped duplicate rows:\n{duplicates}")
             
             cleaned_data = data.drop_duplicates()
+            logger.info(f"Cleaned data shape: {cleaned_data.shape}")
+            logger.info(f"Cleaned data types:\n{cleaned_data.dtypes}")
+            
             
             for column in cleaned_data.columns:
                 if cleaned_data[column].dtype == 'timedelta64[ns]':
@@ -87,8 +93,6 @@ class ExcelUploadService:
                         cleaned_data.loc[mask, column] = None
             
             cleaned_data = cleaned_data.replace({np.nan: None})
-            
-            # logger.info("final data types:\n", cleaned_data.dtypes)
             return cleaned_data
             
         except Exception as e:
@@ -206,7 +210,7 @@ class ExcelUploadService:
             "updatedAt": current_time,
             "status": "Initiated"
         })
-            logger.info(f"Processed record: {processed_record}")
+            logger.info("Processed record")
 
             return processed_record  
 

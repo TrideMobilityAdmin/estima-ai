@@ -9,7 +9,7 @@ from typing import List
 import shutil
 from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
+from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
@@ -212,4 +212,8 @@ async def get_estimate_status(
     current_user: dict = Depends(get_current_user)
 ):
     return await excel_service.estimate_status()
+
+@router.get("/probability_wise_manhrs_sparecost/{estimate_id}",response_model=ProbabilityWiseManhrsSpareCost)
+async def get_probability_wise_manhrs_sparecost(estimate_id: str,current_user:dict=Depends(get_current_user), task_service: TaskService = Depends()):
+    return task_service.get_probability_wise_manhrsspareparts(estimate_id)
 
