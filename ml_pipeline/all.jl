@@ -22,7 +22,6 @@ begin
 	using TextAnalysis
 	using Clustering
 	using Distances
-	using Plots
 	using StatsBase
 end
 
