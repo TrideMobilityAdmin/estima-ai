@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateReport_Url, getEstimateStatus_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateReport_Url, getEstimateStatus_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -320,6 +320,85 @@ export const useApi = () => {
     }
   };
 
+  const getProbabilityWiseDetails = async (estimateId:any) => {
+    try {
+      const response = await axiosInstance.get(getProbabilityWise_Url+estimateId);
+      console.log("✅ API Response probability wise :", response);
+      // showNotification({
+      //   title: "Probability wise data !",
+      //   message: "Successfully Estimate Report Generated",
+      //   color: "green",
+      //   style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      // });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      if(error.response?.data?.detail?.contains("Internal server error")){
+        showNotification({
+          title: "Internal server error!",
+          message: "Failed,try again...",
+          color: "orange",
+          style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        });
+      }
+      showNotification({
+        title: "Failed!",
+        message: "Failed Probability wise data,try again...",
+        color: "orange",
+        style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      });
+      
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
+
+  const updateProbabilityWiseDetails = async (id: string, data:any) => {
+    try {
+      const response = await axiosInstance.put(
+        `${getProbabilityWise_Url}${id}`,
+        data
+      );
+      console.log("✅ API Response probability wise update:", response);
+      
+      showNotification({
+        title: "Success!",
+        message: "Successfully updated probability wise data",
+        color: "green",
+        style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      });
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      
+      if (error.response?.data?.detail?.includes("Internal server error")) {
+        showNotification({
+          title: "Internal server error!",
+          message: "Failed to update, please try again...",
+          color: "orange",
+          style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        });
+      } else {
+        showNotification({
+          title: "Failed!",
+          message: "Failed to update probability wise data, please try again...",
+          color: "orange",
+          style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        });
+      }
+
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      
+      throw error;
+    }
+  };
+
 
   return { 
     RFQFileUpload, 
@@ -329,6 +408,9 @@ export const useApi = () => {
     validateTasks, 
     getAllEstimates, 
     compareUploadFile, 
-    downloadEstimatePdf 
+    downloadEstimatePdf,
+    getAllDataExpertInsights,
+    getProbabilityWiseDetails,
+    updateProbabilityWiseDetails
   };
 };

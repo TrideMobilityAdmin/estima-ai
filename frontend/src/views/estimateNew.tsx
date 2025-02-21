@@ -35,7 +35,7 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconStatusChange } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockShare, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconSettingsDollar, IconStatusChange } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -52,7 +52,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export default function EstimateNew() {
-    const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf } = useApi();
+    const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
@@ -69,6 +69,8 @@ export default function EstimateNew() {
     const [estimateReportloading, setEstimateReportLoading] = useState(false); // Add loading state
     const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
     const [isValidating, setIsValidating] = useState(false);
+    const [probabilityWiseData, setProbabilityWiseData] = useState<any>(null);
+    const [isProbWiseLoading, setIsProbLoading] = useState(false);
 
     // const [tasks, setTasks] = useState<string[]>([]);
     // const [estimateId, setEstimateId] = useState<string>("");
@@ -282,6 +284,32 @@ export default function EstimateNew() {
         }
     }, [selectedEstimateIdReport]);
     console.log("estimate report >>>>", estimateReportData);
+
+    const fetchProbabilityWisedata = async (id: string) => {
+        if (!id) return;
+        setIsProbLoading(true);
+        const data = await getProbabilityWiseDetails(id);
+        if (data) {
+            setProbabilityWiseData(data);
+        }
+        setIsProbLoading(false);
+    };
+
+    // Call API when `selectedEstimateId` changes
+    useEffect(() => {
+        if (selectedEstimateIdProbability) {
+            fetchProbabilityWisedata(selectedEstimateIdProbability);
+        }
+    }, [selectedEstimateIdProbability]);
+    console.log("probabilityWiseData  >>>>", probabilityWiseData);
+
+    // Transform data for the chart
+const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
+    prob: Math.round(item?.prob * 100), // Multiply by 100 and round
+    totalManhrs: item?.totalManhrs,
+    totalSpareCost: item?.totalSpareCost,
+}));
+
 
     const [downloading, setDownloading] = useState(false);
 
@@ -614,18 +642,30 @@ export default function EstimateNew() {
                 </>
             }
             >
+                {
+                    isProbWiseLoading && (
+                        <LoadingOverlay
+                                visible={isProbWiseLoading}
+                                zIndex={1000}
+                                overlayProps={{ radius: 'sm', blur: 2 }}
+                                loaderProps={{ color: 'indigo', type: 'bars' }}
+                            />
+                    )
+                }
+                
                 <Group p={10}>
                 <AreaChart
       h={350}
-      data={probabilityData?.probData || []}
+    //   data={probabilityData?.probData || []}
+    data={transformedData || []}
       dataKey="prob"
       withLegend
       withTooltip
-       xAxisLabel="Probability"
+    xAxisLabel="Probability (%)"
       yAxisLabel="Value"
       series={[
-        { name: 'totalManHrs', color: 'green.6' },
-        { name: 'totalSparesCost', color: 'blue.6' },
+        { name: 'totalManhrs', color: 'green.6' },
+        { name: 'totalSpareCost', color: 'blue.6' },
       ]}
       curveType="linear"
     />
@@ -808,6 +848,14 @@ export default function EstimateNew() {
                                         placeholder="Ex:50"
                                         label="Flight Hours"
                                         {...form.getInputProps("aircraftFlightHours")}
+                                    />
+
+<TextInput
+                                        size="xs"
+                                        leftSection={<MdPin />}
+                                        placeholder="Ex:50"
+                                        label="Area of Operations"
+                                        {...form.getInputProps("areaOfOperations")}
                                     />
 
                                     <Text size="md" fw={500}>
@@ -1320,8 +1368,8 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Total TAT Time */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                            <MdOutlineTimeline style={{ width: "70%", height: "70%" }} />
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
+                            <IconClockShare style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
                             <Text size="md" fw={500} fz="h6" c="gray">
@@ -1347,10 +1395,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                                     <Text fz="sm">{key.charAt(0).toUpperCase() + key.slice(1)}</Text>
                                 </Grid.Col>
                                 <Grid.Col span={9}>
-                                    <Group justify="flex-end" fz="xs" fw="600" c={key === "min" ? "green" : key === "estimated" ? "yellow" : "red"}>
+                                    <Group justify="flex-end" fz="xs" fw="600" c={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"}>
                                         {value} Hrs
                                     </Group>
-                                    <Progress color={key === "min" ? "green" : key === "estimated" ? "yellow" : key === "capping" ? "indigo" : "red"} value={value} />
+                                    <Progress color={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"} value={value} />
                                 </Grid.Col>
                             </Grid>
                         ))}
@@ -1361,8 +1409,8 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Capping Unbilled Cost */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                            <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
+                            <IconSettingsDollar style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
                             <Text size="md" fw={500} fz="h6" c="gray">
@@ -1381,7 +1429,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 <Text size="md" fw={500} fz="h6" c="gray">
                     Estimated Parts
                 </Text>
-                <div style={{ position: "relative", height: "40vh", overflow: "hidden" }}>
+                {/* <div style={{ position: "relative", height: "40vh", overflow: "hidden" }}>
                     <Table stickyHeader striped highlightOnHover>
                         <Table.Thead
                             style={{
@@ -1418,7 +1466,84 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                             )}
                         </Table.Tbody>
                     </Table>
-                </div>
+                </div> */}
+                <div
+                                            className="ag-theme-alpine"
+                                            style={{
+                                                width: "100%",   
+                                                border: "none",
+                                                height: "100%",
+
+                                            }}
+                                        >
+                                            <style>
+                                                {`
+/* Remove the borders and grid lines */
+.ag-theme-alpine .ag-root-wrapper, 
+.ag-theme-alpine .ag-root-wrapper-body,
+.ag-theme-alpine .ag-header,
+.ag-theme-alpine .ag-header-cell,
+.ag-theme-alpine .ag-body-viewport {
+border: none;
+}
+
+/* Remove the cell highlight (border) on cell click */
+.ag-theme-alpine .ag-cell-focus {
+outline: none !important; /* Remove focus border */
+box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove row border */
+.ag-theme-alpine .ag-row {
+border-bottom: none;
+}
+`}
+                                            </style>
+                                            <AgGridReact
+                                                // pagination
+                                                // paginationPageSize={10}
+                                                domLayout="autoHeight" // Ensures height adjusts dynamically
+                                                rowData={parts || []}
+                                                columnDefs={[
+                                                    {
+                                                        field: "partName",
+                                                        headerName: "Part Num",
+                                                        sortable: true,
+                                                        filter: true,
+                                                        floatingFilter: true,
+                                                        resizable: true,
+                                                       flex:2
+                                                    },
+                                                    {
+                                                        field: "partDesc",
+                                                        headerName: "Description                                                            ",
+                                                        sortable: true,
+                                                        filter: true,
+                                                        floatingFilter: true,
+                                                        resizable: true,
+                                                        flex:2
+                                                    },
+                                                    {
+                                                        field: "qty",
+                                                        headerName: "Qty",
+                                                        sortable: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
+                                                        resizable: true,
+                                                        flex:1.5
+                                                    },
+                                                    {
+                                                        field: "price",
+                                                        headerName: "Price($)",
+                                                        sortable: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
+                                                        resizable: true,
+                                                        flex:1.5
+                                                    },
+                                                ]}
+                                            />
+                                        </div>
             </Card>
 
             {/* Right Section */}
@@ -1426,7 +1551,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Estimated Spares Cost */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
                             <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
@@ -1447,6 +1572,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         <Title order={5}>Spare Cost ($)</Title>
                         <AreaChart
                             h={250}
+                            withGradient
                             data={spareCostData}
                             dataKey="date"
                             series={[{ name: "Cost", color: "indigo.6" }]}
@@ -1800,8 +1926,8 @@ border-bottom: none;
                                                             field: "qty",
                                                             headerName: "Qty",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1809,8 +1935,8 @@ border-bottom: none;
                                                             field: "unit",
                                                             headerName: "Unit",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1818,8 +1944,8 @@ border-bottom: none;
                                                             field: "price",
                                                             headerName: "Price($)",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1951,7 +2077,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             </Grid.Col>
                                             <Grid.Col span={10}>
                                                 <Text size="sm" fw={500}>
-                                                    {selectedTask?.sourceTask}
+                                                    {selectedTask?.sourceTask || "-"}
                                                 </Text>
                                             </Grid.Col>
                                         </Grid>
@@ -1965,7 +2091,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             </Grid.Col>
                                             <Grid.Col span={10}>
                                                 <Text size="sm" fw={500}>
-                                                    {selectedTask?.desciption}
+                                                    {selectedTask?.description  || "-"}
                                                 </Text>
                                             </Grid.Col>
                                         </Grid>
@@ -2022,7 +2148,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             style={{
                                                 width: "100%",
                                                 border: "none",
-                                                height: "100%",
+                                                // height: "100%",
 
                                             }}
                                         >
@@ -2077,8 +2203,8 @@ border-bottom: none;
                                                         field: "qty",
                                                         headerName: "Qty",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },
@@ -2086,8 +2212,8 @@ border-bottom: none;
                                                         field: "unit",
                                                         headerName: "Unit",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },
@@ -2095,8 +2221,8 @@ border-bottom: none;
                                                         field: "price",
                                                         headerName: "Price($)",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },

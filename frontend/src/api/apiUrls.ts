@@ -11,3 +11,4 @@ export const getSkillReq_Url = '/skills/analysis';
 export const uploadEstimate_Url = '/upload-estimate';
 export const getEstimateStatus_Url = '/estimate_file_status';
 export const getConfigurations_Url = '/configurations';
+export const getProbabilityWise_Url = '/configurations/';
