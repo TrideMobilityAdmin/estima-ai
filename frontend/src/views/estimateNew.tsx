@@ -47,12 +47,17 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CsvDownloadButton from "react-json-to-csv";
+import { showAppNotification } from "../components/showNotificationGlobally";
+import SkillRequirementAnalytics from "./skillReqAnalytics";
+import { useApiSkillAnalysis } from "../api/services/skillsService";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export default function EstimateNew() {
     const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
+    const { getSkillAnalysis } = useApiSkillAnalysis();
+    const [value, setValue] = useState('estimate');
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
@@ -68,9 +73,12 @@ export default function EstimateNew() {
     const [estimateReportData, setEstReportData] = useState<any>(null);
     const [estimateReportloading, setEstimateReportLoading] = useState(false); // Add loading state
     const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
+    const [validatedSkillsTasks, setValidatedSkillsTasks] = useState<any[]>([]);
     const [isValidating, setIsValidating] = useState(false);
+    const [isValidating2, setIsValidating2] = useState(false);
     const [probabilityWiseData, setProbabilityWiseData] = useState<any>(null);
     const [isProbWiseLoading, setIsProbLoading] = useState(false);
+    const [skillAnalysisData, setSkillAnalysisData] = useState<any>(null);
 
     // const [tasks, setTasks] = useState<string[]>([]);
     // const [estimateId, setEstimateId] = useState<string>("");
@@ -98,11 +106,31 @@ export default function EstimateNew() {
     console.log("selected estimate tasks >>>>", selectedEstimateTasks);
 
     // Handle file and extracted tasks
-    const handleFileChange = (file: File | null, tasks: string[]) => {
+    // Handle file and extracted tasks
+    const handleFileChange = async (file: File | null, tasks: string[]) => {
+        setIsValidating(true);
         setSelectedFile(file);
         setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
         console.log("✅ Selected File:", file ? file.name : "None");
         console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+
+
+        console.log("Extracted Tasks:", tasks);
+        const response = await validateTasks(tasks);
+        setValidatedTasks(response);
+        setIsValidating(false);
+
+        const invalidTasks = response?.filter((task) => task?.status === false);
+        if (invalidTasks.length > 0) {
+            showNotification({
+                title: "Tasks Not Available!",
+                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
+                color: "orange",
+                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            });
+            // showAppNotification("warning", "Tasks Not Available!", invalidTasks.length + "tasks are not available. Only valid tasks will be used to Skill Analysis.");
+        }
+
     };
 
     // 🟢 Function to validate tasks & update UI
@@ -112,10 +140,20 @@ export default function EstimateNew() {
 
         if (response.length > 0) {
             setValidatedTasks(response);
-
+            setValidatedSkillsTasks(response);
         }
         setIsValidating(false);
     };
+
+    const handleValidateSkillsTasks = async (tasks: string[]) => {
+        setIsValidating2(true);
+        const response = await validateTasks(tasks);
+
+        if (response.length > 0) {
+            setValidatedSkillsTasks(response);
+        }
+        setIsValidating2(false);
+    }
 
     const downloadCSV = (status: boolean) => {
         const filteredTasks = validatedTasks?.filter((task) => task?.status === status);
@@ -210,11 +248,6 @@ export default function EstimateNew() {
 
     // Handle Submit
     const handleSubmit = async () => {
-        // if (!form.isValid()) {
-        //     form.validate();
-        //     return;
-        // }
-
         if (!selectedFile) {
             showNotification({
                 title: "Error",
@@ -244,21 +277,80 @@ export default function EstimateNew() {
             if (response) {
                 setRfqSubmissionResponse(response);
                 setRfqSubModalOpened(true);
-                showNotification({
-                    title: "Success",
-                    message: "Estimate report submitted successfully!",
-                    color: "green",
-                });
+                showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+                setValidatedTasks([]);
             }
         } catch (error) {
+            console.error("API Error:", error);
+            showAppNotification("error", "Error!", "Failed to submit estimate report.!");
+            showNotification({
+                title: "Error",
+                message: "Failed to submit estimate report.",
+                color: "red",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    console.log("rfq sub >>> ", rfqSubmissionResponse);
+
+    const handleSubmitSkills = async () => {
+        const validTasks = validatedSkillsTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
+
+        if (validTasks.length === 0) {
+            showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
+            return null; // Return null to indicate no response
+        }
+
+        const requestData = {
+            source_tasks: validTasks,
+        };
+
+        console.log("Submitting data:", requestData);
+
+        try {
+            setLoading(true);
+            const response = await getSkillAnalysis(requestData);
+            console.log("API Response:", response);
+
+            // if (response) {
+            setSkillAnalysisData(response);
+            showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
+            return response; // Return the response
+            // }
+        } catch (error) {
+            showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
             console.error("API Error:", error);
         } finally {
             setLoading(false);
         }
-    }
+        return null; // Return null if no response
+    };
 
-    console.log("rfq sub >>> ", rfqSubmissionResponse);
+    useEffect(()=>{
+        handleSubmitSkills()
+    },[validatedSkillsTasks]);
 
+    console.log("skillAnalysisData", skillAnalysisData);
+
+
+    // const handleBothSubmissions = async () => {
+    //     try {
+    //         setLoading(true);
+    //         await handleSubmit(); // Call the first function
+    //         await handleSubmitSkills(); // Call the second function
+    //     } catch (error) {
+    //         console.error("Error during submission:", error);
+    //         showNotification({
+    //             title: "Error",
+    //             message: "An error occurred during submission.",
+    //             color: "red",
+    //         });
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
     const handleCloseModal = () => {
         setRfqSubModalOpened(false);
         setSelectedFile(null); // Clear selected file
@@ -304,11 +396,11 @@ export default function EstimateNew() {
     console.log("probabilityWiseData  >>>>", probabilityWiseData);
 
     // Transform data for the chart
-const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
-    prob: Math.round(item?.prob * 100), // Multiply by 100 and round
-    totalManhrs: item?.totalManhrs,
-    totalSpareCost: item?.totalSpareCost,
-}));
+    const transformedData = probabilityWiseData?.estProb?.map((item: any) => ({
+        prob: Math.round(item?.prob * 100), // Multiply by 100 and round
+        totalManhrs: item?.totalManhrs,
+        totalSpareCost: item?.totalSpareCost,
+    }));
 
 
     const [downloading, setDownloading] = useState(false);
@@ -319,61 +411,61 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
 
     const probabilityData = {
         "estId": "1234",
-        "probData":[
+        "probData": [
             {
-                prob : 0,
-                totalManHrs : 500,
-                totalSparesCost : 3000
+                prob: 0,
+                totalManHrs: 500,
+                totalSparesCost: 3000
             },
             {
-                prob : 0.1,
-                totalManHrs : 490,
-                totalSparesCost :2900
+                prob: 0.1,
+                totalManHrs: 490,
+                totalSparesCost: 2900
             },
             {
-                prob : 0.2,
-                totalManHrs : 450,
-                totalSparesCost : 2800
+                prob: 0.2,
+                totalManHrs: 450,
+                totalSparesCost: 2800
             },
             {
-                prob : 0.3,
-                totalManHrs : 430,
-                totalSparesCost : 2700
+                prob: 0.3,
+                totalManHrs: 430,
+                totalSparesCost: 2700
             },
             {
-                prob : 0.4,
-                totalManHrs : 410,
-                totalSparesCost : 2600
+                prob: 0.4,
+                totalManHrs: 410,
+                totalSparesCost: 2600
             },
             {
-                prob : 0.5,
-                totalManHrs : 390,
-                totalSparesCost : 2500
+                prob: 0.5,
+                totalManHrs: 390,
+                totalSparesCost: 2500
             },
             {
-                prob : 0.6,
-                totalManHrs : 370,
-                totalSparesCost : 2400
+                prob: 0.6,
+                totalManHrs: 370,
+                totalSparesCost: 2400
             },
             {
-                prob : 0.7,
-                totalManHrs : 350,
-                totalSparesCost : 2300
+                prob: 0.7,
+                totalManHrs: 350,
+                totalSparesCost: 2300
             },
             {
-                prob : 0.8,
-                totalManHrs : 320,
-                totalSparesCost : 2200
+                prob: 0.8,
+                totalManHrs: 320,
+                totalSparesCost: 2200
             },
             {
-                prob : 0.9,
-                totalManHrs : 310,
-                totalSparesCost : 2100
+                prob: 0.9,
+                totalManHrs: 310,
+                totalSparesCost: 2100
             },
             {
-                prob : 1.0,
-                totalManHrs : 300,
-                totalSparesCost : 2000
+                prob: 1.0,
+                totalManHrs: 300,
+                totalSparesCost: 2000
             },
         ]
     }
@@ -622,55 +714,55 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
 
             </Modal>
             <Modal
-            opened={probOpened}
-            onClose={() => {
-                setProbOpened(false);
-                //   form.reset();
-            }}
-            size={800}
-            title={
-                <>
-                <Group>
-                <Title order={4} c='dimmed'>
-                        Probability wise Details 
-                    </Title>
-                    <Title order={4} >
-                        {selectedEstimateIdProbability}
-                    </Title>
-                </Group>
-                    
-                </>
-            }
+                opened={probOpened}
+                onClose={() => {
+                    setProbOpened(false);
+                    //   form.reset();
+                }}
+                size={800}
+                title={
+                    <>
+                        <Group>
+                            <Title order={4} c='dimmed'>
+                                Probability wise Details
+                            </Title>
+                            <Title order={4} >
+                                {selectedEstimateIdProbability}
+                            </Title>
+                        </Group>
+
+                    </>
+                }
             >
                 {
                     isProbWiseLoading && (
                         <LoadingOverlay
-                                visible={isProbWiseLoading}
-                                zIndex={1000}
-                                overlayProps={{ radius: 'sm', blur: 2 }}
-                                loaderProps={{ color: 'indigo', type: 'bars' }}
-                            />
+                            visible={isProbWiseLoading}
+                            zIndex={1000}
+                            overlayProps={{ radius: 'sm', blur: 2 }}
+                            loaderProps={{ color: 'indigo', type: 'bars' }}
+                        />
                     )
                 }
-                
+
                 <Group p={10}>
-                <AreaChart
-      h={350}
-    //   data={probabilityData?.probData || []}
-    data={transformedData || []}
-      dataKey="prob"
-      withLegend
-      withTooltip
-    xAxisLabel="Probability (%)"
-      yAxisLabel="Value"
-      series={[
-        { name: 'totalManhrs', color: 'green.6' },
-        { name: 'totalSpareCost', color: 'blue.6' },
-      ]}
-      curveType="linear"
-    />
+                    <AreaChart
+                        h={350}
+                        //   data={probabilityData?.probData || []}
+                        data={transformedData || []}
+                        dataKey="prob"
+                        withLegend
+                        withTooltip
+                        xAxisLabel="Probability (%)"
+                        yAxisLabel="Value"
+                        series={[
+                            { name: 'totalManhrs', color: 'green.6' },
+                            { name: 'totalSpareCost', color: 'blue.6' },
+                        ]}
+                        curveType="linear"
+                    />
                 </Group>
-           
+
             </Modal>
 
 
@@ -708,14 +800,14 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                     <Grid.Col span={5}>
                         <Card withBorder h='50vh' radius='md'>
 
-                            {/* <LoadingOverlay
-                                visible={isLoading}
+                            <LoadingOverlay
+                                visible={isValidating}
                                 zIndex={1000}
                                 overlayProps={{ radius: 'sm', blur: 2 }}
                                 loaderProps={{ color: 'indigo', type: 'bars' }}
-                            /> */}
+                            />
 
-                            <Group justify="space-between">
+                            {/* <Group justify="space-between">
                                 <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
                                         Tasks Available
@@ -724,7 +816,6 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                                         extractedTasks?.length > 0 ? (
                                             <Badge ta='center' color="indigo" size="md" radius="lg">
                                                 {extractedTasks?.length || 0}
-                                                {/* {tasks?.filter((ele) => ele.status === true)?.length || 0} */}
                                             </Badge>
                                         ) : (
                                             <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
@@ -733,25 +824,70 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                                         )
                                     }
                                 </Group>
-                                {/* <Group mb='xs' align="center">
+                            </Group> */}
+                            <Group justify="space-between">
+                                <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
-                                        Tasks Not-Available
+                                        Tasks Available
                                     </Text>
                                     {
-                                        validatedTasks.length > 0 ? (
-                                            <Badge ta='center' color="red" size="md" radius="lg">
-                                                {validatedTasks?.filter((ele) => ele.status === false)?.length || 0}
+                                        validatedTasks?.length > 0 ? (
+                                            <Badge ta='center' color="green" size="md" radius="lg">
+                                                {validatedTasks?.filter((ele) => ele.status === true)?.length || 0}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="light" ta='center' color="red" size="md" radius="lg">
+                                            <Badge variant="light" ta='center' color="green" size="md" radius="lg">
                                                 0
                                             </Badge>
                                         )
                                     }
-                                </Group> */}
+                                </Group>
+                                <Group mb='xs' align="center">
+                                    <Text size="md" fw={500}>
+                                        Tasks Not-Available
+                                    </Text>
+                                    {
+                                        validatedTasks?.length > 0 ? (
+                                            <Badge ta='center' color="blue" size="md" radius="lg">
+                                                {validatedTasks?.filter((ele) => ele.status === false)?.length || 0}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="light" ta='center' color="blue" size="md" radius="lg">
+                                                0
+                                            </Badge>
+                                        )
+                                    }
+                                </Group>
                             </Group>
-
                             <ScrollArea
+                                style={{
+                                    flex: 1, // Take remaining space for scrollable area
+                                    overflow: "auto",
+                                }}
+                                offsetScrollbars
+                                scrollHideDelay={1}
+                            >
+                                {validatedTasks?.length > 0 ? (
+                                    <SimpleGrid cols={4}>
+                                        {validatedTasks?.map((task, index) => (
+                                            <Badge
+                                                key={index}
+                                                color={task?.status === false ? "blue" : "green"}
+                                                variant="light"
+                                                radius='sm'
+                                                style={{ margin: "0.25em" }}
+                                            >
+                                                {task?.taskid}
+                                            </Badge>
+                                        ))}
+                                    </SimpleGrid>
+                                ) : (
+                                    <Text ta='center' size="sm" c="dimmed">
+                                        No tasks found. Please Select a file.
+                                    </Text>
+                                )}
+                            </ScrollArea>
+                            {/* <ScrollArea
                                 style={{
                                     flex: 1, // Take remaining space for scrollable area
                                     overflow: "auto",
@@ -761,7 +897,8 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                             >
                                 {extractedTasks?.length > 0 ? (
                                     <SimpleGrid cols={4}>
-                                        {extractedTasks?.map((task, index) => (
+
+                                         {extractedTasks?.map((task, index) => (
                                             <Badge
                                                 key={index}
                                                 color='blue'
@@ -778,7 +915,7 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                                         No tasks found. Please Select a file.
                                     </Text>
                                 )}
-                            </ScrollArea>
+                            </ScrollArea> */}
                         </Card>
                     </Grid.Col>
 
@@ -850,7 +987,7 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                                         {...form.getInputProps("aircraftFlightHours")}
                                     />
 
-<TextInput
+                                    <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Ex:50"
@@ -929,7 +1066,6 @@ const transformedData = probabilityWiseData?.estProb?.map((item:any) => ({
                 </Group>
 
                 <Space h='sm' />
-
                 <Card>
                     <Group align="center" gap='sm'>
                         <ThemeIcon variant="light">
@@ -1091,28 +1227,28 @@ border-bottom: none;
                                     cellRenderer: (val: any) => {
                                         let badgeColor: string;
                                         let badgeIcon: JSX.Element;
-                                    
+
                                         // Using switch case for status color and icon mapping
                                         switch (val.data.status.toLowerCase()) {
-                                          case "completed":
-                                            badgeColor = "#10b981"; // Green
-                                            badgeIcon = <IconCircleCheck size={15}/>; // Check circle badgeIcon
-                                            break;
-                                          case "progress":
-                                            badgeColor = "#f59e0b"; // Amber/Orange
-                                            badgeIcon = <IconLoader size={15}/>; // Spinner badgeIcon (you can add CSS for the spinning effect)
-                                            break;
-                                          case "initiated":
-                                            badgeColor = "#3b82f6"; // Light Blue
-                                            badgeIcon = <IconClockUp size={15}/>; // Play badgeIcon
-                                            break;
-                                          case "csv generated":
-                                            badgeColor = "#9333ea"; // Purple
-                                            badgeIcon = <IconFileCheck size={15}/>; // File CSV badgeIcon
-                                            break;
-                                          default:
-                                            badgeColor = "gray"; // Default color if status is not found
-                                            badgeIcon = <IconFileCheck size={15}/>; // Default badgeIcon (optional)
+                                            case "completed":
+                                                badgeColor = "#10b981"; // Green
+                                                badgeIcon = <IconCircleCheck size={15} />; // Check circle badgeIcon
+                                                break;
+                                            case "progress":
+                                                badgeColor = "#f59e0b"; // Amber/Orange
+                                                badgeIcon = <IconLoader size={15} />; // Spinner badgeIcon (you can add CSS for the spinning effect)
+                                                break;
+                                            case "initiated":
+                                                badgeColor = "#3b82f6"; // Light Blue
+                                                badgeIcon = <IconClockUp size={15} />; // Play badgeIcon
+                                                break;
+                                            case "csv generated":
+                                                badgeColor = "#9333ea"; // Purple
+                                                badgeIcon = <IconFileCheck size={15} />; // File CSV badgeIcon
+                                                break;
+                                            default:
+                                                badgeColor = "gray"; // Default color if status is not found
+                                                badgeIcon = <IconFileCheck size={15} />; // Default badgeIcon (optional)
                                         }
 
                                         return (
@@ -1145,13 +1281,13 @@ border-bottom: none;
                                                         size={20}
                                                         color="indigo"
                                                         variant="light"
-                                                            onClick={() => {
-                                                                setSelectedEstimateId(val.data.estID);
-                                                                setSelectedEstimateTasks(val.data.tasks);
-                                                                handleValidateTasks(val.data.tasks);
-                                                                setOpened(true);
-                                                            }}
-                                                       
+                                                        onClick={() => {
+                                                            setSelectedEstimateId(val.data.estID);
+                                                            setSelectedEstimateTasks(val.data.tasks);
+                                                            handleValidateTasks(val.data.tasks);
+                                                            setOpened(true);
+                                                        }}
+
                                                     >
                                                         <IconListCheck />
                                                     </ActionIcon>
@@ -1164,6 +1300,7 @@ border-bottom: none;
                                                         disabled={val?.data?.status?.toLowerCase() !== "completed"}
                                                         onClick={() => {
                                                             setSelectedEstimateIdReport(val.data.estID);
+                                                            handleValidateSkillsTasks(val.data.tasks);
                                                             // setOpened(true);
                                                         }}
                                                     >
@@ -1212,77 +1349,100 @@ border-bottom: none;
                     </div>
 
                 </Card>
+                <Space h='sm' />
 
+                <SegmentedControl
+                    color="indigo"
+                    bg='white'
+                    value={value}
+                    onChange={setValue}
+                    data={[
+                        { label: 'Estimate', value: 'estimate' },
+                        { label: 'Skill', value: 'skill' },
+                    ]}
+                />
+
+                <Space h='sm' />
                 {
-                    estimateReportData !== null ? (
+                    value === 'estimate' ? (
                         <>
-                            <Divider
-                                variant="dashed"
-                                labelPosition="center"
-                                color={"gray"}
-                                pb='sm'
-                                pt='sm'
-                                label={
+                            {
+                                estimateReportData !== null ? (
                                     <>
-                                        <Box ml={5}>Estimate</Box>
+                                        <Divider
+                                            variant="dashed"
+                                            labelPosition="center"
+                                            color={"gray"}
+                                            pb='sm'
+                                            pt='sm'
+                                            label={
+                                                <>
+                                                    <Box ml={5}>Estimate</Box>
+                                                </>
+                                            }
+                                        />
+
+                                        <Group justify="space-between">
+                                            <Group>
+                                                <Title order={4} c='gray'>
+                                                    Overall Estimate Report :
+                                                </Title>
+                                                <Title order={4}>
+                                                    {estimateReportData?.estID || "-"}
+                                                </Title>
+                                            </Group>
+
+                                            <Button
+                                                size="xs"
+                                                variant="filled"
+                                                color="#1bb343"
+                                                leftSection={<MdPictureAsPdf size={14} />}
+                                                rightSection={<MdOutlineFileDownload size={14} />}
+                                                onClick={handleDownload}
+                                                loading={downloading}
+                                            >
+                                                {downloading ? "Downloading..." : "Download Estimate"}
+                                            </Button>
+                                        </Group>
+
+                                        <Space h='sm' />
+
+                                        <OverallEstimateReport
+                                            totalTATTime={44}
+                                            estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
+                                            cappingUnbilledCost={44}
+                                            parts={[
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4, price: 10 },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2, price: 5 },
+                                            ]}
+                                            estimatedSparesCost={44}
+                                            spareCostData={[
+                                                { date: "Min", Cost: 100 },
+                                                { date: "Estimated", Cost: 800 },
+                                                { date: "Max", Cost: 1000 },
+                                            ]}
+                                        />
+                                        <Space h='xl' />
+
+                                        {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
+                                        <FindingsWiseSection tasks={estimateReportData?.tasks} findings={estimateReportData?.findings} />
+
+                                        <Space h='md' />
+                                        {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
+                                        <PreloadWiseSection tasks={estimateReportData?.tasks} />
                                     </>
-                                }
-                            />
-
-                            <Group justify="space-between">
-                                <Group>
-                                    <Title order={4} c='gray'>
-                                        Overall Estimate Report :
-                                    </Title>
-                                    <Title order={4}>
-                                        {estimateReportData?.estID || "-"}
-                                    </Title>
-                                </Group>
-
-                                <Button
-                                    size="xs"
-                                    variant="filled"
-                                    color="#1bb343"
-                                    leftSection={<MdPictureAsPdf size={14} />}
-                                    rightSection={<MdOutlineFileDownload size={14} />}
-                                    onClick={handleDownload}
-                                    loading={downloading}
-                                >
-                                    {downloading ? "Downloading..." : "Download Estimate"}
-                                </Button>
-                            </Group>
-
-                            <Space h='sm' />
-
-                            <OverallEstimateReport
-                                totalTATTime={44}
-                                estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
-                                cappingUnbilledCost={44}
-                                parts={[
-                                    { partDesc: "Bolt", partName: "M12 Bolt", qty: 4, price: 10 },
-                                    { partDesc: "Screw", partName: "Wood Screw", qty: 2, price: 5 },
-                                ]}
-                                estimatedSparesCost={44}
-                                spareCostData={[
-                                    { date: "Min", Cost: 100 },
-                                    { date: "Estimated", Cost: 800 },
-                                    { date: "Max", Cost: 1000 },
-                                ]}
-                            />
-                            <Space h='xl' />
-                            {/* <SegmentedControl color="#1A237E" bg='white' data={['Findings', 'Man Hours', 'Spare Parts']} /> */}
-
-                            {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
-                            <FindingsWiseSection tasks={estimateReportData?.tasks} findings={estimateReportData?.findings} />
-
-                            <Space h='md' />
-                            {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
-                            <PreloadWiseSection tasks={estimateReportData?.tasks} />
+                                ) : (
+                                    <></>
+                                )
+                            }
                         </>
                     ) : (
-                        <></>
+                        <>
+                            <SkillRequirementAnalytics skillAnalysisData={skillAnalysisData} />
+                        </>
                     )
                 }
+
 
 
             </div>
@@ -1468,16 +1628,16 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     </Table>
                 </div> */}
                 <div
-                                            className="ag-theme-alpine"
-                                            style={{
-                                                width: "100%",   
-                                                border: "none",
-                                                height: "100%",
+                    className="ag-theme-alpine"
+                    style={{
+                        width: "100%",
+                        border: "none",
+                        height: "100%",
 
-                                            }}
-                                        >
-                                            <style>
-                                                {`
+                    }}
+                >
+                    <style>
+                        {`
 /* Remove the borders and grid lines */
 .ag-theme-alpine .ag-root-wrapper, 
 .ag-theme-alpine .ag-root-wrapper-body,
@@ -1498,52 +1658,52 @@ box-shadow: none !important; /* Remove any box shadow */
 border-bottom: none;
 }
 `}
-                                            </style>
-                                            <AgGridReact
-                                                // pagination
-                                                // paginationPageSize={10}
-                                                domLayout="autoHeight" // Ensures height adjusts dynamically
-                                                rowData={parts || []}
-                                                columnDefs={[
-                                                    {
-                                                        field: "partName",
-                                                        headerName: "Part Num",
-                                                        sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
-                                                        resizable: true,
-                                                       flex:2
-                                                    },
-                                                    {
-                                                        field: "partDesc",
-                                                        headerName: "Description                                                            ",
-                                                        sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
-                                                        resizable: true,
-                                                        flex:2
-                                                    },
-                                                    {
-                                                        field: "qty",
-                                                        headerName: "Qty",
-                                                        sortable: true,
-                                                        // filter: true,
-                                                        // floatingFilter: true,
-                                                        resizable: true,
-                                                        flex:1.5
-                                                    },
-                                                    {
-                                                        field: "price",
-                                                        headerName: "Price($)",
-                                                        sortable: true,
-                                                        // filter: true,
-                                                        // floatingFilter: true,
-                                                        resizable: true,
-                                                        flex:1.5
-                                                    },
-                                                ]}
-                                            />
-                                        </div>
+                    </style>
+                    <AgGridReact
+                        // pagination
+                        // paginationPageSize={10}
+                        domLayout="autoHeight" // Ensures height adjusts dynamically
+                        rowData={parts || []}
+                        columnDefs={[
+                            {
+                                field: "partName",
+                                headerName: "Part Num",
+                                sortable: true,
+                                filter: true,
+                                floatingFilter: true,
+                                resizable: true,
+                                flex: 2
+                            },
+                            {
+                                field: "partDesc",
+                                headerName: "Description                                                            ",
+                                sortable: true,
+                                filter: true,
+                                floatingFilter: true,
+                                resizable: true,
+                                flex: 2
+                            },
+                            {
+                                field: "qty",
+                                headerName: "Qty",
+                                sortable: true,
+                                // filter: true,
+                                // floatingFilter: true,
+                                resizable: true,
+                                flex: 1.5
+                            },
+                            {
+                                field: "price",
+                                headerName: "Price($)",
+                                sortable: true,
+                                // filter: true,
+                                // floatingFilter: true,
+                                resizable: true,
+                                flex: 1.5
+                            },
+                        ]}
+                    />
+                </div>
             </Card>
 
             {/* Right Section */}
@@ -2091,7 +2251,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             </Grid.Col>
                                             <Grid.Col span={10}>
                                                 <Text size="sm" fw={500}>
-                                                    {selectedTask?.description  || "-"}
+                                                    {selectedTask?.description || "-"}
                                                 </Text>
                                             </Grid.Col>
                                         </Grid>
