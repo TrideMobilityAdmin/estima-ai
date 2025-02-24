@@ -51,9 +51,9 @@ export default function ExpertInsights() {
     manHoursThreshold: 5.0
   });
   const [partsModalOpen, setPartsModalOpen] = useState(false);
-  const [selectedTaskParts, setSelectedTaskParts] = useState<SparePart[]>([]);
+  const [selectedTaskParts, setSelectedTaskParts] = useState<any[]>([]);
   const [newPart, setNewPart] = useState<any>({ partID: '', quantity: 0 });
-  const [currentTaskID, setCurrentTaskID] = useState<string | null>(null);
+  const [currentTaskID, setCurrentTaskID] = useState<number | null>(null);
 
   useEffect(() => {
     fetchExpertInsights();
@@ -144,7 +144,7 @@ export default function ExpertInsights() {
 
   const openPartsModal = (task: TaskRow, index: number) => {
     setSelectedTaskParts([...task.spareParts]);
-    setCurrentTaskID(String(index));
+    setCurrentTaskID(index);
     setPartsModalOpen(true);
     setNewPart({ partID: '', quantity: 0 });
   };
@@ -162,7 +162,7 @@ export default function ExpertInsights() {
 
   const handleSaveParts = () => {
     if (currentTaskID !== null) {
-      const taskIndex = parseInt(currentTaskID);
+      const taskIndex = currentTaskID;
       setTasks(prevTasks => {
         const updatedTasks = [...prevTasks];
         updatedTasks[taskIndex] = {
@@ -326,8 +326,27 @@ export default function ExpertInsights() {
               <tbody>
                 {selectedTaskParts.map((part, index) => (
                   <tr key={index}>
-                    <td>{part.partID}</td>
-                    <td>{part.quantity}</td>
+                    <td>
+                      <TextInput
+                        value={part.partID}
+                        onChange={(e) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].partID = e.target.value;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <NumberInput
+                        value={part.quantity}
+                        onChange={(value) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].quantity = value || 0;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                        min={0}
+                      />
+                    </td>
                     <td>
                       <ActionIcon
                         variant="light"
