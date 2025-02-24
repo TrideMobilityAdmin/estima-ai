@@ -359,7 +359,7 @@ export const useApi = () => {
   const updateProbabilityWiseDetails = async (id: string, data:any) => {
     try {
       const response = await axiosInstance.put(
-        `${getProbabilityWise_Url}${id}`,
+        `${getConfigurations_Url}/${id}`,
         data
       );
       console.log("✅ API Response probability wise update:", response);
