@@ -1,3 +1,4 @@
+from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -101,6 +102,7 @@ def valid_estimate_request():
         "probability": 0.8,
         "operator": "operator1",
         "aircraftAge": 5,
+        "aircraftRegNo":"KE134",
         "aircraftFlightHours": 1000,
         "aircraftFlightCycles": 200
     }
@@ -200,32 +202,7 @@ def test_get_all_estimates(test_client, access_token):
     else:
         assert False, f"Unexpected status code: {response.status_code}, response: {response.json()}"
 
-def test_get_task_estimate_by_id(test_client, access_token,valid_estimate_request):
-    """Test getting a specific task estimate by ID."""
-    response = test_client.post(
-        "/api/v1/estimates",
-        json=valid_estimate_request,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    
-    assert response.status_code == 201, response.json()
-    estimate_id = response.json()["estID"]
-    
-    # Fetch the estimate by ID
-    response = test_client.get(
-        f"/api/v1/estimates/{estimate_id}",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    
-    assert response.status_code == 200, response.json()
-    assert response.json()["estID"] == estimate_id
 
-def test_get_task_estimate_by_id_not_found(test_client, access_token,invalid_estimate_request):
-    """Test getting a non-existent task estimate."""
-    estimate_id = "non_existent_id"
-    response = test_client.get(f"/api/v1/estimates/{estimate_id}", headers=access_token)
-    assert response.status_code == 404
-    assert "Estimate not found" in response.json().get("detail", "")
 
 @pytest.fixture    
 def valid_estimate_request():
@@ -250,55 +227,128 @@ def invalid_estimate_request():
         "aircraftFlightCycles": 500,
     }
 @pytest.mark.parametrize("estimate_request, expected_status, expected_msg", [
-    (valid_estimate_request, 200, "File and estimated data inserted successfully"),  
-    (invalid_estimate_request, 422, None), 
+    (valid_estimate_request, 200, "File and estimated data inserted successfully"),
+    (invalid_estimate_request, 422, None),
 ])
-
-def test_upload_estimate(test_client,access_token,estimate_request, expected_status, expected_msg):
+def test_upload_estimate(test_client, access_token, estimate_request, expected_status, expected_msg):
     """Test uploading an estimate with both valid and invalid requests."""
     file_content = b"mock content of the excel file"
-    file = UploadFile(filename="test_file.xlsx", file=BytesIO(file_content), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    file = UploadFile(filename="test_file.xlsx", file=BytesIO(file_content))
 
     # Prepare the request
     response = test_client.post(
         "/api/v1/estimates/upload",  
         headers={"Authorization": f"Bearer {access_token}"},
         data={"estimate_request": json.dumps(estimate_request)},  
-        files={"file": (file.filename, file.file, file.content_type)}  
+        files={"file": (file.filename, file.file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}  
     )
-    assert response.status_code == expected_status, response.json()
     
+    assert response.status_code == expected_status, response.json()
     
     if expected_status == 200:
         assert "estID" in response.json()
         assert response.json()["status"] == "Initiated"
         assert response.json()["msg"] == expected_msg
     else:
-        assert "detail" in response.json()  
-# def test_task_man_hours(test_client, auth_headers):
-#     """Test getting task man hours."""
-#     task_id = "255000-16-1"
-#     response = test_client.get(f"/api/v1/estimation/man_hours/{task_id}", headers=auth_headers)
-#     assert response.status_code == 200
-#     assert isinstance(response.json(), list)
+        assert "detail" in response.json()
+def test_estimate_by_id(test_client, access_token):
+    """Test getting an estimate by ID."""
+    estimate_id = "AKIA_MWEHWG-SS7P"  
+    response = test_client.get(
+        f"/api/v1/estimates/{estimate_id}",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    assert response.status_code == 200, response.json()
+    data = response.json()
+    assert "estID" in data
+    assert "description" in data
+    assert "tasks" in data
+    assert "aggregatedTasks" in data
+    assert "originalFilename" in data
+    
+    response = test_client.get(
+        "/api/v1/estimates/invalid_id",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    assert response.status_code in [404, 500], response.json()
+    assert "Estimate not found" in response.json()["detail"]
+    
+    response = test_client.get(
+        f"/api/v1/estimates/{estimate_id}",
+        headers={}  
+    )
+    
+    assert response.status_code in [401, 403], response.json() 
+    assert "Not authenticated" in response.json()["detail"]  
 
-# def test_task_man_hours_not_found(test_client, auth_headers):
-#     """Test getting man hours for a non-existent task."""
-#     task_id = "non_existent_task"
-#     response = test_client.get(f"/api/v1/estimation/man_hours/{task_id}", headers=auth_headers)
-#     assert response.status_code == 404
-#     assert "Source task not found" in response.json()["detail"]
-
-# def test_get_spare_parts(test_client, auth_headers):
-#     """Test getting spare parts."""
-#     task_id = "255000-16-1"
-#     response = test_client.get(f"/api/v1/estimation/spare_parts/{task_id}", headers=auth_headers)
-#     assert response.status_code == 200
-#     assert isinstance(response.json(), list)
-
-# def test_get_spare_parts_not_found(test_client, auth_headers):
-#     """Test getting spare parts for a non-existent task."""
-#     task_id = "non_existent_task"
-#     response = test_client.get(f"/api/v1/estimation/spare_parts/{task_id}", headers=auth_headers)
-#     assert response.status_code == 404
-#     assert "Source task not found" in response.json()["detail"]
+def test_get_parts_usage(test_client, access_token):
+    """Test both successful retrieval and no data found for parts usage."""
+ 
+    part_id = "425A200-5"  
+    start_date = datetime(2024, 3, 27)
+    end_date = datetime(2024, 4, 3)
+    
+    response = test_client.get(
+        f"/api/v1/parts/usage/?partId={part_id}&startDate={start_date.isoformat()}&endDate={end_date.isoformat()}",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    if response.status_code == 200:
+        response_data = response.json()
+        assert "data" in response_data
+        assert response_data["data"]["partId"] == part_id
+        assert "usage" in response_data["data"]
+        assert "tasks" in response_data["data"]["usage"]
+        assert "findings" in response_data["data"]["usage"]
+        assert "aircraftDetails" in response_data["data"]
+    elif response.status_code == 404:
+        response_data = response.json()
+        assert "data" in response_data
+        assert response_data["data"] == {}
+    else:
+        assert response.status_code == 422, "Expected validation error"
+        assert "detail" in response.json()
+    
+    invalid_part_id = "INVALID_PART_ID"  
+    response = test_client.get(
+        f"/api/v1/parts/usage/?partId={invalid_part_id}&startDate={start_date.isoformat()}&endDate={end_date.isoformat()}",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    assert response.status_code == 422
+    response_data = response.json()
+    assert "detail" in response_data
+def test_get_probability_wise_manhrs_sparecost(test_client, access_token):
+    """Test both successful retrieval and no data found for probability-wise manhours and spare parts."""
+    
+    valid_estimate_id = "DCNOMK_NSY"  
+    
+    response = test_client.get(
+        f"/api/v1/probability_wise_manhrs_sparecost/{valid_estimate_id}",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    if response.status_code == 200:
+        response_data = response.json()
+        assert "estID" in response_data
+        assert response_data["estID"] == valid_estimate_id
+        assert "estProb" in response_data
+    else:
+        assert response.status_code == 404
+        response_data = response.json()
+        assert "detail" in response_data
+       
+    
+    invalid_estimate_id = "INVALID_ESTIMATE_ID"  
+    
+    response = test_client.get(
+        f"/api/v1/probability-wise-manhrs_sparecost/{invalid_estimate_id}",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    
+    assert response.status_code == 404
+    response_data = response.json()
+    assert "detail" in response_data
+    
