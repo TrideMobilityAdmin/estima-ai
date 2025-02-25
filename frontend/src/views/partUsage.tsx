@@ -78,6 +78,7 @@ export default function PartUsage() {
 
         // Prepare data for the donut chart
         const total = totalTasks + totalFindings;
+
         const tasksPercentage = total > 0 ? (totalTasks / total) * 100 : 0;
         const findingsPercentage = total > 0 ? (totalFindings / total) * 100 : 0;
 
@@ -95,7 +96,7 @@ export default function PartUsage() {
     };
 
 
-
+ 
     // Search filter for tasks
     const filteredTasks = partUsageData?.usage?.tasks?.filter((task: any) =>
         task?.taskId?.toLowerCase().includes(taskSearch?.toLowerCase())
@@ -572,8 +573,8 @@ export default function PartUsage() {
                         data={tasksChartData}
                         dataKey="taskId"
                         series={[
-                            { name: 'packages', color: '#4E66DE' },
-                            { name: 'quantity', color: '#F39C12' },
+                            { name: 'packages', color: '#1445B6' },
+                            { name: 'quantity', color: '#D6B575' },
                         ]}
                         xAxisLabel="Tasks"
                         yAxisLabel="Count"
@@ -681,8 +682,8 @@ export default function PartUsage() {
                         data={findingChartData}
                         dataKey="findingId"
                         series={[
-                            { name: 'packages', color: '#4E66DE' },
-                            { name: 'quantity', color: '#F39C12' },
+                            { name: 'packages', color: '#1445B6' },
+                            { name: 'quantity', color: '#D6B575' },
                         ]}
                         maxBarWidth={40}
                         xAxisLabel="Findings"
@@ -699,12 +700,10 @@ export default function PartUsage() {
                 </SimpleGrid>
                 <Space h='md' />
                 <SimpleGrid cols={2}>
-                    <Card radius='md' h='95vh' style={{ overflowY: "auto" }}>
+                    <Card radius='md' h={partUsageData?.usage ! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
                         <Title order={5}>
                             MPD
                         </Title>
-
-
 
                         <TextInput
                             placeholder="Search Tasks..."
@@ -712,10 +711,12 @@ export default function PartUsage() {
                             onChange={(e) => setTaskSearch(e.currentTarget.value)}
                             mb="md"
                         />
-                        <ScrollArea h='90vh' scrollbarSize={0} scrollHideDelay={0}>
+                        {
+                            filteredTasks?.length > 0 ? (
+                                <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                             <Accordion variant="separated" radius="md">
-                                {filteredTasks?.map((task: any) => (
-                                    <Accordion.Item key={task?.taskId} value={task?.taskId}>
+                                {filteredTasks?.map((task: any,index:number) => (
+                                    <Accordion.Item key={`${task?.taskId} - ${index}` } value={`${task?.taskId} - ${index}` }>
                                         <Accordion.Control>
                                             <Group>
                                                 <IconCube color="#4E66DE" />
@@ -724,8 +725,15 @@ export default function PartUsage() {
 
                                         </Accordion.Control>
                                         <Accordion.Panel>
-                                            <ScrollArea h={300} scrollHideDelay={0}>
-
+                                            <ScrollArea h={task?.packages?.length > 3 ? 250 : 150} scrollHideDelay={0}>
+                                       
+                                            
+                                            <Text fz='xs'>
+                                            <Text span c="gray" inherit>Description : </Text>
+                                                 {task?.taskDescription || "-"}
+                                            </Text>
+                                           
+                                            
                                                 {task?.packages?.map((pkg: any) => (
                                                     <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
                                                         <Group justify="space-between" align="flex-start">
@@ -755,8 +763,20 @@ export default function PartUsage() {
                                 ))}
                             </Accordion>
                         </ScrollArea>
+                            ) : (
+                                <>
+                                <Center p={50}>
+                                <Text >
+                                    No Tasks Found
+                                </Text>
+                                </Center>
+                                
+                                </>
+                            )
+                        }
+                        
                     </Card>
-                    <Card radius='md' h='95vh' style={{ overflowY: "auto" }}>
+                    <Card radius='md' h={partUsageData?.usage ! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
                         <Title order={5}>
                             Findings
                         </Title>
@@ -767,10 +787,12 @@ export default function PartUsage() {
                             onChange={(e) => setFindingSearch(e.currentTarget.value)}
                             mb="md"
                         />
-                        <ScrollArea h='90vh' scrollbarSize={0} scrollHideDelay={0}>
+                        {
+                            filteredFindings?.length > 0 ? (
+                                <ScrollArea h={'85vh'} scrollbarSize={0} scrollHideDelay={0}>
                             <Accordion variant="separated" radius="md">
-                                {filteredFindings?.map((finding: any) => (
-                                    <Accordion.Item key={finding?.taskId} value={finding?.taskId}>
+                                {filteredFindings?.map((finding: any,index:number) => (
+                                    <Accordion.Item key={`${finding?.taskId} - ${index}` } value={`${finding?.taskId} - ${index}` }>
                                         <Accordion.Control>
                                             <Group>
                                                 <IconAlertTriangle color="#4E66DE" />
@@ -779,7 +801,10 @@ export default function PartUsage() {
                                         </Accordion.Control>
                                         <Accordion.Panel>
                                             <ScrollArea h={300} scrollHideDelay={0}>
-
+                                            <Text fz='xs'>
+                                            <Text span c="gray" inherit>Description : </Text>
+                                                 {finding?.taskDescription || "-"}
+                                            </Text>
                                                 {finding?.packages?.map((pkg: any) => (
                                                     <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
                                                         <Group justify="space-between">
@@ -812,6 +837,18 @@ export default function PartUsage() {
                                 ))}
                             </Accordion>
                         </ScrollArea>
+                            ) : (
+                                <>
+                                <Center p={50}>
+                                <Text >
+                                    No Findings Found
+                                </Text>
+                                </Center>
+                                
+                                </>
+                            )
+                        }
+                        
                     </Card>
                 </SimpleGrid>
             </div>

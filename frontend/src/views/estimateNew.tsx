@@ -35,7 +35,7 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconStatusChange } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockShare, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconSettingsDollar, IconStatusChange } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -47,12 +47,17 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CsvDownloadButton from "react-json-to-csv";
+import { showAppNotification } from "../components/showNotificationGlobally";
+import SkillRequirementAnalytics from "./skillReqAnalytics";
+import { useApiSkillAnalysis } from "../api/services/skillsService";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export default function EstimateNew() {
-    const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf } = useApi();
+    const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
+    const { getSkillAnalysis } = useApiSkillAnalysis();
+    const [value, setValue] = useState('estimate');
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
@@ -68,7 +73,12 @@ export default function EstimateNew() {
     const [estimateReportData, setEstReportData] = useState<any>(null);
     const [estimateReportloading, setEstimateReportLoading] = useState(false); // Add loading state
     const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
+    const [validatedSkillsTasks, setValidatedSkillsTasks] = useState<any[]>([]);
     const [isValidating, setIsValidating] = useState(false);
+    const [isValidating2, setIsValidating2] = useState(false);
+    const [probabilityWiseData, setProbabilityWiseData] = useState<any>(null);
+    const [isProbWiseLoading, setIsProbLoading] = useState(false);
+    const [skillAnalysisData, setSkillAnalysisData] = useState<any>(null);
 
     // const [tasks, setTasks] = useState<string[]>([]);
     // const [estimateId, setEstimateId] = useState<string>("");
@@ -96,11 +106,31 @@ export default function EstimateNew() {
     console.log("selected estimate tasks >>>>", selectedEstimateTasks);
 
     // Handle file and extracted tasks
-    const handleFileChange = (file: File | null, tasks: string[]) => {
+    // Handle file and extracted tasks
+    const handleFileChange = async (file: File | null, tasks: string[]) => {
+        setIsValidating(true);
         setSelectedFile(file);
         setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
         console.log("✅ Selected File:", file ? file.name : "None");
         console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+
+
+        console.log("Extracted Tasks:", tasks);
+        const response = await validateTasks(tasks);
+        setValidatedTasks(response);
+        setIsValidating(false);
+
+        const invalidTasks = response?.filter((task) => task?.status === false);
+        if (invalidTasks.length > 0) {
+            showNotification({
+                title: "Tasks Not Available!",
+                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
+                color: "orange",
+                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            });
+            // showAppNotification("warning", "Tasks Not Available!", invalidTasks.length + "tasks are not available. Only valid tasks will be used to Skill Analysis.");
+        }
+
     };
 
     // 🟢 Function to validate tasks & update UI
@@ -110,10 +140,20 @@ export default function EstimateNew() {
 
         if (response.length > 0) {
             setValidatedTasks(response);
-
+            setValidatedSkillsTasks(response);
         }
         setIsValidating(false);
     };
+
+    const handleValidateSkillsTasks = async (tasks: string[]) => {
+        setIsValidating2(true);
+        const response = await validateTasks(tasks);
+
+        if (response.length > 0) {
+            setValidatedSkillsTasks(response);
+        }
+        setIsValidating2(false);
+    }
 
     const downloadCSV = (status: boolean) => {
         const filteredTasks = validatedTasks?.filter((task) => task?.status === status);
@@ -208,11 +248,6 @@ export default function EstimateNew() {
 
     // Handle Submit
     const handleSubmit = async () => {
-        // if (!form.isValid()) {
-        //     form.validate();
-        //     return;
-        // }
-
         if (!selectedFile) {
             showNotification({
                 title: "Error",
@@ -242,21 +277,80 @@ export default function EstimateNew() {
             if (response) {
                 setRfqSubmissionResponse(response);
                 setRfqSubModalOpened(true);
-                showNotification({
-                    title: "Success",
-                    message: "Estimate report submitted successfully!",
-                    color: "green",
-                });
+                showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+                setValidatedTasks([]);
             }
         } catch (error) {
+            console.error("API Error:", error);
+            showAppNotification("error", "Error!", "Failed to submit estimate report.!");
+            showNotification({
+                title: "Error",
+                message: "Failed to submit estimate report.",
+                color: "red",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    console.log("rfq sub >>> ", rfqSubmissionResponse);
+
+    const handleSubmitSkills = async () => {
+        const validTasks = validatedSkillsTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
+
+        if (validTasks.length === 0) {
+            showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
+            return null; // Return null to indicate no response
+        }
+
+        const requestData = {
+            source_tasks: validTasks,
+        };
+
+        console.log("Submitting data:", requestData);
+
+        try {
+            setLoading(true);
+            const response = await getSkillAnalysis(requestData);
+            console.log("API Response:", response);
+
+            // if (response) {
+            setSkillAnalysisData(response);
+            showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
+            return response; // Return the response
+            // }
+        } catch (error) {
+            showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
             console.error("API Error:", error);
         } finally {
             setLoading(false);
         }
-    }
+        return null; // Return null if no response
+    };
 
-    console.log("rfq sub >>> ", rfqSubmissionResponse);
+    useEffect(()=>{
+        handleSubmitSkills()
+    },[validatedSkillsTasks]);
 
+    console.log("skillAnalysisData", skillAnalysisData);
+
+
+    // const handleBothSubmissions = async () => {
+    //     try {
+    //         setLoading(true);
+    //         await handleSubmit(); // Call the first function
+    //         await handleSubmitSkills(); // Call the second function
+    //     } catch (error) {
+    //         console.error("Error during submission:", error);
+    //         showNotification({
+    //             title: "Error",
+    //             message: "An error occurred during submission.",
+    //             color: "red",
+    //         });
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
     const handleCloseModal = () => {
         setRfqSubModalOpened(false);
         setSelectedFile(null); // Clear selected file
@@ -283,6 +377,32 @@ export default function EstimateNew() {
     }, [selectedEstimateIdReport]);
     console.log("estimate report >>>>", estimateReportData);
 
+    const fetchProbabilityWisedata = async (id: string) => {
+        if (!id) return;
+        setIsProbLoading(true);
+        const data = await getProbabilityWiseDetails(id);
+        if (data) {
+            setProbabilityWiseData(data);
+        }
+        setIsProbLoading(false);
+    };
+
+    // Call API when `selectedEstimateId` changes
+    useEffect(() => {
+        if (selectedEstimateIdProbability) {
+            fetchProbabilityWisedata(selectedEstimateIdProbability);
+        }
+    }, [selectedEstimateIdProbability]);
+    console.log("probabilityWiseData  >>>>", probabilityWiseData);
+
+    // Transform data for the chart
+    const transformedData = probabilityWiseData?.estProb?.map((item: any) => ({
+        prob: Math.round(item?.prob * 100), // Multiply by 100 and round
+        totalManhrs: item?.totalManhrs,
+        totalSpareCost: item?.totalSpareCost,
+    }));
+
+
     const [downloading, setDownloading] = useState(false);
 
     const handleDownload = (id: any) => {
@@ -291,61 +411,61 @@ export default function EstimateNew() {
 
     const probabilityData = {
         "estId": "1234",
-        "probData":[
+        "probData": [
             {
-                prob : 0,
-                totalManHrs : 500,
-                totalSparesCost : 3000
+                prob: 0,
+                totalManHrs: 500,
+                totalSparesCost: 3000
             },
             {
-                prob : 0.1,
-                totalManHrs : 490,
-                totalSparesCost :2900
+                prob: 0.1,
+                totalManHrs: 490,
+                totalSparesCost: 2900
             },
             {
-                prob : 0.2,
-                totalManHrs : 450,
-                totalSparesCost : 2800
+                prob: 0.2,
+                totalManHrs: 450,
+                totalSparesCost: 2800
             },
             {
-                prob : 0.3,
-                totalManHrs : 430,
-                totalSparesCost : 2700
+                prob: 0.3,
+                totalManHrs: 430,
+                totalSparesCost: 2700
             },
             {
-                prob : 0.4,
-                totalManHrs : 410,
-                totalSparesCost : 2600
+                prob: 0.4,
+                totalManHrs: 410,
+                totalSparesCost: 2600
             },
             {
-                prob : 0.5,
-                totalManHrs : 390,
-                totalSparesCost : 2500
+                prob: 0.5,
+                totalManHrs: 390,
+                totalSparesCost: 2500
             },
             {
-                prob : 0.6,
-                totalManHrs : 370,
-                totalSparesCost : 2400
+                prob: 0.6,
+                totalManHrs: 370,
+                totalSparesCost: 2400
             },
             {
-                prob : 0.7,
-                totalManHrs : 350,
-                totalSparesCost : 2300
+                prob: 0.7,
+                totalManHrs: 350,
+                totalSparesCost: 2300
             },
             {
-                prob : 0.8,
-                totalManHrs : 320,
-                totalSparesCost : 2200
+                prob: 0.8,
+                totalManHrs: 320,
+                totalSparesCost: 2200
             },
             {
-                prob : 0.9,
-                totalManHrs : 310,
-                totalSparesCost : 2100
+                prob: 0.9,
+                totalManHrs: 310,
+                totalSparesCost: 2100
             },
             {
-                prob : 1.0,
-                totalManHrs : 300,
-                totalSparesCost : 2000
+                prob: 1.0,
+                totalManHrs: 300,
+                totalSparesCost: 2000
             },
         ]
     }
@@ -594,43 +714,55 @@ export default function EstimateNew() {
 
             </Modal>
             <Modal
-            opened={probOpened}
-            onClose={() => {
-                setProbOpened(false);
-                //   form.reset();
-            }}
-            size={800}
-            title={
-                <>
-                <Group>
-                <Title order={4} c='dimmed'>
-                        Probability wise Details 
-                    </Title>
-                    <Title order={4} >
-                        {selectedEstimateIdProbability}
-                    </Title>
-                </Group>
-                    
-                </>
-            }
+                opened={probOpened}
+                onClose={() => {
+                    setProbOpened(false);
+                    //   form.reset();
+                }}
+                size={800}
+                title={
+                    <>
+                        <Group>
+                            <Title order={4} c='dimmed'>
+                                Probability wise Details
+                            </Title>
+                            <Title order={4} >
+                                {selectedEstimateIdProbability}
+                            </Title>
+                        </Group>
+
+                    </>
+                }
             >
+                {
+                    isProbWiseLoading && (
+                        <LoadingOverlay
+                            visible={isProbWiseLoading}
+                            zIndex={1000}
+                            overlayProps={{ radius: 'sm', blur: 2 }}
+                            loaderProps={{ color: 'indigo', type: 'bars' }}
+                        />
+                    )
+                }
+
                 <Group p={10}>
-                <AreaChart
-      h={350}
-      data={probabilityData?.probData || []}
-      dataKey="prob"
-      withLegend
-      withTooltip
-       xAxisLabel="Probability"
-      yAxisLabel="Value"
-      series={[
-        { name: 'totalManHrs', color: 'green.6' },
-        { name: 'totalSparesCost', color: 'blue.6' },
-      ]}
-      curveType="linear"
-    />
+                    <AreaChart
+                        h={350}
+                        //   data={probabilityData?.probData || []}
+                        data={transformedData || []}
+                        dataKey="prob"
+                        withLegend
+                        withTooltip
+                        xAxisLabel="Probability (%)"
+                        yAxisLabel="Value"
+                        series={[
+                            { name: 'totalManhrs', color: 'green.6' },
+                            { name: 'totalSpareCost', color: 'blue.6' },
+                        ]}
+                        curveType="linear"
+                    />
                 </Group>
-           
+
             </Modal>
 
 
@@ -668,14 +800,14 @@ export default function EstimateNew() {
                     <Grid.Col span={5}>
                         <Card withBorder h='50vh' radius='md'>
 
-                            {/* <LoadingOverlay
-                                visible={isLoading}
+                            <LoadingOverlay
+                                visible={isValidating}
                                 zIndex={1000}
                                 overlayProps={{ radius: 'sm', blur: 2 }}
                                 loaderProps={{ color: 'indigo', type: 'bars' }}
-                            /> */}
+                            />
 
-                            <Group justify="space-between">
+                            {/* <Group justify="space-between">
                                 <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
                                         Tasks Available
@@ -684,7 +816,6 @@ export default function EstimateNew() {
                                         extractedTasks?.length > 0 ? (
                                             <Badge ta='center' color="indigo" size="md" radius="lg">
                                                 {extractedTasks?.length || 0}
-                                                {/* {tasks?.filter((ele) => ele.status === true)?.length || 0} */}
                                             </Badge>
                                         ) : (
                                             <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
@@ -693,25 +824,70 @@ export default function EstimateNew() {
                                         )
                                     }
                                 </Group>
-                                {/* <Group mb='xs' align="center">
+                            </Group> */}
+                            <Group justify="space-between">
+                                <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
-                                        Tasks Not-Available
+                                        Tasks Available
                                     </Text>
                                     {
-                                        validatedTasks.length > 0 ? (
-                                            <Badge ta='center' color="red" size="md" radius="lg">
-                                                {validatedTasks?.filter((ele) => ele.status === false)?.length || 0}
+                                        validatedTasks?.length > 0 ? (
+                                            <Badge ta='center' color="green" size="md" radius="lg">
+                                                {validatedTasks?.filter((ele) => ele.status === true)?.length || 0}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="light" ta='center' color="red" size="md" radius="lg">
+                                            <Badge variant="light" ta='center' color="green" size="md" radius="lg">
                                                 0
                                             </Badge>
                                         )
                                     }
-                                </Group> */}
+                                </Group>
+                                <Group mb='xs' align="center">
+                                    <Text size="md" fw={500}>
+                                        Tasks Not-Available
+                                    </Text>
+                                    {
+                                        validatedTasks?.length > 0 ? (
+                                            <Badge ta='center' color="blue" size="md" radius="lg">
+                                                {validatedTasks?.filter((ele) => ele.status === false)?.length || 0}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="light" ta='center' color="blue" size="md" radius="lg">
+                                                0
+                                            </Badge>
+                                        )
+                                    }
+                                </Group>
                             </Group>
-
                             <ScrollArea
+                                style={{
+                                    flex: 1, // Take remaining space for scrollable area
+                                    overflow: "auto",
+                                }}
+                                offsetScrollbars
+                                scrollHideDelay={1}
+                            >
+                                {validatedTasks?.length > 0 ? (
+                                    <SimpleGrid cols={4}>
+                                        {validatedTasks?.map((task, index) => (
+                                            <Badge
+                                                key={index}
+                                                color={task?.status === false ? "blue" : "green"}
+                                                variant="light"
+                                                radius='sm'
+                                                style={{ margin: "0.25em" }}
+                                            >
+                                                {task?.taskid}
+                                            </Badge>
+                                        ))}
+                                    </SimpleGrid>
+                                ) : (
+                                    <Text ta='center' size="sm" c="dimmed">
+                                        No tasks found. Please Select a file.
+                                    </Text>
+                                )}
+                            </ScrollArea>
+                            {/* <ScrollArea
                                 style={{
                                     flex: 1, // Take remaining space for scrollable area
                                     overflow: "auto",
@@ -721,7 +897,8 @@ export default function EstimateNew() {
                             >
                                 {extractedTasks?.length > 0 ? (
                                     <SimpleGrid cols={4}>
-                                        {extractedTasks?.map((task, index) => (
+
+                                         {extractedTasks?.map((task, index) => (
                                             <Badge
                                                 key={index}
                                                 color='blue'
@@ -738,7 +915,7 @@ export default function EstimateNew() {
                                         No tasks found. Please Select a file.
                                     </Text>
                                 )}
-                            </ScrollArea>
+                            </ScrollArea> */}
                         </Card>
                     </Grid.Col>
 
@@ -808,6 +985,14 @@ export default function EstimateNew() {
                                         placeholder="Ex:50"
                                         label="Flight Hours"
                                         {...form.getInputProps("aircraftFlightHours")}
+                                    />
+
+                                    <TextInput
+                                        size="xs"
+                                        leftSection={<MdPin />}
+                                        placeholder="Ex:50"
+                                        label="Area of Operations"
+                                        {...form.getInputProps("areaOfOperations")}
                                     />
 
                                     <Text size="md" fw={500}>
@@ -881,7 +1066,6 @@ export default function EstimateNew() {
                 </Group>
 
                 <Space h='sm' />
-
                 <Card>
                     <Group align="center" gap='sm'>
                         <ThemeIcon variant="light">
@@ -1043,28 +1227,28 @@ border-bottom: none;
                                     cellRenderer: (val: any) => {
                                         let badgeColor: string;
                                         let badgeIcon: JSX.Element;
-                                    
+
                                         // Using switch case for status color and icon mapping
                                         switch (val.data.status.toLowerCase()) {
-                                          case "completed":
-                                            badgeColor = "#10b981"; // Green
-                                            badgeIcon = <IconCircleCheck size={15}/>; // Check circle badgeIcon
-                                            break;
-                                          case "progress":
-                                            badgeColor = "#f59e0b"; // Amber/Orange
-                                            badgeIcon = <IconLoader size={15}/>; // Spinner badgeIcon (you can add CSS for the spinning effect)
-                                            break;
-                                          case "initiated":
-                                            badgeColor = "#3b82f6"; // Light Blue
-                                            badgeIcon = <IconClockUp size={15}/>; // Play badgeIcon
-                                            break;
-                                          case "csv generated":
-                                            badgeColor = "#9333ea"; // Purple
-                                            badgeIcon = <IconFileCheck size={15}/>; // File CSV badgeIcon
-                                            break;
-                                          default:
-                                            badgeColor = "gray"; // Default color if status is not found
-                                            badgeIcon = <IconFileCheck size={15}/>; // Default badgeIcon (optional)
+                                            case "completed":
+                                                badgeColor = "#10b981"; // Green
+                                                badgeIcon = <IconCircleCheck size={15} />; // Check circle badgeIcon
+                                                break;
+                                            case "progress":
+                                                badgeColor = "#f59e0b"; // Amber/Orange
+                                                badgeIcon = <IconLoader size={15} />; // Spinner badgeIcon (you can add CSS for the spinning effect)
+                                                break;
+                                            case "initiated":
+                                                badgeColor = "#3b82f6"; // Light Blue
+                                                badgeIcon = <IconClockUp size={15} />; // Play badgeIcon
+                                                break;
+                                            case "csv generated":
+                                                badgeColor = "#9333ea"; // Purple
+                                                badgeIcon = <IconFileCheck size={15} />; // File CSV badgeIcon
+                                                break;
+                                            default:
+                                                badgeColor = "gray"; // Default color if status is not found
+                                                badgeIcon = <IconFileCheck size={15} />; // Default badgeIcon (optional)
                                         }
 
                                         return (
@@ -1097,13 +1281,13 @@ border-bottom: none;
                                                         size={20}
                                                         color="indigo"
                                                         variant="light"
-                                                            onClick={() => {
-                                                                setSelectedEstimateId(val.data.estID);
-                                                                setSelectedEstimateTasks(val.data.tasks);
-                                                                handleValidateTasks(val.data.tasks);
-                                                                setOpened(true);
-                                                            }}
-                                                       
+                                                        onClick={() => {
+                                                            setSelectedEstimateId(val.data.estID);
+                                                            setSelectedEstimateTasks(val.data.tasks);
+                                                            handleValidateTasks(val.data.tasks);
+                                                            setOpened(true);
+                                                        }}
+
                                                     >
                                                         <IconListCheck />
                                                     </ActionIcon>
@@ -1116,6 +1300,7 @@ border-bottom: none;
                                                         disabled={val?.data?.status?.toLowerCase() !== "completed"}
                                                         onClick={() => {
                                                             setSelectedEstimateIdReport(val.data.estID);
+                                                            handleValidateSkillsTasks(val.data.tasks);
                                                             // setOpened(true);
                                                         }}
                                                     >
@@ -1164,77 +1349,100 @@ border-bottom: none;
                     </div>
 
                 </Card>
+                <Space h='sm' />
 
+                <SegmentedControl
+                    color="indigo"
+                    bg='white'
+                    value={value}
+                    onChange={setValue}
+                    data={[
+                        { label: 'Estimate', value: 'estimate' },
+                        { label: 'Skill', value: 'skill' },
+                    ]}
+                />
+
+                <Space h='sm' />
                 {
-                    estimateReportData !== null ? (
+                    value === 'estimate' ? (
                         <>
-                            <Divider
-                                variant="dashed"
-                                labelPosition="center"
-                                color={"gray"}
-                                pb='sm'
-                                pt='sm'
-                                label={
+                            {
+                                estimateReportData !== null ? (
                                     <>
-                                        <Box ml={5}>Estimate</Box>
+                                        <Divider
+                                            variant="dashed"
+                                            labelPosition="center"
+                                            color={"gray"}
+                                            pb='sm'
+                                            pt='sm'
+                                            label={
+                                                <>
+                                                    <Box ml={5}>Estimate</Box>
+                                                </>
+                                            }
+                                        />
+
+                                        <Group justify="space-between">
+                                            <Group>
+                                                <Title order={4} c='gray'>
+                                                    Overall Estimate Report :
+                                                </Title>
+                                                <Title order={4}>
+                                                    {estimateReportData?.estID || "-"}
+                                                </Title>
+                                            </Group>
+
+                                            <Button
+                                                size="xs"
+                                                variant="filled"
+                                                color="#1bb343"
+                                                leftSection={<MdPictureAsPdf size={14} />}
+                                                rightSection={<MdOutlineFileDownload size={14} />}
+                                                onClick={handleDownload}
+                                                loading={downloading}
+                                            >
+                                                {downloading ? "Downloading..." : "Download Estimate"}
+                                            </Button>
+                                        </Group>
+
+                                        <Space h='sm' />
+
+                                        <OverallEstimateReport
+                                            totalTATTime={44}
+                                            estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
+                                            cappingUnbilledCost={44}
+                                            parts={[
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4, price: 10 },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2, price: 5 },
+                                            ]}
+                                            estimatedSparesCost={44}
+                                            spareCostData={[
+                                                { date: "Min", Cost: 100 },
+                                                { date: "Estimated", Cost: 800 },
+                                                { date: "Max", Cost: 1000 },
+                                            ]}
+                                        />
+                                        <Space h='xl' />
+
+                                        {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
+                                        <FindingsWiseSection tasks={estimateReportData?.tasks} findings={estimateReportData?.findings} />
+
+                                        <Space h='md' />
+                                        {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
+                                        <PreloadWiseSection tasks={estimateReportData?.tasks} />
                                     </>
-                                }
-                            />
-
-                            <Group justify="space-between">
-                                <Group>
-                                    <Title order={4} c='gray'>
-                                        Overall Estimate Report :
-                                    </Title>
-                                    <Title order={4}>
-                                        {estimateReportData?.estID || "-"}
-                                    </Title>
-                                </Group>
-
-                                <Button
-                                    size="xs"
-                                    variant="filled"
-                                    color="#1bb343"
-                                    leftSection={<MdPictureAsPdf size={14} />}
-                                    rightSection={<MdOutlineFileDownload size={14} />}
-                                    onClick={handleDownload}
-                                    loading={downloading}
-                                >
-                                    {downloading ? "Downloading..." : "Download Estimate"}
-                                </Button>
-                            </Group>
-
-                            <Space h='sm' />
-
-                            <OverallEstimateReport
-                                totalTATTime={44}
-                                estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
-                                cappingUnbilledCost={44}
-                                parts={[
-                                    { partDesc: "Bolt", partName: "M12 Bolt", qty: 4, price: 10 },
-                                    { partDesc: "Screw", partName: "Wood Screw", qty: 2, price: 5 },
-                                ]}
-                                estimatedSparesCost={44}
-                                spareCostData={[
-                                    { date: "Min", Cost: 100 },
-                                    { date: "Estimated", Cost: 800 },
-                                    { date: "Max", Cost: 1000 },
-                                ]}
-                            />
-                            <Space h='xl' />
-                            {/* <SegmentedControl color="#1A237E" bg='white' data={['Findings', 'Man Hours', 'Spare Parts']} /> */}
-
-                            {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
-                            <FindingsWiseSection tasks={estimateReportData?.tasks} findings={estimateReportData?.findings} />
-
-                            <Space h='md' />
-                            {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
-                            <PreloadWiseSection tasks={estimateReportData?.tasks} />
+                                ) : (
+                                    <></>
+                                )
+                            }
                         </>
                     ) : (
-                        <></>
+                        <>
+                            <SkillRequirementAnalytics skillAnalysisData={skillAnalysisData} />
+                        </>
                     )
                 }
+
 
 
             </div>
@@ -1320,8 +1528,8 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Total TAT Time */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                            <MdOutlineTimeline style={{ width: "70%", height: "70%" }} />
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
+                            <IconClockShare style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
                             <Text size="md" fw={500} fz="h6" c="gray">
@@ -1347,10 +1555,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                                     <Text fz="sm">{key.charAt(0).toUpperCase() + key.slice(1)}</Text>
                                 </Grid.Col>
                                 <Grid.Col span={9}>
-                                    <Group justify="flex-end" fz="xs" fw="600" c={key === "min" ? "green" : key === "estimated" ? "yellow" : "red"}>
+                                    <Group justify="flex-end" fz="xs" fw="600" c={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"}>
                                         {value} Hrs
                                     </Group>
-                                    <Progress color={key === "min" ? "green" : key === "estimated" ? "yellow" : key === "capping" ? "indigo" : "red"} value={value} />
+                                    <Progress color={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"} value={value} />
                                 </Grid.Col>
                             </Grid>
                         ))}
@@ -1361,8 +1569,8 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Capping Unbilled Cost */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                            <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
+                            <IconSettingsDollar style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
                             <Text size="md" fw={500} fz="h6" c="gray">
@@ -1381,7 +1589,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 <Text size="md" fw={500} fz="h6" c="gray">
                     Estimated Parts
                 </Text>
-                <div style={{ position: "relative", height: "40vh", overflow: "hidden" }}>
+                {/* <div style={{ position: "relative", height: "40vh", overflow: "hidden" }}>
                     <Table stickyHeader striped highlightOnHover>
                         <Table.Thead
                             style={{
@@ -1418,6 +1626,83 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                             )}
                         </Table.Tbody>
                     </Table>
+                </div> */}
+                <div
+                    className="ag-theme-alpine"
+                    style={{
+                        width: "100%",
+                        border: "none",
+                        height: "100%",
+
+                    }}
+                >
+                    <style>
+                        {`
+/* Remove the borders and grid lines */
+.ag-theme-alpine .ag-root-wrapper, 
+.ag-theme-alpine .ag-root-wrapper-body,
+.ag-theme-alpine .ag-header,
+.ag-theme-alpine .ag-header-cell,
+.ag-theme-alpine .ag-body-viewport {
+border: none;
+}
+
+/* Remove the cell highlight (border) on cell click */
+.ag-theme-alpine .ag-cell-focus {
+outline: none !important; /* Remove focus border */
+box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove row border */
+.ag-theme-alpine .ag-row {
+border-bottom: none;
+}
+`}
+                    </style>
+                    <AgGridReact
+                        // pagination
+                        // paginationPageSize={10}
+                        domLayout="autoHeight" // Ensures height adjusts dynamically
+                        rowData={parts || []}
+                        columnDefs={[
+                            {
+                                field: "partName",
+                                headerName: "Part Num",
+                                sortable: true,
+                                filter: true,
+                                floatingFilter: true,
+                                resizable: true,
+                                flex: 2
+                            },
+                            {
+                                field: "partDesc",
+                                headerName: "Description                                                            ",
+                                sortable: true,
+                                filter: true,
+                                floatingFilter: true,
+                                resizable: true,
+                                flex: 2
+                            },
+                            {
+                                field: "qty",
+                                headerName: "Qty",
+                                sortable: true,
+                                // filter: true,
+                                // floatingFilter: true,
+                                resizable: true,
+                                flex: 1.5
+                            },
+                            {
+                                field: "price",
+                                headerName: "Price($)",
+                                sortable: true,
+                                // filter: true,
+                                // floatingFilter: true,
+                                resizable: true,
+                                flex: 1.5
+                            },
+                        ]}
+                    />
                 </div>
             </Card>
 
@@ -1426,7 +1711,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 {/* Estimated Spares Cost */}
                 <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="indigo">
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
                             <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
                         </ThemeIcon>
                         <Flex direction="column">
@@ -1447,6 +1732,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         <Title order={5}>Spare Cost ($)</Title>
                         <AreaChart
                             h={250}
+                            withGradient
                             data={spareCostData}
                             dataKey="date"
                             series={[{ name: "Cost", color: "indigo.6" }]}
@@ -1800,8 +2086,8 @@ border-bottom: none;
                                                             field: "qty",
                                                             headerName: "Qty",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1809,8 +2095,8 @@ border-bottom: none;
                                                             field: "unit",
                                                             headerName: "Unit",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1818,8 +2104,8 @@ border-bottom: none;
                                                             field: "price",
                                                             headerName: "Price($)",
                                                             sortable: true,
-                                                            filter: true,
-                                                            floatingFilter: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
                                                             resizable: true,
                                                             flex: 1
                                                         },
@@ -1951,7 +2237,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             </Grid.Col>
                                             <Grid.Col span={10}>
                                                 <Text size="sm" fw={500}>
-                                                    {selectedTask?.sourceTask}
+                                                    {selectedTask?.sourceTask || "-"}
                                                 </Text>
                                             </Grid.Col>
                                         </Grid>
@@ -1965,7 +2251,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             </Grid.Col>
                                             <Grid.Col span={10}>
                                                 <Text size="sm" fw={500}>
-                                                    {selectedTask?.desciption}
+                                                    {selectedTask?.description || "-"}
                                                 </Text>
                                             </Grid.Col>
                                         </Grid>
@@ -2022,7 +2308,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             style={{
                                                 width: "100%",
                                                 border: "none",
-                                                height: "100%",
+                                                // height: "100%",
 
                                             }}
                                         >
@@ -2077,8 +2363,8 @@ border-bottom: none;
                                                         field: "qty",
                                                         headerName: "Qty",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },
@@ -2086,8 +2372,8 @@ border-bottom: none;
                                                         field: "unit",
                                                         headerName: "Unit",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },
@@ -2095,8 +2381,8 @@ border-bottom: none;
                                                         field: "price",
                                                         headerName: "Price($)",
                                                         sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
+                                                        // filter: true,
+                                                        // floatingFilter: true,
                                                         resizable: true,
                                                         flex: 1
                                                     },

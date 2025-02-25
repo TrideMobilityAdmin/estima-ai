@@ -13,6 +13,7 @@ import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
 import { SkillsFindingsDonutChart, SkillsTasksDonutChart } from "../components/skillwiseTasksDonut";
 import { showAppNotification } from "../components/showNotificationGlobally";
 import { DonutChart } from "@mantine/charts";
+import SkillRequirementAnalytics from "./skillReqAnalytics";
 
 export default function SkillRequirement() {
     const { validateTasks } = useApi();
@@ -184,191 +185,6 @@ export default function SkillRequirement() {
     // Calculate total avg time for tasks and findings
     const totalAvgTimeTasks = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks);
     const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings);
-
-    // const jsonData = {
-    //     "skillAnalysis": {
-    //         "tasks": [
-    //             {
-    //                 "taskId": "200435-01-1 (LH)",
-    //                 "taskDescription": "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
-    //                 "skills": [
-    //                     {
-    //                         "skill": "Skill 1",
-    //                         "manHours": {
-    //                             "min": 4,
-    //                             "avg": 6,
-    //                             "max": 8
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": "Skill 2",
-    //                         "manHours": {
-    //                             "min": 6,
-    //                             "avg": 4,
-    //                             "max": 4
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": "Skill 3",
-    //                         "manHours": {
-    //                             "min": 4,
-    //                             "avg": 4,
-    //                             "max": 4
-    //                         }
-    //                     }
-    //                 ]
-    //             },
-    //             {
-    //                 "taskId": "200435-01-4",
-    //                 "taskDescription": "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
-    //                 "skills": [
-    //                     {
-    //                         "skill": "skill 2",
-    //                         "manHours": {
-    //                             "min": 4,
-    //                             "avg": 4,
-    //                             "max": 4
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": "skill 1",
-    //                         "manHours": {
-    //                             "min": 3,
-    //                             "avg": 6,
-    //                             "max": 12
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": "skill 4",
-    //                         "manHours": {
-    //                             "min": 6,
-    //                             "avg": 4,
-    //                             "max": 12
-    //                         }
-    //                     }
-    //                 ]
-    //             }
-    //         ],
-    //         "findings": [
-    //             {
-    //                 "taskId": "200435-01-1 (LH)",
-    //                 "skills": [
-    //                     {
-    //                         "skill": 'skill 1',
-    //                         "manHours": {
-    //                             "min": 2,
-    //                             "avg": 4,
-    //                             "max": 6
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": 'skill 2',
-    //                         "manHours": {
-    //                             "min": 4,
-    //                             "avg": 4,
-    //                             "max": 6
-    //                         }
-    //                     },
-    //                     {
-    //                         "skill": 'skill 3',
-    //                         "manHours": {
-    //                             "min": 2,
-    //                             "avg": 2,
-    //                             "max": 2
-    //                         }
-    //                     }
-    //                 ]
-    //             },
-    //             {
-    //                 "taskId": "200435-01-1 (RH)",
-    //                 "skills": [
-    //                     {
-    //                         "skill": 'skill 1',
-    //                         "manHours": {
-    //                             "min": 2,
-    //                             "avg": 2,
-    //                             "max": 2
-    //                         }
-    //                     }
-    //                 ]
-    //             },
-    //             {
-    //                 "taskId": "200435-01-4",
-    //                 "skills": [
-    //                     {
-    //                         "skill": 'skill 1',
-    //                         "manHours": {
-    //                             "min": 2,
-    //                             "avg": 2,
-    //                             "max": 2
-    //                         }
-    //                     }
-    //                 ]
-    //             }
-    //         ]
-    //     }
-    // };
-    // const chartConfig: ApexOptions = {
-    //     chart: {
-    //         background: 'transparent',
-    //         type: 'donut',
-    //     },
-    //     title: {
-    //         text: 'Skill Distribution',
-    //         align: 'center',
-    //         style: {
-    //             fontSize: '16px',
-    //             fontWeight: 500,
-    //         },
-    //     },
-    //     plotOptions: {
-    //         pie: {
-    //             donut: {
-    //                 size: '65%',
-    //                 labels: {
-    //                     show: true,
-    //                     value: {
-    //                         show: true,
-    //                         fontSize: '16px',
-    //                         fontWeight: 600,
-    //                         formatter: (val: any) => `${val?.toFixed(1)}%`,
-    //                     },
-    //                     total: {
-    //                         show: true,
-    //                         fontSize: '16px',
-    //                         fontWeight: 600,
-    //                         formatter: (w: any) => {
-    //                             const total = w?.globals?.seriesTotals?.reduce((a: number, b: number) => a + b, 0);
-    //                             return `${total?.toFixed(1)} hrs`;
-    //                         },
-    //                     },
-    //                 },
-    //             },
-    //         },
-    //     },
-    //     dataLabels: {
-    //         enabled: true,
-    //         formatter: (val: number) => `${val?.toFixed(1)}%`,
-    //         style: {
-    //             fontSize: '14px',
-    //             fontWeight: 600,
-    //         },
-    //     },
-    //     legend: {
-    //         position: 'bottom',
-    //         fontSize: '14px',
-    //     },
-    //     stroke: {
-    //         width: 0,
-    //     },
-    //     tooltip: {
-    //         enabled: true,
-    //         y: {
-    //             formatter: (val: number) => `${val?.toFixed(1)} hrs`,
-    //         },
-    //     },
-    // };
-
 
     const TaskAccordion = ({ data }: { data: any[] }) => {
         const [taskSearch, setTaskSearch] = useState("");
@@ -938,7 +754,7 @@ export default function SkillRequirement() {
                         </>
                     }
                 />
-                <SimpleGrid cols={4}>
+                {/* <SimpleGrid cols={4}>
                     <Card withBorder radius='md' bg='#e1e6f7'>
                         <Group gap='lg' justify="space-between">
                             <Flex direction='column'>
@@ -1028,9 +844,194 @@ export default function SkillRequirement() {
                             <FindingAccordion data={skillAnalysisData?.skillAnalysis.findings} />
                         </ScrollArea>
                     </Card>
-                </SimpleGrid>
-
+                </SimpleGrid> */}
+                <SkillRequirementAnalytics skillAnalysisData={skillAnalysisData}/>
             </div>
         </>
     )
 }
+
+
+    // const jsonData = {
+    //     "skillAnalysis": {
+    //         "tasks": [
+    //             {
+    //                 "taskId": "200435-01-1 (LH)",
+    //                 "taskDescription": "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
+    //                 "skills": [
+    //                     {
+    //                         "skill": "Skill 1",
+    //                         "manHours": {
+    //                             "min": 4,
+    //                             "avg": 6,
+    //                             "max": 8
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": "Skill 2",
+    //                         "manHours": {
+    //                             "min": 6,
+    //                             "avg": 4,
+    //                             "max": 4
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": "Skill 3",
+    //                         "manHours": {
+    //                             "min": 4,
+    //                             "avg": 4,
+    //                             "max": 4
+    //                         }
+    //                     }
+    //                 ]
+    //             },
+    //             {
+    //                 "taskId": "200435-01-4",
+    //                 "taskDescription": "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
+    //                 "skills": [
+    //                     {
+    //                         "skill": "skill 2",
+    //                         "manHours": {
+    //                             "min": 4,
+    //                             "avg": 4,
+    //                             "max": 4
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": "skill 1",
+    //                         "manHours": {
+    //                             "min": 3,
+    //                             "avg": 6,
+    //                             "max": 12
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": "skill 4",
+    //                         "manHours": {
+    //                             "min": 6,
+    //                             "avg": 4,
+    //                             "max": 12
+    //                         }
+    //                     }
+    //                 ]
+    //             }
+    //         ],
+    //         "findings": [
+    //             {
+    //                 "taskId": "200435-01-1 (LH)",
+    //                 "skills": [
+    //                     {
+    //                         "skill": 'skill 1',
+    //                         "manHours": {
+    //                             "min": 2,
+    //                             "avg": 4,
+    //                             "max": 6
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": 'skill 2',
+    //                         "manHours": {
+    //                             "min": 4,
+    //                             "avg": 4,
+    //                             "max": 6
+    //                         }
+    //                     },
+    //                     {
+    //                         "skill": 'skill 3',
+    //                         "manHours": {
+    //                             "min": 2,
+    //                             "avg": 2,
+    //                             "max": 2
+    //                         }
+    //                     }
+    //                 ]
+    //             },
+    //             {
+    //                 "taskId": "200435-01-1 (RH)",
+    //                 "skills": [
+    //                     {
+    //                         "skill": 'skill 1',
+    //                         "manHours": {
+    //                             "min": 2,
+    //                             "avg": 2,
+    //                             "max": 2
+    //                         }
+    //                     }
+    //                 ]
+    //             },
+    //             {
+    //                 "taskId": "200435-01-4",
+    //                 "skills": [
+    //                     {
+    //                         "skill": 'skill 1',
+    //                         "manHours": {
+    //                             "min": 2,
+    //                             "avg": 2,
+    //                             "max": 2
+    //                         }
+    //                     }
+    //                 ]
+    //             }
+    //         ]
+    //     }
+    // };
+    // const chartConfig: ApexOptions = {
+    //     chart: {
+    //         background: 'transparent',
+    //         type: 'donut',
+    //     },
+    //     title: {
+    //         text: 'Skill Distribution',
+    //         align: 'center',
+    //         style: {
+    //             fontSize: '16px',
+    //             fontWeight: 500,
+    //         },
+    //     },
+    //     plotOptions: {
+    //         pie: {
+    //             donut: {
+    //                 size: '65%',
+    //                 labels: {
+    //                     show: true,
+    //                     value: {
+    //                         show: true,
+    //                         fontSize: '16px',
+    //                         fontWeight: 600,
+    //                         formatter: (val: any) => `${val?.toFixed(1)}%`,
+    //                     },
+    //                     total: {
+    //                         show: true,
+    //                         fontSize: '16px',
+    //                         fontWeight: 600,
+    //                         formatter: (w: any) => {
+    //                             const total = w?.globals?.seriesTotals?.reduce((a: number, b: number) => a + b, 0);
+    //                             return `${total?.toFixed(1)} hrs`;
+    //                         },
+    //                     },
+    //                 },
+    //             },
+    //         },
+    //     },
+    //     dataLabels: {
+    //         enabled: true,
+    //         formatter: (val: number) => `${val?.toFixed(1)}%`,
+    //         style: {
+    //             fontSize: '14px',
+    //             fontWeight: 600,
+    //         },
+    //     },
+    //     legend: {
+    //         position: 'bottom',
+    //         fontSize: '14px',
+    //     },
+    //     stroke: {
+    //         width: 0,
+    //     },
+    //     tooltip: {
+    //         enabled: true,
+    //         y: {
+    //             formatter: (val: number) => `${val?.toFixed(1)} hrs`,
+    //         },
+    //     },
+    // };

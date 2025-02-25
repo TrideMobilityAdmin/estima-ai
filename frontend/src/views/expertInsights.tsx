@@ -13,11 +13,12 @@ import {
   Modal,
   Center,
 } from '@mantine/core';
-import { IconPlus, IconSettings, IconSettingsPlus, IconTrash } from '@tabler/icons-react';
+import { IconSettingsPlus, IconTrash } from '@tabler/icons-react';
+import { useApi } from '../api/services/estimateSrvice';
 
 interface SparePart {
-  partID: any;
-  quantity: any;
+  partID: string;
+  quantity: number;
 }
 
 interface TaskRow {
@@ -28,207 +29,272 @@ interface TaskRow {
   spareParts: SparePart[];
 }
 
-interface InsightData {
+interface Thresholds {
+  tatThreshold: number;
+  manHoursThreshold: number;
+}
+
+interface ApiData {
   defaultProbability: number;
+  thresholds: Thresholds;
   miscLaborTasks: TaskRow[];
 }
 
 export default function ExpertInsights() {
+  const { getAllDataExpertInsights, updateProbabilityWiseDetails } = useApi();
   const [isEditMode, setIsEditMode] = useState(false);
   const [probability, setProbability] = useState<any>(50);
+  const [id, setId] = useState<string>('');
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [thresholds, setThresholds] = useState<Thresholds>({
+    tatThreshold: 12.0,
+    manHoursThreshold: 5.0
+  });
   const [partsModalOpen, setPartsModalOpen] = useState(false);
-  const [selectedTaskParts, setSelectedTaskParts] = useState<SparePart[]>([]);
-  const [newPart, setNewPart] = useState<SparePart>({ partID: '', quantity: 0 });
-  const [currentTaskID, setCurrentTaskID] = useState<string | null>(null);
+  const [selectedTaskParts, setSelectedTaskParts] = useState<any[]>([]);
+  const [newPart, setNewPart] = useState<any>({ partID: '', quantity: 0 });
+  const [currentTaskID, setCurrentTaskID] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/expert-insights');
-        const data: InsightData = await response.json();
-        setProbability(data.defaultProbability);
-        setTasks(data.miscLaborTasks);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-
-    fetchData();
+    fetchExpertInsights();
   }, []);
 
+  const fetchExpertInsights = async () => {
+    try {
+      const data = await getAllDataExpertInsights();
+      if (data && data.length > 0) {
+        const insightData = data[0];
+        setId(insightData._id);
+        setProbability(insightData.defaultProbability);
+        setThresholds(insightData.thresholds || {
+          tatThreshold: 12.0,
+          manHoursThreshold: 5.0
+        });
+        setTasks(insightData.miscLaborTasks);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
   const handleAddTask = () => {
-    setTasks([...tasks, createEmptyTask()]);
+    const newTask: TaskRow = {
+      taskID: '',
+      taskDescription: '',
+      skill: '',
+      manHours: 0,
+      spareParts: [],
+    };
+    setTasks(prevTasks => [...prevTasks, newTask]);
   };
 
-  const createEmptyTask = (): TaskRow => ({
-    taskID: Date.now().toString(),
-    taskDescription: '',
-    skill: '',
-    manHours: 0,
-    spareParts: [],
-  });
-
-  const handleUpdateTask = (id: string, field: keyof TaskRow, value: any) => {
-    setTasks(tasks.map(task => 
-      task.taskID === id ? { ...task, [field]: value } : task
-    ));
+  const handleUpdateTask = (index: number, field: keyof TaskRow, value: any) => {
+    setTasks(prevTasks => {
+      const updatedTasks = [...prevTasks];
+      updatedTasks[index] = {
+        ...updatedTasks[index],
+        [field]: value
+      };
+      return updatedTasks;
+    });
   };
 
-  const handleDeleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.taskID !== id));
+  const handleDeleteTask = (index: number) => {
+    setTasks(prevTasks => prevTasks.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
-    const data: InsightData = {
-      defaultProbability: probability,
-      miscLaborTasks: tasks,
-    };
-
-    console.log('Edited Data:', data); // Log the edited data
-
     try {
-      const response = await fetch('/api/expert-insights', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        setIsEditMode(false);
+      // Validate if all taskIDs are filled
+      const emptyTaskIDs = tasks.some(task => !task.taskID.trim());
+      if (emptyTaskIDs) {
+        alert('Please fill in all Task IDs before saving');
+        return;
       }
+
+      // Prepare data in the exact required format
+      const apiData: ApiData = {
+        defaultProbability: Number(probability),
+        thresholds: {
+          tatThreshold: thresholds.tatThreshold,
+          manHoursThreshold: thresholds.manHoursThreshold
+        },
+        miscLaborTasks: tasks.map(task => ({
+          taskID: task.taskID,
+          taskDescription: task.taskDescription,
+          skill: task.skill,
+          manHours: Number(task.manHours),
+          spareParts: task.spareParts.map(part => ({
+            partID: part.partID,
+            quantity: Number(part.quantity)
+          }))
+        }))
+      };
+
+      // Call the update service with the exact data structure
+      await updateProbabilityWiseDetails(id, apiData);
+      setIsEditMode(false);
+      
+      // Refresh the data
+      await fetchExpertInsights();
     } catch (error) {
       console.error('Error saving data:', error);
     }
   };
 
-  const openPartsModal = (task: TaskRow) => {
-    setSelectedTaskParts(task.spareParts);
-    setCurrentTaskID(task.taskID);
+  const openPartsModal = (task: TaskRow, index: number) => {
+    setSelectedTaskParts([...task.spareParts]);
+    setCurrentTaskID(index);
     setPartsModalOpen(true);
+    setNewPart({ partID: '', quantity: 0 });
   };
 
   const handleAddPart = () => {
-    if (newPart.partID && newPart.quantity > 0) {
-      setSelectedTaskParts([...selectedTaskParts, newPart]);
+    if (newPart.partID.trim() && newPart.quantity > 0) {
+      setSelectedTaskParts(prevParts => [...prevParts, { ...newPart }]);
       setNewPart({ partID: '', quantity: 0 });
     }
   };
 
+  const handleDeletePart = (index: number) => {
+    setSelectedTaskParts(prevParts => prevParts.filter((_, i) => i !== index));
+  };
+
   const handleSaveParts = () => {
-    const updatedTasks = tasks.map(task => 
-      task.taskID === currentTaskID ? { ...task, spareParts: selectedTaskParts } : task
-    );
-    setTasks(updatedTasks);
-    setPartsModalOpen(false);
+    if (currentTaskID !== null) {
+      const taskIndex = currentTaskID;
+      setTasks(prevTasks => {
+        const updatedTasks = [...prevTasks];
+        updatedTasks[taskIndex] = {
+          ...updatedTasks[taskIndex],
+          spareParts: [...selectedTaskParts]
+        };
+        return updatedTasks;
+      });
+      setPartsModalOpen(false);
+    }
   };
 
   return (
-    <div style={{ paddingLeft: 80, paddingRight: 80, paddingTop: 20, paddingBottom: 20 }}>
-      <Stack gap="md" p="md">
+    <div style={{ padding: '20px 80px' }}>
+      <Stack gap="md">
         <Group justify="right" gap="md">
-          <Switch 
-            label="Enable Edit Mode" 
-            checked={isEditMode} 
-            onChange={(event) => {
-              setIsEditMode(event.currentTarget.checked);
-            }} 
+          <Switch
+            label="Enable Edit Mode"
+            checked={isEditMode}
+            onChange={(event) => setIsEditMode(event.currentTarget.checked)}
           />
-          <Button color='green' onClick={handleSave} disabled={!isEditMode}>Save</Button>
+          <Button color="green" onClick={handleSave} disabled={!isEditMode}>
+            Save
+          </Button>
         </Group>
 
         <Card shadow="sm" p="lg">
           <NumberInput
-            w='20vw'
+            w="20vw"
             label="Probability"
             value={probability}
             onChange={(value) => setProbability(value || 0)}
             disabled={!isEditMode}
-            suffix='%'
+            suffix="%"
+            min={0}
+            max={100}
           />
         </Card>
 
         <Card shadow="sm" p="lg">
           <Group justify="right" mb="md">
-            <Button color='#00065e' onClick={handleAddTask} disabled={!isEditMode}>Add Task</Button>
+            <Button
+              color="#00065e"
+              onClick={handleAddTask}
+              disabled={!isEditMode}
+            >
+              Add Task
+            </Button>
           </Group>
 
-          <ScrollArea scrollHideDelay={0} w="100%" style={{ maxWidth: '100%', overflowX: 'auto' }}>
-            <Card>
-              <Table highlightOnHover withTableBorder withColumnBorders>
-                <thead>
-                  <tr>
-                    <th style={{ minWidth: '180px' }}>Task ID</th>
-                    <th style={{ minWidth: '220px' }}>Task Description</th>
-                    <th style={{ minWidth: '100px' }}>Skill</th>
-                    <th style={{ minWidth: '120px' }}>Man Hours</th>
-                    <th style={{ minWidth: '120px' }}>Parts</th>
-                    <th style={{ minWidth: '120px' }}>Actions</th>
+          <ScrollArea>
+            <Table highlightOnHover withTableBorder withColumnBorders>
+              <thead>
+                <tr>
+                  <th style={{ minWidth: '180px' }}>Task ID</th>
+                  <th style={{ minWidth: '220px' }}>Task Description</th>
+                  <th style={{ minWidth: '100px' }}>Skill</th>
+                  <th style={{ minWidth: '120px' }}>Man Hours</th>
+                  <th style={{ minWidth: '120px' }}>Parts</th>
+                  <th style={{ minWidth: '120px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((task, index) => (
+                  <tr key={index}>
+                    <td>
+                      <TextInput
+                        value={task.taskID}
+                        onChange={(e) =>
+                          handleUpdateTask(index, 'taskID', e.target.value)
+                        }
+                        disabled={!isEditMode}
+                        placeholder="Enter Task ID"
+                      />
+                    </td>
+                    <td>
+                      <TextInput
+                        value={task.taskDescription}
+                        onChange={(e) =>
+                          handleUpdateTask(index, 'taskDescription', e.target.value)
+                        }
+                        disabled={!isEditMode}
+                        placeholder="Enter Description"
+                      />
+                    </td>
+                    <td>
+                      <TextInput
+                        value={task.skill}
+                        onChange={(e) =>
+                          handleUpdateTask(index, 'skill', e.target.value)
+                        }
+                        disabled={!isEditMode}
+                        placeholder="Enter Skill"
+                      />
+                    </td>
+                    <td>
+                      <NumberInput
+                        value={task.manHours}
+                        onChange={(value) =>
+                          handleUpdateTask(index, 'manHours', value || 0)
+                        }
+                        disabled={!isEditMode}
+                        min={0}
+                        placeholder="Enter Hours"
+                      />
+                    </td>
+                    <td>
+                      <Center>
+                        <ActionIcon
+                          variant="light"
+                          color="cyan"
+                          onClick={() => openPartsModal(task, index)}
+                          disabled={!isEditMode}
+                        >
+                          <IconSettingsPlus />
+                        </ActionIcon>
+                      </Center>
+                    </td>
+                    <td>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        disabled={!isEditMode}
+                        onClick={() => handleDeleteTask(index)}
+                      >
+                        <IconTrash size="1.125rem" />
+                      </ActionIcon>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {tasks.map((task) => {
-                    const isRowEditable = isEditMode;
-                    return (
-                      <tr key={task.taskID}>
-                        <td>
-                          <TextInput
-                            value={task.taskID}
-                            onChange={(e) => handleUpdateTask(task.taskID, 'taskID', e.target.value)}
-                            disabled={!isRowEditable}
-                          />
-                        </td>
-                        <td>
-                          <TextInput
-                            value={task.taskDescription}
-                            onChange={(e) => handleUpdateTask(task.taskID, 'taskDescription', e.target.value)}
-                            disabled={!isRowEditable}
-                          />
-                        </td>
-                        <td>
-                          <TextInput
-                            value={task.skill}
-                            onChange={(e) => handleUpdateTask(task.taskID, 'skill', e.target.value)}
-                            disabled={!isRowEditable}
-                          />
-                        </td>
-                        <td>
-                          <NumberInput
-                            value={task.manHours}
-                            onChange={(value) => handleUpdateTask(task.taskID, 'manHours', value)}
-                            disabled={!isRowEditable}
-                          />
-                        </td>
-                        <td>
-                          <Center>
-                            <ActionIcon 
-                              variant="light" 
-                              color="cyan"
-                              onClick={() => openPartsModal(task)} 
-                              disabled={!isRowEditable}
-                            >
-                              <IconSettingsPlus />
-                            </ActionIcon>
-                          </Center>
-                        </td>
-                        <td>
-                          <Group gap="xs">
-                            <ActionIcon
-                              variant='light'
-                              color="red"
-                              disabled={!isEditMode}
-                              onClick={() => handleDeleteTask(task.taskID)}
-                            >
-                              <IconTrash size="1.125rem" />
-                            </ActionIcon>
-                          </Group>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </Card>
+                ))}
+              </tbody>
+            </Table>
           </ScrollArea>
         </Card>
 
@@ -237,58 +303,97 @@ export default function ExpertInsights() {
           onClose={() => setPartsModalOpen(false)}
           title="Spare Parts"
         >
-          <Group justify='right'>
-          <Button leftSection={<IconSettingsPlus size={20}/>} size='xs' variant='light' onClick={handleAddPart} style={{ marginBottom: '10px' }}>Add Part</Button>
-          </Group>
-          
-          <Table>
-            <thead>
-              <tr>
-                <th>Part ID</th>
-                <th>Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedTaskParts.map((part, index) => (
-                <tr key={index}>
-                  <td>{part.partID}</td>
-                  <td>{part.quantity}</td>
-                  <td>
-                    <ActionIcon
-                      variant='light'
-                      color="red"
-                      onClick={() => {
-                        const updatedParts = selectedTaskParts.filter((_, i) => i !== index);
-                        setSelectedTaskParts(updatedParts);
-                      }}
-                    >
-                      <IconTrash size="1.125rem" />
-                    </ActionIcon>
-                  </td>
+          <Stack gap="md">
+            <Group justify="right">
+              <Button
+                leftSection={<IconSettingsPlus size={20} />}
+                size="xs"
+                variant="light"
+                onClick={handleAddPart}
+              >
+                Add Part
+              </Button>
+            </Group>
+
+            <Table>
+              <thead>
+                <tr>
+                  <th>Part ID</th>
+                  <th>Quantity</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-              <tr>
-                <td>
-                  <TextInput
-                    placeholder="Part ID"
-                    value={newPart.partID}
-                    onChange={(e) => setNewPart({ ...newPart, partID: e.target.value })}
-                  />
-                </td>
-                <td>
-                  <NumberInput
-                    placeholder="Quantity"
-                    value={newPart.quantity}
-                    onChange={(value) => setNewPart({ ...newPart, quantity: value || 0 })}
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </Table>
-          <Group justify='right'>
-          <Button size='xs' variant='filled' color='green' onClick={handleSaveParts} style={{ marginTop: '10px' }}>Save Parts</Button>
-          </Group>
-          
+              </thead>
+              <tbody>
+                {selectedTaskParts.map((part, index) => (
+                  <tr key={index}>
+                    <td>
+                      <TextInput
+                        value={part.partID}
+                        onChange={(e) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].partID = e.target.value;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <NumberInput
+                        value={part.quantity}
+                        onChange={(value) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].quantity = value || 0;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                        min={0}
+                      />
+                    </td>
+                    <td>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        onClick={() => handleDeletePart(index)}
+                      >
+                        <IconTrash size="1.125rem" />
+                      </ActionIcon>
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td>
+                    <TextInput
+                      placeholder="Part ID"
+                      value={newPart.partID}
+                      onChange={(e) =>
+                        setNewPart({ ...newPart, partID: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <NumberInput
+                      placeholder="Quantity"
+                      value={newPart.quantity}
+                      onChange={(value) =>
+                        setNewPart({ ...newPart, quantity: value || 0 })
+                      }
+                      min={0}
+                    />
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </Table>
+
+            <Group justify="right">
+              <Button
+                size="xs"
+                variant="filled"
+                color="green"
+                onClick={handleSaveParts}
+              >
+                Save Parts
+              </Button>
+            </Group>
+          </Stack>
         </Modal>
       </Stack>
     </div>
