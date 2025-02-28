@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput } from "@mantine/core";
+import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput, Center } from "@mantine/core";
 import { IconAlertTriangle, IconClock, IconCube } from "@tabler/icons-react";
 import SkillsDonutChart from "../components/skillsDonut"; // Assuming this is your chart component
 
@@ -13,8 +13,8 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         }, 0);
     };
 
-    const totalAvgTimeTasks = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks)?.toFixed(2);
-    const totalAvgTimeFindings = calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings)?.toFixed(2);
+    const totalAvgTimeTasks = Math.round(calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks) || 0);
+const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings) || 0);
 
     const [donutData, setDonutData] = useState([]);
 
@@ -350,7 +350,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
 
     return (
         <>
-            <SimpleGrid cols={4}>
+            <SimpleGrid cols={4} pt={10}>
                 <Card withBorder radius='md' bg='#e1e6f7'>
                     <Group gap='lg' justify="space-between">
                         <Flex direction='column'>
@@ -392,31 +392,68 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             </SimpleGrid>
             <Space h='sm' />
             <SimpleGrid cols={2}>
-                <Card withBorder h='85vh' shadow="sm">
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
                     <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                         <Text fw={600} size="lg" mb="sm">MPD</Text>
                         <TaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
                     </ScrollArea>
+                    
                 </Card>
-                <Card withBorder h='85vh' shadow="sm">
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
                     <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                         <Text fw={600} size="lg" mb="sm">Findings</Text>
                         <FindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
                     </ScrollArea>
                 </Card>
             </SimpleGrid>
             <Space h='sm' />
             <SimpleGrid cols={2}>
-                <Card withBorder h='85vh' shadow="sm">
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
                     <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                         <Text fw={600} size="lg" mb="sm">Skill - Tasks</Text>
                         <SkillTaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
                     </ScrollArea>
                 </Card>
-                <Card withBorder h='85vh' shadow="sm">
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
                     <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                         <Text fw={600} size="lg" mb="sm">Skill - Findings</Text>
                         <SkillFindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
                     </ScrollArea>
                 </Card>
             </SimpleGrid>

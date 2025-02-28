@@ -114,7 +114,7 @@ export default function SkillRequirement() {
             if (response) {
                 setSkillAnalysisData(response);
                 processDonutData(response?.skillAnalysis);
-                showAppNotification("success", "Skill analysis!", "Successfully Generated Skill Analysis");
+                // showAppNotification("success", "Skill analysis!", "Successfully Generated Skill Analysis");
             }
         } catch (error) {
             showAppNotification("error", "Failed!", "Failed Generating, try agian");

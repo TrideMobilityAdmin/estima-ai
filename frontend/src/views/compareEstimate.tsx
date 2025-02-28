@@ -166,11 +166,11 @@ export default function CompareEstimate() {
   ) || [];
 
   const estimatedData = compareEstimatedData?.comparisonResults.map(
-    (result: any) => result.estimated?.toFixed(2)
+    (result: any) => result.estimated?.toFixed(0)
   ) || [];
 
   const actualData = compareEstimatedData?.comparisonResults.map(
-    (result: any) => result.actual?.toFixed(2)
+    (result: any) => result.actual?.toFixed(0)
   ) || [];
 
   // Prepare data for radial chart
@@ -286,7 +286,7 @@ export default function CompareEstimate() {
             mb='sm'
             radius='md'
             variant='light'
-            rightSection={<IconArrowMoveRight />}
+            // rightSection={<IconArrowMoveRight />}
             color='#000087'
           >
             Compare
@@ -363,11 +363,11 @@ export default function CompareEstimate() {
             <Group justify="space-between">
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Estimated</Text>
-                <Text fw={600} fz="lg">{manHours?.estimated?.toFixed(2) || 0}</Text>
+                <Text fw={600} fz="lg">{manHours?.estimated?.toFixed(0) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Actual</Text>
-                <Text fw={600} fz="lg">{manHours?.actual?.toFixed(2) || 0}</Text>
+                <Text fw={600} fz="lg">{manHours?.actual?.toFixed(0) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Difference</Text>
@@ -376,7 +376,8 @@ export default function CompareEstimate() {
                   fz="lg"
                   c={Number(calculateDifference(manHours)) >= 0 ? '#F20000' : '#088A45'}
                 >
-                  {calculateDifference(manHours)} Hrs
+                  {/* {calculateDifference(manHours)} Hrs */}
+                  {manHours?.actual?.toFixed(0) - manHours?.estimated?.toFixed(0) || 0}
                 </Text>
               </Flex>
             </Group>
@@ -404,6 +405,7 @@ export default function CompareEstimate() {
                   fz="lg"
                   c={Number(calculateDifference(spareCost)) >= 0 ? '#F20000' : '#088A45'}
                 >
+                  {/* {spareCost?.actual?.toFixed(0) - spareCost?.estimated?.toFixed(0) || 0} */}
                   {calculateDifference(spareCost)} $
                 </Text>
               </Flex>
@@ -419,11 +421,11 @@ export default function CompareEstimate() {
             <Group justify="space-between">
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Estimated</Text>
-                <Text fw={600} fz="lg">{tatTime?.estimated?.toFixed(2) || 0}</Text>
+                <Text fw={600} fz="lg">{tatTime?.estimated?.toFixed(0) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Actual</Text>
-                <Text fw={600} fz="lg">{tatTime?.actual?.toFixed(2) || 0}</Text>
+                <Text fw={600} fz="lg">{tatTime?.actual?.toFixed(0) || 0}</Text>
               </Flex>
               <Flex direction="column" justify="center" align="center">
                 <Text fw={400} fz="sm">Difference</Text>
@@ -432,7 +434,8 @@ export default function CompareEstimate() {
                   fz="lg"
                   c={Number(calculateDifference(tatTime)) >= 0 ? '#F20000' : '#088A45'}
                 >
-                  {calculateDifference(tatTime)} Hrs
+                  {/* {calculateDifference(tatTime)} Hrs */}
+                  {tatTime?.actual?.toFixed(0) - tatTime?.estimated?.toFixed(0) || 0}
                 </Text>
               </Flex>
             </Group>
@@ -551,12 +554,12 @@ export default function CompareEstimate() {
                 yaxis: [
                   {
                     title: { text: "Estimated (Bar)" },
-                    labels: { formatter: (val: number) => `${val.toFixed(2)}` },
+                    labels: { formatter: (val: number) => `${val.toFixed(0)}` },
                   },
                   {
                     opposite: true,
                     title: { text: "Actual (Line)" },
-                    labels: { formatter: (val: number) => `${val.toFixed(2)}` },
+                    labels: { formatter: (val: number) => `${val.toFixed(0)}` },
                   },
                 ],
                 tooltip: { shared: true },
