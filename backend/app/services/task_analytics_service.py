@@ -995,9 +995,8 @@ class TaskService:
         logger.info(f"Fetching estimate by ID: {estimate_id}")
 
         try:
-            # Define the aggregation pipeline
             pipeline = [
-                {'$match': {'estID': estimate_id}},  # Matching string ID
+                {'$match': {'estID': estimate_id}},  
                 {'$lookup': {
                     'from': 'estimate_file_upload',
                     'localField': 'estID',
@@ -1025,6 +1024,19 @@ class TaskService:
                         }
                     }
                 }},
+                {
+                    '$addFields': {
+                        'tatTime': {
+                            '$divide': [
+                                {
+                                    '$add': [
+                                        '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
+                                        ]
+                                }, 20
+                            ]
+                        }
+                    }
+                },
                 {'$project': {
                     '_id': {'$toString': '$_id'},
                     'estID': 1,
@@ -1049,7 +1061,8 @@ class TaskService:
                     'createdAt': 1,
                     'lastUpdated': 1,
                     'createdBy': 1,
-                    'updatedBy': {'$toString': '$updatedBy'}
+                    'updatedBy': {'$toString': '$updatedBy'},
+                    'tatTime': 1
                 }}
             ]
 
@@ -1381,7 +1394,7 @@ class TaskService:
             }, {
                 '$project': {
                     '_id': 0, 
-                    'estID': 'PWLFYCHAAUL99EC5', 
+                    'estID': estimate_id, 
                     'estProb': [
                         {
                             'prob': 0.1, 
