@@ -219,33 +219,7 @@ class ExcelUploadService:
                 status_code=500,
                 detail=f"Error processing Excel file: {str(e)}"
             )
-    # def save_to_mongodb(self, data: Dict[str, Any]) -> Dict[str, Any]:
-    #     try:
-    #         result = self.collection.insert_one(data)
-    #         return {
-    #             "status": "success",
-    #             "inserted_count": str(result.inserted_id),
-    #             "message": "Data successfully saved to database"
-    #         }
-    #     except Exception as e:
-    #         logger.error(f"MongoDB insertion error: {str(e)}")
-    #         raise HTTPException(
-    #             status_code=500,
-    #             detail=f"Database error: {str(e)}"
-    #         )
-
-    # async def upload_excel(self, file: UploadFile = File(...)) -> Dict[str, Any]:
-    #     await self.validate_excel_file(file)
-    #     json_data = await self.process_file(file)
-    #     result = self.save_to_mongodb(json_data)
-        
-    #     return {
-    #         "estID":json_data["estID"],
-    #         "message": "File uploaded and processed successfully",
-    #         "filename": file.filename,
-    #         "records_inserted": result["inserted_count"],
-    #         "status": "success"
-    #     }
+   
     
     async def compare_estimates(self, estimate_id,file: UploadFile = File(...)) -> ComparisonResponse:
         await self.validate_excel_file(file)
