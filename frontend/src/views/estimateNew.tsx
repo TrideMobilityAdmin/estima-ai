@@ -299,7 +299,7 @@ export default function EstimateNew() {
         const validTasks = validatedSkillsTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
 
         if (validTasks.length === 0) {
-            showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
+            // showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
             return null; // Return null to indicate no response
         }
 
@@ -316,11 +316,11 @@ export default function EstimateNew() {
 
             // if (response) {
             setSkillAnalysisData(response);
-            showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
+            // showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
             return response; // Return the response
             // }
         } catch (error) {
-            showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
+            // showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
             console.error("API Error:", error);
         } finally {
             setLoading(false);
@@ -944,10 +944,10 @@ export default function EstimateNew() {
                                         size="xs"
                                         leftSection={<MdPin />}
                                         placeholder="Ex: 0.5"
-                                        label="Probability"
-                                        min={0.1}
-                                        max={1}
-                                        step={0.1}
+                                        label="Select Probability"
+                                        min={10}
+                                        max={100}
+                                        step={10}
                                         //   precision={2}
                                         {...form.getInputProps("probability")}
                                     />
@@ -990,7 +990,7 @@ export default function EstimateNew() {
                                     <TextInput
                                         size="xs"
                                         leftSection={<MdPin />}
-                                        placeholder="Ex:50"
+                                        placeholder="Ex: Area"
                                         label="Area of Operations"
                                         {...form.getInputProps("areaOfOperations")}
                                     />
@@ -1304,7 +1304,6 @@ border-bottom: none;
                                                             // setOpened(true);
                                                         }}
                                                     >
-
                                                         <IconReport />
                                                     </ActionIcon>
                                                 </Tooltip>
@@ -1364,6 +1363,21 @@ border-bottom: none;
 
                 <Space h='sm' />
                 {
+                    estimateReportData !== null ? (
+                        <Group>
+                                                <Title order={4} c='gray'>
+                                                    Selected Estimate  :
+                                                </Title>
+                                                <Title order={4}>
+                                                    {estimateReportData?.estID || "-"}
+                                                </Title>
+                                            </Group>
+                    ) : (
+                        <></>
+                    )
+                }
+                
+                {
                     value === 'estimate' ? (
                         <>
                             {
@@ -1385,14 +1399,14 @@ border-bottom: none;
                                         <Group justify="space-between">
                                             <Group>
                                                 <Title order={4} c='gray'>
-                                                    Overall Estimate Report :
+                                                    Overall Estimate Report 
                                                 </Title>
-                                                <Title order={4}>
+                                                {/* <Title order={4}>
                                                     {estimateReportData?.estID || "-"}
-                                                </Title>
+                                                </Title> */}
                                             </Group>
 
-                                            <Button
+                                            {/* <Button
                                                 size="xs"
                                                 variant="filled"
                                                 color="#1bb343"
@@ -1402,7 +1416,7 @@ border-bottom: none;
                                                 loading={downloading}
                                             >
                                                 {downloading ? "Downloading..." : "Download Estimate"}
-                                            </Button>
+                                            </Button> */}
                                         </Group>
 
                                         <Space h='sm' />
@@ -1477,7 +1491,7 @@ interface Task {
 interface FindingDetail {
     logItem: string;
     probability: any;
-    desciption: string;
+    description: string;
     mhs: ManHours;
     spareParts: any[];
 }
@@ -1796,7 +1810,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                             <Card h="100%" w="100%" p="md" bg="none">
                                 <Group>
                                     <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                        Source Tasks
+                                        Total Source Tasks
                                     </Text>
                                     <Text size="md" fw={500} mb="xs">
                                         {tasks?.length}
@@ -1930,8 +1944,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                         // paddingRight: '10px'
                                     }}
                                 >
-                                    {selectedFinding ? (
-                                        <>
+                                    {/* {selectedFinding ? (
+                                        <> */}
                                             <Grid>
                                                 <Grid.Col span={2}>
                                                     <Text size="md" fw={500} c="dimmed">
@@ -1940,7 +1954,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 </Grid.Col>
                                                 <Grid.Col span={10}>
                                                     <Text size="sm" fw={500}>
-                                                        {selectedFinding?.logItem}
+                                                        {selectedFinding?.logItem || "-"}
                                                     </Text>
                                                 </Grid.Col>
                                             </Grid>
@@ -1954,7 +1968,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 </Grid.Col>
                                                 <Grid.Col span={10}>
                                                     <Text size="sm" fw={500}>
-                                                        {selectedFinding?.desciption}
+                                                        {selectedFinding?.description || "-"}
                                                     </Text>
                                                 </Grid.Col>
                                             </Grid>
@@ -1972,7 +1986,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     </Grid.Col>
                                                     <Grid.Col span={2}>
                                                         <Text size="sm" fw={600} c="#E07B39">
-                                                            {selectedFinding?.probability} %
+                                                            {selectedFinding?.probability || 0} %
                                                         </Text>
                                                     </Grid.Col>
                                                 </Grid>
@@ -1988,7 +2002,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Min</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min || 0} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockDown color="green" size='25' />
                                                     </Group>
@@ -1997,7 +2011,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Max</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max || 0} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockUp color="red" size='25' />
                                                     </Group>
@@ -2005,8 +2019,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 <Card bg='#f3f7da' shadow="0" radius='md'>
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
-                                                            <Text fz='xs'>Average</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg || 0} Hr</Text>
+                                                            <Text fz='xs'>Avg</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCode color="orange" size='25' />
                                                     </Group>
@@ -2014,8 +2028,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 <Card bg='#dae8f7' shadow="0" radius='md'>
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
-                                                            <Text fz='xs'>Estimated</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est || 0} Hr</Text>
+                                                            <Text fz='xs'>Est</Text>
+                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCheck color="indigo" size='25' />
                                                     </Group>
@@ -2031,7 +2045,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 style={{
                                                     width: "100%",
                                                     border: "none",
-                                                    height: "100%",
+                                                    // height: "100%",
 
                                                 }}
                                             >
@@ -2112,10 +2126,10 @@ border-bottom: none;
                                                     ]}
                                                 />
                                             </div>
-                                        </>
+                                        {/* </>
                                     ) : (
                                         <Text>Select a finding to view details.</Text>
-                                    )}
+                                    )} */}
                                 </div>
                             </Card>
                         </Grid.Col>
@@ -2161,7 +2175,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                         <Card h="100%" w="100%" p="md" bg="none">
                             <Group>
                                 <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                    Source Tasks
+                                    Total Source Tasks
                                 </Text>
                                 <Text size="md" fw={500} mb="xs">
                                     {tasks?.length}
@@ -2265,7 +2279,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                                 <Group justify="space-between" align="start">
                                                     <Flex direction='column'>
                                                         <Text fz='xs'>Min</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.min || 0} Hr</Text>
+                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.min?.toFixed(0) || 0} Hr</Text>
                                                     </Flex>
                                                     <IconClockDown color="green" size='25' />
                                                 </Group>
@@ -2274,7 +2288,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                                 <Group justify="space-between" align="start">
                                                     <Flex direction='column'>
                                                         <Text fz='xs'>Max</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.max || 0} Hr</Text>
+                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.max?.toFixed(0) || 0} Hr</Text>
                                                     </Flex>
                                                     <IconClockUp color="red" size='25' />
                                                 </Group>
@@ -2283,7 +2297,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                                 <Group justify="space-between" align="start">
                                                     <Flex direction='column'>
                                                         <Text fz='xs'>Average</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg || 0} Hr</Text>
+                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
                                                     </Flex>
                                                     <IconClockCode color="orange" size='25' />
                                                 </Group>
@@ -2292,7 +2306,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                                 <Group justify="space-between" align="start">
                                                     <Flex direction='column'>
                                                         <Text fz='xs'>Estimated</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.est || 0} Hr</Text>
+                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.est?.toFixed(0) || 0} Hr</Text>
                                                     </Flex>
                                                     <IconClockCheck color="indigo" size='25' />
                                                 </Group>
@@ -2366,7 +2380,14 @@ border-bottom: none;
                                                         // filter: true,
                                                         // floatingFilter: true,
                                                         resizable: true,
-                                                        flex: 1
+                                                        flex: 1,
+                                                        cellRenderer: (val: any) => {
+                                                            return (
+                                                              <Text>
+                                                                {val?.data?.qty?.toFixed(2) || 0}
+                                                              </Text>
+                                                            );
+                                                          },
                                                     },
                                                     {
                                                         field: "unit",
@@ -2384,7 +2405,14 @@ border-bottom: none;
                                                         // filter: true,
                                                         // floatingFilter: true,
                                                         resizable: true,
-                                                        flex: 1
+                                                        flex: 1,
+                                                        cellRenderer: (val: any) => {
+                                                            return (
+                                                              <Text>
+                                                                {val?.data?.price?.toFixed(4) || 0}
+                                                              </Text>
+                                                            );
+                                                          },
                                                     },
                                                 ]}
                                             />
