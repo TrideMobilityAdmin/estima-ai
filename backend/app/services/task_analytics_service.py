@@ -801,13 +801,13 @@ class TaskService:
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
             sub_task_aircraft_details_result = list(self.subtaskparts_collection.aggregate(sub_task_aircraft_details))
 
-            logger.info(f"Results of task_parts: {task_parts_result}\n")
-            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}\n")
-            logger.info(f"Results of aircraft_details: {sub_task_aircraft_details_result}\n")
+            logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
+            logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
+            logger.info(f"Results of aircraft_details: {len(sub_task_aircraft_details_result)}\n")
 
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
-                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
+                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
             # Construct final output
             output = {
                 "partId": part_id,
@@ -815,8 +815,8 @@ class TaskService:
                 "usage": {
                     "tasks": [
                         {
-                            "taskId": t["taskId"],
-                            "taskDescription": t["taskDescription"],
+                            "taskId": t.get("taskId",""),
+                            "taskDescription": t.get("taskDescription",""),
                             "packages": [
                                 {"packageId": pkg["packageId"], "date": pkg["date"], "quantity": pkg["quantity"]}
                                 for pkg in t.get("packages", [])
@@ -826,8 +826,8 @@ class TaskService:
                     ],
                     "findings": [
                         {
-                            "taskId": f["taskId"],
-                            "taskDescription": f["taskDescription"],
+                            "taskId": f.get("taskId", ""),
+                            "taskDescription": f.get("taskDescription", ""),
                             "packages": [
                                 {
                                             "packageId": pkg["packageId"],
@@ -874,7 +874,7 @@ class TaskService:
 
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
-            logger.error(f"Error fetching parts usage: {str(e)}")
+            logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
     
     
@@ -936,6 +936,12 @@ class TaskService:
             
             logger.info(f"Retrieved skill analysis for tasks: {task_skill_results}")
             logger.info(f"Retrieved skill analysis for sub-tasks: {sub_task_skill_results}")
+            if not task_skill_results and not sub_task_skill_results:
+                logger.info("No data found for both tasks and sub-tasks")
+                return {
+                    "skillAnalysis": {},
+                    "response": {"statusCode": 404, "message": "No data found for the specified tasks"}
+                }
 
             # Process results into response format
             tasks = [
