@@ -45,9 +45,9 @@ class TaskService:
         # self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
-        self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
+        self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
-        
+        self.configurations_collection=self.mongo_client.get_collection("configurations")
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -151,22 +151,22 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
-    async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
-        """
-        Create a estimate status based on the provided tasks and parameters.
-        """
-        try:
-            estimate_id = await self._generate_estimateid()
-            estimate_status_doc = {
-                "estID": estimate_id,
-                "status":"Initiated"
-            }
-            self.estimates_status_collection.insert_one(estimate_status_doc)
-            response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
-            return response
-        except Exception as e:
-            logger.error(f"Error creating estimate status: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
+    # async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
+    #     """
+    #     Create a estimate status based on the provided tasks and parameters.
+    #     """
+    #     try:
+    #         estimate_id = await self._generate_estimateid()
+    #         estimate_status_doc = {
+    #             "estID": estimate_id,
+    #             "status":"Initiated"
+    #         }
+    #         self.estimates_status_collection.insert_one(estimate_status_doc)
+    #         response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
+    #         return response
+    #     except Exception as e:
+    #         logger.error(f"Error creating estimate status: {str(e)}")
+    #         raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
 
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
@@ -988,7 +988,10 @@ class TaskService:
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return {"error": f"An error occurred while processing the request: {str(e)}"}
+            return {
+                "skillAnalysis": {},
+            "response": {"statusCode": 404, "message": f"An error occurred while processing the request: {str(e)}"}
+            }
             # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
    
@@ -999,78 +1002,164 @@ class TaskService:
         Returns raw aggregation result directly from MongoDB
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
+        configurations = self.configurations_collection.find_one()
+        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        
 
         try:
             pipeline = [
-                {'$match': {'estID': estimate_id}},  
-                {'$lookup': {
-                    'from': 'estimate_file_upload',
-                    'localField': 'estID',
-                    'foreignField': 'estID',
-                    'as': 'estimate'
-                }},
-                {'$unwind': {'path': '$estimate', 'preserveNullAndEmptyArrays': True}},
-                {'$addFields': {
-                    'filteredFindings': {
-                        '$filter': {
-                            'input': {'$ifNull': ['$findings', []]},
-                            'as': 'finding',
-                            'cond': {
-                                '$gt': [
-                                    {'$max': {
-                                        '$map': {
-                                            'input': {'$ifNull': ['$$finding.details', []]},
-                                            'as': 'detail',
-                                            'in': {'$ifNull': ['$$detail.prob', 0]}
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_file_upload', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$addFields': {
+            'filteredFindings': {
+                '$filter': {
+                    'input': {
+                        '$ifNull': [
+                            '$findings', []
+                        ]
+                    }, 
+                    'as': 'finding', 
+                    'cond': {
+                        '$gt': [
+                            {
+                                '$max': {
+                                    '$map': {
+                                        'input': {
+                                            '$ifNull': [
+                                                '$$finding.details', []
+                                            ]
+                                        }, 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$ifNull': [
+                                                '$$detail.prob', 0
+                                            ]
                                         }
-                                    }},
-                                    {'$ifNull': ['$estimate.probability', 0]}
+                                    }
+                                }
+                            }, {
+                                '$ifNull': [
+                                    '$estimate.probability', 0
                                 ]
                             }
-                        }
+                        ]
                     }
-                }},
-                {
-                    '$addFields': {
-                        'tatTime': {
-                            '$divide': [
-                                {
-                                    '$add': [
-                                        '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
-                                        ]
-                                }, 20
-                            ]
-                        }
-                    }
-                },
-                {'$project': {
-                    '_id': {'$toString': '$_id'},
-                    'estID': 1,
-                    'description': 1,
-                    'tasks': {
+                }
+            }
+        }
+    }, {
+        '$addFields': {
+            'aggregatedFilteredFindings': {
+                'totalMhs': {
+                    '$sum': {
                         '$map': {
-                            'input': '$tasks',
-                            'as': 'task',
-                            'in':{
-                                '$mergeObjects': [
-                                    '$$task',
-                                     {'_id': '$$REMOVE'}  
-                                ]
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': '$$detail.mhs.avg'
+                                    }
+                                }
                             }
                         }
-                    },
-                    'aggregatedTasks': 1,
-                    'findings': '$filteredFindings',
-                    'aggregatedFindings': 1,
-                    'originalFilename': 1,
-                    'userID': {'$toString': '$userID'},
-                    'createdAt': 1,
-                    'lastUpdated': 1,
-                    'createdBy': 1,
-                    'updatedBy': {'$toString': '$updatedBy'},
-                    'tatTime': 1
-                }}
-            ]
+                    }
+                }, 
+                'totalSpareCost': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$sum': {
+                                                '$map': {
+                                                    'input': '$$detail.spareParts', 
+                                                    'as': 'sparePart', 
+                                                    'in': {
+                                                        '$multiply': [
+                                                            '$$sparePart.price', '$$sparePart.qty'
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$addFields': {
+            'tatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            '$aggregatedTasks.totalMhs', '$aggregatedFilteredFindings.totalMhs'
+                        ]
+                    }, man_hours_threshold
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'description': 1, 
+            'tasks': {
+                '$map': {
+                    'input': '$tasks', 
+                    'as': 'task', 
+                    'in': {
+                        '$mergeObjects': [
+                            '$$task', {
+                                '_id': '$$REMOVE'
+                            }
+                        ]
+                    }
+                }
+            }, 
+            'aggregatedTasks': 1, 
+            'findings': '$filteredFindings', 
+            'aggregatedFindings': '$aggregatedFilteredFindings',
+            'originalFilename': 1, 
+            'tatTime': 1, 
+            'userID': {
+                '$toString': '$userID'
+            }, 
+            'createdAt': 1, 
+            'lastUpdated': 1, 
+            'createdBy': 1, 
+            'updatedBy': {
+                '$toString': '$updatedBy'
+            }
+        }
+    }
+]
 
             # Execute aggregation and get first result
             result = list(self.estimates_collection.aggregate(pipeline))
