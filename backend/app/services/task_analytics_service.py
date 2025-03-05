@@ -135,10 +135,10 @@ class TaskService:
 
             # Query MongoDB to check which tasks exist
             existing_tasks_list = self.taskdescription_collection.find(
-                {"Task": {"$in": task_ids}}, {"_id": 0, "Task": 1}
+                {"task_number": {"$in": task_ids}}, {"_id": 0, "task_number": 1}
             )
             existing_tasks_list = list(existing_tasks_list)  
-            existing_tasks = list(doc["Task"] for doc in existing_tasks_list)
+            existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
             validated_tasks = [
                 ValidTasks(taskid=task, status=(task in existing_tasks))
                 for task in task_ids
@@ -530,13 +530,13 @@ class TaskService:
             task_parts_pipeline = [
                 {
         '$match': {
-            'RequestedPart': part_id
+            'requested_part_number': part_id
         }
     }, {
         '$lookup': {
             'from': 'task_description', 
             'let': {
-                'convertedPackage': '$Package'
+                'convertedPackage': '$package_number'
             }, 
             'pipeline': [
                 {
@@ -545,15 +545,15 @@ class TaskService:
                             '$and': [
                                 {
                                     '$eq': [
-                                        '$Package', '$$convertedPackage'
+                                        '$package_number', '$$convertedPackage'
                                     ]
                                 }, {
                                     '$gte': [
-                                        '$ActualStartDate', startDate
+                                        '$actual_start_date', startDate
                                     ]
                                 }, {
                                     '$lt': [
-                                        '$ActualEndDate', endDate
+                                        '$actual_end_date', endDate
                                     ]
                                 }
                             ]
@@ -561,8 +561,8 @@ class TaskService:
                     }
                 }, {
                     '$project': {
-                        'ActualStartDate': 1, 
-                        'Description': 1, 
+                        'actual_start_date': 1, 
+                        'description': 1, 
                         '_id': 0
                     }
                 }
@@ -576,19 +576,22 @@ class TaskService:
         }
     }, {
         '$group': {
-            '_id': '$RequestedPart', 
+            '_id': '$requested_part_number', 
             'partDescription': {
-                '$first': '$PartDescription'
+                '$first': '$part_description'
             }, 
             'tasks': {
                 '$push': {
-                    'taskId': '$Task', 
-                    'taskDescription': '$task_info.Description', 
+                    'taskId': '$task_number', 
+                    'taskDescription': '$task_info.description', 
                     'packages': [
                         {
-                            'packageId': '$Package', 
-                            'date': '$task_info.ActualStartDate', 
-                            'quantity': '$RequestedQty'
+                            'packageId': '$package_number', 
+                            # 'date': '$task_info.actual_start_date', 
+                            'date': {
+                            '$ifNull': ['$task_info.actual_start_date', '0001-01-01T00:00:00Z']  # Replace null with a default date
+                        }, 
+                            'quantity': '$requested_quantity'
                         }
                     ]
                 }
@@ -604,56 +607,28 @@ class TaskService:
             ]
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-            {
+    {
         '$match': {
-            'IssuedPart': part_id
+            'issued_part_number': part_id
         }
     }, {
         '$lookup': {
             'from': 'sub_task_description', 
-            'let': {
-                'convertedPackage': {
-                    '$cond': {
-                        'if': {
-                            '$regexMatch': {
-                                'input': '$Package', 
-                                'regex': 'HMV(\\d{2})(\\d{6})(\\d{4})'
-                            }
-                        }, 
-                        'then': {
-                            '$concat': [
-                                {
-                                    '$substrCP': [
-                                        '$Package', 7, 5
-                                    ]
-                                }, '/', {
-                                    '$substrCP': [
-                                        '$Package', 12, 6
-                                    ]
-                                }, '/', {
-                                    '$substrCP': [
-                                        '$Package', 18, 4
-                                    ]
-                                }
-                            ]
-                        }, 
-                        'else': '$Package'
-                    }
-                }
-            }, 
+            'localField': 'package_number', 
+            'foreignField': 'package_number', 
+            'as': 'task_info', 
             'pipeline': [
                 {
                     '$project': {
-                        'convertedPackage': '$$convertedPackage', 
-                        'ActualStartDate': 1, 
-                        'ActualEndDate': 1, 
-                        'SourceTaskDiscrep': 1, 
-                        'LogItem': 1, 
+                        'convertedPackage': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'source_task_discrepancy_number': 1, 
+                        'log_item_number': 1, 
                         '_id': 0
                     }
                 }
-            ], 
-            'as': 'task_info'
+            ]
         }
     }, {
         '$unwind': {
@@ -666,15 +641,15 @@ class TaskService:
                 '$and': [
                     {
                         '$eq': [
-                            '$task_info.convertedPackage', '$Package'
+                            '$task_info.convertedPackage', '$package_number'
                         ]
                     }, {
                         '$gte': [
-                            '$task_info.ActualStartDate', startDate
+                            '$task_info.actual_start_date', startDate
                         ]
                     }, {
                         '$lt': [
-                            '$task_info.ActualEndDate', endDate
+                            '$task_info.actual_end_date', endDate
                         ]
                     }
                 ]
@@ -683,13 +658,17 @@ class TaskService:
     }, {
         '$lookup': {
             'from': 'task_description', 
-            'localField': 'task_info.SourceTaskDiscrep', 
-            'foreignField': 'Task', 
+            'localField': 'task_info.source_task_discrepancy_number', 
+            'foreignField': 'task_number', 
             'as': 'task_desc', 
             'pipeline': [
                 {
                     '$project': {
-                        'Description': 1, 
+                        'Description': {
+                            '$ifNull': [
+                                '$description', ''
+                            ]
+                        }, 
                         '_id': 0
                     }
                 }
@@ -702,18 +681,21 @@ class TaskService:
         }
     }, {
         '$group': {
-            '_id': '$IssuedPart', 
+            '_id': '$issued_part_number', 
             'findings': {
                 '$push': {
-                    'taskId': '$Task', 
-                    'taskDescription': '$task_desc.Description', 
+                    'taskId': '$task_number', 
+                    'taskDescription': '$task_desc.description', 
                     'packages': [
                         {
-                            'packageId': '$Package', 
-                            'logItem': '$task_info.LogItem', 
-                            'description': '$TaskDescription', 
-                            'date': '$task_info.ActualStartDate', 
-                            'quantity': '$UsedQty'
+                            'packageId': '$package_number', 
+                            'logItem': '$task_info.log_item_number', 
+                            'description': '$task_description', 
+                            # 'date': '$task_info.actual_start_date', 
+                            'date': {
+                            '$ifNull': ['$task_info.actual_start_date', '0001-01-01T00:00:00Z']  # Replace null with a default date
+                        }, 
+                            'quantity': '$used_quantity'
                         }
                     ]
                 }
@@ -724,18 +706,18 @@ class TaskService:
             'effectiveDate': 0
         }
     }
-                ]
+]
             sub_task_aircraft_details = [
                 {
         '$match': {
-            'IssuedPart': '4200A200-6'
+            'IssuedPart': part_id
         }
     },
             {
                 '$lookup': {
                     'from': "aircraft_details",
-                    'localField': "Package",
-                    'foreignField': "Package",
+                    'localField': "package_number",
+                    'foreignField': "package_number",
                     'as': "aircraft"
                 }
             },
@@ -750,7 +732,7 @@ class TaskService:
                     'aircraftModels': [
                         {
                             '$group': {
-                                '_id': "$aircraft.AircraftModel",
+                                '_id': "$aircraft.aircraft_model",
                                 'count': {
                                     '$sum': 1
                                 }
@@ -771,7 +753,7 @@ class TaskService:
                     'statusCodes': [
                         {
                             '$group': {
-                                '_id': "$StockStatus",
+                                '_id': "$stock_status",
                                 'count': {
                                     '$sum': 1
                                 }
@@ -820,7 +802,7 @@ class TaskService:
                             "taskId": t.get("taskId",""),
                             "taskDescription": t.get("taskDescription",""),
                             "packages": [
-                                {"packageId": pkg["packageId"], "date": pkg["date"], "quantity": pkg["quantity"]}
+                                {"packageId": pkg["packageId"], "date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"]}
                                 for pkg in t.get("packages", [])
                             ]
                         }
@@ -836,7 +818,7 @@ class TaskService:
                                             # "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
                                             "logItem": pkg.get("logItem", ""),  # Use .get() to avoid KeyError
                                             "description": pkg.get("description", ""),  # Use .get() to avoid KeyError
-                                            "date": pkg["date"],
+                                            "date": pkg.get("date", "0001-01-01T00:00:00Z"),
                                             "quantity": pkg["quantity"]
                     }
                                 for pkg in f.get("packages", [])
@@ -859,7 +841,7 @@ class TaskService:
             for task in output["usage"]["tasks"]:
                 logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
                 for pkg in task["packages"]:
-                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
                     date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
                     logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
             # Process findings
@@ -867,11 +849,11 @@ class TaskService:
             for finding in output["usage"]["findings"]:
                 logger.info(f"Processing finding: {finding['taskId']} - {finding['taskDescription']}")
                 for pkg in finding["packages"]:
-                    date_key = pkg["date"].strftime("%Y-%m-%d")  # Extract date only
+                    date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"] # Extract date only
                     date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
                     logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
             output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
-            logger.info(f"Final date-wise quantities: {output['dateWiseQty']}")
+            logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
 
 
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
@@ -890,54 +872,153 @@ class TaskService:
         """
         try:
             logger.info(f"Analyzing skills for tasks: {source_tasks}")
+            logger.info(f"Analyzing skills for tasks: len={len(source_tasks)}")
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": {"$in": source_tasks}}},  
+                {"$match": {"task_number": {"$in": source_tasks}}},  
                 {
-                    "$group": {
-                        "_id": "$Task",
-                        "taskDescription": {"$first": "$Description"},
-                        "skills": {
-                            "$push": {
-                                "skill": "$Skill",
-                                "manHours": {
-                                    "min": {"$min": "$ActualManHrs"},
-                                    "avg": {"$avg": "$ActualManHrs"},
-                                    "max": {"$max": "$ActualManHrs"}
-                                }
+        '$group': {
+            '_id': {
+                'task_number': '$task_number', 
+                'skill_number': '$skill_number'
+            }, 
+            'taskDescription': {
+                '$first': '$description'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.task_number', 
+            'taskDescription': {
+                '$first': '$taskDescription'
+            }, 
+            'skills': {
+                '$push': {
+                    'skill': '$_id.skill_number', 
+                    'manhours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 1, 
+            'taskDescription': 1, 
+            'skills': {
+                '$map': {
+                    'input': '$skills', 
+                    'as': 'skill', 
+                    'in': {
+                        'skill': '$$skill.skill', 
+                        'manhours': {
+                            'min': {
+                                '$round': [
+                                    '$$skill.manhours.min', 2
+                                ]
+                            }, 
+                            'max': {
+                                '$round': [
+                                    '$$skill.manhours.max', 2
+                                ]
+                            }, 
+                            'avg': {
+                                '$round': [
+                                    '$$skill.manhours.avg', 2
+                                ]
                             }
                         }
                     }
                 }
+            }
+        }
+    }
             ]
 
             # MongoDB pipeline for sub-task findings
             sub_tasks_skill_pipeline = [
-                {"$match": {"SourceTaskDiscrep": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"source_task_discrepancy_number": {"$in": source_tasks}}},  # Modified to use $in operator
                 {
-                    "$group": {
-                        "_id": "$SourceTaskDiscrep",
-                        "skills": {
-                            "$push": {
-                                "skill": "$Skill",
-                                "manHours": {
-                                    "min": {"$min": "$ActualManHrs"},
-                                    "avg": {"$avg": "$ActualManHrs"},
-                                    "max": {"$max": "$ActualManHrs"}
-                                }
+        '$group': {
+            '_id': {
+                'task_number': '$source_task_discrepancy_number', 
+                'skill_number': '$skill_number'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.task_number', 
+            'skills': {
+                '$push': {
+                    'skill': '$_id.skill_number', 
+                    'manhours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 1, 
+            'skills': {
+                '$map': {
+                    'input': '$skills', 
+                    'as': 'skill', 
+                    'in': {
+                        'skill': '$$skill.skill', 
+                        'manhours': {
+                            'min': {
+                                '$round': [
+                                    '$$skill.manhours.min', 2
+                                ]
+                            }, 
+                            'max': {
+                                '$round': [
+                                    '$$skill.manhours.max', 2
+                                ]
+                            }, 
+                            'avg': {
+                                '$round': [
+                                    '$$skill.manhours.avg', 2
+                                ]
                             }
                         }
                     }
                 }
+            }
+        }
+    }
             ]
 
             # Execute MongoDB queries
             task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
             
-            logger.info(f"Retrieved skill analysis for tasks: {task_skill_results}")
-            logger.info(f"Retrieved skill analysis for sub-tasks: {sub_task_skill_results}")
+            logger.info(f"Retrieved skill analysis for tasks: len={len(task_skill_results)}")
+            logger.info(f"Retrieved skill analysis for sub-tasks: len={len(sub_task_skill_results)}")
             if not task_skill_results and not sub_task_skill_results:
                 logger.info("No data found for both tasks and sub-tasks")
                 return {
@@ -953,7 +1034,7 @@ class TaskService:
                     "skills": [
                         {
                             "skill": skill["skill"],
-                            "manHours": skill["manHours"]
+                            "manHours": skill["manhours"]
                         }
                         for skill in task["skills"]
                     ]
@@ -967,7 +1048,7 @@ class TaskService:
                     "skills": [
                         {
                             "skill": skill["skill"],
-                            "manHours": skill["manHours"]
+                            "manHours": skill["manhours"]
                         }
                         for skill in sub_task["skills"]
                     ]
@@ -975,8 +1056,8 @@ class TaskService:
                 for sub_task in sub_task_skill_results
             ]
 
-            logger.info(f"Processed skill analysis for tasks: {tasks}")
-            logger.info(f"Processed skill analysis for findings: {findings}")
+            logger.info(f"Processed skill analysis for tasks: len={len(tasks)}")
+            logger.info(f"Processed skill analysis for findings: len={len(findings)}")
 
             # Construct final response
             response = {

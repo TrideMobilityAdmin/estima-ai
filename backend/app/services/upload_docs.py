@@ -411,15 +411,7 @@ class ExcelUploadService:
                         y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                         y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-        # y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
-        # for aggregated_finding in estimate.aggregatedFindingsByTask:
-        #     y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
-        #     y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
-        #     y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
+       
 
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
