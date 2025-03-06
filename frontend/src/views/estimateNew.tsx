@@ -1,5 +1,5 @@
 // import { Grid, Title } from "@mantine/core";
-import { ActionIcon, Avatar, List, LoadingOverlay, Modal, NumberInput, Paper, SegmentedControl, Select, Stack, Tooltip } from "@mantine/core";
+import { ActionIcon, Avatar, Center, List, LoadingOverlay, Modal, MultiSelect, NumberInput, Paper, SegmentedControl, Select, Stack, Textarea, Tooltip } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
     Badge,
@@ -35,10 +35,12 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconChartArcs3, IconCheck, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockShare, IconClockUp, IconDownload, IconError404, IconFileCheck, IconListCheck, IconListDetails, IconLoader, IconMinimize, IconReport, IconSettingsDollar, IconStatusChange } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconChecklist, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockHour4, IconClockShare, IconClockUp, IconDeselect, IconDownload, IconError404, IconFile, IconFileCheck, IconHourglass, IconListCheck, IconListDetails, IconLoader, IconMessage2Plus, IconMinimize, IconPercentage66, IconPlane, IconPlaneTilt, IconPlus, IconRecycle, IconReport, IconRowRemove, IconSettingsDollar, IconShadow, IconSquareCheck, IconStatusChange, IconTrash, IconX } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
+import { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+
 import { useApi } from "../api/services/estimateSrvice";
 import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
@@ -50,16 +52,19 @@ import CsvDownloadButton from "react-json-to-csv";
 import { showAppNotification } from "../components/showNotificationGlobally";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
+import { useRef } from "react";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export default function EstimateNew() {
     const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
+    const { getAllDataExpertInsights } = useApi();
     const { getSkillAnalysis } = useApiSkillAnalysis();
     const [value, setValue] = useState('estimate');
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
+    const [selectedFileTasksOpened, setSelectedFileTasksOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
     const [selectedDownloadEstimateId, setSelectedDownloadEstimateId] = useState<any>();
     const [selectedEstimateIdReport, setSelectedEstimateIdReport] = useState<any>();
@@ -79,7 +84,12 @@ export default function EstimateNew() {
     const [probabilityWiseData, setProbabilityWiseData] = useState<any>(null);
     const [isProbWiseLoading, setIsProbLoading] = useState(false);
     const [skillAnalysisData, setSkillAnalysisData] = useState<any>(null);
-
+    const [expertInsightsData, setExpertInsightsData] = useState<any>();
+    const [expertInsightsTasks, setExpertInsightsTasks] = useState<any[]>([]);
+    const [selectedExpertInsightsTaskIDs, setSelectedExpertInsightTaskIDs] = useState<any[]>([]);
+    const [selectedExpertInsightTasks, setSelectedExpertInsightTasks] = useState<any[]>([]);
+    const aircraftRegNoRef = useRef<HTMLInputElement | null>(null);
+    const [additionalTasks, setAdditionalTasks] = useState<any>([]);
     // const [tasks, setTasks] = useState<string[]>([]);
     // const [estimateId, setEstimateId] = useState<string>("");
     const [generatedEstimateId, setGeneratedEstimateId] = useState<string>("");
@@ -88,10 +98,26 @@ export default function EstimateNew() {
     // const [isLoading, setIsLoading] = useState(false);
 
 
+    // const fetchEstimatesStatus = async () => {
+    //     setLoading(true);
+    //     const data = await getAllEstimatesStatus();
+    //     if (data) {
+    //         setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    //     }
+    //     setLoading(false);
+    // };
     const fetchEstimatesStatus = async () => {
         setLoading(true);
         const data = await getAllEstimatesStatus();
         if (data) {
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+            const filteredData = data.filter((item: any) => new Date(item.createdAt) >= threeDaysAgo);
+            const sortedData = filteredData.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            // setEstimatesStatusData(sortedData);
+
             setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         }
         setLoading(false);
@@ -105,7 +131,43 @@ export default function EstimateNew() {
     console.log("all estimates status>>>", estimatesStatusData);
     console.log("selected estimate tasks >>>>", selectedEstimateTasks);
 
-    // Handle file and extracted tasks
+    useEffect(() => {
+        fetchExpertInsights();
+    }, []);
+
+    const fetchExpertInsights = async () => {
+        try {
+            const data = await getAllDataExpertInsights();
+            if (data && data.length > 0) {
+                const insightData = data[0];
+                setExpertInsightsData(insightData);
+                // setId(insightData._id);
+                // setProbability(insightData.defaultProbability);
+                // setThresholds(insightData.thresholds || {
+                //   tatThreshold: 12.0,
+                //   manHoursThreshold: 5.0
+                // });
+                setExpertInsightsTasks(insightData.miscLaborTasks);
+            }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    };
+    console.log("expert insight data >>>>", expertInsightsData);
+
+    console.log("expert insight tasks >>>>", expertInsightsTasks);
+
+    const handleExpertInsightsChange = (selectedIDs: string[]) => {
+        setSelectedExpertInsightTaskIDs(selectedIDs);
+
+        // Store selected full objects
+        const selectedObjects = expertInsightsTasks?.filter(task => selectedIDs?.includes(task.taskID));
+        setSelectedExpertInsightTasks(selectedObjects);
+    };
+
+    console.log("selected expert insights tasks ids >>>>", selectedExpertInsightsTaskIDs);
+    console.log("selected expert insights tasks obj >>>>", selectedExpertInsightTasks);
+
     // Handle file and extracted tasks
     const handleFileChange = async (file: File | null, tasks: string[]) => {
         setIsValidating(true);
@@ -228,26 +290,70 @@ export default function EstimateNew() {
     // Form initialization
     const form = useForm({
         initialValues: {
+            tasks: [],
             probability: "",
             operator: "",
             aircraftRegNo: "",
             aircraftAge: "",
             aircraftFlightHours: "",
             aircraftFlightCycles: "",
+            areaOfOperations: '',
+            cappingTypeManhrs: '',
+            cappingManhrs: '',
+            cappingTypeSpareCost: '',
+            cappingSpareCost: '',
+            taskID: '',
+            taskDescription: '',
+            typeOfCheck: '',
+            miscLaborTasks: []
         },
 
-        // validate: {
-        //     probability: (value) => (value ? null : "Probability is required"),
-        //     operator: (value) => (value.trim() ? null : "Operator is required"),
-        //     aircraftRegNo: (value) => (value.trim() ? null : "RegNo is required"),
-        //     aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
-        //     aircraftFlightHours: (value) => (value.trim() ? null : "Flight Hours are required"),
-        //     aircraftFlightCycles: (value) => (value.trim() ? null : "Flight Cycles are required"),
-        // },
+        validate: {
+            // probability: (value) => (value ? null : "Probability is required"),
+            // operator: (value) => (value.trim() ? null : "Operator is not available, enter N/A"),
+            // aircraftRegNo: (value) => (value.trim() ? null : "RegNo is not available, enter N/A"),
+            // typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
+            operator: (value, values) => {
+                if (!value.trim() && !values.aircraftRegNo.trim()) {
+                    return "Either Operator or Aircraft Reg No is mandatory.";
+                }
+                return value.trim() ? null : "Operator is not available, enter N/A";
+            },
+            aircraftRegNo: (value, values) => {
+                if (!value.trim() && !values.operator.trim()) {
+                    return "Either Operator or Aircraft Reg No is mandatory.";
+                }
+                return value.trim() ? null : "RegNo is not available, enter N/A";
+            },
+            typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
+            // aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
+            // aircraftFlightHours: (value) => (value.trim() ? null : "Flight Hours are required"),
+            // aircraftFlightCycles: (value) => (value.trim() ? null : "Flight Cycles are required"),
+        },
     });
 
     // Handle Submit
     const handleSubmit = async () => {
+
+        const validationErrors = form.validate();
+
+        if (validationErrors.hasErrors) {
+            if (validationErrors.errors.typeOfCheck) {
+                showAppNotification("warning", "Validation Error", "Please select a Type of Check");
+            }
+            if (validationErrors.errors.operator) {
+                showAppNotification("warning", "Validation Error", "Operator is required");
+            }
+            if (validationErrors.errors.aircraftRegNo) {
+                showAppNotification("warning", "Aircraft Registration Number", "Please enter the Aircraft Registration Number");
+                if (aircraftRegNoRef.current) {
+                    aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                    aircraftRegNoRef.current.focus(); // Optionally focus the input
+                }
+                return; // Prevent submission if there are errors    
+            }
+        }
+
         if (!selectedFile) {
             showNotification({
                 title: "Error",
@@ -256,15 +362,29 @@ export default function EstimateNew() {
             });
             return;
         }
+        const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
+
+        // Get the selected tasks from the MultiSelect
+        const miscLaborTasks = selectedExpertInsightTasks || [];
 
         const requestData = {
-            tasks: extractedTasks || [],
+            // tasks: extractedTasks || [],
+            tasks: validTasks || [],
             probability: Number(form.values.probability) || 0,
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
             aircraftAge: Number(form.values.aircraftAge) || 0,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
+            areaOfOperations: form.values.areaOfOperations || "",
+            cappingTypeManhrs: form.values.cappingTypeManhrs || "",
+            cappingManhrs: Number(form.values.cappingManhrs) || 0,
+            cappingTypeSpareCost: form.values.cappingTypeSpareCost || "",
+            cappingSpareCost: Number(form.values.cappingSpareCost) || 0,
+            taskID: form.values.taskID || "",
+            taskDescription: form.values.taskDescription || "",
+            typeOfCheck: form.values.typeOfCheck || "",
+            miscLaborTasks: miscLaborTasks
         };
 
         console.log("Submitting data:", requestData);
@@ -328,9 +448,9 @@ export default function EstimateNew() {
         return null; // Return null if no response
     };
 
-    useEffect(()=>{
+    useEffect(() => {
         handleSubmitSkills()
-    },[validatedSkillsTasks]);
+    }, [validatedSkillsTasks]);
 
     console.log("skillAnalysisData", skillAnalysisData);
 
@@ -470,6 +590,21 @@ export default function EstimateNew() {
         ]
     }
 
+    const handleAddAdditionalTask = () => {
+        setAdditionalTasks([...additionalTasks, { taskID: '', description: '' }]);
+    };
+
+    const handleDeleteAdditionalTask = (index: any) => {
+        const newTasks = additionalTasks.filter((_: any, i: any) => i !== index);
+        setAdditionalTasks(newTasks);
+    };
+
+    const handleTaskChange = (index: any, field: any, value: any) => {
+        const newTasks = additionalTasks.map((task: any, i: any) => (i === index ? { ...task, [field]: value } : task));
+        setAdditionalTasks(newTasks);
+    };
+
+    console.log("additional tasks >>>>", additionalTasks);
     // const handleSubmit = async () => {
     //     // const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
 
@@ -532,6 +667,7 @@ export default function EstimateNew() {
 
     return (
         <>
+            {/* Estimate success Modal */}
             <Modal
                 opened={rfqSubModalOpened}
                 onClose={() => {
@@ -607,6 +743,7 @@ export default function EstimateNew() {
                     </div>
                 )}
             </Modal>
+            {/* Tasks for Estimate Id */}
             <Modal
                 opened={opened}
                 onClose={() => {
@@ -713,6 +850,7 @@ export default function EstimateNew() {
 
 
             </Modal>
+            {/* Probabiity wise data for estimate id */}
             <Modal
                 opened={probOpened}
                 onClose={() => {
@@ -764,50 +902,77 @@ export default function EstimateNew() {
                 </Group>
 
             </Modal>
-
-
-            <div style={{ padding: 70 }}>
-                <Grid grow gutter="xs">
-                    <Grid.Col span={3}>
-                        <Card withBorder
-                            // className="glass-card"
-                            h='50vh' radius='md'
-                        // style={{
-                        //     background: 'rgba(255, 255, 255, 0.1)',
-                        //     backdropFilter : "blur(50px)",
-                        //     boxShadow : "0 4px 30px rgba(0, 0, 0, 0.1)",
-                        //     borderRadius: '8px',
-                        //     padding: '16px',
-                        //     display: 'flex',
-                        //     flexDirection: "column",
-                        // }}
-                        >
+            {/* Tasks for slected rfq file */}
+            <Modal
+                opened={selectedFileTasksOpened}
+                onClose={() => {
+                    setSelectedFileTasksOpened(false);
+                    //   form.reset();
+                }}
+                size={800}
+                title={
+                    <>
+                        <Group justify="space-between">
                             <Group>
-                                <Text size="md" fw={500}>
-                                    Select Document
+                                <Badge variant="filled" color="teal" radius='sm' size="lg">{validatedTasks?.length}</Badge>
+                                <Text c='gray' fw={600}>
+                                    Tasks for :
                                 </Text>
-                                <RFQUploadDropZoneExcel
-                                    name="Excel Files"
-                                    changeHandler={handleFileChange}
-                                    selectedFile={selectedFile} // Pass selectedFile as prop
-                                    setSelectedFile={setSelectedFile} // Pass setSelectedFile as prop
-                                    color="green" // Optional custom border color
-                                />
+                                <Text fw={600}>
+                                    {selectedEstimateId}
+                                </Text>
                             </Group>
-                        </Card>
-                    </Grid.Col>
 
-                    <Grid.Col span={5}>
-                        <Card withBorder h='50vh' radius='md'>
 
-                            <LoadingOverlay
-                                visible={isValidating}
-                                zIndex={1000}
-                                overlayProps={{ radius: 'sm', blur: 2 }}
-                                loaderProps={{ color: 'indigo', type: 'bars' }}
-                            />
+                            <Group>
+                                <Tooltip label="Download Available Tasks">
+                                    <Button
+                                        size="xs"
+                                        color="green"
+                                        variant="light"
+                                        rightSection={<IconDownload size='18' />}
+                                        onClick={() => downloadCSV(true)}
+                                    >
+                                        {validatedTasks?.filter((ele) => ele?.status === true)?.length}
+                                    </Button>
+                                    {/* <ActionIcon size={25} color="green" variant="light" onClick={() => downloadCSV(true)}>
+                                        <IconDownload />
+                                    </ActionIcon> */}
+                                </Tooltip>
 
-                            {/* <Group justify="space-between">
+                                {/* Button for Not Available Tasks */}
+                                <Tooltip label="Download Not Available Tasks">
+                                    <Button
+                                        size="xs"
+                                        color="blue"
+                                        variant="light"
+                                        rightSection={<IconDownload size='18' />}
+                                        onClick={() => downloadCSV(false)}
+                                    >
+                                        {validatedTasks?.filter((ele) => ele?.status === false)?.length}
+
+                                    </Button>
+                                    {/* <ActionIcon size={25} color="blue" variant="light" onClick={() => downloadCSV(false)}>
+                                        <IconDownload />
+                                    </ActionIcon> */}
+                                </Tooltip>
+                            </Group>
+
+                        </Group>
+                        <Space h='sm' />
+                    </>
+                }
+                scrollAreaComponent={ScrollArea.Autosize}
+            >
+
+                <LoadingOverlay
+                    visible={isValidating}
+                    zIndex={1000}
+                    overlayProps={{ radius: 'sm', blur: 2 }}
+                    loaderProps={{ color: 'indigo', type: 'bars' }}
+                />
+
+                {/* <Group justify="space-between">
                                 <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
                                         Tasks Available
@@ -825,6 +990,253 @@ export default function EstimateNew() {
                                     }
                                 </Group>
                             </Group> */}
+                <Group justify="space-between">
+                    <Group mb='xs' align="center" >
+                        <Text size="md" fw={500}>
+                            Tasks Available
+                        </Text>
+                        {
+                            validatedTasks?.length > 0 ? (
+                                <Badge ta='center' color="green" size="md" radius="lg">
+                                    {/* {validatedTasks?.filter((ele) => ele.status === true)?.length || 0} */}
+                                    {Math.round(((validatedTasks?.filter((ele) => ele.status === true)?.length / validatedTasks?.length) * 100) || 0)} %
+                                </Badge>
+                            ) : (
+                                <Badge variant="light" ta='center' color="green" size="md" radius="lg">
+                                    0
+                                </Badge>
+                            )
+                        }
+                    </Group>
+                    <Group mb='xs' align="center">
+                        <Text size="md" fw={500}>
+                            Tasks Not-Available
+                        </Text>
+                        {
+                            validatedTasks?.length > 0 ? (
+                                <Badge ta='center' color="blue" size="md" radius="lg">
+                                    {/* {validatedTasks?.filter((ele) => ele.status === false)?.length || 0} */}
+                                    {Math.round(((validatedTasks?.filter((ele) => ele.status === false)?.length / validatedTasks?.length) * 100) || 0)} %
+                                </Badge>
+                            ) : (
+                                <Badge variant="light" ta='center' color="blue" size="md" radius="lg">
+                                    0
+                                </Badge>
+                            )
+                        }
+                    </Group>
+                </Group>
+                {/* <ScrollArea
+                                style={{
+                                    flex: 1, // Take remaining space for scrollable area
+                                    overflow: "auto",
+                                }}
+                                offsetScrollbars
+                                scrollHideDelay={1}
+                                scrollbarSize={5}
+                            > */}
+                {validatedTasks?.length > 0 ? (
+                    <SimpleGrid cols={5}>
+                        {validatedTasks?.map((task, index) => (
+                            <Badge
+                                fullWidth
+                                key={index}
+                                color={task?.status === false ? "blue" : "green"}
+                                variant="light"
+                                radius='sm'
+                                style={{ margin: "0.25em" }}
+                            >
+                                {task?.taskid}
+                            </Badge>
+                        ))}
+                    </SimpleGrid>
+                ) : (
+                    <Text ta='center' size="sm" c="dimmed">
+                        No tasks found. Please Select a file.
+                    </Text>
+                )}
+                {/* </ScrollArea> */}
+
+
+
+
+            </Modal>
+
+
+            <div style={{ padding: 70 }}>
+                <Grid grow gutter="xs">
+                    <Grid.Col span={4}>
+                        {/* <Card withBorder
+                            // className="glass-card"
+                            h='20vh' radius='md'
+                        // style={{
+                        //     background: 'rgba(255, 255, 255, 0.1)',
+                        //     backdropFilter : "blur(50px)",
+                        //     boxShadow : "0 4px 30px rgba(0, 0, 0, 0.1)",
+                        //     borderRadius: '8px',
+                        //     padding: '16px',
+                        //     display: 'flex',
+                        //     flexDirection: "column",
+                        // }}
+                        > */}
+                        {/* <Group> */}
+                        {/* <Text size="md" fw={500}>
+                                    Select Document
+                                </Text> */}
+
+                        {/* </Group>
+                        </Card> */}
+                        {/* <Space h='xs'/> */}
+                        <Card withBorder h='60vh' radius='md'>
+                            <Group justify="space-between">
+                                <Text size="md" fw={500} >
+                                    Select Document
+                                </Text>
+                                {/* {
+                                    selectedFile && ( */}
+                                <Tooltip label={selectedFile ? "Show Tasks for Selected file" : "Select file for Tasks"}>
+                                    <Button
+                                        size='xs'
+                                        color="#000480"
+                                        radius='lg'
+                                        variant="light"
+                                        disabled={selectedFile ? false : true}
+                                        onClick={() => {
+                                            setSelectedEstimateId(selectedFile?.name);
+                                            setSelectedFileTasksOpened(true);
+                                        }}
+                                        rightSection={<IconListCheck size={20} />}
+                                    >
+                                        Show Tasks
+                                    </Button>
+                                </Tooltip>
+                                {/* )
+                                } */}
+
+
+                            </Group>
+
+                            <Space h='xs' />
+                            <ScrollArea
+                                style={{
+                                    flex: 1, // Take remaining space for scrollable area
+                                    overflow: "auto",
+                                }}
+                                offsetScrollbars
+                                scrollHideDelay={1}
+                                scrollbarSize={5}
+                            >
+                                <RFQUploadDropZoneExcel
+                                    name="Excel Files"
+                                    changeHandler={handleFileChange}
+                                    selectedFile={selectedFile} // Pass selectedFile as prop
+                                    setSelectedFile={setSelectedFile} // Pass setSelectedFile as prop
+                                    color="green" // Optional custom border color
+                                />
+                                <Space h='sm' />
+                                <Group justify="space-between" pb='sm'>
+                                    <Text size="md" fw={500} >
+                                        Add Additional Tasks
+                                    </Text>
+                                    <Button size="xs" onClick={handleAddAdditionalTask} color="blue" variant="light" rightSection={<IconMessage2Plus size={18} />}>
+                                        Add Task
+                                    </Button>
+                                </Group>
+
+                                <Table withRowBorders withTableBorder withColumnBorders>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '100px', height: '100%' }}>Task ID</th> {/* Set a fixed width for Task ID */}
+                                            <th style={{ width: '300px' }}>Description</th> {/* Set a wider width for Description */}
+                                            {/* <th style={{ width: '120px' }}>Check Type</th> Set a fixed width for Check Type */}
+                                            <th style={{ width: '50px' }}>Actions</th> {/* Set a fixed width for Actions */}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {additionalTasks?.map((task: any, index: any) => (
+
+                                            <tr key={index}>
+                                                <td style={{ alignContent: 'start' }}>
+                                                    <TextInput
+                                                        size="xs"
+                                                        placeholder="Ex: 1234"
+                                                        value={task.taskID}
+                                                        onChange={(e) => handleTaskChange(index, 'taskID', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <Textarea
+                                                        size="xs"
+                                                        // w='18vw'
+                                                        placeholder="Task Description"
+                                                        autosize
+                                                        minRows={1}
+                                                        value={task.description}
+                                                        onChange={(e) => handleTaskChange(index, 'description', e.target.value.replace(/\n/g, ' '))}
+                                                    />
+                                                </td>
+                                                {/* <td>
+                                                    <Select
+                                                        size="xs"
+                                                        // width='12vw'
+                                                        placeholder="Check Type"
+                                                        data={['Type 1', 'Type 2', 'Type 3']} // Replace with your check types
+                                                        value={task.typeOfCheck}
+                                                        onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
+                                                    />
+                                                </td> */}
+                                                <td>
+                                                    <Center>
+                                                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteAdditionalTask(index)}>
+                                                            <IconTrash size='20' />
+                                                        </ActionIcon>
+                                                    </Center>
+
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </Table>
+
+                                {/* <SimpleGrid cols={1} spacing='xs'>
+                                    <TextInput
+                                        size="xs"
+                                        leftSection={<IconChecklist />}
+                                        placeholder="1234..."
+                                        label="Task ID"
+                                        {...form.getInputProps("taskID")}
+                                    />
+                                    <Textarea
+                                        size="xs"
+                                        label="Description"
+                                        placeholder="Task Description"
+                                        autosize
+                                        minRows={4}
+                                        {...form.getInputProps("taskDescription")}
+                                    />
+                                    <TextInput
+                                        size="xs"
+                                        leftSection={<IconFileCheck size='20' />}
+                                        placeholder="check"
+                                        label="Check Type"
+                                        {...form.getInputProps("typeOfCheck")}
+                                    />
+                                    
+                                </SimpleGrid> */}
+                            </ScrollArea>
+                        </Card>
+                    </Grid.Col>
+
+                    {/* <Grid.Col span={5}>
+                        <Card withBorder h='60vh' radius='md'>
+
+                            <LoadingOverlay
+                                visible={isValidating}
+                                zIndex={1000}
+                                overlayProps={{ radius: 'sm', blur: 2 }}
+                                loaderProps={{ color: 'indigo', type: 'bars' }}
+                            />
+
                             <Group justify="space-between">
                                 <Group mb='xs' align="center" >
                                     <Text size="md" fw={500}>
@@ -866,6 +1278,7 @@ export default function EstimateNew() {
                                 }}
                                 offsetScrollbars
                                 scrollHideDelay={1}
+                                scrollbarSize={5}
                             >
                                 {validatedTasks?.length > 0 ? (
                                     <SimpleGrid cols={4}>
@@ -887,40 +1300,12 @@ export default function EstimateNew() {
                                     </Text>
                                 )}
                             </ScrollArea>
-                            {/* <ScrollArea
-                                style={{
-                                    flex: 1, // Take remaining space for scrollable area
-                                    overflow: "auto",
-                                }}
-                                offsetScrollbars
-                                scrollHideDelay={1}
-                            >
-                                {extractedTasks?.length > 0 ? (
-                                    <SimpleGrid cols={4}>
-
-                                         {extractedTasks?.map((task, index) => (
-                                            <Badge
-                                                key={index}
-                                                color='blue'
-                                                variant="light"
-                                                radius='sm'
-                                                style={{ margin: "0.25em" }}
-                                            >
-                                                {task}
-                                            </Badge>
-                                        ))}
-                                    </SimpleGrid>
-                                ) : (
-                                    <Text ta='center' size="sm" c="dimmed">
-                                        No tasks found. Please Select a file.
-                                    </Text>
-                                )}
-                            </ScrollArea> */}
+                            
                         </Card>
-                    </Grid.Col>
+                    </Grid.Col> */}
 
                     <Grid.Col span={4}>
-                        <Card withBorder h='50vh' radius='md'>
+                        <Card withBorder h='60vh' radius='md'>
                             <Text size="md" fw={500} >
                                 RFQ Parameters
                             </Text>
@@ -931,69 +1316,96 @@ export default function EstimateNew() {
                                 }}
                                 offsetScrollbars
                                 scrollHideDelay={1}
+                            // scrollbarSize={5}
                             >
                                 <SimpleGrid cols={1} spacing='xs'>
-                                    {/* <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex:50"
-                                        label="Probability"
-                                        {...form.getInputProps("probability")}
-                                    /> */}
-                                    <NumberInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex: 0.5"
-                                        label="Select Probability"
-                                        min={10}
-                                        max={100}
-                                        step={10}
-                                        //   precision={2}
-                                        {...form.getInputProps("probability")}
-                                    />
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Indigo, AirIndia"
-                                        label="Operator"
-                                        {...form.getInputProps("operator")}
-                                    />
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex:N734AB, SP-LR"
-                                        label="Aircraft Reg No"
-                                        {...form.getInputProps("aircraftRegNo")}
-                                    />
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex:50"
-                                        label="Aircraft Age"
-                                        {...form.getInputProps("aircraftAge")}
-                                    />
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex:50"
-                                        label="Flight Cycles"
-                                        {...form.getInputProps("aircraftFlightCycles")}
-                                    />
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex:50"
-                                        label="Flight Hours"
-                                        {...form.getInputProps("aircraftFlightHours")}
-                                    />
+                                    <SimpleGrid cols={2}>
+                                        <NumberInput
+                                            size="xs"
+                                            leftSection={<IconPercentage66 size={20} />}
+                                            placeholder="Ex: 0.5"
+                                            label="Select Probability"
+                                            defaultValue={50}
+                                            min={10}
+                                            max={100}
+                                            step={10}
+                                            //   precision={2}
+                                            {...form.getInputProps("probability")}
+                                        />
 
-                                    <TextInput
-                                        size="xs"
-                                        leftSection={<MdPin />}
-                                        placeholder="Ex: Area"
-                                        label="Area of Operations"
-                                        {...form.getInputProps("areaOfOperations")}
-                                    />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<MdPin />}
+                                            placeholder="Ex:50"
+                                            label="Aircraft Age"
+                                            {...form.getInputProps("aircraftAge")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconPlaneTilt size='20' />}
+                                            placeholder="Indigo, AirIndia"
+                                            label="Operator"
+                                            {...form.getInputProps("operator")}
+                                        />
+                                        <TextInput
+                                            ref={aircraftRegNoRef}
+                                            size="xs"
+                                            leftSection={<IconPlaneTilt size='20' />}
+                                            placeholder="Ex:N734AB, SP-LR"
+                                            label="Aircraft Reg No"
+                                            {...form.getInputProps("aircraftRegNo")}
+                                        />
+                                        <Select
+                                            size="xs"
+                                            // width='12vw' 
+                                            searchable
+                                            label='Check Type'
+                                            placeholder="Check Type"
+                                            data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
+                                            // value={task.typeOfCheck}
+                                            // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
+                                            {...form.getInputProps("typeOfCheck")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconRecycle size={20} />}
+                                            placeholder="Ex:50"
+                                            label="Flight Cycles"
+                                            {...form.getInputProps("aircraftFlightCycles")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconHourglass size={20} />}
+                                            placeholder="Ex:50"
+                                            label="Flight Hours"
+                                            {...form.getInputProps("aircraftFlightHours")}
+                                        />
+
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconShadow size={20} />}
+                                            placeholder="Ex: Area"
+                                            label="Area of Operations"
+                                            {...form.getInputProps("areaOfOperations")}
+                                        />
+                                        <MultiSelect
+                                            size="xs"
+                                            label="Expert Insights"
+                                            placeholder="Select from Insights"
+                                            data={expertInsightsTasks?.map(task => ({ value: task.taskID, label: task.taskID }))}
+                                            value={selectedExpertInsightsTaskIDs}
+                                            onChange={handleExpertInsightsChange}
+                                            style={(theme) => ({
+                                                // Customize the selected badge styles
+                                                selected: {
+                                                    backgroundColor: theme.colors.green[6], // Change this to your desired color
+                                                    color: theme.white, // Change text color if needed
+                                                },
+                                            })}
+                                        />
+
+                                    </SimpleGrid>
+
 
                                     <Text size="md" fw={500}>
                                         Capping
@@ -1008,15 +1420,16 @@ export default function EstimateNew() {
                                                 data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
                                                 defaultValue="React"
                                                 allowDeselect
+                                                {...form.getInputProps("cappingTypeManhrs")}
                                             />
                                         </Grid.Col>
                                         <Grid.Col span={5}>
                                             <TextInput
                                                 size="xs"
-                                                leftSection={<MdPin />}
+                                                leftSection={<IconClockHour4 size={20} />}
                                                 placeholder="Ex: 40"
                                                 label="Man Hours"
-                                            //   {...form.getInputProps("assetOwner")}
+                                                {...form.getInputProps("cappingManhrs")}
                                             />
                                         </Grid.Col>
                                     </Grid>
@@ -1030,20 +1443,20 @@ export default function EstimateNew() {
                                                 data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
                                                 defaultValue="React"
                                                 allowDeselect
+                                                {...form.getInputProps("cappingTypeSpareCost")}
                                             />
                                         </Grid.Col>
                                         <Grid.Col span={5}>
                                             <TextInput
                                                 size="xs"
-                                                leftSection={<MdPin />}
+                                                leftSection={<IconSettingsDollar size={20} />}
                                                 placeholder="Ex: 600$"
                                                 label="Cost($)"
-                                            //   {...form.getInputProps("assetOwner")}
+                                                {...form.getInputProps("cappingSpareCost")}
                                             />
                                         </Grid.Col>
                                     </Grid>
                                 </SimpleGrid>
-
 
                             </ScrollArea>
                         </Card>
@@ -1057,7 +1470,7 @@ export default function EstimateNew() {
                         gradient={{ from: 'indigo', to: 'cyan', deg: 90 }}
                         // variant="filled"
                         // color='#1A237E'
-                        disabled={extractedTasks?.length > 0 ? false : true}
+                        disabled={extractedTasks?.length > 0 || additionalTasks?.length > 0 ? false : true}
                         leftSection={<MdLensBlur size={14} />}
                         rightSection={<MdOutlineArrowForward size={14} />}
                     >
@@ -1111,7 +1524,7 @@ border-bottom: none;
 
                         <AgGridReact
                             pagination
-                            paginationPageSize={10}
+                            paginationPageSize={5}
                             domLayout="autoHeight" // Ensures height adjusts dynamically
                             rowData={estimatesStatusData || []}
                             columnDefs={[
@@ -1193,10 +1606,8 @@ border-bottom: none;
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (params: any) => (
-                                        <Text
-                                            mt='xs'
-                                        >
-                                            {params.value.toFixed(2)}
+                                        <Text mt='xs'>
+                                            {Math.round(params.value)} {/* Use Math.round to round to the nearest whole number */}
                                         </Text>
                                     ),
                                 },
@@ -1365,18 +1776,18 @@ border-bottom: none;
                 {
                     estimateReportData !== null ? (
                         <Group>
-                                                <Title order={4} c='gray'>
-                                                    Selected Estimate  :
-                                                </Title>
-                                                <Title order={4}>
-                                                    {estimateReportData?.estID || "-"}
-                                                </Title>
-                                            </Group>
+                            <Title order={4} c='gray'>
+                                Selected Estimate  :
+                            </Title>
+                            <Title order={4}>
+                                {estimateReportData?.estID || "-"}
+                            </Title>
+                        </Group>
                     ) : (
                         <></>
                     )
                 }
-                
+
                 {
                     value === 'estimate' ? (
                         <>
@@ -1399,7 +1810,7 @@ border-bottom: none;
                                         <Group justify="space-between">
                                             <Group>
                                                 <Title order={4} c='gray'>
-                                                    Overall Estimate Report 
+                                                    Overall Estimate Report
                                                 </Title>
                                                 {/* <Title order={4}>
                                                     {estimateReportData?.estID || "-"}
@@ -1426,8 +1837,8 @@ border-bottom: none;
                                             estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
                                             cappingUnbilledCost={44}
                                             parts={[
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4, price: 10 },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2, price: 5 },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
                                             ]}
                                             estimatedSparesCost={44}
                                             spareCostData={[
@@ -1511,6 +1922,7 @@ interface Part {
     partName: string;
     qty: number;
     price: number;
+    unit: any;
 }
 
 interface ChartData {
@@ -1681,7 +2093,7 @@ border-bottom: none;
                         columnDefs={[
                             {
                                 field: "partName",
-                                headerName: "Part Num",
+                                headerName: "Part Number",
                                 sortable: true,
                                 filter: true,
                                 floatingFilter: true,
@@ -1700,6 +2112,15 @@ border-bottom: none;
                             {
                                 field: "qty",
                                 headerName: "Qty",
+                                sortable: true,
+                                // filter: true,
+                                // floatingFilter: true,
+                                resizable: true,
+                                flex: 1.5
+                            },
+                            {
+                                field: "unit",
+                                headerName: "Units",
                                 sortable: true,
                                 // filter: true,
                                 // floatingFilter: true,
@@ -1946,15 +2367,667 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                 >
                                     {/* {selectedFinding ? (
                                         <> */}
+                                    <Grid>
+                                        <Grid.Col span={2}>
+                                            <Text size="md" fw={500} c="dimmed">
+                                                Log Item
+                                            </Text>
+                                        </Grid.Col>
+                                        <Grid.Col span={10}>
+                                            <Text size="sm" fw={500}>
+                                                {selectedFinding?.logItem || "-"}
+                                            </Text>
+                                        </Grid.Col>
+                                    </Grid>
+
+                                    <Space h="sm" />
+                                    <Grid>
+                                        <Grid.Col span={2}>
+                                            <Text size="md" fw={500} c="dimmed">
+                                                Description
+                                            </Text>
+                                        </Grid.Col>
+                                        <Grid.Col span={10}>
+                                            <Text size="sm" fw={500}>
+                                                {selectedFinding?.description || "-"}
+                                            </Text>
+                                        </Grid.Col>
+                                    </Grid>
+
+                                    <Space h="lg" />
+                                    <Card shadow="0" bg="#f5f5f5">
+                                        <Grid grow justify="left" align="center">
+                                            <Grid.Col span={2}>
+                                                <Text size="md" fw={500} c="dimmed">
+                                                    Probability
+                                                </Text>
+                                            </Grid.Col>
+                                            <Grid.Col span={8}>
+                                                <Progress w="100%" color="#E07B39" radius="md" size="lg" value={selectedFinding?.probability} />
+                                            </Grid.Col>
+                                            <Grid.Col span={2}>
+                                                <Text size="sm" fw={600} c="#E07B39">
+                                                    {selectedFinding?.probability || 0} %
+                                                </Text>
+                                            </Grid.Col>
+                                        </Grid>
+                                    </Card>
+
+                                    <Space h="lg" />
+
+                                    <Text size="md" fw={500} c="dimmed">
+                                        Man Hours
+                                    </Text>
+                                    <SimpleGrid cols={4}>
+                                        <Card bg='#daf7de' shadow="0" radius='md'>
+                                            <Group justify="space-between" align="start">
+                                                <Flex direction='column'>
+                                                    <Text fz='xs'>Min</Text>
+                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min?.toFixed(0) || 0} Hr</Text>
+                                                </Flex>
+                                                <IconClockDown color="green" size='25' />
+                                            </Group>
+                                        </Card>
+                                        <Card bg='#fcebeb' shadow="0" radius='md'>
+                                            <Group justify="space-between" align="start">
+                                                <Flex direction='column'>
+                                                    <Text fz='xs'>Max</Text>
+                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max?.toFixed(0) || 0} Hr</Text>
+                                                </Flex>
+                                                <IconClockUp color="red" size='25' />
+                                            </Group>
+                                        </Card>
+                                        <Card bg='#f3f7da' shadow="0" radius='md'>
+                                            <Group justify="space-between" align="start">
+                                                <Flex direction='column'>
+                                                    <Text fz='xs'>Avg</Text>
+                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
+                                                </Flex>
+                                                <IconClockCode color="orange" size='25' />
+                                            </Group>
+                                        </Card>
+                                        <Card bg='#dae8f7' shadow="0" radius='md'>
+                                            <Group justify="space-between" align="start">
+                                                <Flex direction='column'>
+                                                    <Text fz='xs'>Est</Text>
+                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est?.toFixed(0) || 0} Hr</Text>
+                                                </Flex>
+                                                <IconClockCheck color="indigo" size='25' />
+                                            </Group>
+                                        </Card>
+                                    </SimpleGrid>
+                                    <Space h="md" />
+
+                                    <Text size="md" mb="xs" fw={500} c="dimmed">
+                                        Spare parts
+                                    </Text>
+                                    <div
+                                        className="ag-theme-alpine"
+                                        style={{
+                                            width: "100%",
+                                            border: "none",
+                                            // height: "100%",
+
+                                        }}
+                                    >
+                                        <style>
+                                            {`
+/* Remove the borders and grid lines */
+.ag-theme-alpine .ag-root-wrapper, 
+.ag-theme-alpine .ag-root-wrapper-body,
+.ag-theme-alpine .ag-header,
+.ag-theme-alpine .ag-header-cell,
+.ag-theme-alpine .ag-body-viewport {
+border: none;
+}
+
+/* Remove the cell highlight (border) on cell click */
+.ag-theme-alpine .ag-cell-focus {
+outline: none !important; /* Remove focus border */
+box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove row border */
+.ag-theme-alpine .ag-row {
+border-bottom: none;
+}
+`}
+                                        </style>
+                                        <AgGridReact
+                                            pagination
+                                            paginationPageSize={10}
+                                            domLayout="autoHeight" // Ensures height adjusts dynamically
+                                            rowData={selectedFinding?.spareParts || []}
+                                            columnDefs={[
+                                                {
+                                                    field: "partId",
+                                                    headerName: "Part Number",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "desc",
+                                                    headerName: "Description",
+                                                    sortable: true,
+                                                    filter: true,
+                                                    floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "qty",
+                                                    headerName: "Qty",
+                                                    sortable: true,
+                                                    // filter: true,
+                                                    // floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "unit",
+                                                    headerName: "Unit",
+                                                    sortable: true,
+                                                    // filter: true,
+                                                    // floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                                {
+                                                    field: "price",
+                                                    headerName: "Price($)",
+                                                    sortable: true,
+                                                    // filter: true,
+                                                    // floatingFilter: true,
+                                                    resizable: true,
+                                                    flex: 1
+                                                },
+                                            ]}
+                                        />
+                                    </div>
+                                    {/* </>
+                                    ) : (
+                                        <Text>Select a finding to view details.</Text>
+                                    )} */}
+                                </div>
+                            </Card>
+                        </Grid.Col>
+
+
+                    </Grid>
+                </Card>
+            </>
+
+        </>
+    );
+};
+
+const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
+    const [selectedTask, setSelectedTask] = useState<any>(null);
+    const [taskSearch, setTaskSearch] = useState<string>('');
+    const [tableOpened, setTableOpened] = useState(false);
+    const [flattenedData, setFlattenedData] = useState([]);
+    // Filter tasks based on search query
+    const filteredTasks = tasks?.filter((task) =>
+        task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
+    );
+
+    // Select the first task by default
+    useEffect(() => {
+        if (tasks?.length > 0) {
+            setSelectedTask(tasks[0]);
+        }
+    }, [tasks]);
+
+    // Flatten the data structure when tasks change
+    useEffect(() => {
+        if (!tasks || tasks.length === 0) return;
+
+        const flattened: any = [];
+
+        tasks.forEach(task => {
+            // If task has spare parts, create a row for each spare part
+            if (task.spareParts && task.spareParts.length > 0) {
+                task.spareParts.forEach((part: any) => {
+                    flattened.push({
+                        sourceTask: task.sourceTask,
+                        description: task.description,
+                        cluster_id: task.cluster_id,
+                        mhsMin: task.mhs.min,
+                        mhsMax: task.mhs.max,
+                        mhsAvg: task.mhs.avg,
+                        mhsEst: task.mhs.est,
+                        partId: part.partId,
+                        partDesc: part.desc,
+                        qty: part.qty,
+                        unit: part.unit,
+                        price: part.price
+                    });
+                });
+            } else {
+                // If task has no spare parts, create a single row with task data only
+                flattened.push({
+                    sourceTask: task.sourceTask,
+                    description: task.description,
+                    cluster_id: task.cluster_id,
+                    mhsMin: task.mhs.min,
+                    mhsMax: task.mhs.max,
+                    mhsAvg: task.mhs.avg,
+                    mhsEst: task.mhs.est,
+                    partId: '',
+                    partDesc: '',
+                    qty: '',
+                    unit: '',
+                    price: ''
+                });
+            }
+        });
+
+        setFlattenedData(flattened);
+    }, [tasks]);
+
+    // Column definitions for the table
+  const columnDefs: ColDef[] = [
+    { 
+        headerName: 'Source Task', 
+        field: 'sourceTask', 
+        filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        width:150,
+        // flex: 2,
+        pinned: 'left'
+    },
+    { 
+        headerName: 'Description', 
+        field: 'description', 
+        filter: true,
+        floatingFilter: true,
+        resizable: true,
+        width:400,
+        // flex: 4,
+        // pinned: 'left'
+    },
+    { 
+        headerName: 'Cluster ID', 
+        field: 'cluster_id', 
+        filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        width:100
+        // flex: 1,
+        // pinned:'left'
+    },
+   
+    { 
+        headerName: 'Man Hours', 
+        field: 'mhsMin', 
+        // filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 4,
+        width:300,
+        cellRenderer: (val: any) => {
+            return (
+                
+                <Flex direction='row' justify='space-between'>
+                
+                    <Badge variant="light" color="teal" fullWidth>
+                       Min : {val?.data?.mhsMin?.toFixed(0)}
+                    </Badge>
+                    <Badge variant="light" color="blue" fullWidth>
+                       Avg : {val?.data?.mhsAvg?.toFixed(0)}
+                    </Badge>
+                    <Badge variant="light" color="violet" fullWidth>
+                       Max : {val?.data?.mhsMax?.toFixed(0)}
+                    </Badge>
+                    
+                </Flex>
+            );
+        },
+    },
+    // { 
+    //     headerName: 'Man Hours (Max)', 
+    //     field: 'mhsMax', 
+    //     filter: true,
+    //     sortable:true,
+    //     floatingFilter: true,
+    //     resizable: true,
+    //     flex: 1
+    // },
+    // { 
+    //     headerName: 'Man Hours (Avg)', 
+    //     field: 'mhsAvg', 
+    //     filter: true,
+    //     sortable:true,
+    //     floatingFilter: true,
+    //     resizable: true,
+    //     flex: 1
+    // },
+    // { 
+    //     headerName: 'Man Hours (Est)', 
+    //     field: 'mhsEst', 
+    //     filter: true,
+    //     sortable:true,
+    //     floatingFilter: true,
+    //     resizable: true,
+    //     flex: 1
+    // },
+    { 
+        headerName: 'Part Number', 
+        field: 'partId', 
+        filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 1
+    },
+    { 
+        headerName: 'Part Description', 
+        field: 'partDesc', 
+        filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 1
+    },
+    { 
+        headerName: 'Quantity', 
+        field: 'qty', 
+        // filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 1
+        width:150,
+        cellRenderer: (val: any) => {
+            return (
+                <Text>
+                    {val?.data?.qty?.toFixed(2)}
+                </Text>
+            );
+        },
+    },
+    { 
+        headerName: 'Unit', 
+        field: 'unit', 
+        // filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 1
+        width:150,
+    },
+    { 
+        headerName: 'Price', 
+        field: 'price', 
+        // filter: true,
+        sortable:true,
+        floatingFilter: true,
+        resizable: true,
+        // flex: 1
+        width:150,
+        cellRenderer: (val: any) => {
+            return (
+                <Text>
+                    {val?.data?.price?.toFixed(4)}
+                </Text>
+            );
+        },
+    }
+  ];
+
+  const downloadCSV = () => {
+    if (!flattenedData || flattenedData.length === 0) {
+        console.warn("No data available for CSV export");
+        return;
+    }
+
+    // Define CSV Headers (Column Titles)
+    const csvHeaders = [
+        "Source Task",
+        "Description",
+        "Cluster ID",
+        "MHS Min",
+        "MHS Max",
+        "MHS Avg",
+        "MHS Est",
+        "Part ID",
+        "Part Description",
+        "Quantity",
+        "Unit",
+        "Price"
+    ];
+
+    // Function to escape CSV fields
+    const escapeCSVField = (field :any) => {
+        if (field === null || field === undefined) return "-"; // Handle null or undefined
+        const stringField = String(field);
+        // If the field contains a comma, double quote, or newline, wrap it in double quotes
+        if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+            return `"${stringField.replace(/"/g, '""')}"`; // Escape double quotes by doubling them
+        }
+        return stringField;
+    };
+
+    // Map Flattened Data to CSV Format
+    const csvData = flattenedData.map((task:any) => [
+        escapeCSVField(task.sourceTask),
+        escapeCSVField(task.description),
+        escapeCSVField(task.cluster_id),
+        escapeCSVField(task.mhsMin),
+        escapeCSVField(task.mhsMax),
+        escapeCSVField(task.mhsAvg),
+        escapeCSVField(task.mhsEst),
+        escapeCSVField(task.partId),
+        escapeCSVField(task.partDesc),
+        escapeCSVField(task.qty),
+        escapeCSVField(task.unit),
+        escapeCSVField(task.price)
+    ]);
+
+    // Convert array to CSV format
+    const csvContent =
+        "data:text/csv;charset=utf-8," +
+        [csvHeaders.map(escapeCSVField), ...csvData.map(row => row.map(escapeCSVField))].map((row) => row.join(",")).join("\n");
+
+    // Create a download link and trigger click
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `MPD_Tasks.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+
+
+    return (
+        <>
+            <Modal
+                opened={tableOpened}
+                onClose={() => {
+                    setTableOpened(false);
+                    //   form.reset();
+                }}
+                size='100%'
+                scrollAreaComponent={ScrollArea.Autosize}
+                title={
+                    <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    {/* Title aligned to the start */}
+                    <Text size="lg" fw={600} c="white">
+                        MPD
+                    </Text>
+        
+                    {/* Button aligned to the end */}
+                    <Button color="green" size="xs" onClick={downloadCSV} ml='70vw'>
+                        Download CSV
+                    </Button>
+                </div>
+                </>
+                  }
+                styles={{
+                    header: {
+                        backgroundColor: "#124076", // Set header background color
+                        padding: "12px",
+                    },
+                    close: {
+                        color: 'white'
+                    },
+                }}
+            >
+                <div
+                    className="ag-theme-alpine"
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      height: "auto",
+                    }}
+                >
+                    <style>
+                        {`
+/* Remove the borders and grid lines */
+.ag-theme-alpine .ag-root-wrapper, 
+.ag-theme-alpine .ag-root-wrapper-body,
+.ag-theme-alpine .ag-header,
+.ag-theme-alpine .ag-header-cell,
+.ag-theme-alpine .ag-body-viewport {
+border: none;
+}
+
+/* Remove the cell highlight (border) on cell click */
+.ag-theme-alpine .ag-cell-focus {
+outline: none !important; /* Remove focus border */
+box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove row border */
+.ag-theme-alpine .ag-row {
+border-bottom: none;
+}
+`}
+                    </style>
+                   
+                    <AgGridReact
+            rowData={flattenedData}
+            columnDefs={columnDefs}
+            pagination={true}
+            paginationPageSize={10}
+            domLayout="autoHeight"
+            // defaultColDef={{
+            //   sortable: true,
+            //   filter: true,
+            //   resizable: true,
+            //   minWidth: 100,
+            //   flex: 1
+            // }}
+          />
+                </div>
+            </Modal>
+            <Card withBorder p={0} h="90vh" bg="none">
+                <Card
+                    p={10}
+                    c='white'
+                    bg='#124076'
+                    onClick={(values: any) => {
+                        setTableOpened(true);
+                    }}>
+                    <Title order={4}>
+                        MPD
+                    </Title>
+                </Card>
+                <Card withBorder p={0} h="80vh" bg="none">
+                    <Space h="xs" />
+                    <Grid h="100%">
+                        {/* Left Section: Tasks List */}
+                        <Grid.Col span={3}>
+                            <Card h="100%" w="100%" p="md" bg="none">
+                                <Group>
+                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
+                                        Total Source Tasks
+                                    </Text>
+                                    <Text size="md" fw={500} mb="xs">
+                                        {tasks?.length}
+                                    </Text>
+                                </Group>
+
+                                <TextInput
+                                    placeholder="Search tasks..."
+                                    value={taskSearch}
+                                    onChange={(e) => setTaskSearch(e.target.value)}
+                                    mb="md"
+                                />
+
+                                <Card
+                                    bg="none"
+                                    p={0}
+                                    h="calc(80vh - 150px)"
+                                    style={{
+                                        overflowY: 'auto',
+                                        scrollbarWidth: 'thin',
+                                    }}
+                                >
+                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
+                                        {filteredTasks?.map((task, taskIndex) => (
+                                            <Badge
+                                                fullWidth
+                                                key={taskIndex}
+                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
+                                                color="#4C7B8B"
+                                                size="lg"
+                                                mb='md'
+                                                h={35}
+                                                radius="md"
+                                                onClick={() => setSelectedTask(task)}
+                                            >
+                                                <Text fw={500}>{task?.sourceTask}</Text>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </Card>
+                            </Card>
+                        </Grid.Col>
+
+                        {/* Right Section: Selected Task Details */}
+                        <Grid.Col span={9}>
+                            <Card
+                                radius="xl"
+                                h="100%"
+                                w="100%"
+                                shadow="sm"
+                                p="md"
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        flex: 1,
+                                        overflowY: 'auto',
+                                        scrollbarWidth: 'none',
+                                        maxHeight: 'calc(70vh - 50px)'
+                                    }}
+                                >
+                                    {selectedTask ? (
+                                        <>
                                             <Grid>
                                                 <Grid.Col span={2}>
                                                     <Text size="md" fw={500} c="dimmed">
-                                                        Log Item
+                                                        Source Task
                                                     </Text>
                                                 </Grid.Col>
                                                 <Grid.Col span={10}>
                                                     <Text size="sm" fw={500}>
-                                                        {selectedFinding?.logItem || "-"}
+                                                        {selectedTask?.sourceTask || "-"}
                                                     </Text>
                                                 </Grid.Col>
                                             </Grid>
@@ -1968,32 +3041,12 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 </Grid.Col>
                                                 <Grid.Col span={10}>
                                                     <Text size="sm" fw={500}>
-                                                        {selectedFinding?.description || "-"}
+                                                        {selectedTask?.description || "-"}
                                                     </Text>
                                                 </Grid.Col>
                                             </Grid>
 
                                             <Space h="lg" />
-                                            <Card shadow="0" bg="#f5f5f5">
-                                                <Grid grow justify="left" align="center">
-                                                    <Grid.Col span={2}>
-                                                        <Text size="md" fw={500} c="dimmed">
-                                                            Probability
-                                                        </Text>
-                                                    </Grid.Col>
-                                                    <Grid.Col span={8}>
-                                                        <Progress w="100%" color="#E07B39" radius="md" size="lg" value={selectedFinding?.probability} />
-                                                    </Grid.Col>
-                                                    <Grid.Col span={2}>
-                                                        <Text size="sm" fw={600} c="#E07B39">
-                                                            {selectedFinding?.probability || 0} %
-                                                        </Text>
-                                                    </Grid.Col>
-                                                </Grid>
-                                            </Card>
-
-                                            <Space h="lg" />
-
                                             <Text size="md" fw={500} c="dimmed">
                                                 Man Hours
                                             </Text>
@@ -2002,7 +3055,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Min</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min?.toFixed(0) || 0} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedTask?.mhs?.min?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockDown color="green" size='25' />
                                                     </Group>
@@ -2011,7 +3064,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
                                                             <Text fz='xs'>Max</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max?.toFixed(0) || 0} Hr</Text>
+                                                            <Text fz='xl' fw={600}>{selectedTask?.mhs?.max?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockUp color="red" size='25' />
                                                     </Group>
@@ -2019,8 +3072,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 <Card bg='#f3f7da' shadow="0" radius='md'>
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
-                                                            <Text fz='xs'>Avg</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
+                                                            <Text fz='xs'>Average</Text>
+                                                            <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCode color="orange" size='25' />
                                                     </Group>
@@ -2028,17 +3081,17 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findin
                                                 <Card bg='#dae8f7' shadow="0" radius='md'>
                                                     <Group justify="space-between" align="start">
                                                         <Flex direction='column'>
-                                                            <Text fz='xs'>Est</Text>
-                                                            <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est?.toFixed(0) || 0} Hr</Text>
+                                                            <Text fz='xs'>Estimated</Text>
+                                                            <Text fz='xl' fw={600}>{selectedTask?.mhs?.est?.toFixed(0) || 0} Hr</Text>
                                                         </Flex>
                                                         <IconClockCheck color="indigo" size='25' />
                                                     </Group>
                                                 </Card>
                                             </SimpleGrid>
-                                            <Space h="md" />
 
+                                            <Space h="md" />
                                             <Text size="md" mb="xs" fw={500} c="dimmed">
-                                                Spare parts
+                                                Spare Parts
                                             </Text>
                                             <div
                                                 className="ag-theme-alpine"
@@ -2076,11 +3129,11 @@ border-bottom: none;
                                                     pagination
                                                     paginationPageSize={10}
                                                     domLayout="autoHeight" // Ensures height adjusts dynamically
-                                                    rowData={selectedFinding?.spareParts || []}
+                                                    rowData={selectedTask?.spareParts || []}
                                                     columnDefs={[
                                                         {
                                                             field: "partId",
-                                                            headerName: "Part Num",
+                                                            headerName: "Part Number",
                                                             sortable: true,
                                                             filter: true,
                                                             floatingFilter: true,
@@ -2089,7 +3142,7 @@ border-bottom: none;
                                                         },
                                                         {
                                                             field: "desc",
-                                                            headerName: "Description",
+                                                            headerName: "Description                                                            ",
                                                             sortable: true,
                                                             filter: true,
                                                             floatingFilter: true,
@@ -2103,7 +3156,14 @@ border-bottom: none;
                                                             // filter: true,
                                                             // floatingFilter: true,
                                                             resizable: true,
-                                                            flex: 1
+                                                            flex: 1,
+                                                            cellRenderer: (val: any) => {
+                                                                return (
+                                                                    <Text>
+                                                                        {val?.data?.qty?.toFixed(2) || 0}
+                                                                    </Text>
+                                                                );
+                                                            },
                                                         },
                                                         {
                                                             field: "unit",
@@ -2121,312 +3181,29 @@ border-bottom: none;
                                                             // filter: true,
                                                             // floatingFilter: true,
                                                             resizable: true,
-                                                            flex: 1
+                                                            flex: 1,
+                                                            cellRenderer: (val: any) => {
+                                                                return (
+                                                                    <Text>
+                                                                        {val?.data?.price?.toFixed(4) || 0}
+                                                                    </Text>
+                                                                );
+                                                            },
                                                         },
                                                     ]}
                                                 />
                                             </div>
-                                        {/* </>
+                                        </>
                                     ) : (
-                                        <Text>Select a finding to view details.</Text>
-                                    )} */}
+                                        <Text>Select a task to view details.</Text>
+                                    )}
                                 </div>
                             </Card>
                         </Grid.Col>
-
-
                     </Grid>
                 </Card>
-            </>
-
+            </Card>
         </>
-    );
-};
-
-const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
-    const [selectedTask, setSelectedTask] = useState<any>(null);
-    const [taskSearch, setTaskSearch] = useState<string>('');
-
-    // Filter tasks based on search query
-    const filteredTasks = tasks?.filter((task) =>
-        task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
-    );
-
-    // Select the first task by default
-    useEffect(() => {
-        if (tasks?.length > 0) {
-            setSelectedTask(tasks[0]);
-        }
-    }, [tasks]);
-
-
-    return (
-        <Card withBorder p={0} h="90vh" bg="none">
-            <Card p={10} c='white' bg='#124076'>
-                <Title order={4}>
-                    MPD
-                </Title>
-            </Card>
-            <Card withBorder p={0} h="80vh" bg="none">
-                <Space h="xs" />
-                <Grid h="100%">
-                    {/* Left Section: Tasks List */}
-                    <Grid.Col span={3}>
-                        <Card h="100%" w="100%" p="md" bg="none">
-                            <Group>
-                                <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                    Total Source Tasks
-                                </Text>
-                                <Text size="md" fw={500} mb="xs">
-                                    {tasks?.length}
-                                </Text>
-                            </Group>
-
-                            <TextInput
-                                placeholder="Search tasks..."
-                                value={taskSearch}
-                                onChange={(e) => setTaskSearch(e.target.value)}
-                                mb="md"
-                            />
-
-                            <Card
-                                bg="none"
-                                p={0}
-                                h="calc(80vh - 150px)"
-                                style={{
-                                    overflowY: 'auto',
-                                    scrollbarWidth: 'thin',
-                                }}
-                            >
-                                <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                    {filteredTasks?.map((task, taskIndex) => (
-                                        <Badge
-                                            fullWidth
-                                            key={taskIndex}
-                                            variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
-                                            color="#4C7B8B"
-                                            size="lg"
-                                            mb='md'
-                                            h={35}
-                                            radius="md"
-                                            onClick={() => setSelectedTask(task)}
-                                        >
-                                            <Text fw={500}>{task?.sourceTask}</Text>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </Card>
-                        </Card>
-                    </Grid.Col>
-
-                    {/* Right Section: Selected Task Details */}
-                    <Grid.Col span={9}>
-                        <Card
-                            radius="xl"
-                            h="100%"
-                            w="100%"
-                            shadow="sm"
-                            p="md"
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <div
-                                style={{
-                                    flex: 1,
-                                    overflowY: 'auto',
-                                    scrollbarWidth: 'none',
-                                    maxHeight: 'calc(70vh - 50px)'
-                                }}
-                            >
-                                {selectedTask ? (
-                                    <>
-                                        <Grid>
-                                            <Grid.Col span={2}>
-                                                <Text size="md" fw={500} c="dimmed">
-                                                    Source Task
-                                                </Text>
-                                            </Grid.Col>
-                                            <Grid.Col span={10}>
-                                                <Text size="sm" fw={500}>
-                                                    {selectedTask?.sourceTask || "-"}
-                                                </Text>
-                                            </Grid.Col>
-                                        </Grid>
-
-                                        <Space h="sm" />
-                                        <Grid>
-                                            <Grid.Col span={2}>
-                                                <Text size="md" fw={500} c="dimmed">
-                                                    Description
-                                                </Text>
-                                            </Grid.Col>
-                                            <Grid.Col span={10}>
-                                                <Text size="sm" fw={500}>
-                                                    {selectedTask?.description || "-"}
-                                                </Text>
-                                            </Grid.Col>
-                                        </Grid>
-
-                                        <Space h="lg" />
-                                        <Text size="md" fw={500} c="dimmed">
-                                            Man Hours
-                                        </Text>
-                                        <SimpleGrid cols={4}>
-                                            <Card bg='#daf7de' shadow="0" radius='md'>
-                                                <Group justify="space-between" align="start">
-                                                    <Flex direction='column'>
-                                                        <Text fz='xs'>Min</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.min?.toFixed(0) || 0} Hr</Text>
-                                                    </Flex>
-                                                    <IconClockDown color="green" size='25' />
-                                                </Group>
-                                            </Card>
-                                            <Card bg='#fcebeb' shadow="0" radius='md'>
-                                                <Group justify="space-between" align="start">
-                                                    <Flex direction='column'>
-                                                        <Text fz='xs'>Max</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.max?.toFixed(0) || 0} Hr</Text>
-                                                    </Flex>
-                                                    <IconClockUp color="red" size='25' />
-                                                </Group>
-                                            </Card>
-                                            <Card bg='#f3f7da' shadow="0" radius='md'>
-                                                <Group justify="space-between" align="start">
-                                                    <Flex direction='column'>
-                                                        <Text fz='xs'>Average</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
-                                                    </Flex>
-                                                    <IconClockCode color="orange" size='25' />
-                                                </Group>
-                                            </Card>
-                                            <Card bg='#dae8f7' shadow="0" radius='md'>
-                                                <Group justify="space-between" align="start">
-                                                    <Flex direction='column'>
-                                                        <Text fz='xs'>Estimated</Text>
-                                                        <Text fz='xl' fw={600}>{selectedTask?.mhs?.est?.toFixed(0) || 0} Hr</Text>
-                                                    </Flex>
-                                                    <IconClockCheck color="indigo" size='25' />
-                                                </Group>
-                                            </Card>
-                                        </SimpleGrid>
-
-                                        <Space h="md" />
-                                        <Text size="md" mb="xs" fw={500} c="dimmed">
-                                            Spare Parts
-                                        </Text>
-                                        <div
-                                            className="ag-theme-alpine"
-                                            style={{
-                                                width: "100%",
-                                                border: "none",
-                                                // height: "100%",
-
-                                            }}
-                                        >
-                                            <style>
-                                                {`
-/* Remove the borders and grid lines */
-.ag-theme-alpine .ag-root-wrapper, 
-.ag-theme-alpine .ag-root-wrapper-body,
-.ag-theme-alpine .ag-header,
-.ag-theme-alpine .ag-header-cell,
-.ag-theme-alpine .ag-body-viewport {
-border: none;
-}
-
-/* Remove the cell highlight (border) on cell click */
-.ag-theme-alpine .ag-cell-focus {
-outline: none !important; /* Remove focus border */
-box-shadow: none !important; /* Remove any box shadow */
-}
-
-/* Remove row border */
-.ag-theme-alpine .ag-row {
-border-bottom: none;
-}
-`}
-                                            </style>
-                                            <AgGridReact
-                                                pagination
-                                                paginationPageSize={10}
-                                                domLayout="autoHeight" // Ensures height adjusts dynamically
-                                                rowData={selectedTask?.spareParts || []}
-                                                columnDefs={[
-                                                    {
-                                                        field: "partId",
-                                                        headerName: "Part Num",
-                                                        sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
-                                                        resizable: true,
-                                                        flex: 1
-                                                    },
-                                                    {
-                                                        field: "desc",
-                                                        headerName: "Description                                                            ",
-                                                        sortable: true,
-                                                        filter: true,
-                                                        floatingFilter: true,
-                                                        resizable: true,
-                                                        flex: 1
-                                                    },
-                                                    {
-                                                        field: "qty",
-                                                        headerName: "Qty",
-                                                        sortable: true,
-                                                        // filter: true,
-                                                        // floatingFilter: true,
-                                                        resizable: true,
-                                                        flex: 1,
-                                                        cellRenderer: (val: any) => {
-                                                            return (
-                                                              <Text>
-                                                                {val?.data?.qty?.toFixed(2) || 0}
-                                                              </Text>
-                                                            );
-                                                          },
-                                                    },
-                                                    {
-                                                        field: "unit",
-                                                        headerName: "Unit",
-                                                        sortable: true,
-                                                        // filter: true,
-                                                        // floatingFilter: true,
-                                                        resizable: true,
-                                                        flex: 1
-                                                    },
-                                                    {
-                                                        field: "price",
-                                                        headerName: "Price($)",
-                                                        sortable: true,
-                                                        // filter: true,
-                                                        // floatingFilter: true,
-                                                        resizable: true,
-                                                        flex: 1,
-                                                        cellRenderer: (val: any) => {
-                                                            return (
-                                                              <Text>
-                                                                {val?.data?.price?.toFixed(4) || 0}
-                                                              </Text>
-                                                            );
-                                                          },
-                                                    },
-                                                ]}
-                                            />
-                                        </div>
-                                    </>
-                                ) : (
-                                    <Text>Select a task to view details.</Text>
-                                )}
-                            </div>
-                        </Card>
-                    </Grid.Col>
-                </Grid>
-            </Card>
-        </Card>
     );
 };
 

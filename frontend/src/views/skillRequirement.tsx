@@ -14,6 +14,7 @@ import { SkillsFindingsDonutChart, SkillsTasksDonutChart } from "../components/s
 import { showAppNotification } from "../components/showNotificationGlobally";
 import { DonutChart } from "@mantine/charts";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
+import RFQSkillsUploadDropZoneExcel from "../components/rfqSkillUploadDropzone";
 
 export default function SkillRequirement() {
     const { validateTasks } = useApi();
@@ -646,7 +647,7 @@ export default function SkillRequirement() {
                                 changeHandler={handleTasks}
                                 color="green" // Optional custom border color
                             /> */}
-                            <RFQUploadDropZoneExcel
+                            <RFQSkillsUploadDropZoneExcel
                                 name="Excel Files"
                                 changeHandler={handleFileChange}
                                 selectedFile={selectedFile} // Pass selectedFile as prop

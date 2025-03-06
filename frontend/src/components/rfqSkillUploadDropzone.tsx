@@ -1,5 +1,5 @@
 // RFQUploadDropZoneExcel.tsx
-import { ActionIcon, Flex, Paper, Text, Group, Center, Space } from "@mantine/core";
+import { ActionIcon, Flex, Paper, Text, Group } from "@mantine/core";
 import { Dropzone } from "@mantine/dropzone";
 import { useEffect, useState } from "react";
 import { MdClose, MdFilePresent, MdUploadFile } from "react-icons/md";
@@ -14,7 +14,7 @@ interface UploadDropZoneExcelProps {
   setSelectedFile?: (file: File | null) => void;
 }
 
-const RFQUploadDropZoneExcel = ({
+const RFQSkillsUploadDropZoneExcel = ({
   name,
   changeHandler,
   selectedFile,
@@ -195,40 +195,33 @@ const RFQUploadDropZoneExcel = ({
         ]}
         styles={{
           root: {
-            height: "12vh",
-            width: "100%",
             borderColor: color || "#ced4da",
             borderStyle: "dashed",
             borderWidth: 2,
             borderRadius: 10,
             backgroundColor: "#F4F4F4",
             textAlign: "center",
-            padding: "1.5em",
+            padding: "2em",
             cursor: "pointer",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            flexDirection: "column",
           },
         }}
         onDrop={handleDrop}
         multiple={false}
       >
-        <Flex direction='row'  align='center' gap="xl">
-          <MdUploadFile size={50} color={color || "#1a73e8"} />
-          <Text c="dimmed" size="sm">
+        <Group justify="center" gap="xl">
+          <MdUploadFile size={40} color={color || "#1a73e8"} />
+          <Text c="dimmed" size="md">
             Drag and drop your {name} here, or click to select a file
           </Text>
-        </Flex>
+        </Group>
       </Dropzone>
 
       {file && (
         <div className="mt-4">
-          <Space h='sm'/>
           <Flex gap="md" justify="center" align="center" direction="row">
             <Paper
               withBorder
-              // w={200}
+              w={200}
               shadow="xs"
               radius="md"
               p="sm"
@@ -249,4 +242,4 @@ const RFQUploadDropZoneExcel = ({
   );
 };
 
-export default RFQUploadDropZoneExcel;
+export default RFQSkillsUploadDropZoneExcel;

@@ -141,7 +141,7 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                                         <SkillsDonutChart task={finding} />
                                         {finding?.skills?.map((skill : any) => (
                                             <Card key={skill.skill} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
-                                                <Text size="sm" fw={500}>{skill?.skill || "Unknown"}</Text>
+                                                <Text size="sm" fw={500}>{skill?.skill || "Unknown Skill"}</Text>
                                                 <Group justify="space-between">
                                                     <Text fz="xs" c="green" fw={700}>
                                                         Min {skill?.manHours?.min} Hr
@@ -178,7 +178,7 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
 
             data?.forEach((task : any) => {
                 task?.skills?.forEach((skillData : any) => {
-                    const skillName = skillData?.skill?.trim() || "Unknown";
+                    const skillName = skillData?.skill?.trim() || "Unknown Skill";
                     if (!skillMap.has(skillName)) {
                         skillMap.set(skillName, []);
                     }
@@ -269,7 +269,7 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
 
             data?.forEach((finding : any) => {
                 finding?.skills?.forEach((skillData : any) => {
-                    const skillName = skillData?.skill?.trim() || "Unknown";
+                    const skillName = skillData?.skill?.trim() || "Unknown Skill";
                     if (!skillMap.has(skillName)) {
                         skillMap.set(skillName, []);
                     }
@@ -354,12 +354,12 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                 <Card withBorder radius='md' bg='#e1e6f7'>
                     <Group gap='lg' justify="space-between">
                         <Flex direction='column'>
-                            <Text fw={400} fz='sm'>Tasks</Text>
+                            <Text fw={400} fz='sm'>Source Tasks</Text>
                             <Text fw={600} fz='h2'>{skillAnalysisData?.skillAnalysis?.tasks?.length || 0}</Text>
                         </Flex>
                         <IconCube color="#4E66DE" size='39' />
                     </Group>
-                    <Text fw={500} fz='sm' c='dimmed'>skills - {totalTaskSkills || 0}</Text>
+                    {/* <Text fw={500} fz='sm' c='dimmed'>skills - {totalTaskSkills || 0}</Text> */}
                 </Card>
                 <Card withBorder radius='md' bg='#d2fad4'>
                     <Group gap='lg' justify="space-between">
@@ -378,7 +378,7 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                         </Flex>
                         <IconAlertTriangle color="red" size='39' />
                     </Group>
-                    <Text fw={500} fz='sm' c='dimmed'>skills - {totalFindingSkills || 0}</Text>
+                    {/* <Text fw={500} fz='sm' c='dimmed'>skills - {totalFindingSkills || 0}</Text> */}
                 </Card>
                 <Card withBorder radius='md' bg='#FFEDE2'>
                     <Group gap='lg' justify="space-between">
@@ -388,40 +388,6 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                         </Flex>
                         <IconClock color="orange" size='39' />
                     </Group>
-                </Card>
-            </SimpleGrid>
-            <Space h='sm' />
-            <SimpleGrid cols={2}>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">MPD</Text>
-                        <TaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
-                    
-                </Card>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">Findings</Text>
-                        <FindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
                 </Card>
             </SimpleGrid>
             <Space h='sm' />
@@ -445,6 +411,41 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                     <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
                         <Text fw={600} size="lg" mb="sm">Skill - Findings</Text>
                         <SkillFindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
+                    </ScrollArea>
+                </Card>
+            </SimpleGrid>
+            
+            <Space h='sm' />
+            <SimpleGrid cols={2}>
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
+                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
+                        <Text fw={600} size="lg" mb="sm">MPD</Text>
+                        <TaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
+                        {
+                        skillAnalysisData === null ? (
+                            <Center>
+                            <Text>No Data Found </Text>
+                            </Center>
+                        ) : (
+                            <></>
+                        )
+                    }
+                    </ScrollArea>
+                    
+                </Card>
+                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
+                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
+                        <Text fw={600} size="lg" mb="sm">Findings</Text>
+                        <FindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
                         {
                         skillAnalysisData === null ? (
                             <Center>

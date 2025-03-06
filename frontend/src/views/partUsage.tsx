@@ -1,13 +1,19 @@
 import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center } from "@mantine/core";
 import { showNotification, useEffect, useState } from "../constants/GlobalImports";
 import { DatePickerInput } from "@mantine/dates";
-import { IconAlertTriangle, IconCheck, IconCube, IconMenuDeep, IconTool } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCalendar, IconCheck, IconCube, IconMenuDeep, IconTool } from "@tabler/icons-react";
 import ReactApexChart from "react-apexcharts";
 import '../App.css';
 import { useApiPartUsage } from "../api/services/partUsageService";
 import { showAppNotification } from "../components/showNotificationGlobally";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { AreaChart, BarChart, DonutChart, LineChart } from "@mantine/charts";
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DateRangePicker } from '@mui/x-date-pickers-pro/DateRangePicker';
+import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
+import { Box } from '@mui/material';
+
 // import { useApiPartUsage } from "../api/services/partUsageService";
 
 export default function PartUsage() {
@@ -19,6 +25,11 @@ export default function PartUsage() {
     const twoDaysAgo = dayjs("2024-03-27").startOf("day").toDate(); // March 27, 2024
     const today = dayjs("2024-04-03").endOf("day").toDate(); // April 3, 2024
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
+    // Initialize with Dayjs objects
+    // const twoDaysAgo = dayjs("2024-03-27").startOf("day"); // March 27, 2024
+    // const today = dayjs("2024-04-03").endOf("day"); // April 3, 2024
+    // const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([twoDaysAgo, today]); // Date range
+
     const [partUsageData, setPartUsageData] = useState<any>();
     const [isLoading, setIsLoading] = useState(false);
     const [taskSearch, setTaskSearch] = useState("");
@@ -96,7 +107,7 @@ export default function PartUsage() {
     };
 
 
- 
+
     // Search filter for tasks
     const filteredTasks = partUsageData?.usage?.tasks?.filter((task: any) =>
         task?.taskId?.toLowerCase().includes(taskSearch?.toLowerCase())
@@ -122,27 +133,27 @@ export default function PartUsage() {
     // );
 
     // Prepare Data for the tasks wise Bar Graph
-    const taskIds = filteredTasks?.map((task:any) => task.taskId);
-    const taskWisePackageLength = filteredTasks?.map((task:any) => task?.packages?.length);
-    const taskWiseTotalQuantity = filteredTasks?.map((task:any) =>
-        task?.packages?.reduce((sum:any, pkg:any) => sum + pkg?.quantity, 0)
+    const taskIds = filteredTasks?.map((task: any) => task.taskId);
+    const taskWisePackageLength = filteredTasks?.map((task: any) => task?.packages?.length);
+    const taskWiseTotalQuantity = filteredTasks?.map((task: any) =>
+        task?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0)
     );
 
     // Prepare Data for the Findings wise Bar Graph
-    const findingIds = filteredFindings?.map((finding:any) => finding?.taskId);
-    const findingWisePackageLength = filteredFindings?.map((finding:any) => finding?.packages?.length);
-    const findingWiseTotalQuantity = filteredFindings?.map((finding:any) =>
-        finding?.packages?.reduce((sum:any, pkg:any) => sum + pkg?.quantity, 0)
+    const findingIds = filteredFindings?.map((finding: any) => finding?.taskId);
+    const findingWisePackageLength = filteredFindings?.map((finding: any) => finding?.packages?.length);
+    const findingWiseTotalQuantity = filteredFindings?.map((finding: any) =>
+        finding?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0)
     );
 
     // Prepare data for Mantine BarChart
-    const tasksChartData = taskIds?.map((taskId:any, index:any) => ({
+    const tasksChartData = taskIds?.map((taskId: any, index: any) => ({
         taskId,
         packages: taskWisePackageLength[index] || 0,
         quantity: taskWiseTotalQuantity[index] || 0,
     })) || [];
 
-    const findingChartData = findingIds?.map((findingId:any, index:any) => ({
+    const findingChartData = findingIds?.map((findingId: any, index: any) => ({
         findingId,
         packages: findingWisePackageLength[index] || 0,
         quantity: findingWiseTotalQuantity[index] || 0,
@@ -163,29 +174,34 @@ export default function PartUsage() {
             return total + findingQuantity;
         }, 0);
     }
-    
+
     return (
         <>
             <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
-                <Group justify="flex-end">
-                    <TextInput
-                        size="xs"
-                        label="Enter Part ID"
-                        placeholder="Type Part ID"
-                        value={inputPartId}
-                        onChange={(event) => setInputPartId(event.currentTarget.value)}
-                        rightSection={
-                            <ActionIcon
-                                // size="xs"
-                                onClick={handleCheck}
-                                disabled={!inputPartId}
-                                loading={isLoading}
-                                color="green"
-                            >
-                                <IconCheck />
-                            </ActionIcon>
-                        }
+                <Group justify="flex-end" align="end">
+                {/* <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Box sx={{ backgroundColor: 'none', padding: 0, borderRadius: 1, width: '350px' }}>
+                <DemoContainer components={['DateRangePicker']}>
+                    <DateRangePicker
+                        value={dateRange}
+                        onChange={(newValue) => setDateRange(newValue)}
+                        localeText={{ start: 'Start Date', end: 'End Date' }}
+                        sx={{
+                            '& .MuiInputBase-root': {
+                                fontSize: '0.875rem', // Smaller font size
+                            },
+                            '& .MuiOutlinedInput-root': {
+                                backgroundColor: 'white', // White background for the input
+                                height: '35px', // Smaller height for the input
+                            },
+                            '& .MuiInputBase-input': {
+                                padding: '8px 12px', // Adjust padding for smaller height
+                            },
+                        }}
                     />
+                </DemoContainer>
+            </Box>
+        </LocalizationProvider> */}
                     <DatePickerInput
                         size="xs"
                         w='18vw'
@@ -194,37 +210,66 @@ export default function PartUsage() {
                         placeholder="Pick dates range"
                         value={dateRange}
                         onChange={setDateRange}
+                        leftSection={<IconCalendar size='20' />}
+                        popoverProps={{ withinPortal: true }}
                     />
+                    <TextInput
+                        size="xs"
+                        label="Enter Part ID"
+                        placeholder="Type Part ID"
+                        value={inputPartId}
+                        onChange={(event) => setInputPartId(event.currentTarget.value)}
+                    // rightSection={
+                    //     <ActionIcon
+                    //         // size="xs"
+                    //         onClick={handleCheck}
+                    //         disabled={!inputPartId}
+                    //         loading={isLoading}
+                    //         color="green"
+                    //     >
+                    //         <IconCheck />
+                    //     </ActionIcon>
+                    // }
+                    />
+                    <Button
+                        size="xs"
+                        onClick={handleCheck}
+                        disabled={!inputPartId}
+                        loading={isLoading}
+                        color="green"
+                    >
+                        Submit
+                    </Button>
                 </Group>
                 <Space h='sm' />
                 <Grid>
                     <Grid.Col span={4}>
-                    <Card>
-                        <Group>
-                        <Text  fw='500' c='dimmed'>
-                        Part Id - 
-                    </Text>
-                    <Text fw='600'>
-                        {partUsageData?.partId || validatedPartId}
-                    </Text>
-                        </Group>
-                    
-                </Card>
+                        <Card>
+                            <Group>
+                                <Text fw='500' c='dimmed'>
+                                    Part Id -
+                                </Text>
+                                <Text fw='600'>
+                                    {partUsageData?.partId || validatedPartId}
+                                </Text>
+                            </Group>
+
+                        </Card>
                     </Grid.Col>
                     <Grid.Col span={8}>
-                    <Card>
-                    <Group>
-                        <Text  fw='500' c='dimmed'>
-                        Description - 
-                    </Text>
-                    <Text fw='600'>
-                        {partUsageData?.partDescription || "-"}
-                    </Text>
-                        </Group>
-                </Card>
+                        <Card>
+                            <Group>
+                                <Text fw='500' c='dimmed'>
+                                    Description -
+                                </Text>
+                                <Text fw='600'>
+                                    {partUsageData?.partDescription || "-"}
+                                </Text>
+                            </Group>
+                        </Card>
                     </Grid.Col>
                 </Grid>
-                
+
                 <Space h='sm' />
                 <SimpleGrid cols={4}>
                     <Card radius='md'>
@@ -232,7 +277,7 @@ export default function PartUsage() {
                             <IconCube color="#4E66DE" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Tasks
+                                    Source Tasks
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {partUsageData?.usage?.tasks?.length || 0}
@@ -412,7 +457,7 @@ export default function PartUsage() {
                                     data:  partUsageData?.aircraftDetails?.aircraftModels?.map((ele : any)=> ele?.count || 0)
                                 }]}
                             /> */}
-                             <Title order={5} c='dimmed'>
+                            <Title order={5} c='dimmed'>
                                 Aircraft wise Quantity
                             </Title>
                             <BarChart
@@ -424,9 +469,9 @@ export default function PartUsage() {
                                     { name: 'count', color: 'rgba(0, 49, 196, 1)' },
                                 ]}
                                 tickLine="y"
-                                barProps={{ radius: 10}}
+                                barProps={{ radius: 10 }}
                                 maxBarWidth={40} // Adjust the gap between categories
-                                // barGap={5} // Adjust the gap between bars
+                            // barGap={5} // Adjust the gap between bars
                             />
                         </Card>
                     </Grid.Col>
@@ -482,7 +527,7 @@ export default function PartUsage() {
                                     data: partUsageData?.aircraftDetails?.stockStatusCodes?.map((ele: any) => ele?.count || 0)
                                 }]}
                             /> */}
-                             <Title order={5} c='dimmed'>
+                            <Title order={5} c='dimmed'>
                                 Part Supplied
                             </Title>
                             <BarChart
@@ -495,9 +540,9 @@ export default function PartUsage() {
                                 ]}
                                 tickLine="y"
 
-                                barProps={{ radius: 10}}
+                                barProps={{ radius: 10 }}
                                 maxBarWidth={40} // Adjust the gap between categories
-                                // barGap={5} // Adjust the gap between bars
+                            // barGap={5} // Adjust the gap between bars
                             />
                         </Card>
                     </Grid.Col>
@@ -505,27 +550,27 @@ export default function PartUsage() {
                 <Space h='md' />
                 <SimpleGrid cols={2}>
                     <Card>
-                    <Title order={5} c='dimmed'>
+                        <Title order={5} c='dimmed'>
                             MPD - Packages & Qty
                         </Title>
                         <Card
-                        style={{
-                            width: "100%",
-                            height: "350px", // Increase the Card height
-                            overflowX: "auto", // Enable horizontal scrolling
-                            overflowY: "hidden", // Prevent vertical scrolling
-                            scrollbarWidth: 'thin',
-
-                        }}
-                    >
-                       
-                        <div
                             style={{
-                                width: Math.max(taskIds?.length * 80, 400), // Set minimum width to 400px or adjust as needed
+                                width: "100%",
+                                height: "350px", // Increase the Card height
+                                overflowX: "auto", // Enable horizontal scrolling
+                                overflowY: "hidden", // Prevent vertical scrolling
+                                scrollbarWidth: 'thin',
+
                             }}
-                            className="scrollable-container"
                         >
-                            {/* <ReactApexChart
+
+                            <div
+                                style={{
+                                    width: Math.max(taskIds?.length * 80, 400), // Set minimum width to 400px or adjust as needed
+                                }}
+                                className="scrollable-container"
+                            >
+                                {/* <ReactApexChart
                                 type="bar"
                                 height={250}
                                 width={Math.max(taskIds?.length * 80, 400)} // Dynamic width for scrolling
@@ -568,45 +613,45 @@ export default function PartUsage() {
                                     { name: "Quantity", data: taskWiseTotalQuantity },
                                 ]}
                             /> */}
-                            <BarChart
-                        h={300}
-                        data={tasksChartData}
-                        dataKey="taskId"
-                        series={[
-                            { name: 'packages', color: '#1445B6' },
-                            { name: 'quantity', color: '#D6B575' },
-                        ]}
-                        xAxisLabel="Tasks"
-                        yAxisLabel="Count"
-                        tickLine="y"
-                        barProps={{ radius: 10}}
-                        
-                    />
-                        </div>
-                    </Card>
+                                <BarChart
+                                    h={300}
+                                    data={tasksChartData}
+                                    dataKey="taskId"
+                                    series={[
+                                        { name: 'packages', color: '#1445B6' },
+                                        { name: 'quantity', color: '#D6B575' },
+                                    ]}
+                                    xAxisLabel="Tasks"
+                                    yAxisLabel="Count"
+                                    tickLine="y"
+                                    barProps={{ radius: 10 }}
+
+                                />
+                            </div>
+                        </Card>
                     </Card>
                     <Card>
-                    <Title order={5} c='dimmed'>
+                        <Title order={5} c='dimmed'>
                             Findings - Packages & Qty
                         </Title>
                         <Card
-                        style={{
-                            width: "100%",
-                            height: "350px", // Increase the Card height
-                            overflowX: "auto", // Enable horizontal scrolling
-                            overflowY: "hidden", // Prevent vertical scrolling
-                            scrollbarWidth: 'thin',
-
-                        }}
-                    >
-                       
-                        <div
                             style={{
-                                width: Math.max(findingIds?.length * 80, 400), // Set minimum width to 400px or adjust as needed
+                                width: "100%",
+                                height: "350px", // Increase the Card height
+                                overflowX: "auto", // Enable horizontal scrolling
+                                overflowY: "hidden", // Prevent vertical scrolling
+                                scrollbarWidth: 'thin',
+
                             }}
-                            className="scrollable-container"
                         >
-                            {/* <ReactApexChart
+
+                            <div
+                                style={{
+                                    width: Math.max(findingIds?.length * 80, 400), // Set minimum width to 400px or adjust as needed
+                                }}
+                                className="scrollable-container"
+                            >
+                                {/* <ReactApexChart
                                 type="bar"
                                 height='250'
                                 width={Math.max(findingIds?.length * 80, 400)} // Dynamic width for horizontal scrolling
@@ -677,30 +722,30 @@ export default function PartUsage() {
                                     { name: "Quantity", data: findingWiseTotalQuantity },
                                 ]}
                             /> */}
-                            <BarChart
-                        h={300}
-                        data={findingChartData}
-                        dataKey="findingId"
-                        series={[
-                            { name: 'packages', color: '#1445B6' },
-                            { name: 'quantity', color: '#D6B575' },
-                        ]}
-                        maxBarWidth={40}
-                        xAxisLabel="Findings"
-                        yAxisLabel="Count"
-                        tickLine="y"
-                        barProps={{ radius: 10}}
-                        // barCategoryGap={10} // Adjust the gap between categories
-                        // barGap={5} // Adjust the gap between bars
-                    />
-                        </div>
+                                <BarChart
+                                    h={300}
+                                    data={findingChartData}
+                                    dataKey="findingId"
+                                    series={[
+                                        { name: 'packages', color: '#1445B6' },
+                                        { name: 'quantity', color: '#D6B575' },
+                                    ]}
+                                    maxBarWidth={40}
+                                    xAxisLabel="Findings"
+                                    yAxisLabel="Count"
+                                    tickLine="y"
+                                    barProps={{ radius: 10 }}
+                                // barCategoryGap={10} // Adjust the gap between categories
+                                // barGap={5} // Adjust the gap between bars
+                                />
+                            </div>
+                        </Card>
                     </Card>
-                    </Card>
-                    
+
                 </SimpleGrid>
                 <Space h='md' />
                 <SimpleGrid cols={2}>
-                    <Card radius='md' h={partUsageData?.usage ! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
+                    <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
                         <Title order={5}>
                             MPD
                         </Title>
@@ -714,69 +759,69 @@ export default function PartUsage() {
                         {
                             filteredTasks?.length > 0 ? (
                                 <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                            <Accordion variant="separated" radius="md">
-                                {filteredTasks?.map((task: any,index:number) => (
-                                    <Accordion.Item key={`${task?.taskId} - ${index}` } value={`${task?.taskId} - ${index}` }>
-                                        <Accordion.Control>
-                                            <Group>
-                                                <IconCube color="#4E66DE" />
-                                                {task?.taskId || "-"}
-                                            </Group>
+                                    <Accordion variant="separated" radius="md">
+                                        {filteredTasks?.map((task: any, index: number) => (
+                                            <Accordion.Item key={`${task?.taskId} - ${index}`} value={`${task?.taskId} - ${index}`}>
+                                                <Accordion.Control>
+                                                    <Group>
+                                                        <IconCube color="#4E66DE" />
+                                                        {task?.taskId || "-"}
+                                                    </Group>
 
-                                        </Accordion.Control>
-                                        <Accordion.Panel>
-                                            <ScrollArea h={task?.packages?.length > 3 ? 250 : 150} scrollHideDelay={0}>
-                                       
-                                            
-                                            <Text fz='xs'>
-                                            <Text span c="gray" inherit>Description : </Text>
-                                                 {task?.taskDescription || "-"}
-                                            </Text>
-                                           
-                                            
-                                                {task?.packages?.map((pkg: any) => (
-                                                    <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
-                                                        <Group justify="space-between" align="flex-start">
-                                                            <Flex direction='column'>
-                                                                <Group>
-                                                                    <Text c='dimmed' fz='sm'>
-                                                                        Package ID :
-                                                                    </Text>
-                                                                    <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
+                                                </Accordion.Control>
+                                                <Accordion.Panel>
+                                                    <ScrollArea h={task?.packages?.length > 3 ? 250 : 150} scrollHideDelay={0}>
+
+
+                                                        <Text fz='xs'>
+                                                            <Text span c="gray" inherit>Description : </Text>
+                                                            {task?.taskDescription || "-"}
+                                                        </Text>
+
+
+                                                        {task?.packages?.map((pkg: any) => (
+                                                            <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
+                                                                <Group justify="space-between" align="flex-start">
+                                                                    <Flex direction='column'>
+                                                                        <Group>
+                                                                            <Text c='dimmed' fz='sm'>
+                                                                                Package ID :
+                                                                            </Text>
+                                                                            <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
+                                                                        </Group>
+                                                                        <Group>
+                                                                            <Text c='dimmed' fz='sm'>
+                                                                                Date :
+                                                                            </Text>
+                                                                            <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
+                                                                        </Group>
+                                                                    </Flex>
+
+
+                                                                    <Badge color="blue">Qty: {pkg?.quantity || "-"}</Badge>
                                                                 </Group>
-                                                                <Group>
-                                                                    <Text c='dimmed' fz='sm'>
-                                                                        Date :
-                                                                    </Text>
-                                                                    <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
-                                                                </Group>
-                                                            </Flex>
-
-
-                                                            <Badge color="blue">Qty: {pkg?.quantity || "-"}</Badge>
-                                                        </Group>
-                                                    </Card>
-                                                ))}
-                                            </ScrollArea>
-                                        </Accordion.Panel>
-                                    </Accordion.Item>
-                                ))}
-                            </Accordion>
-                        </ScrollArea>
+                                                            </Card>
+                                                        ))}
+                                                    </ScrollArea>
+                                                </Accordion.Panel>
+                                            </Accordion.Item>
+                                        ))}
+                                    </Accordion>
+                                </ScrollArea>
                             ) : (
                                 <>
-                                <Center p={50}>
-                                <Text >
-                                    No Tasks Found
-                                </Text>
-                                </Center>
-                                
+                                    <Center p={50}>
+                                        <Text >
+                                            No Tasks Found
+                                        </Text>
+                                    </Center>
+
                                 </>
                             )
                         }
-                        
+
                     </Card>
-                    <Card radius='md' h={partUsageData?.usage ! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
+                    <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
                         <Title order={5}>
                             Findings
                         </Title>
@@ -790,65 +835,65 @@ export default function PartUsage() {
                         {
                             filteredFindings?.length > 0 ? (
                                 <ScrollArea h={'85vh'} scrollbarSize={0} scrollHideDelay={0}>
-                            <Accordion variant="separated" radius="md">
-                                {filteredFindings?.map((finding: any,index:number) => (
-                                    <Accordion.Item key={`${finding?.taskId} - ${index}` } value={`${finding?.taskId} - ${index}` }>
-                                        <Accordion.Control>
-                                            <Group>
-                                                <IconAlertTriangle color="#4E66DE" />
-                                                {finding?.taskId || "-"}
-                                            </Group>
-                                        </Accordion.Control>
-                                        <Accordion.Panel>
-                                            <ScrollArea h={300} scrollHideDelay={0}>
-                                            <Text fz='xs'>
-                                            <Text span c="gray" inherit>Description : </Text>
-                                                 {finding?.taskDescription || "-"}
-                                            </Text>
-                                                {finding?.packages?.map((pkg: any) => (
-                                                    <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
-                                                        <Group justify="space-between">
-                                                            <Text fw='500'>{pkg?.packageId || "-"}</Text>
-                                                            <Badge color="red">Qty: {pkg?.quantity || "-"}</Badge>
-                                                        </Group>
-                                                        <Group>
-                                                            <Text c='dimmed' fz='sm'>
-                                                                Log Item :
-                                                            </Text>
-                                                            <Text fw={500} fz='sm'>{pkg?.logItem || "-"}</Text>
-                                                        </Group>
-                                                        <Group>
-                                                            <Text c='dimmed' fz='sm'>
-                                                                Description :
-                                                            </Text>
-                                                            <Text fw={500} fz='sm'>{pkg?.description || "-"}</Text>
-                                                        </Group>
-                                                        <Group>
-                                                            <Text c='dimmed' fz='sm'>
-                                                                Date :
-                                                            </Text>
-                                                            <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
-                                                        </Group>
-                                                    </Card>
-                                                ))}
-                                            </ScrollArea>
-                                        </Accordion.Panel>
-                                    </Accordion.Item>
-                                ))}
-                            </Accordion>
-                        </ScrollArea>
+                                    <Accordion variant="separated" radius="md">
+                                        {filteredFindings?.map((finding: any, index: number) => (
+                                            <Accordion.Item key={`${finding?.taskId} - ${index}`} value={`${finding?.taskId} - ${index}`}>
+                                                <Accordion.Control>
+                                                    <Group>
+                                                        <IconAlertTriangle color="#4E66DE" />
+                                                        {finding?.taskId || "-"}
+                                                    </Group>
+                                                </Accordion.Control>
+                                                <Accordion.Panel>
+                                                    <ScrollArea h={300} scrollHideDelay={0}>
+                                                        <Text fz='xs'>
+                                                            <Text span c="gray" inherit>Description : </Text>
+                                                            {finding?.taskDescription || "-"}
+                                                        </Text>
+                                                        {finding?.packages?.map((pkg: any) => (
+                                                            <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
+                                                                <Group justify="space-between">
+                                                                    <Text fw='500'>{pkg?.packageId || "-"}</Text>
+                                                                    <Badge color="red">Qty: {pkg?.quantity || "-"}</Badge>
+                                                                </Group>
+                                                                <Group>
+                                                                    <Text c='dimmed' fz='sm'>
+                                                                        Log Item :
+                                                                    </Text>
+                                                                    <Text fw={500} fz='sm'>{pkg?.logItem || "-"}</Text>
+                                                                </Group>
+                                                                <Group>
+                                                                    <Text c='dimmed' fz='sm'>
+                                                                        Description :
+                                                                    </Text>
+                                                                    <Text fw={500} fz='sm'>{pkg?.description || "-"}</Text>
+                                                                </Group>
+                                                                <Group>
+                                                                    <Text c='dimmed' fz='sm'>
+                                                                        Date :
+                                                                    </Text>
+                                                                    <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
+                                                                </Group>
+                                                            </Card>
+                                                        ))}
+                                                    </ScrollArea>
+                                                </Accordion.Panel>
+                                            </Accordion.Item>
+                                        ))}
+                                    </Accordion>
+                                </ScrollArea>
                             ) : (
                                 <>
-                                <Center p={50}>
-                                <Text >
-                                    No Findings Found
-                                </Text>
-                                </Center>
-                                
+                                    <Center p={50}>
+                                        <Text >
+                                            No Findings Found
+                                        </Text>
+                                    </Center>
+
                                 </>
                             )
                         }
-                        
+
                     </Card>
                 </SimpleGrid>
             </div>
