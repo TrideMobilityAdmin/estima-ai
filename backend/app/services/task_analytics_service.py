@@ -45,9 +45,9 @@ class TaskService:
         # self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
-        self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
+        self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
-        
+        self.configurations_collection=self.mongo_client.get_collection("configurations")
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -151,22 +151,24 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
-    async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
-        """
-        Create a estimate status based on the provided tasks and parameters.
-        """
-        try:
-            estimate_id = await self._generate_estimateid()
-            estimate_status_doc = {
-                "estID": estimate_id,
-                "status":"Initiated"
-            }
-            self.estimates_status_collection.insert_one(estimate_status_doc)
-            response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
-            return response
-        except Exception as e:
-            logger.error(f"Error creating estimate status: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
+    
+    
+    # async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
+    #     """
+    #     Create a estimate status based on the provided tasks and parameters.
+    #     """
+    #     try:
+    #         estimate_id = await self._generate_estimateid()
+    #         estimate_status_doc = {
+    #             "estID": estimate_id,
+    #             "status":"Initiated"
+    #         }
+    #         self.estimates_status_collection.insert_one(estimate_status_doc)
+    #         response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
+    #         return response
+    #     except Exception as e:
+    #         logger.error(f"Error creating estimate status: {str(e)}")
+    #         raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
 
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
@@ -801,13 +803,13 @@ class TaskService:
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
             sub_task_aircraft_details_result = list(self.subtaskparts_collection.aggregate(sub_task_aircraft_details))
 
-            logger.info(f"Results of task_parts: {task_parts_result}\n")
-            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}\n")
-            logger.info(f"Results of aircraft_details: {sub_task_aircraft_details_result}\n")
+            logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
+            logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
+            logger.info(f"Results of aircraft_details: {len(sub_task_aircraft_details_result)}\n")
 
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
-                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
+                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
             # Construct final output
             output = {
                 "partId": part_id,
@@ -815,8 +817,8 @@ class TaskService:
                 "usage": {
                     "tasks": [
                         {
-                            "taskId": t["taskId"],
-                            "taskDescription": t["taskDescription"],
+                            "taskId": t.get("taskId",""),
+                            "taskDescription": t.get("taskDescription",""),
                             "packages": [
                                 {"packageId": pkg["packageId"], "date": pkg["date"], "quantity": pkg["quantity"]}
                                 for pkg in t.get("packages", [])
@@ -826,8 +828,8 @@ class TaskService:
                     ],
                     "findings": [
                         {
-                            "taskId": f["taskId"],
-                            "taskDescription": f["taskDescription"],
+                            "taskId": f.get("taskId", ""),
+                            "taskDescription": f.get("taskDescription", ""),
                             "packages": [
                                 {
                                             "packageId": pkg["packageId"],
@@ -874,7 +876,7 @@ class TaskService:
 
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
-            logger.error(f"Error fetching parts usage: {str(e)}")
+            logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
     
     
@@ -936,6 +938,12 @@ class TaskService:
             
             logger.info(f"Retrieved skill analysis for tasks: {task_skill_results}")
             logger.info(f"Retrieved skill analysis for sub-tasks: {sub_task_skill_results}")
+            if not task_skill_results and not sub_task_skill_results:
+                logger.info("No data found for both tasks and sub-tasks")
+                return {
+                    "skillAnalysis": {},
+                    "response": {"statusCode": 404, "message": "No data found for the specified tasks"}
+                }
 
             # Process results into response format
             tasks = [
@@ -982,7 +990,10 @@ class TaskService:
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return {"error": f"An error occurred while processing the request: {str(e)}"}
+            return {
+                "skillAnalysis": {},
+            "response": {"statusCode": 404, "message": f"An error occurred while processing the request: {str(e)}"}
+            }
             # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
    
@@ -993,78 +1004,351 @@ class TaskService:
         Returns raw aggregation result directly from MongoDB
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
+        configurations = self.configurations_collection.find_one()
+        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        # valid_tasks_response =self.validate_tasks(current_user)
+        # valid_task_ids = [task.taskid for task in valid_tasks_response if task.status]
 
         try:
             pipeline = [
-                {'$match': {'estID': estimate_id}},  
-                {'$lookup': {
-                    'from': 'estimate_file_upload',
-                    'localField': 'estID',
-                    'foreignField': 'estID',
-                    'as': 'estimate'
-                }},
-                {'$unwind': {'path': '$estimate', 'preserveNullAndEmptyArrays': True}},
-                {'$addFields': {
-                    'filteredFindings': {
-                        '$filter': {
-                            'input': {'$ifNull': ['$findings', []]},
-                            'as': 'finding',
-                            'cond': {
-                                '$gt': [
-                                    {'$max': {
-                                        '$map': {
-                                            'input': {'$ifNull': ['$$finding.details', []]},
-                                            'as': 'detail',
-                                            'in': {'$ifNull': ['$$detail.prob', 0]}
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_file_upload', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    },
+    #   {
+    #             # Match tasks based on valid task IDs after unwinding the estimate
+    #             '$match': {
+    #                 'tasks.SourceTask': { '$in': valid_task_ids }
+    #             }
+    #         },
+    {
+        '$addFields': {
+            'filteredFindings': {
+                '$filter': {
+                    'input': {
+                        '$ifNull': [
+                            '$findings', []
+                        ]
+                    }, 
+                    'as': 'finding', 
+                    'cond': {
+                        '$gt': [
+                            {
+                                '$max': {
+                                    '$map': {
+                                        'input': {
+                                            '$ifNull': [
+                                                '$$finding.details', []
+                                            ]
+                                        }, 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$ifNull': [
+                                                '$$detail.prob', 0
+                                            ]
                                         }
-                                    }},
-                                    {'$ifNull': ['$estimate.probability', 0]}
+                                    }
+                                }
+                            }, {
+                                '$ifNull': [
+                                    '$estimate.probability', 0
                                 ]
                             }
-                        }
+                        ]
                     }
-                }},
-                {
-                    '$addFields': {
-                        'tatTime': {
-                            '$divide': [
-                                {
-                                    '$add': [
-                                        '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
-                                        ]
-                                }, 20
-                            ]
-                        }
-                    }
-                },
-                {'$project': {
-                    '_id': {'$toString': '$_id'},
-                    'estID': 1,
-                    'description': 1,
-                    'tasks': {
+                }
+            }
+        }
+    }, {
+        '$addFields': {
+            'aggregatedFilteredFindings': {
+                'totalMhs': {
+                    '$sum': {
                         '$map': {
-                            'input': '$tasks',
-                            'as': 'task',
-                            'in':{
-                                '$mergeObjects': [
-                                    '$$task',
-                                     {'_id': '$$REMOVE'}  
-                                ]
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': '$$detail.mhs.avg'
+                                    }
+                                }
                             }
                         }
-                    },
-                    'aggregatedTasks': 1,
-                    'findings': '$filteredFindings',
-                    'aggregatedFindings': 1,
-                    'originalFilename': 1,
-                    'userID': {'$toString': '$userID'},
-                    'createdAt': 1,
-                    'lastUpdated': 1,
-                    'createdBy': 1,
-                    'updatedBy': {'$toString': '$updatedBy'},
-                    'tatTime': 1
-                }}
-            ]
+                    }
+                }, 
+                'totalSpareCost': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$sum': {
+                                                '$map': {
+                                                    'input': '$$detail.spareParts', 
+                                                    'as': 'sparePart', 
+                                                    'in': {
+                                                        '$multiply': [
+                                                            '$$sparePart.price', '$$sparePart.qty'
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+     {
+        '$addFields': {
+            'estimate_manhrs': {
+                'min': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.min', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.min', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'max': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.max', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.max', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'avg': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.avg', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.avg', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'est': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.est', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.est', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    },{
+        '$addFields': {
+            'tatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            {
+                                '$ifNull': [
+                                    '$aggregatedTasks.totalMhs', 0
+                                ]
+                            }, {
+                                '$ifNull': [
+                                    '$aggregatedFilteredFindings.totalMhs', 0
+                                ]
+                            }
+                        ]
+                    }, man_hours_threshold
+                ]
+            }, 
+            'estimatedSpareCost': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$aggregatedTasks.totalSpareCost', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$aggregatedFilteredFindings.totalSpareCost', 0
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'description': 1, 
+             'overallEstimateReport': {
+                'estimatedTatTime': '$tatTime', 
+                'estimatedSpareCost': '$estimatedSpareCost', 
+                'estimateManhrs': '$estimate_manhrs'
+            }, 
+            'tasks': {
+                '$map': {
+                    'input': '$tasks', 
+                    'as': 'task', 
+                    'in': {
+                        '$mergeObjects': [
+                            '$$task', {
+                                '_id': '$$REMOVE'
+                            }
+                        ]
+                    }
+                }
+            }, 
+            'aggregatedTasks': 1, 
+            'findings': '$filteredFindings', 
+            'aggregatedFindings': '$aggregatedFilteredFindings',
+            'originalFilename': 1, 
+            'userID': {
+                '$toString': '$userID'
+            }, 
+            'createdAt': 1, 
+            'lastUpdated': 1, 
+            'createdBy': 1, 
+            'updatedBy': {
+                '$toString': '$updatedBy'
+            }
+        }
+    }
+]
 
             # Execute aggregation and get first result
             result = list(self.estimates_collection.aggregate(pipeline))
@@ -1073,8 +1357,54 @@ class TaskService:
                 raise HTTPException(status_code=404, detail="Estimate not found")
 
             # Return the first document
-            logger.warning(f"estimated collection fetched: {result}")
-            return result[0]
+            # logger.warning(f"estimated collection fetched: {result}")
+            # return result[0]
+        
+            estimate_data = result[0]
+            estimated_spare_parts = {}
+            for task in estimate_data.get('tasks', []):
+                for spare_part in task.get('spareParts', []):
+                    part_id = spare_part['partId']
+                    if part_id not in estimated_spare_parts:
+                        estimated_spare_parts[part_id] = {
+                            'desc': spare_part['desc'],
+                            'unit': spare_part['unit'],
+                            'qty': 0,
+                            'price': 0
+                        }
+                    estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+                    estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+
+            for finding in estimate_data.get('filteredFindings', []):
+                for detail in finding.get('details', []):
+                    for spare_part in detail.get('spareParts', []):
+                        part_id = spare_part['partId']
+                        if part_id not in estimated_spare_parts:
+                            estimated_spare_parts[part_id] = {
+                                'desc': spare_part['desc'],
+                                'unit': spare_part['unit'],
+                                'qty': 0,
+                                'price': 0
+                            }
+                        estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+                        estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+            estimated_spare_parts_list = [
+                {
+                    'partID': part_id,
+                    'desc': data['desc'],
+                    'unit': data['unit'],
+                    'qty': data['qty'],
+                    'price': data['price']
+                }
+                for part_id, data in estimated_spare_parts.items()
+            ]
+
+            # Step 3: Add estimated spare parts to the result
+            # Step 3: Add estimated spare parts to the overallEstimateReport
+            estimate_data['overallEstimateReport']['estimatedSpareParts'] = estimated_spare_parts_list
+            logger.info("Estimated collection fetched successfully")
+            return estimate_data
+
 
         except Exception as e:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")

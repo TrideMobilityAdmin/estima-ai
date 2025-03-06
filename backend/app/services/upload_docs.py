@@ -28,6 +28,8 @@ class ExcelUploadService:
         self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
+        self.configurations_collection=self.mongo_client.get_collection("configurations")
+        
        
     def clean_field_name(self, field_name: str) -> str:
         try:
@@ -225,15 +227,47 @@ class ExcelUploadService:
         await self.validate_excel_file(file)
         actual_data = await self.process_excel_file(file)
         logger.info(f"Actual data extracted: {len(actual_data)} records")
+
+        configurations = self.configurations_collection.find_one()
+        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        
         estimated_data = self.estimate_output.aggregate([
-            {'$match': {'estID': estimate_id}},
-            {'$project': {
-                '_id': 0,
-                'estID': 1,
-                'estimatedManhrs': '$aggregatedTasks.totalMhs',
-                'estimatedSparePartsCost': '$aggregatedTasks.totalPartsCost'
-            }}
-        ])
+    {
+        '$match': {
+            'estID': 'bPIuMKg4ZSaO-ysA'
+        }
+    }, {
+        '$addFields': {
+            'estimatedManhrs': {
+                '$add': [
+                    '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
+                ]
+            }, 
+            'estimatedSparePartsCost': {
+                '$add': [
+                    '$aggregatedTasks.totalPartsCost', '$aggregatedFindings.totalPartsCost'
+                ]
+            }, 
+            'estimatedTatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
+                        ]
+                    }, man_hours_threshold
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'estimatedManhrs': 1, 
+            'estimatedSparePartsCost': 1, 
+            'estimatedTatTime': 1
+        }
+    }
+])
         estimated_data = list(estimated_data)
         if not estimated_data:
             logger.error(f"No estimate found with ID: {estimate_id}")
@@ -455,17 +489,52 @@ class ExcelUploadService:
 
         taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
         logger.info(f"Hash of Estima: {taskUniqHash}")
+
+        current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
+    
+        formatted_date = current_time.strftime("%d%m%Y")
+        base_est_id = f"{estimate_request.aircraftRegNo}-{estimate_request.typeOfCheck}-{estimate_request.operator}-{formatted_date}"
+        latest_version = 0
+        version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
+        
+        # Query for existing estimates with the same aircraft registration and base ID pattern
+        existing_estimates = self.estima_collection.find({
+            "aircraftRegNo": estimate_request.aircraftRegNo,
+            "estID": {"$regex": version_regex_pattern}
+        })
+        latest_doc = existing_estimates.sort("estID", -1).limit(1).to_list(length=1)
+    
+        if latest_doc:
+            # Extract version number using regex
+            version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
+            if version_match:
+                latest_version = int(version_match.group(1))
+        new_version = latest_version + 1                             # Increment version number
+        est_id = f"{base_est_id}-V{new_version:02d}"
         
         data_to_insert = {
             **json_data,
-            "estID":taskUniqHash,
+            "estHashID":taskUniqHash,
+
+            "estID":est_id,
             # "tasks": estimate_request.tasks,
             "probability": estimate_request.probability,
             "operator": estimate_request.operator,
+            "typeOfCheck": estimate_request.typeOfCheck,
             "aircraftAge": estimate_request.aircraftAge,
             "aircraftRegNo":estimate_request.aircraftRegNo,
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
+            "areaOfOperations": estimate_request.areaOfOperations,
+            "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
+            "cappingManhrs": estimate_request.cappingManhrs,
+            "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
+            "cappingSpareCost": estimate_request.cappingSpareCost,
+            "taskID": estimate_request.taskID,
+            "taskDescription": estimate_request.taskDescription,
+            "miscLaborTasks": estimate_request.miscLaborTasks,
+
+            
               
         }
         
@@ -475,8 +544,9 @@ class ExcelUploadService:
         
         
         response = {
-            "estID":taskUniqHash,
+            "estHashID":taskUniqHash,
             "status": "Initiated",
+            "estID": est_id,
             "msg": "File and estimated data inserted successfully",
             "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
         }
@@ -489,8 +559,9 @@ class ExcelUploadService:
         Get all estimate status documents from the estimates_file_upload collection
         """
         logger.info("Fetching all estimates")
-
-        # Define the aggregation pipeline
+        configurations = self.configurations_collection.find_one()
+        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        
         pipeline = [
             {
         '$lookup': {
@@ -531,7 +602,26 @@ class ExcelUploadService:
                         ]
                     }
                 ]
-            }
+            },
+             'tatTime': {
+                    '$divide': [
+                        {
+                            '$add': [
+                                {
+                                    '$ifNull': [
+                                        '$estimate.aggregatedTasks.totalMhs', 0
+                                    ]
+                                }, 
+                                {
+                                    '$ifNull': [
+                                        '$estimate.aggregatedFindings.totalMhs', 0
+                                    ]
+                                }
+                            ]
+                        },
+                        man_hours_threshold 
+                    ]
+                }
         }
     }, {
         '$project': {
@@ -541,6 +631,9 @@ class ExcelUploadService:
             'aircraftRegNo': '$aircraftRegNo', 
             'status': '$status', 
             'totalMhs': 1, 
+            'tatTime': {
+                    '$ifNull': ['$tatTime', 0.0] 
+                },
             'totalPartsCost': 1, 
             'createdAt': '$createdAt'
         }

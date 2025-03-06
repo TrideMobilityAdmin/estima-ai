@@ -41,15 +41,33 @@ class Estimate(BaseModel):
     lastUpdated: datetime|None=None
 # create estimate
 
-
+class SparePart(BaseModel):
+    partID:str
+    quantity:float
+class MiscLaborTask(BaseModel):
+    taskID: str
+    taskDescription: str
+    manHours: float
+    spareParts:List[SparePart]
+    skill:str
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
-     operator: str
      aircraftAge: int 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
+     areaOfOperations: str
+     cappingTypeManhrs: str
+     cappingManhrs: float
+     cappingTypeSpareCost: str
+     cappingSpareCost: float
+     taskID: str
+     taskDescription: str
+     typeOfCheck: str
+     operator: str 
      aircraftRegNo:str
+     miscLaborTasks: List[MiscLaborTask]
+     
      
      
      def to_dict(self):
@@ -149,15 +167,7 @@ class DownloadResponse(BaseModel):
         "arbitrary_types_allowed": True,
         "populate_by_name": True,
     }
-class SparePart(BaseModel):
-    partID:str
-    quantity:float
-class MiscLaborTask(BaseModel):
-    taskID: str
-    taskDescription: str
-    manHours: float
-    spareParts:List[SparePart]
-    skill:str
+
 class Thresholds(BaseModel):
     tatThreshold: float
     manHoursThreshold: float
@@ -191,6 +201,7 @@ class EstimateStatusResponse(BaseModel):
     totalMhs:float
     totalPartsCost:float
     status:str
+    tatTime:float=0.0
     aircraftRegNo:str
     createdAt:datetime
 
