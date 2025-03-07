@@ -9,7 +9,7 @@ from typing import List
 import shutil
 from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost
+from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
@@ -212,6 +212,16 @@ async def get_estimate_status(
     current_user: dict = Depends(get_current_user)
 ):
     return await excel_service.estimate_status()
+@router.put("/estimates/{estID}/remarks", response_model=Dict[str, Any])
+async def update_remarks(
+    estID: str,
+    request: UpdateRemarksRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update remarks for a specific estimate
+    """
+    return await excel_service.update_estimate_status_remarks(estID, remark=request.remark,current_user=current_user)
 
 @router.get("/probability_wise_manhrs_sparecost/{estimate_id}",response_model=ProbabilityWiseManhrsSpareCost)
 async def get_probability_wise_manhrs_sparecost(estimate_id: str,current_user:dict=Depends(get_current_user), task_service: TaskService = Depends()):

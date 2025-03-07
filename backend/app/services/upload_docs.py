@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from io import BytesIO
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
+from app.middleware.auth import get_current_user
 from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
@@ -29,6 +30,7 @@ class ExcelUploadService:
         self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
+        self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -411,7 +413,15 @@ class ExcelUploadService:
                         y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                         y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-       
+        # y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
+        # for aggregated_finding in estimate.aggregatedFindingsByTask:
+        #     y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
+        #     y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
+        #     y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
 
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
@@ -485,10 +495,7 @@ class ExcelUploadService:
         current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
     
         formatted_date = current_time.strftime("%d%m%Y")
-        type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
-        logger.info(f"type of check is : {type_of_check_no_spaces}")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
-        logger.info(f"base_est_id: {base_est_id}")
+        base_est_id = f"{estimate_request.aircraftRegNo}-{estimate_request.typeOfCheck}-{estimate_request.operator}-{formatted_date}"
         latest_version = 0
         version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
         
@@ -506,7 +513,6 @@ class ExcelUploadService:
                 latest_version = int(version_match.group(1))
         new_version = latest_version + 1                             # Increment version number
         est_id = f"{base_est_id}-V{new_version:02d}"
-        logger.info(f"estID is : {est_id}")
         
         data_to_insert = {
             **json_data,
@@ -522,15 +528,13 @@ class ExcelUploadService:
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
             "areaOfOperations": estimate_request.areaOfOperations,
-            # "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
-            # "cappingManhrs": estimate_request.cappingManhrs,
-            # "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
-            # "cappingSpareCost": estimate_request.cappingSpareCost,
-            "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
-            "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-            # "taskID": estimate_request.taskID,
-            # "taskDescription": estimate_request.taskDescription,
-            "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
+            "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
+            "cappingManhrs": estimate_request.cappingManhrs,
+            "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
+            "cappingSpareCost": estimate_request.cappingSpareCost,
+            "taskID": estimate_request.taskID,
+            "taskDescription": estimate_request.taskDescription,
+            "miscLaborTasks": estimate_request.miscLaborTasks,
 
             
               
@@ -560,8 +564,8 @@ class ExcelUploadService:
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
         
-        pipeline = [
-            {
+        pipeline = pipeline = [
+    {
         '$lookup': {
             'from': 'estima_output', 
             'localField': 'estID', 
@@ -571,6 +575,18 @@ class ExcelUploadService:
     }, {
         '$unwind': {
             'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_status_remarks',
+            'localField': 'estID',
+            'foreignField': 'estID',
+            'as': 'remarks_doc'
+        }
+    }, {
+        '$unwind': {
+            'path': '$remarks_doc',
             'preserveNullAndEmptyArrays': True
         }
     }, {
@@ -601,25 +617,33 @@ class ExcelUploadService:
                     }
                 ]
             },
-             'tatTime': {
-                    '$divide': [
-                        {
-                            '$add': [
-                                {
-                                    '$ifNull': [
-                                        '$estimate.aggregatedTasks.totalMhs', 0
-                                    ]
-                                }, 
-                                {
-                                    '$ifNull': [
-                                        '$estimate.aggregatedFindings.totalMhs', 0
-                                    ]
-                                }
-                            ]
-                        },
-                        man_hours_threshold 
-                    ]
+            'tatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            {
+                                '$ifNull': [
+                                    '$estimate.aggregatedTasks.totalMhs', 0
+                                ]
+                            }, 
+                            {
+                                '$ifNull': [
+                                    '$estimate.aggregatedFindings.totalMhs', 0
+                                ]
+                            }
+                        ]
+                    },
+                    man_hours_threshold 
+                ]
+            },
+            'remarks': {
+                '$ifNull': ['$remarks_doc.remarks', []]
+            },
+            'remarksCount': {
+                '$size': {
+                    '$ifNull': ['$remarks_doc.remarks', []]
                 }
+            }
         }
     }, {
         '$project': {
@@ -630,21 +654,102 @@ class ExcelUploadService:
             'status': '$status', 
             'totalMhs': 1, 
             'tatTime': {
-                    '$ifNull': ['$tatTime', 0.0] 
-                },
+                '$ifNull': ['$tatTime', 0.0] 
+            },
             'totalPartsCost': 1, 
-            'createdAt': '$createdAt'
+            'createdAt': '$createdAt',
+            'remarks': 1,
+            'remarksCount': 1
         }
     }
-        ]
+]
 
         
         results = self.estima_collection.aggregate(pipeline).to_list(length=None)
+        for result in results:
+          
+            existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
+            
+            # If it doesn't exist, create one with empty remarks
+   
+            if not existing_remarks:
+                self.remarks_collection.insert_one({
+                    "estID": result["estID"],
+                    "remarks": [{
+                        "remark": "",
+                        "updatedAt": datetime.utcnow(),
+                        "updatedBy": "",
+                        "createdAt": datetime.utcnow(),
+                        "active": True
+                    }],
+                    
+                })
+        
 
         response = [EstimateStatusResponse(**result) for result in results]
 
         return response
+    async def update_estimate_status_remarks(self, estID: str, remark: str,current_user:dict=Depends(get_current_user)) -> Dict[str, Any]:
+        """
+        Update remarks for a specific estimate
+        
+        Args:
+            estID: The ID of the estimate to update
+            remarks: The new remarks text
+            
+        Returns:
+            Dictionary with update status and information
+        """
+        logger.info(f"Updating remarks for estimate ID: {estID}")
+        
+        # Check if the estimate exists in the remarks collection
+        existing_record = self.remarks_collection.find_one({"estID": estID})
+        
+        if not existing_record:
+            logger.error(f"Estimate with ID {estID} not found in remarks collection")
+            raise HTTPException(status_code=404, detail=f"Estimate with ID {estID} not found")
+        
+        current_time = datetime.utcnow()
+        if existing_record['remarks'] and existing_record['remarks'][0]['remark'] == "":
+        # Update the first remark directly
+            update_result = self.remarks_collection.update_one(
+                {"estID": estID, "remarks.remark": ""},
+                {"$set": {
+                    "remarks.$.remark": remark,
+                    "remarks.$.updatedAt": current_time,
+                    "remarks.$.updatedBy": current_user["username"],
+                    "remarks.$.createdAt": current_time,
+                    "remarks.$.active": True
+                }}
+            )
+        else:
+            new_remark = {
+            "remark": remark,
+            "updatedAt": current_time,
+            "updatedBy":current_user["username"],
+            "createdAt":current_time,
+            "active": True
+            }
+            update_result = self.remarks_collection.update_one(
+            {"estID": estID},
+            {"$push": {
+                "remarks": new_remark
+            }}
+    )
     
+        if update_result.modified_count > 0:
+            logger.info(f"Remarks updated successfully for estimate ID: {estID}")
+            return {
+                "success": True,
+                "message": "Remarks updated successfully",
+                "estID": estID,
+                "newRemark": new_remark if 'new_remark' in locals() else None,
+                "updatedAt": current_time
+        }
+            
+        else:
+            logger.error(f"Failed to update remarks for estimate ID: {estID}")
+            raise HTTPException(status_code=500, detail="Failed to update remarks")
 
 def convert_hash_to_ack_id(hash_hex: str) -> str:
     hash_bytes = bytes.fromhex(hash_hex)

@@ -132,6 +132,24 @@ class EstimateStatus(BaseModel):
     estID:str
     status:str
 #estimate response schema
+
+class RemarkItem(BaseModel):
+    remark: str
+    updatedAt: datetime
+    createdAt: datetime
+    updatedBy: str= "Unknown"
+    active: bool
+    
+class EstimateStatusResponse(BaseModel):
+    estID:str
+    tasks: List[str]
+    totalMhs:float
+    totalPartsCost:float
+    status:str
+    tatTime:float=0.0
+    aircraftRegNo:str
+    createdAt:datetime
+    remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):
     estID: str
     description: str = ""
@@ -200,15 +218,6 @@ class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
 
-class EstimateStatusResponse(BaseModel):
-    estID:str
-    tasks: List[str]
-    totalMhs:float
-    totalPartsCost:float
-    status:str
-    tatTime:float=0.0
-    aircraftRegNo:str
-    createdAt:datetime
 
 class EstimateIDResponse(BaseModel):
     estID: str
