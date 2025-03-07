@@ -495,7 +495,10 @@ class ExcelUploadService:
         current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
     
         formatted_date = current_time.strftime("%d%m%Y")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{estimate_request.typeOfCheck}-{estimate_request.operator}-{formatted_date}"
+        type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+        logger.info(f"type of check is : {type_of_check_no_spaces}")
+        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+        logger.info(f"base_est_id: {base_est_id}")
         latest_version = 0
         version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
         
@@ -513,6 +516,7 @@ class ExcelUploadService:
                 latest_version = int(version_match.group(1))
         new_version = latest_version + 1                             # Increment version number
         est_id = f"{base_est_id}-V{new_version:02d}"
+        logger.info(f"estID is : {est_id}")
         
         data_to_insert = {
             **json_data,
