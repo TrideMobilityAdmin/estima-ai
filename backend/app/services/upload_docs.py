@@ -522,14 +522,10 @@ class ExcelUploadService:
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
             "areaOfOperations": estimate_request.areaOfOperations,
-            # "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
-            # "cappingManhrs": estimate_request.cappingManhrs,
-            # "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
-            # "cappingSpareCost": estimate_request.cappingSpareCost,
+            
             "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
             "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-            # "taskID": estimate_request.taskID,
-            # "taskDescription": estimate_request.taskDescription,
+           
             "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
 
             
