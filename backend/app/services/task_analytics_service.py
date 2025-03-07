@@ -528,51 +528,52 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline = [
-                {
+    {
         '$match': {
             'requested_part_number': part_id
         }
     }, {
         '$lookup': {
             'from': 'task_description', 
-            'let': {
-                'convertedPackage': '$package_number'
-            }, 
+            'localField': 'package_number', 
+            'foreignField': 'package_number', 
+            'as': 'task_info', 
             'pipeline': [
                 {
-                    '$match': {
-                        '$expr': {
-                            '$and': [
-                                {
-                                    '$eq': [
-                                        '$package_number', '$$convertedPackage'
-                                    ]
-                                }, {
-                                    '$gte': [
-                                        '$actual_start_date', startDate
-                                    ]
-                                }, {
-                                    '$lt': [
-                                        '$actual_end_date', endDate
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }, {
                     '$project': {
+                        'convertedPackage': '$package_number', 
                         'actual_start_date': 1, 
+                        'actual_end_date': 1, 
                         'description': 1, 
                         '_id': 0
                     }
                 }
-            ], 
-            'as': 'task_info'
+            ]
         }
     }, {
         '$unwind': {
             'path': '$task_info', 
             'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$eq': [
+                            '$task_info.convertedPackage', '$package_number'
+                        ]
+                    }, {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
         }
     }, {
         '$group': {
@@ -587,10 +588,9 @@ class TaskService:
                     'packages': [
                         {
                             'packageId': '$package_number', 
-                            # 'date': '$task_info.actual_start_date', 
                             'date': {
                             '$ifNull': ['$task_info.actual_start_date', '0001-01-01T00:00:00Z']  # Replace null with a default date
-                        }, 
+                        },
                             'quantity': '$requested_quantity'
                         }
                     ]
@@ -604,7 +604,7 @@ class TaskService:
             'effectiveDate': 0
         }
     }
-            ]
+]
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
     {
@@ -710,7 +710,7 @@ class TaskService:
             sub_task_aircraft_details = [
                 {
         '$match': {
-            'IssuedPart': part_id
+            'issued_part_number': part_id
         }
     },
             {
