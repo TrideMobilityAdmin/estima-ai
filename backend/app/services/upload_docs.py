@@ -411,15 +411,7 @@ class ExcelUploadService:
                         y_position = draw_wrapped_text(160, y_position, f"  unit: {spare.unit}", width - 200)
                         y_position = draw_wrapped_text(160, y_position, f"  price: {spare.price}", width - 200)
 
-        # y_position = draw_wrapped_text(100, y_position, "aggregatedFindingsByTask:", width - 200)
-        # for aggregated_finding in estimate.aggregatedFindingsByTask:
-        #     y_position = draw_wrapped_text(120, y_position, f"- taskId: {aggregated_finding.taskId}", width - 200)
-        #     y_position = draw_wrapped_text(120, y_position, "  aggregatedMhs:", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    min: {aggregated_finding.aggregatedMhs.min}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    max: {aggregated_finding.aggregatedMhs.max}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    avg: {aggregated_finding.aggregatedMhs.avg}", width - 200)
-        #     y_position = draw_wrapped_text(140, y_position, f"    est: {aggregated_finding.aggregatedMhs.est}", width - 200)
-        #     y_position = draw_wrapped_text(120, y_position, f"  totalPartsCost: {aggregated_finding.totalPartsCost}", width - 200)
+       
 
         y_position = draw_wrapped_text(100, y_position, "aggregatedFindings:", width - 200)
         y_position = draw_wrapped_text(120, y_position, f"  totalMhs: {estimate.aggregatedFindings.totalMhs}", width - 200)
@@ -493,7 +485,10 @@ class ExcelUploadService:
         current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
     
         formatted_date = current_time.strftime("%d%m%Y")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{estimate_request.typeOfCheck}-{estimate_request.operator}-{formatted_date}"
+        type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+        logger.info(f"type of check is : {type_of_check_no_spaces}")
+        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+        logger.info(f"base_est_id: {base_est_id}")
         latest_version = 0
         version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
         
@@ -511,6 +506,7 @@ class ExcelUploadService:
                 latest_version = int(version_match.group(1))
         new_version = latest_version + 1                             # Increment version number
         est_id = f"{base_est_id}-V{new_version:02d}"
+        logger.info(f"estID is : {est_id}")
         
         data_to_insert = {
             **json_data,
@@ -526,13 +522,15 @@ class ExcelUploadService:
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
             "areaOfOperations": estimate_request.areaOfOperations,
-            "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
-            "cappingManhrs": estimate_request.cappingManhrs,
-            "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
-            "cappingSpareCost": estimate_request.cappingSpareCost,
-            "taskID": estimate_request.taskID,
-            "taskDescription": estimate_request.taskDescription,
-            "miscLaborTasks": estimate_request.miscLaborTasks,
+            # "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
+            # "cappingManhrs": estimate_request.cappingManhrs,
+            # "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
+            # "cappingSpareCost": estimate_request.cappingSpareCost,
+            "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
+            "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
+            # "taskID": estimate_request.taskID,
+            # "taskDescription": estimate_request.taskDescription,
+            "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
 
             
               

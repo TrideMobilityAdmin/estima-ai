@@ -50,6 +50,15 @@ class MiscLaborTask(BaseModel):
     manHours: float
     spareParts:List[SparePart]
     skill:str
+class AdditionalTasks(BaseModel):
+    taskID: str
+    taskDescription: str
+class Capping(BaseModel):
+    cappingTypeManhrs: str
+    cappingManhrs: float
+    cappingTypeSpareCost: str
+    cappingSpareCost: float
+
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
@@ -57,15 +66,11 @@ class EstimateRequest(BaseModel):
      aircraftFlightHours: int 
      aircraftFlightCycles: int
      areaOfOperations: str
-     cappingTypeManhrs: str
-     cappingManhrs: float
-     cappingTypeSpareCost: str
-     cappingSpareCost: float
-     taskID: str
-     taskDescription: str
+     cappingDetails:Optional[Capping]=None
      typeOfCheck: str
      operator: str 
      aircraftRegNo:str
+     additionalTasks: List[AdditionalTasks]
      miscLaborTasks: List[MiscLaborTask]
      
      
