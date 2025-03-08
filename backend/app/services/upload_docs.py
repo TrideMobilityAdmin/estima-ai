@@ -661,7 +661,7 @@ class ExcelUploadService:
 ]
 
         
-        results = self.estima_collection.aggregate(pipeline).to_list(length=None)
+        results = list(self.estima_collection.aggregate(pipeline))
         for result in results:
           
             existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
