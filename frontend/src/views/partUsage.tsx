@@ -1,7 +1,7 @@
-import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center } from "@mantine/core";
+import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center, ThemeIcon, Tooltip, Divider } from "@mantine/core";
 import { showNotification, useEffect, useState } from "../constants/GlobalImports";
 import { DatePickerInput } from "@mantine/dates";
-import { IconAlertTriangle, IconCalendar, IconCheck, IconCube, IconMenuDeep, IconTool } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCalendar, IconCheck, IconCube, IconMenuDeep, IconReport, IconSettingsBolt, IconSettingsDown, IconSettingsSearch, IconTool } from "@tabler/icons-react";
 import ReactApexChart from "react-apexcharts";
 import '../App.css';
 import { useApiPartUsage } from "../api/services/partUsageService";
@@ -13,6 +13,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateRangePicker } from '@mui/x-date-pickers-pro/DateRangePicker';
 import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { Box } from '@mui/material';
+import { AgGridReact } from "ag-grid-react";
 
 // import { useApiPartUsage } from "../api/services/partUsageService";
 
@@ -175,6 +176,42 @@ export default function PartUsage() {
         }, 0);
     }
 
+    const multParts = [
+        {
+            partID : '425A200-5',
+            desc : 'Part Description about 425A200-5',
+            totalTask : '40',
+            tasksPartQty : '44',
+            totalFindigs : '66',
+            findigsPartQty : '66'
+        },
+        {
+            partID : '4200200-6',
+            desc : 'Description of the part for 4200200-6',
+            totalTask : '20',
+            tasksPartQty : '20',
+            totalFindigs : '50',
+            findigsPartQty : '60'
+        },
+        {
+            partID : '4200A00-1',
+            desc : 'Part Description for 4200A00-1',
+            totalTask : '25',
+            tasksPartQty : '40',
+            totalFindigs : '44',
+            findigsPartQty : '66'
+        }
+    ]
+
+    const CustomHeader = ({ defaultName, tooltipName }:any) => {
+        return (
+          <Tooltip label={tooltipName} withArrow>
+            <span style={{ cursor: 'pointer' }}>{defaultName}</span>
+          </Tooltip>
+        );
+      };
+      
+
     return (
         <>
             <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
@@ -242,12 +279,178 @@ export default function PartUsage() {
                     </Button>
                 </Group>
                 <Space h='sm' />
+                <Card>
+                    <Group align="center" gap='sm'>
+                        <ThemeIcon variant="light">
+                            <IconSettingsSearch />
+                        </ThemeIcon>
+                        <Title order={5} >
+                            Multiple Spare Parts
+                        </Title>
+                    </Group>
+                    <Space h='sm' />
+                    <div
+                        className="ag-theme-alpine"
+                        style={{
+                            width: "100%",
+                            border: "none",
+                            height: "100%",
+
+                        }}
+                    >
+                        <style>
+                            {`
+/* Remove the borders and grid lines */
+.ag-theme-alpine .ag-root-wrapper, 
+.ag-theme-alpine .ag-root-wrapper-body,
+.ag-theme-alpine .ag-header,
+.ag-theme-alpine .ag-header-cell,
+.ag-theme-alpine .ag-body-viewport {
+border: none;
+}
+
+/* Remove the cell highlight (border) on cell click */
+.ag-theme-alpine .ag-cell-focus {
+outline: none !important; /* Remove focus border */
+box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove row border */
+.ag-theme-alpine .ag-row {
+border-bottom: none;
+}
+`}
+                        </style>
+
+                        <AgGridReact
+                            pagination
+                            paginationPageSize={5}
+                            domLayout="autoHeight" // Ensures height adjusts dynamically
+                            rowData={multParts || []}
+                            columnDefs={[
+                                
+                                {
+                                    field: "partID",
+                                    headerName: "Part ID",
+                                    // headerComponent: (params : any) => <CustomHeader defaultName="Part ID" tooltipName="Part ID" />,
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    flex:1,
+                                },
+                                {
+                                    field: "desc",
+                                    headerName: "Description",
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    // width:600
+                                    flex: 4
+                                },
+                                {
+                                    field: "totalTask",
+                                    headerName: "Tasks",
+                                    headerComponent: (params :any) => <CustomHeader defaultName="Tasks" tooltipName="Total Tasks" />,
+
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    // width:600
+                                    flex: 1
+                                },
+                                {
+                                    field: "tasksPartQty",
+                                    headerName: "Parts Qty",
+                                    headerComponent: (params :any) => <CustomHeader defaultName="Parts Qty" tooltipName="Tasks Parts Qty" />,
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    // width:600
+                                    flex: 1
+                                },
+                                {
+                                    field: "totalFindigs",
+                                    headerName: "Findings",
+                                    headerComponent: (params :any) => <CustomHeader defaultName="Findings" tooltipName="Total Findings" />,
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    // width:600
+                                    flex: 1
+                                },
+                                {
+                                    field: "findigsPartQty",
+                                    headerName: "Parts Qty",
+                                    headerComponent: (params :any) => <CustomHeader defaultName="Parts Qty" tooltipName="Findings Parts Qty" />,
+                                    sortable: true,
+                                    filter: true,
+                                    floatingFilter: true,
+                                    resizable: true,
+                                    // width:600
+                                    flex: 1
+                                },
+                                {
+                                    // field: "actions",
+                                    headerName: "Actions",
+                                    // sortable: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
+                                    flex: 1,
+                                    resizable: true,
+                                    // editable: true,
+                                    cellRenderer: (val: any) => {
+                                        return (
+                                            <Group mt='xs' align="center" justify="center">
+                                                
+                                                <Tooltip label="Get Part Data">
+                                                    <ActionIcon
+                                                        size={20}
+                                                        color="teal"
+                                                        variant="light"
+                                                        // disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                                        onClick={() => {
+                                                            // setSelectedEstimateIdReport(val.data.estID);
+                                                            // handleValidateSkillsTasks(val.data.tasks);
+                                                            // setOpened(true);
+                                                        }}
+                                                    >
+                                                        <IconSettingsDown />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            </Group>
+
+                                        );
+                                    },
+                                },
+                            ]}
+                        />
+                    </div>
+
+                </Card>
+                {/* <Space h='sm' /> */}
+                <Divider
+                    variant="dashed"
+                    labelPosition="center"
+                    color={"gray"}
+                    pb='sm'
+                    pt='sm'
+                    label={
+                        <>
+                            <Box >Part Usage</Box>
+                        </>
+                    }
+                />
                 <Grid>
                     <Grid.Col span={4}>
                         <Card>
                             <Group>
                                 <Text fw='500' c='dimmed'>
-                                    Part Id -
+                                    Selected Part -
                                 </Text>
                                 <Text fw='600'>
                                     {partUsageData?.partId || validatedPartId}

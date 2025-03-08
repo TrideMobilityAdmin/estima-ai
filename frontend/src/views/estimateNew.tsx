@@ -1,5 +1,5 @@
 // import { Grid, Title } from "@mantine/core";
-import { ActionIcon, Avatar, Center, List, LoadingOverlay, Modal, MultiSelect, NumberInput, Paper, SegmentedControl, Select, Stack, Textarea, Tooltip } from "@mantine/core";
+import { Accordion, ActionIcon, Avatar, Center, Checkbox, List, LoadingOverlay, Modal, MultiSelect, NumberInput, Paper, SegmentedControl, Select, Stack, Textarea, Tooltip } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
     Badge,
@@ -35,7 +35,7 @@ import {
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconChartArcs3, IconCheck, IconChecklist, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockHour4, IconClockShare, IconClockUp, IconDeselect, IconDownload, IconError404, IconFile, IconFileCheck, IconHourglass, IconListCheck, IconListDetails, IconLoader, IconMessage2Plus, IconMinimize, IconPercentage66, IconPlane, IconPlaneTilt, IconPlus, IconRecycle, IconReport, IconRowRemove, IconSettingsDollar, IconShadow, IconSquareCheck, IconStatusChange, IconTrash, IconX } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconChecklist, IconChevronDown, IconChevronUp, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockHour4, IconClockShare, IconClockUp, IconDeselect, IconDownload, IconError404, IconFile, IconFileCheck, IconHourglass, IconListCheck, IconListDetails, IconLoader, IconMessage, IconMessage2Plus, IconMinimize, IconPercentage, IconPercentage66, IconPin, IconPlane, IconPlaneTilt, IconPlus, IconRecycle, IconReport, IconRowRemove, IconSettingsDollar, IconShadow, IconSquareCheck, IconStatusChange, IconTrash, IconX } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -52,7 +52,7 @@ import CsvDownloadButton from "react-json-to-csv";
 import { showAppNotification } from "../components/showNotificationGlobally";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -64,11 +64,13 @@ export default function EstimateNew() {
     const [value, setValue] = useState('estimate');
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
+    const [remarksOpened, setRemarksOpened] = useState(false);
     const [selectedFileTasksOpened, setSelectedFileTasksOpened] = useState(false);
     const [selectedEstimateId, setSelectedEstimateId] = useState<any>();
     const [selectedDownloadEstimateId, setSelectedDownloadEstimateId] = useState<any>();
     const [selectedEstimateIdReport, setSelectedEstimateIdReport] = useState<any>();
     const [selectedEstimateIdProbability, setSelectedEstimateIdProbability] = useState<any>();
+    const [selectedEstimateRemarks, setSelectedEstimateIdRemarks] = useState<any>();
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
     const [rfqSubmissionResponse, setRfqSubmissionResponse] = useState<any>(null);
@@ -291,21 +293,24 @@ export default function EstimateNew() {
     const form = useForm({
         initialValues: {
             tasks: [],
-            probability: "",
+            probability: 50,
             operator: "",
             aircraftRegNo: "",
             aircraftAge: "",
             aircraftFlightHours: "",
             aircraftFlightCycles: "",
             areaOfOperations: '',
-            cappingTypeManhrs: '',
-            cappingManhrs: '',
-            cappingTypeSpareCost: '',
-            cappingSpareCost: '',
+            cappingDetails: {
+                cappingTypeManhrs: "",
+                cappingManhrs: 0,
+                cappingTypeSpareCost: "",
+                cappingSpareCost: 0,
+            },
             taskID: '',
             taskDescription: '',
             typeOfCheck: '',
-            miscLaborTasks: []
+            miscLaborTasks: [],
+            additionalTasks: []
         },
 
         validate: {
@@ -323,7 +328,6 @@ export default function EstimateNew() {
                 if (!value.trim() && !values.operator.trim()) {
                     return "Either Operator or Aircraft Reg No is mandatory.";
                 }
-                return value.trim() ? null : "RegNo is not available, enter N/A";
             },
             typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
             // aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
@@ -352,6 +356,9 @@ export default function EstimateNew() {
                 }
                 return; // Prevent submission if there are errors    
             }
+            if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
+                showAppNotification("warning", "Not both are N/A", "Any of them Mandatory of Reg Num or Operator");
+            }
         }
 
         if (!selectedFile) {
@@ -366,26 +373,35 @@ export default function EstimateNew() {
 
         // Get the selected tasks from the MultiSelect
         const miscLaborTasks = selectedExpertInsightTasks || [];
+        // Ensure at least one empty additional task if none are added
+        const defaultAdditionalTasks = additionalTasks.length > 0 ? additionalTasks : [{ taskID: "", taskDescription: "" }];
+
+        // Ensure at least one empty misc labor task if none exist
+        const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
+            ? selectedExpertInsightTasks
+            : [{ taskID: "", taskDescription: "", manHours: 0, skill: "", spareParts: [{ partID: "", quantity: "" }] }];
+
 
         const requestData = {
-            // tasks: extractedTasks || [],
             tasks: validTasks || [],
-            probability: Number(form.values.probability) || 0,
+            probability: (Number(form.values.probability) / 100) || 0,
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
             aircraftAge: Number(form.values.aircraftAge) || 0,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-            areaOfOperations: form.values.areaOfOperations || "",
-            cappingTypeManhrs: form.values.cappingTypeManhrs || "",
-            cappingManhrs: Number(form.values.cappingManhrs) || 0,
-            cappingTypeSpareCost: form.values.cappingTypeSpareCost || "",
-            cappingSpareCost: Number(form.values.cappingSpareCost) || 0,
-            taskID: form.values.taskID || "",
-            taskDescription: form.values.taskDescription || "",
-            typeOfCheck: form.values.typeOfCheck || "",
-            miscLaborTasks: miscLaborTasks
+            areaOfOperations: form.values.areaOfOperations || "N/A", // Ensure it's not empty
+            cappingDetails: {
+                cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || 'N/A',
+                cappingManhrs: form.values.cappingDetails.cappingManhrs || 0,
+                cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || 'N/A',
+                cappingSpareCost: form.values.cappingDetails.cappingSpareCost || 0,
+            },
+            additionalTasks: defaultAdditionalTasks,
+            typeOfCheck: form.values.typeOfCheck || "N/A", // Ensure it's not empty
+            miscLaborTasks: defaultMiscLaborTasks
         };
+
 
         console.log("Submitting data:", requestData);
 
@@ -411,6 +427,7 @@ export default function EstimateNew() {
         } finally {
             setLoading(false);
         }
+
     };
 
     console.log("rfq sub >>> ", rfqSubmissionResponse);
@@ -591,7 +608,7 @@ export default function EstimateNew() {
     }
 
     const handleAddAdditionalTask = () => {
-        setAdditionalTasks([...additionalTasks, { taskID: '', description: '' }]);
+        setAdditionalTasks([...additionalTasks, { taskID: '', taskDescription: '' }]);
     };
 
     const handleDeleteAdditionalTask = (index: any) => {
@@ -664,6 +681,161 @@ export default function EstimateNew() {
     //     console.log("Updated UI response:", estimateReportData);
     // }, [estimateReportData]);
     // console.log("response UI >>>>", estimateReportData);
+    const [expanded, setExpanded] = useState(false);
+    const [selectedFields, setSelectedFields] = useState<string[]>([]);
+    const [showFields, setShowFields] = useState<string[]>([]);
+
+    const toggleFieldSelection = (field: string) => {
+        setSelectedFields((prev) =>
+            prev.includes(field)
+                ? prev.filter((f) => f !== field)
+                : [...prev, field]
+        );
+    };
+    const fields = [
+        { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={10} max={100} step={10} {...form.getInputProps("probability")} /> },
+        { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
+        { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
+        { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
+        { label: "Check Type", name: "typeOfCheck", component: <Select size="xs" data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']} {...form.getInputProps("typeOfCheck")} /> },
+        { label: "Flight Cycles", name: "aircraftFlightCycles", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftFlightCycles")} /> },
+        { label: "Flight Hours", name: "aircraftFlightHours", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftFlightHours")} /> },
+        { label: "Area of Operations", name: "areaOfOperations", component: <TextInput size="xs" placeholder="Ex: Area" {...form.getInputProps("areaOfOperations")} /> },
+        {
+            label: "Expert Insights", name: "expertInsights", component: (
+                <MultiSelect
+                    size="xs"
+                    // label="Expert Insights"
+                    placeholder="Select from Insights"
+                    data={expertInsightsTasks?.map(task => ({ value: task.taskID, label: task.taskID }))}
+                    value={selectedExpertInsightsTaskIDs}
+                    onChange={handleExpertInsightsChange}
+                    style={(theme) => ({
+                        // Customize the selected badge styles
+                        selected: {
+                            backgroundColor: theme.colors.green[6], // Change this to your desired color
+                            color: theme.white, // Change text color if needed
+                        },
+                    })}
+                />
+            )
+        },
+        // { label: "Man Hrs Capping Type", name: "cappingTypeManhrs", component: <Select data={['Type - 1', 'Type - 2', 'Type - 3']} {...form.getInputProps("cappingDetails.cappingTypeManhrs")} /> },
+        // { label: "Man Hours", name: "cappingManhrs", component: <TextInput placeholder="Ex: 40" {...form.getInputProps("cappingDetails.cappingManhrs")} /> },
+        // { label: "Spares Capping Type", name: "cappingTypeSpareCost", component: <Select data={['Type - 1', 'Type - 2', 'Type - 3']} {...form.getInputProps("cappingDetails.cappingTypeSpareCost")} /> },
+        // { label: "Cost ($)", name: "cappingSpareCost", component: <TextInput placeholder="Ex: 600$" {...form.getInputProps("cappingDetails.cappingSpareCost")} /> },
+        { label: "Capping Man Hrs", name: "cappingManhrs" },
+        { label: "Capping Spares", name: "cappingSpares" },
+    ];
+
+    const sampleRemarks = [
+        {
+            id: 1,
+            userName: 'John Doe',
+            date: '2025-03-05T14:30:00',
+            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
+        },
+        {
+            id: 2,
+            userName: 'Jane Smith',
+            date: '2025-03-06T09:15:00',
+            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
+        },
+        {
+            id: 1,
+            userName: 'John Doe',
+            date: '2025-03-05T14:30:00',
+            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
+        },
+        {
+            id: 2,
+            userName: 'Jane Smith',
+            date: '2025-03-06T09:15:00',
+            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
+        },
+        {
+            id: 1,
+            userName: 'John Doe',
+            date: '2025-03-05T14:30:00',
+            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
+        },
+        {
+            id: 2,
+            userName: 'Jane Smith',
+            date: '2025-03-06T09:15:00',
+            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
+        }
+    ];
+
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+    // Sort remarks from oldest to newest (ensures scrolling from bottom)
+    const sortedRemarks = [...sampleRemarks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    useEffect(() => {
+        if (remarksOpened && scrollAreaRef.current) {
+            const scrollElement = scrollAreaRef.current;
+            scrollElement.scrollTop = scrollElement.scrollHeight; // Scroll to the bottom
+        }
+    }, [remarksOpened, sortedRemarks.length]); // Update on new messages
+
+
+    // Format date
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
+    // Format date
+
+
+    const RemarkItem = ({ remark }: any) => {
+        const isCurrentUser = remark.userName === 'Current User';
+
+        return (
+            <Flex
+                direction="column"
+                align={isCurrentUser ? 'flex-end' : 'flex-start'}
+                mb="xs"
+            >
+                <Paper
+                    p="xs"
+                    radius="md"
+                    withBorder
+                    bg={isCurrentUser ? '#e3f2fd' : 'white'}
+                    style={{
+                        maxWidth: '80%',
+                        alignSelf: 'flex-end',
+                    }}
+                >
+                    <Group justify="space-between" gap="xs" mb={5}>
+                        <Group gap="xs">
+                            <Avatar
+                                color={isCurrentUser ? "blue" : "cyan"}
+                                radius="xl"
+                                size="sm"
+                            >
+                                {remark.userName.charAt(0)}
+                            </Avatar>
+                            <Text size="sm" fw={500}>
+                                {remark.userName}
+                            </Text>
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                            {formatDate(remark.date)}
+                        </Text>
+                    </Group>
+                    <Text size="sm" ml={30}>
+                        {remark.remark}
+                    </Text>
+                </Paper>
+            </Flex>
+        );
+    };
 
     return (
         <>
@@ -1061,6 +1233,81 @@ export default function EstimateNew() {
 
 
             </Modal>
+            {/* Remarks for Estimate id */}
+            <Modal
+                opened={remarksOpened}
+                onClose={() => {
+                    setRemarksOpened(false);
+                    //   form.reset();
+                }}
+                size={800}
+                title={
+                    <>
+                        <Group>
+                            <Group >
+                                <ThemeIcon variant="white">
+                                    <IconMessage />
+                                </ThemeIcon>
+                                <Title order={4} c='dimmed'>
+                                    Remarks
+                                </Title>
+                            </Group>
+
+                            <Title order={4} >
+                                {selectedEstimateRemarks}
+                            </Title>
+                        </Group>
+
+                    </>
+                }
+            >
+
+                <Card h='50vh' withBorder bg='#f0eded' radius='lg'>
+                    <ScrollArea h="100%" viewportRef={scrollAreaRef} offsetScrollbars scrollbarSize={0}>
+                        <Stack justify="flex-start" h="100%" gap="md">
+                            {sortedRemarks.map((remark) => (
+                                <RemarkItem key={remark.id} remark={remark} />
+                            ))}
+                        </Stack>
+                    </ScrollArea>
+                </Card>
+                <Divider
+                    variant="dashed"
+                    labelPosition="center"
+                    color={"gray"}
+                    pb='sm'
+                    pt='sm'
+                    label={
+                        <>
+                            <Box ml={5}>Add Remarks</Box>
+                        </>
+                    }
+                />
+
+                <Textarea
+                    radius='md'
+                    // label="Add New Remark !"
+                    //   description="Input description"
+                    placeholder="Add your Remark here"
+                    autosize
+                    minRows={2}
+                    maxRows={3}
+                />
+                <Space h='xs' />
+                <Group justify="flex-end">
+                    <Button
+                        size="xs"
+                        variant="gradient"
+                        gradient={{ from: 'blue', to: 'green', deg: 90 }}
+                    >
+                        Submit
+                    </Button>
+                </Group>
+                <Group>
+
+                </Group>
+
+            </Modal>
 
 
             <div style={{ padding: 70 }}>
@@ -1172,7 +1419,7 @@ export default function EstimateNew() {
                                                         autosize
                                                         minRows={1}
                                                         value={task.description}
-                                                        onChange={(e) => handleTaskChange(index, 'description', e.target.value.replace(/\n/g, ' '))}
+                                                        onChange={(e) => handleTaskChange(index, 'taskDescription', e.target.value.replace(/\n/g, ' '))}
                                                     />
                                                 </td>
                                                 {/* <td>
@@ -1305,7 +1552,113 @@ export default function EstimateNew() {
                     </Grid.Col> */}
 
                     <Grid.Col span={4}>
-                        <Card withBorder h='60vh' radius='md'>
+                        <Card withBorder h="60vh" radius="md">
+                            <Group justify="space-between" onClick={() => setExpanded(!expanded)} style={{ cursor: "pointer" }}>
+                                <Text size="md" mb='sm' fw={500}>
+                                    RFQ Parameters
+                                </Text>
+                                <Group>
+                                    {expanded ? <IconChevronUp color="gray" /> : <IconChevronDown color="gray" />}
+                                </Group>
+                            </Group>
+
+                            {expanded && (
+                                <ScrollArea scrollbarSize={0} style={{ maxHeight: "50vh", overflowX: 'hidden' }}>
+                                    <SimpleGrid cols={1} spacing="xs">
+                                        {fields.map((field) => (
+                                            <Grid key={field.name} align="center">
+                                                <Grid.Col span={8}>
+                                                    <Text>{field.label}</Text>
+                                                </Grid.Col>
+                                                <Grid.Col span={4}>
+                                                    <Checkbox
+                                                        checked={selectedFields.includes(field.name)}
+                                                        onChange={() => toggleFieldSelection(field.name)}
+                                                    />
+                                                </Grid.Col>
+                                            </Grid>
+                                        ))}
+                                    </SimpleGrid>
+                                    <Group justify="center">
+                                        <Button variant="light" mt="sm" onClick={() => {
+                                            setShowFields([...selectedFields]);
+                                            setExpanded(false); // Collapse the accordion after showing inputs
+                                        }}>
+                                            Show Inputs
+                                        </Button>
+                                    </Group>
+                                </ScrollArea>
+                            )}
+
+                            <ScrollArea style={{ flex: 1, overflow: "auto", marginTop: "10px" }} offsetScrollbars scrollHideDelay={1}>
+                                <SimpleGrid cols={1} spacing="xs">
+                                    <SimpleGrid cols={2}>
+                                        {showFields
+                                            .filter(field => !["cappingManhrs", "cappingSpares"].includes(field)) // Exclude capping fields from the main display
+                                            .map((field) => (
+                                                <div key={field}>
+                                                    <Text size="xs" fw={500}>
+                                                        {fields.find(f => f.name === field)?.label}
+                                                    </Text>
+                                                    {fields.find(f => f.name === field)?.component}
+                                                </div>
+                                            ))}
+                                    </SimpleGrid>
+                                </SimpleGrid>
+
+                                {/* Capping Fields Section */}
+                                <SimpleGrid cols={1} spacing="xs" mt="sm">
+                                    {selectedFields.includes("cappingManhrs") && (
+                                        <Grid>
+                                            <Grid.Col span={7}>
+                                                <Select
+                                                    size="xs"
+                                                    label="Man Hrs Capping Type"
+                                                    placeholder="Select Capping Type"
+                                                    data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                    allowDeselect
+                                                    {...form.getInputProps("cappingDetails.cappingTypeManhrs")}
+                                                />
+                                            </Grid.Col>
+                                            <Grid.Col span={5}>
+                                                <TextInput
+                                                    size="xs"
+                                                    leftSection={<IconClockHour4 size={20} />}
+                                                    placeholder="Ex: 40"
+                                                    label="Man Hours"
+                                                    {...form.getInputProps("cappingDetails.cappingManhrs")}
+                                                />
+                                            </Grid.Col>
+                                        </Grid>
+                                    )}
+
+                                    {selectedFields.includes("cappingSpares") && (
+                                        <Grid>
+                                            <Grid.Col span={7}>
+                                                <Select
+                                                    size="xs"
+                                                    label="Spares Capping Type"
+                                                    placeholder="Select Capping Type"
+                                                    data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                    allowDeselect
+                                                    {...form.getInputProps("cappingDetails.cappingTypeSpareCost")}
+                                                />
+                                            </Grid.Col>
+                                            <Grid.Col span={5}>
+                                                <TextInput
+                                                    size="xs"
+                                                    leftSection={<IconSettingsDollar size={20} />}
+                                                    placeholder="Ex: 600$"
+                                                    label="Cost($)"
+                                                    {...form.getInputProps("cappingDetails.cappingSpareCost")}
+                                                />
+                                            </Grid.Col>
+                                        </Grid>
+                                    )}
+                                </SimpleGrid>
+                            </ScrollArea>
+                        </Card>
+                        {/* <Card withBorder h='60vh' radius='md'>
                             <Text size="md" fw={500} >
                                 RFQ Parameters
                             </Text>
@@ -1420,7 +1773,7 @@ export default function EstimateNew() {
                                                 data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
                                                 defaultValue="React"
                                                 allowDeselect
-                                                {...form.getInputProps("cappingTypeManhrs")}
+                                                {...form.getInputProps("cappingDetails.cappingTypeManhrs")}
                                             />
                                         </Grid.Col>
                                         <Grid.Col span={5}>
@@ -1429,7 +1782,7 @@ export default function EstimateNew() {
                                                 leftSection={<IconClockHour4 size={20} />}
                                                 placeholder="Ex: 40"
                                                 label="Man Hours"
-                                                {...form.getInputProps("cappingManhrs")}
+                                                {...form.getInputProps("cappingDetails.cappingManhrs")}
                                             />
                                         </Grid.Col>
                                     </Grid>
@@ -1443,7 +1796,7 @@ export default function EstimateNew() {
                                                 data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
                                                 defaultValue="React"
                                                 allowDeselect
-                                                {...form.getInputProps("cappingTypeSpareCost")}
+                                                {...form.getInputProps("cappingDetails.cappingTypeSpareCost")}
                                             />
                                         </Grid.Col>
                                         <Grid.Col span={5}>
@@ -1452,14 +1805,15 @@ export default function EstimateNew() {
                                                 leftSection={<IconSettingsDollar size={20} />}
                                                 placeholder="Ex: 600$"
                                                 label="Cost($)"
-                                                {...form.getInputProps("cappingSpareCost")}
+                                                {...form.getInputProps("cappingDetails.cappingSpareCost")}
                                             />
                                         </Grid.Col>
                                     </Grid>
                                 </SimpleGrid>
 
                             </ScrollArea>
-                        </Card>
+                        </Card> */}
+
                     </Grid.Col>
                 </Grid>
 
@@ -1568,7 +1922,7 @@ border-bottom: none;
                                     filter: true,
                                     floatingFilter: true,
                                     resizable: true,
-                                    flex: 1,
+                                    flex: 2,
                                     // cellRenderer: (params: any) => (
                                     //     <Text
                                     //         mt='xs'
@@ -1634,7 +1988,7 @@ border-bottom: none;
                                     filter: true,
                                     floatingFilter: true,
                                     resizable: true,
-                                    flex: 1,
+                                    flex: 1.5,
                                     cellRenderer: (val: any) => {
                                         let badgeColor: string;
                                         let badgeIcon: JSX.Element;
@@ -1681,7 +2035,7 @@ border-bottom: none;
                                     // sortable: true,
                                     // filter: true,
                                     // floatingFilter: true,
-                                    flex: 1,
+                                    flex: 2,
                                     resizable: true,
                                     // editable: true,
                                     cellRenderer: (val: any) => {
@@ -1747,6 +2101,20 @@ border-bottom: none;
                                                         }}
                                                     >
                                                         <IconChartArcs3 />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                                <Tooltip label="Remarks!">
+                                                    <ActionIcon
+                                                        size={20}
+                                                        color="blue"
+                                                        variant="light"
+                                                        disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                                        onClick={(values: any) => {
+                                                            setRemarksOpened(true);
+                                                            setSelectedEstimateIdRemarks(val?.data?.estID);
+                                                        }}
+                                                    >
+                                                        <IconMessage />
                                                     </ActionIcon>
                                                 </Tooltip>
                                             </Group>
@@ -1952,7 +2320,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             {/* Left Section */}
             <Flex justify="flex-start" align="flex-start" direction="column">
                 {/* Total TAT Time */}
-                <Card withBorder w="100%" p={5}>
+                {/* <Card withBorder w="100%" p={5}>
                     <Group p={0} gap="sm">
                         <ThemeIcon variant="light" radius="md" size="60" color="#124076">
                             <IconClockShare style={{ width: "70%", height: "70%" }} />
@@ -1967,10 +2335,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         </Flex>
                     </Group>
                 </Card>
-                <Space h="sm" />
+                <Space h="sm" /> */}
 
                 {/* Estimated Man Hours */}
-                <Card withBorder w="100%">
+                <Card withBorder w="100%" >
                     <Flex gap="lg" direction="column">
                         <Title order={6} c="gray">
                             Est Man Hrs.
@@ -1990,7 +2358,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         ))}
                     </Flex>
                 </Card>
-                <Space h="sm" />
+                <Space h="xs" />
 
                 {/* Capping Unbilled Cost */}
                 <Card withBorder w="100%" p={5}>
@@ -2000,10 +2368,26 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         </ThemeIcon>
                         <Flex direction="column">
                             <Text size="md" fw={500} fz="h6" c="gray">
-                                Cost Capping ($)
+                                Unbillable Cost ($)
                             </Text>
                             <Text size="md" fw={600} fz="h3">
                                 {cappingUnbilledCost}
+                            </Text>
+                        </Flex>
+                    </Group>
+                </Card>
+                <Space h="xs" />
+                <Card withBorder w="100%" p={5}>
+                    <Group p={0} gap="sm">
+                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
+                            <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
+                        </ThemeIcon>
+                        <Flex direction="column">
+                            <Text size="md" fw={500} fz="h6" c="gray">
+                                Estimated Spares Cost ($)
+                            </Text>
+                            <Text size="md" fw={600} fz="h3">
+                                {estimatedSparesCost}
                             </Text>
                         </Flex>
                     </Group>
@@ -2144,29 +2528,14 @@ border-bottom: none;
             {/* Right Section */}
             <Flex justify="flex-start" align="flex-start" direction="column">
                 {/* Estimated Spares Cost */}
-                <Card withBorder w="100%" p={5}>
-                    <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
-                            <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
-                        </ThemeIcon>
-                        <Flex direction="column">
-                            <Text size="md" fw={500} fz="h6" c="gray">
-                                Estimated Spares Cost ($)
-                            </Text>
-                            <Text size="md" fw={600} fz="h3">
-                                {estimatedSparesCost}
-                            </Text>
-                        </Flex>
-                    </Group>
-                </Card>
-                <Space h="sm" />
+
 
                 {/* Spare Cost Chart */}
-                <Card w="100%" withBorder radius={10}>
+                <Card w="100%" withBorder >
                     <Flex gap="lg" direction="column">
                         <Title order={5}>Spare Cost ($)</Title>
                         <AreaChart
-                            h={250}
+                            h={330}
                             withGradient
                             data={spareCostData}
                             dataKey="date"
@@ -2575,11 +2944,63 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     );
 
     // Select the first task by default
-    useEffect(() => {
-        if (tasks?.length > 0) {
-            setSelectedTask(tasks[0]);
-        }
+    // useEffect(() => {
+    //     if (tasks?.length > 0) {
+    //         setSelectedTask(tasks[0]);
+    //     }
+    // }, [tasks]);
+
+    // Group tasks by the first two digits before the first hyphen
+    const groupedTasks = useMemo(() => {
+        if (!tasks) return {};
+
+        return tasks.reduce((groups, task) => {
+            // Extract the first group (first two digits before the first hyphen)
+            const taskId = task.sourceTask;
+            const groupKey = taskId.split('-')[0];
+
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+
+            groups[groupKey].push(task);
+            return groups;
+        }, {});
     }, [tasks]);
+
+    // Filter tasks based on search
+    const filteredGroups = useMemo(() => {
+        if (!taskSearch.trim()) return groupedTasks;
+
+        const filtered: any = {};
+
+        Object.keys(groupedTasks).forEach((groupKey) => {
+            const filteredTasks = groupedTasks[groupKey]?.filter((task: any) =>
+                task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
+            );
+
+            if (filteredTasks.length > 0) {
+                filtered[groupKey] = filteredTasks;
+            }
+        });
+
+        return filtered;
+    }, [groupedTasks, taskSearch]);
+    // Get all group keys for default opened accordions
+    const defaultOpenValues = useMemo(() => {
+        return Object.keys(filteredGroups);
+    }, [filteredGroups]);
+
+    useEffect(() => {
+        if (!selectedTask && Object.keys(filteredGroups).length > 0) {
+            const firstGroupKey = Object.keys(filteredGroups)[0];
+            const firstTask = filteredGroups[firstGroupKey]?.[0];
+
+            if (firstTask) {
+                setSelectedTask(firstTask);
+            }
+        }
+    }, [filteredGroups, selectedTask]);
 
     // Flatten the data structure when tasks change
     useEffect(() => {
@@ -2629,222 +3050,272 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     }, [tasks]);
 
     // Column definitions for the table
-  const columnDefs: ColDef[] = [
-    { 
-        headerName: 'Source Task', 
-        field: 'sourceTask', 
-        filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        width:150,
-        // flex: 2,
-        pinned: 'left'
-    },
-    { 
-        headerName: 'Description', 
-        field: 'description', 
-        filter: true,
-        floatingFilter: true,
-        resizable: true,
-        width:400,
-        // flex: 4,
-        // pinned: 'left'
-    },
-    { 
-        headerName: 'Cluster ID', 
-        field: 'cluster_id', 
-        filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        width:100
-        // flex: 1,
-        // pinned:'left'
-    },
-   
-    { 
-        headerName: 'Man Hours', 
-        field: 'mhsMin', 
-        // filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 4,
-        width:300,
-        cellRenderer: (val: any) => {
-            return (
-                
-                <Flex direction='row' justify='space-between'>
-                
-                    <Badge variant="light" color="teal" fullWidth>
-                       Min : {val?.data?.mhsMin?.toFixed(0)}
-                    </Badge>
-                    <Badge variant="light" color="blue" fullWidth>
-                       Avg : {val?.data?.mhsAvg?.toFixed(0)}
-                    </Badge>
-                    <Badge variant="light" color="violet" fullWidth>
-                       Max : {val?.data?.mhsMax?.toFixed(0)}
-                    </Badge>
-                    
-                </Flex>
-            );
+    const columnDefs: ColDef[] = [
+        {
+            headerName: 'Source Task',
+            field: 'sourceTask',
+            filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            width: 150,
+            // flex: 2,
+            pinned: 'left'
         },
-    },
-    // { 
-    //     headerName: 'Man Hours (Max)', 
-    //     field: 'mhsMax', 
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // { 
-    //     headerName: 'Man Hours (Avg)', 
-    //     field: 'mhsAvg', 
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // { 
-    //     headerName: 'Man Hours (Est)', 
-    //     field: 'mhsEst', 
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    { 
-        headerName: 'Part Number', 
-        field: 'partId', 
-        filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 1
-    },
-    { 
-        headerName: 'Part Description', 
-        field: 'partDesc', 
-        filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 1
-    },
-    { 
-        headerName: 'Quantity', 
-        field: 'qty', 
-        // filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 1
-        width:150,
-        cellRenderer: (val: any) => {
-            return (
-                <Text>
-                    {val?.data?.qty?.toFixed(2)}
-                </Text>
-            );
+        {
+            headerName: 'Description',
+            field: 'description',
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            width: 400,
+            // flex: 4,
+            // pinned: 'left'
         },
-    },
-    { 
-        headerName: 'Unit', 
-        field: 'unit', 
-        // filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 1
-        width:150,
-    },
-    { 
-        headerName: 'Price', 
-        field: 'price', 
-        // filter: true,
-        sortable:true,
-        floatingFilter: true,
-        resizable: true,
-        // flex: 1
-        width:150,
-        cellRenderer: (val: any) => {
-            return (
-                <Text>
-                    {val?.data?.price?.toFixed(4)}
-                </Text>
-            );
+        {
+            headerName: 'Cluster ID',
+            field: 'cluster_id',
+            filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            width: 100
+            // flex: 1,
+            // pinned:'left'
         },
-    }
-  ];
 
-  const downloadCSV = () => {
-    if (!flattenedData || flattenedData.length === 0) {
-        console.warn("No data available for CSV export");
-        return;
-    }
+        {
+            headerName: 'Man Hours',
+            field: 'mhsMin',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 4,
+            width: 300,
+            cellRenderer: (val: any) => {
+                return (
 
-    // Define CSV Headers (Column Titles)
-    const csvHeaders = [
-        "Source Task",
-        "Description",
-        "Cluster ID",
-        "MHS Min",
-        "MHS Max",
-        "MHS Avg",
-        "MHS Est",
-        "Part ID",
-        "Part Description",
-        "Quantity",
-        "Unit",
-        "Price"
+                    <Flex direction='row' justify='space-between'>
+
+                        <Badge variant="light" color="teal" fullWidth>
+                            Min : {val?.data?.mhsMin?.toFixed(0)}
+                        </Badge>
+                        <Badge variant="light" color="blue" fullWidth>
+                            Avg : {val?.data?.mhsAvg?.toFixed(0)}
+                        </Badge>
+                        <Badge variant="light" color="violet" fullWidth>
+                            Max : {val?.data?.mhsMax?.toFixed(0)}
+                        </Badge>
+
+                    </Flex>
+                );
+            },
+        },
+        // { 
+        //     headerName: 'Man Hours (Max)', 
+        //     field: 'mhsMax', 
+        //     filter: true,
+        //     sortable:true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     flex: 1
+        // },
+        // { 
+        //     headerName: 'Man Hours (Avg)', 
+        //     field: 'mhsAvg', 
+        //     filter: true,
+        //     sortable:true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     flex: 1
+        // },
+        // { 
+        //     headerName: 'Man Hours (Est)', 
+        //     field: 'mhsEst', 
+        //     filter: true,
+        //     sortable:true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     flex: 1
+        // },
+        {
+            headerName: 'Part Number',
+            field: 'partId',
+            filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+        },
+        {
+            headerName: 'Part Description',
+            field: 'partDesc',
+            filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+        },
+        {
+            headerName: 'Quantity',
+            field: 'qty',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+            width: 150,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {val?.data?.qty?.toFixed(2)}
+                    </Text>
+                );
+            },
+        },
+        {
+            headerName: 'Unit',
+            field: 'unit',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+            width: 150,
+        },
+        {
+            headerName: 'Price',
+            field: 'price',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+            width: 150,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {val?.data?.price?.toFixed(4)}
+                    </Text>
+                );
+            },
+        }
     ];
 
-    // Function to escape CSV fields
-    const escapeCSVField = (field :any) => {
-        if (field === null || field === undefined) return "-"; // Handle null or undefined
-        const stringField = String(field);
-        // If the field contains a comma, double quote, or newline, wrap it in double quotes
-        if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
-            return `"${stringField.replace(/"/g, '""')}"`; // Escape double quotes by doubling them
+    const downloadCSV = () => {
+        if (!flattenedData || flattenedData.length === 0) {
+            console.warn("No data available for CSV export");
+            return;
         }
-        return stringField;
+
+        // Define CSV Headers (Column Titles)
+        const csvHeaders = [
+            "Source Task",
+            "Description",
+            "Cluster ID",
+            "MHS Min",
+            "MHS Max",
+            "MHS Avg",
+            "MHS Est",
+            "Part ID",
+            "Part Description",
+            "Quantity",
+            "Unit",
+            "Price"
+        ];
+
+        // Function to escape CSV fields
+        const escapeCSVField = (field: any) => {
+            if (field === null || field === undefined) return "-"; // Handle null or undefined
+            const stringField = String(field);
+            // If the field contains a comma, double quote, or newline, wrap it in double quotes
+            if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+                return `"${stringField.replace(/"/g, '""')}"`; // Escape double quotes by doubling them
+            }
+            return stringField;
+        };
+
+        // Map Flattened Data to CSV Format
+        const csvData = flattenedData.map((task: any) => [
+            escapeCSVField(task.sourceTask),
+            escapeCSVField(task.description),
+            escapeCSVField(task.cluster_id),
+            escapeCSVField(task.mhsMin),
+            escapeCSVField(task.mhsMax),
+            escapeCSVField(task.mhsAvg),
+            escapeCSVField(task.mhsEst),
+            escapeCSVField(task.partId),
+            escapeCSVField(task.partDesc),
+            escapeCSVField(task.qty),
+            escapeCSVField(task.unit),
+            escapeCSVField(task.price)
+        ]);
+
+        // Convert array to CSV format
+        const csvContent =
+            "data:text/csv;charset=utf-8," +
+            [csvHeaders.map(escapeCSVField), ...csvData.map(row => row.map(escapeCSVField))].map((row) => row.join(",")).join("\n");
+
+        // Create a download link and trigger click
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `MPD_Tasks.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
-    // Map Flattened Data to CSV Format
-    const csvData = flattenedData.map((task:any) => [
-        escapeCSVField(task.sourceTask),
-        escapeCSVField(task.description),
-        escapeCSVField(task.cluster_id),
-        escapeCSVField(task.mhsMin),
-        escapeCSVField(task.mhsMax),
-        escapeCSVField(task.mhsAvg),
-        escapeCSVField(task.mhsEst),
-        escapeCSVField(task.partId),
-        escapeCSVField(task.partDesc),
-        escapeCSVField(task.qty),
-        escapeCSVField(task.unit),
-        escapeCSVField(task.price)
-    ]);
+    const downloadExcel = () => {
+        if (!flattenedData || flattenedData.length === 0) {
+            console.warn("No data available for Excel export");
+            return;
+        }
 
-    // Convert array to CSV format
-    const csvContent =
-        "data:text/csv;charset=utf-8," +
-        [csvHeaders.map(escapeCSVField), ...csvData.map(row => row.map(escapeCSVField))].map((row) => row.join(",")).join("\n");
+        // Define Excel Headers (Column Titles)
+        const excelHeaders = [
+            "Source Task",
+            "Description",
+            "Cluster ID",
+            "MHS Min",
+            "MHS Max",
+            "MHS Avg",
+            "MHS Est",
+            "Part ID",
+            "Part Description",
+            "Quantity",
+            "Unit",
+            "Price"
+        ];
 
-    // Create a download link and trigger click
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `MPD_Tasks.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
+        // Function to process and clean data
+        const processField = (field: any) => (field === null || field === undefined ? "-" : field);
+
+        // Map Flattened Data to Excel Format
+        const excelData = flattenedData.map((task: any) => ({
+            "Source Task": processField(task.sourceTask),
+            "Description": processField(task.description),
+            "Cluster ID": processField(task.cluster_id),
+            "MHS Min": processField(task.mhsMin),
+            "MHS Max": processField(task.mhsMax),
+            "MHS Avg": processField(task.mhsAvg),
+            "MHS Est": processField(task.mhsEst),
+            "Part ID": processField(task.partId),
+            "Part Description": processField(task.partDesc),
+            "Quantity": processField(task.qty),
+            "Unit": processField(task.unit),
+            "Price": processField(task.price),
+        }));
+
+        // Create a new Workbook and Worksheet
+        const worksheet = XLSX.utils.json_to_sheet(excelData, { header: excelHeaders });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "MPD_Tasks");
+
+        // Write the file and trigger download
+        XLSX.writeFile(workbook, "MPD_Tasks.xlsx");
+    };
 
 
 
@@ -2860,19 +3331,22 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                 scrollAreaComponent={ScrollArea.Autosize}
                 title={
                     <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    {/* Title aligned to the start */}
-                    <Text size="lg" fw={600} c="white">
-                        MPD
-                    </Text>
-        
-                    {/* Button aligned to the end */}
-                    <Button color="green" size="xs" onClick={downloadCSV} ml='70vw'>
-                        Download CSV
-                    </Button>
-                </div>
-                </>
-                  }
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <Title order={4} c='white'>
+                                MPD
+                            </Title>
+                            <Space w={50} />
+                            <Text c='white'>
+                                Total Source Tasks - {tasks?.length}
+                            </Text>
+                            {/* <Space w={600}/> */}
+                            {/* Button aligned to the end */}
+                            <Button color="green" size="xs" onClick={downloadCSV} ml='50vw' >
+                                Download CSV
+                            </Button>
+                        </div>
+                    </>
+                }
                 styles={{
                     header: {
                         backgroundColor: "#124076", // Set header background color
@@ -2886,9 +3360,9 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                 <div
                     className="ag-theme-alpine"
                     style={{
-                      width: "100%",
-                      border: "none",
-                      height: "auto",
+                        width: "100%",
+                        border: "none",
+                        height: "auto",
                     }}
                 >
                     <style>
@@ -2914,21 +3388,21 @@ border-bottom: none;
 }
 `}
                     </style>
-                   
+
                     <AgGridReact
-            rowData={flattenedData}
-            columnDefs={columnDefs}
-            pagination={true}
-            paginationPageSize={10}
-            domLayout="autoHeight"
-            // defaultColDef={{
-            //   sortable: true,
-            //   filter: true,
-            //   resizable: true,
-            //   minWidth: 100,
-            //   flex: 1
-            // }}
-          />
+                        rowData={flattenedData}
+                        columnDefs={columnDefs}
+                        pagination={true}
+                        paginationPageSize={10}
+                        domLayout="autoHeight"
+                    // defaultColDef={{
+                    //   sortable: true,
+                    //   filter: true,
+                    //   resizable: true,
+                    //   minWidth: 100,
+                    //   flex: 1
+                    // }}
+                    />
                 </div>
             </Modal>
             <Card withBorder p={0} h="90vh" bg="none">
@@ -2938,7 +3412,10 @@ border-bottom: none;
                     bg='#124076'
                     onClick={(values: any) => {
                         setTableOpened(true);
-                    }}>
+                    }}
+                    style={{ cursor: 'pointer' }}
+                >
+
                     <Title order={4}>
                         MPD
                     </Title>
@@ -2946,11 +3423,11 @@ border-bottom: none;
                 <Card withBorder p={0} h="80vh" bg="none">
                     <Space h="xs" />
                     <Grid h="100%">
-                        {/* Left Section: Tasks List */}
+                        {/* Left Section: Tasks List with Tree Structure */}
                         <Grid.Col span={3}>
                             <Card h="100%" w="100%" p="md" bg="none">
                                 <Group>
-                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
+                                    <Text size="md" fw={500} mb="xs" c="dimmed">
                                         Total Source Tasks
                                     </Text>
                                     <Text size="md" fw={500} mb="xs">
@@ -2969,31 +3446,40 @@ border-bottom: none;
                                     bg="none"
                                     p={0}
                                     h="calc(80vh - 150px)"
-                                    style={{
-                                        overflowY: 'auto',
-                                        scrollbarWidth: 'thin',
-                                    }}
                                 >
-                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                        {filteredTasks?.map((task, taskIndex) => (
-                                            <Badge
-                                                fullWidth
-                                                key={taskIndex}
-                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
-                                                color="#4C7B8B"
-                                                size="lg"
-                                                mb='md'
-                                                h={35}
-                                                radius="md"
-                                                onClick={() => setSelectedTask(task)}
-                                            >
-                                                <Text fw={500}>{task?.sourceTask}</Text>
-                                            </Badge>
-                                        ))}
-                                    </div>
+                                    <ScrollArea h="100%" scrollbarSize={6}>
+                                        <Accordion defaultValue={defaultOpenValues} multiple>
+                                            {Object.keys(filteredGroups).map((groupKey) => (
+                                                <Accordion.Item key={groupKey} value={groupKey}>
+                                                    <Accordion.Control>
+                                                        <Text fw={600}> {groupKey}</Text>
+                                                    </Accordion.Control>
+                                                    <Accordion.Panel>
+                                                        {filteredGroups[groupKey]?.map((task: any, taskIndex: any) => (
+                                                            <Badge
+                                                                fullWidth
+                                                                key={taskIndex}
+                                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
+                                                                color="#4C7B8B"
+                                                                size="lg"
+                                                                mb="md"
+                                                                h={35}
+                                                                radius="md"
+                                                                onClick={() => setSelectedTask(task)}
+                                                                style={{ cursor: 'pointer' }}
+                                                            >
+                                                                <Text fw={500}>{task?.sourceTask}</Text>
+                                                            </Badge>
+                                                        ))}
+                                                    </Accordion.Panel>
+                                                </Accordion.Item>
+                                            ))}
+                                        </Accordion>
+                                    </ScrollArea>
                                 </Card>
                             </Card>
                         </Grid.Col>
+
 
                         {/* Right Section: Selected Task Details */}
                         <Grid.Col span={9}>
@@ -3046,6 +3532,19 @@ border-bottom: none;
                                                 </Grid.Col>
                                             </Grid>
 
+                                            <Space h="sm" />
+                                            <Grid>
+                                                <Grid.Col span={2}>
+                                                    <Text size="md" fw={500} c="dimmed">
+                                                        Cluster Id
+                                                    </Text>
+                                                </Grid.Col>
+                                                <Grid.Col span={10}>
+                                                    <Text size="sm" fw={500}>
+                                                        {selectedTask?.cluster_id || "-"}
+                                                    </Text>
+                                                </Grid.Col>
+                                            </Grid>
                                             <Space h="lg" />
                                             <Text size="md" fw={500} c="dimmed">
                                                 Man Hours
@@ -3207,7 +3706,118 @@ border-bottom: none;
     );
 };
 
+// RFQ PARAMETRS OLD
+{/* 
+    <Card withBorder h="60vh" radius="md">
+     
+      <Group justify="space-between" onClick={() => setExpanded(!expanded)} style={{ cursor: "pointer" }}>
+      <Text size="md" mb='sm' fw={500} >
+        RFQ Parameters
+      </Text>
+      <Group>
+        {
+            expanded ? <IconChevronUp color="gray"/> : <IconChevronDown color="gray"/>
+        }
+      </Group>
+      </Group>
+      
 
+     
+      {expanded && (
+        <ScrollArea scrollbarSize={0} style={{ maxHeight: "50vh", overflowX: 'hidden' }}>
+          <SimpleGrid cols={1} spacing="xs">
+            {fields.map((field) => (
+              <Grid key={field.name} align="center">
+                <Grid.Col span={8}>
+                  <Text>{field.label}</Text>
+                </Grid.Col>
+                <Grid.Col span={4}>
+                  <Checkbox
+                    checked={selectedFields.includes(field.name)}
+                    onChange={() => toggleFieldSelection(field.name)}
+                  />
+                </Grid.Col>
+              </Grid>
+            ))}
+          </SimpleGrid>
+          <Group justify="center">
+          <Button variant="light" mt="sm" onClick={() => {
+    setShowFields([...selectedFields]);
+    setExpanded(false); // Collapse the accordion after showing inputs
+}}>
+            Show Inputs
+          </Button>
+          </Group>
+          
+        </ScrollArea>
+      )}
+
+      
+      <ScrollArea style={{ flex: 1, overflow: "auto", marginTop: "10px" }} offsetScrollbars scrollHideDelay={1}>
+        <SimpleGrid cols={1} spacing="xs">
+          <SimpleGrid cols={2}>
+            {fields
+              .filter((field) => showFields.includes(field.name))
+              .map((field) => (
+                <div key={field.name}>
+                  <Text size="xs" fw={500}>
+                    {field.label}
+                  </Text>
+                  {field.component}
+                </div>
+              ))}
+          </SimpleGrid>
+        </SimpleGrid>
+      </ScrollArea>
+    </Card> */}
+{/* Left Section: Tasks List */ }
+{/* <Grid.Col span={3}>
+                            <Card h="100%" w="100%" p="md" bg="none">
+                                <Group>
+                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
+                                        Total Source Tasks
+                                    </Text>
+                                    <Text size="md" fw={500} mb="xs">
+                                        {tasks?.length}
+                                    </Text>
+                                </Group>
+
+                                <TextInput
+                                    placeholder="Search tasks..."
+                                    value={taskSearch}
+                                    onChange={(e) => setTaskSearch(e.target.value)}
+                                    mb="md"
+                                />
+
+                                <Card
+                                    bg="none"
+                                    p={0}
+                                    h="calc(80vh - 150px)"
+                                    style={{
+                                        overflowY: 'auto',
+                                        scrollbarWidth: 'thin',
+                                    }}
+                                >
+                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
+                                        {filteredTasks?.map((task, taskIndex) => (
+                                            <Badge
+                                                fullWidth
+                                                key={taskIndex}
+                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
+                                                color="#4C7B8B"
+                                                size="lg"
+                                                mb='md'
+                                                h={35}
+                                                radius="md"
+                                                onClick={() => setSelectedTask(task)}
+                                            >
+                                                <Text fw={500}>{task?.sourceTask}</Text>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </Card>
+                            </Card>
+                        </Grid.Col> */}
 {/* <Group>
                         
 <Tooltip label="Download Historical Tasks"  withArrow position="top">
