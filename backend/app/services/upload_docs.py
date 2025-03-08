@@ -491,6 +491,7 @@ class ExcelUploadService:
         current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
     
         formatted_date = current_time.strftime("%d%m%Y")
+        # remove spaces
         type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
         logger.info(f"type of check is : {type_of_check_no_spaces}")
         base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
@@ -506,11 +507,10 @@ class ExcelUploadService:
         latest_doc = existing_estimates.sort("estID", -1).limit(1).to_list(length=1)
     
         if latest_doc:
-            # Extract version number using regex
             version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
             if version_match:
                 latest_version = int(version_match.group(1))
-        new_version = latest_version + 1                             # Increment version number
+        new_version = latest_version + 1                             
         est_id = f"{base_est_id}-V{new_version:02d}"
         logger.info(f"estID is : {est_id}")
         
@@ -528,10 +528,8 @@ class ExcelUploadService:
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
             "areaOfOperations": estimate_request.areaOfOperations,
-            
             "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
             "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-           
             "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
 
             
