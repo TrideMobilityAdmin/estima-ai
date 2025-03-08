@@ -504,7 +504,7 @@ class ExcelUploadService:
             "aircraftRegNo": estimate_request.aircraftRegNo,
             "estID": {"$regex": version_regex_pattern}
         })
-        latest_doc = existing_estimates.sort("estID", -1).limit(1).to_list(length=1)
+        latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
     
         if latest_doc:
             version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
