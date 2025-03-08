@@ -236,7 +236,7 @@ class ExcelUploadService:
         estimated_data = self.estimate_output.aggregate([
     {
         '$match': {
-            'estID': 'bPIuMKg4ZSaO-ysA'
+            'estID': estimate_id
         }
     }, {
         '$addFields': {
@@ -434,11 +434,8 @@ class ExcelUploadService:
 
         p.showPage()
         p.save()
-
-        # Move the buffer position to the beginning
         buffer.seek(0)
 
-        # Create a StreamingResponse with the PDF content
         logger.info("Creating PDF response")
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
@@ -448,21 +445,20 @@ class ExcelUploadService:
         logger.info("Generating estimate ID")
         try:
             logger.info("Finding count of estimates")
-            count = self.collection.count_documents({})  # Await count
+            count = self.collection.count_documents({}) 
             logger.info(f"Count of estimates: {count}")
 
             if count == 0:
                 logger.info("No estimates found, starting with EST-001")
                 return "EST-001"
 
-        # Fetch the last inserted estimate
             last_estimate = self.collection.find_one(
                 {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                sort=[("_id", -1)],  
                 projection={"estID": 1}
             )
 
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+            logger.info(f"Last estimate found: {last_estimate}")  
 
             if not last_estimate or "estID" not in last_estimate:
                 logger.warning("No estID found in the last estimate, defaulting to EST-001")
@@ -704,7 +700,6 @@ class ExcelUploadService:
         """
         logger.info(f"Updating remarks for estimate ID: {estID}")
         
-        # Check if the estimate exists in the remarks collection
         existing_record = self.remarks_collection.find_one({"estID": estID})
         
         if not existing_record:
