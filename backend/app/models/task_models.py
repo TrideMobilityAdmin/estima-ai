@@ -82,4 +82,6 @@ class EstProb(BaseModel):
 class ProbabilityWiseManhrsSpareCost(BaseModel):
     estID:str
     estProb:List[EstProb]
-    
+class UpdateRemarksRequest(BaseModel):
+    remark: str
+

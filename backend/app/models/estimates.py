@@ -50,6 +50,15 @@ class MiscLaborTask(BaseModel):
     manHours: float
     spareParts:List[SparePart]
     skill:str
+class AdditionalTasks(BaseModel):
+    taskID: str
+    taskDescription: str
+class Capping(BaseModel):
+    cappingTypeManhrs: str
+    cappingManhrs: float
+    cappingTypeSpareCost: str
+    cappingSpareCost: float
+
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
@@ -57,15 +66,11 @@ class EstimateRequest(BaseModel):
      aircraftFlightHours: int 
      aircraftFlightCycles: int
      areaOfOperations: str
-     cappingTypeManhrs: str
-     cappingManhrs: float
-     cappingTypeSpareCost: str
-     cappingSpareCost: float
-     taskID: str
-     taskDescription: str
+     cappingDetails:Optional[Capping]=None
      typeOfCheck: str
      operator: str 
      aircraftRegNo:str
+     additionalTasks: List[AdditionalTasks]
      miscLaborTasks: List[MiscLaborTask]
      
      
@@ -127,6 +132,24 @@ class EstimateStatus(BaseModel):
     estID:str
     status:str
 #estimate response schema
+
+class RemarkItem(BaseModel):
+    remark: str
+    updatedAt: datetime
+    createdAt: datetime
+    updatedBy: str= "Unknown"
+    active: bool
+    
+class EstimateStatusResponse(BaseModel):
+    estID:str
+    tasks: List[str]
+    totalMhs:float
+    totalPartsCost:float
+    status:str
+    tatTime:float=0.0
+    aircraftRegNo:str
+    createdAt:datetime
+    remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):
     estID: str
     description: str = ""
@@ -195,15 +218,6 @@ class ComparisonResponse(BaseModel):
     estimateID: str
     comparisonResults:List[ComparisonResult]
 
-class EstimateStatusResponse(BaseModel):
-    estID:str
-    tasks: List[str]
-    totalMhs:float
-    totalPartsCost:float
-    status:str
-    tatTime:float=0.0
-    aircraftRegNo:str
-    createdAt:datetime
 
 class EstimateIDResponse(BaseModel):
     estID: str

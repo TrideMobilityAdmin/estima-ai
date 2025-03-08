@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from io import BytesIO
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
+from app.middleware.auth import get_current_user
 from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
@@ -29,6 +30,7 @@ class ExcelUploadService:
         self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
+        self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -234,7 +236,7 @@ class ExcelUploadService:
         estimated_data = self.estimate_output.aggregate([
     {
         '$match': {
-            'estID': 'bPIuMKg4ZSaO-ysA'
+            'estID': estimate_id
         }
     }, {
         '$addFields': {
@@ -432,11 +434,8 @@ class ExcelUploadService:
 
         p.showPage()
         p.save()
-
-        # Move the buffer position to the beginning
         buffer.seek(0)
 
-        # Create a StreamingResponse with the PDF content
         logger.info("Creating PDF response")
         response = StreamingResponse(buffer, media_type="application/pdf")
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
@@ -446,21 +445,20 @@ class ExcelUploadService:
         logger.info("Generating estimate ID")
         try:
             logger.info("Finding count of estimates")
-            count = self.collection.count_documents({})  # Await count
+            count = self.collection.count_documents({}) 
             logger.info(f"Count of estimates: {count}")
 
             if count == 0:
                 logger.info("No estimates found, starting with EST-001")
                 return "EST-001"
 
-        # Fetch the last inserted estimate
             last_estimate = self.collection.find_one(
                 {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
+                sort=[("_id", -1)],  
                 projection={"estID": 1}
             )
 
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
+            logger.info(f"Last estimate found: {last_estimate}")  
 
             if not last_estimate or "estID" not in last_estimate:
                 logger.warning("No estID found in the last estimate, defaulting to EST-001")
@@ -493,7 +491,11 @@ class ExcelUploadService:
         current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
     
         formatted_date = current_time.strftime("%d%m%Y")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{estimate_request.typeOfCheck}-{estimate_request.operator}-{formatted_date}"
+        # remove spaces
+        type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+        logger.info(f"type of check is : {type_of_check_no_spaces}")
+        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+        logger.info(f"base_est_id: {base_est_id}")
         latest_version = 0
         version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
         
@@ -505,12 +507,12 @@ class ExcelUploadService:
         latest_doc = existing_estimates.sort("estID", -1).limit(1).to_list(length=1)
     
         if latest_doc:
-            # Extract version number using regex
             version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
             if version_match:
                 latest_version = int(version_match.group(1))
-        new_version = latest_version + 1                             # Increment version number
+        new_version = latest_version + 1                             
         est_id = f"{base_est_id}-V{new_version:02d}"
+        logger.info(f"estID is : {est_id}")
         
         data_to_insert = {
             **json_data,
@@ -526,13 +528,9 @@ class ExcelUploadService:
             "aircraftFlightHours": estimate_request.aircraftFlightHours,
             "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
             "areaOfOperations": estimate_request.areaOfOperations,
-            "cappingTypeManhrs": estimate_request.cappingTypeManhrs,
-            "cappingManhrs": estimate_request.cappingManhrs,
-            "cappingTypeSpareCost": estimate_request.cappingTypeSpareCost,
-            "cappingSpareCost": estimate_request.cappingSpareCost,
-            "taskID": estimate_request.taskID,
-            "taskDescription": estimate_request.taskDescription,
-            "miscLaborTasks": estimate_request.miscLaborTasks,
+            "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
+            "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
+            "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
 
             
               
@@ -562,8 +560,8 @@ class ExcelUploadService:
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
         
-        pipeline = [
-            {
+        pipeline = pipeline = [
+    {
         '$lookup': {
             'from': 'estima_output', 
             'localField': 'estID', 
@@ -573,6 +571,18 @@ class ExcelUploadService:
     }, {
         '$unwind': {
             'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_status_remarks',
+            'localField': 'estID',
+            'foreignField': 'estID',
+            'as': 'remarks_doc'
+        }
+    }, {
+        '$unwind': {
+            'path': '$remarks_doc',
             'preserveNullAndEmptyArrays': True
         }
     }, {
@@ -603,25 +613,33 @@ class ExcelUploadService:
                     }
                 ]
             },
-             'tatTime': {
-                    '$divide': [
-                        {
-                            '$add': [
-                                {
-                                    '$ifNull': [
-                                        '$estimate.aggregatedTasks.totalMhs', 0
-                                    ]
-                                }, 
-                                {
-                                    '$ifNull': [
-                                        '$estimate.aggregatedFindings.totalMhs', 0
-                                    ]
-                                }
-                            ]
-                        },
-                        man_hours_threshold 
-                    ]
+            'tatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            {
+                                '$ifNull': [
+                                    '$estimate.aggregatedTasks.totalMhs', 0
+                                ]
+                            }, 
+                            {
+                                '$ifNull': [
+                                    '$estimate.aggregatedFindings.totalMhs', 0
+                                ]
+                            }
+                        ]
+                    },
+                    man_hours_threshold 
+                ]
+            },
+            'remarks': {
+                '$ifNull': ['$remarks_doc.remarks', []]
+            },
+            'remarksCount': {
+                '$size': {
+                    '$ifNull': ['$remarks_doc.remarks', []]
                 }
+            }
         }
     }, {
         '$project': {
@@ -632,21 +650,101 @@ class ExcelUploadService:
             'status': '$status', 
             'totalMhs': 1, 
             'tatTime': {
-                    '$ifNull': ['$tatTime', 0.0] 
-                },
+                '$ifNull': ['$tatTime', 0.0] 
+            },
             'totalPartsCost': 1, 
-            'createdAt': '$createdAt'
+            'createdAt': '$createdAt',
+            'remarks': 1,
+            'remarksCount': 1
         }
     }
-        ]
+]
 
         
         results = self.estima_collection.aggregate(pipeline).to_list(length=None)
+        for result in results:
+          
+            existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
+            
+            # If it doesn't exist, create one with empty remarks
+   
+            if not existing_remarks:
+                self.remarks_collection.insert_one({
+                    "estID": result["estID"],
+                    "remarks": [{
+                        "remark": "",
+                        "updatedAt": datetime.utcnow(),
+                        "updatedBy": "",
+                        "createdAt": datetime.utcnow(),
+                        "active": True
+                    }],
+                    
+                })
+        
 
         response = [EstimateStatusResponse(**result) for result in results]
 
         return response
+    async def update_estimate_status_remarks(self, estID: str, remark: str,current_user:dict=Depends(get_current_user)) -> Dict[str, Any]:
+        """
+        Update remarks for a specific estimate
+        
+        Args:
+            estID: The ID of the estimate to update
+            remarks: The new remarks text
+            
+        Returns:
+            Dictionary with update status and information
+        """
+        logger.info(f"Updating remarks for estimate ID: {estID}")
+        
+        existing_record = self.remarks_collection.find_one({"estID": estID})
+        
+        if not existing_record:
+            logger.error(f"Estimate with ID {estID} not found in remarks collection")
+            raise HTTPException(status_code=404, detail=f"Estimate with ID {estID} not found")
+        
+        current_time = datetime.utcnow()
+        if existing_record['remarks'] and existing_record['remarks'][0]['remark'] == "":
+        # Update the first remark directly
+            update_result = self.remarks_collection.update_one(
+                {"estID": estID, "remarks.remark": ""},
+                {"$set": {
+                    "remarks.$.remark": remark,
+                    "remarks.$.updatedAt": current_time,
+                    "remarks.$.updatedBy": current_user["username"],
+                    "remarks.$.createdAt": current_time,
+                    "remarks.$.active": True
+                }}
+            )
+        else:
+            new_remark = {
+            "remark": remark,
+            "updatedAt": current_time,
+            "updatedBy":current_user["username"],
+            "createdAt":current_time,
+            "active": True
+            }
+            update_result = self.remarks_collection.update_one(
+            {"estID": estID},
+            {"$push": {
+                "remarks": new_remark
+            }}
+    )
     
+        if update_result.modified_count > 0:
+            logger.info(f"Remarks updated successfully for estimate ID: {estID}")
+            return {
+                "success": True,
+                "message": "Remarks updated successfully",
+                "estID": estID,
+                "newRemark": new_remark if 'new_remark' in locals() else None,
+                "updatedAt": current_time
+        }
+            
+        else:
+            logger.error(f"Failed to update remarks for estimate ID: {estID}")
+            raise HTTPException(status_code=500, detail="Failed to update remarks")
 
 def convert_hash_to_ack_id(hash_hex: str) -> str:
     hash_bytes = bytes.fromhex(hash_hex)
