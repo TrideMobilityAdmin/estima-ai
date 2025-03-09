@@ -518,7 +518,7 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching man hours: {str(e)}"
             )
-
+    
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
@@ -528,266 +528,266 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline = [
-    {
-        '$match': {
-            'requested_part_number': part_id
-        }
-    }, {
-        '$lookup': {
-            'from': 'task_description', 
-            'localField': 'package_number', 
-            'foreignField': 'package_number', 
-            'as': 'task_info', 
-            'pipeline': [
-                {
-                    '$project': {
-                        'convertedPackage': '$package_number', 
-                        'actual_start_date': 1, 
-                        'actual_end_date': 1, 
-                        'description': 1, 
-                        '_id': 0
-                    }
-                }
-            ]
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_info', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$match': {
-            '$expr': {
-                '$and': [
-                    {
-                        '$eq': [
-                            '$task_info.convertedPackage', '$package_number'
-                        ]
-                    }, {
-                        '$gte': [
-                            '$task_info.actual_start_date', startDate
-                        ]
-                    }, {
-                        '$lt': [
-                            '$task_info.actual_end_date', endDate
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$group': {
-            '_id': '$requested_part_number', 
-            'partDescription': {
-                '$first': '$part_description'
-            }, 
-            'tasks': {
-                '$push': {
-                    'taskId': '$task_number', 
-                    'taskDescription': '$task_info.description', 
-                    'packages': [
-                        {
-                            'packageId': '$package_number', 
-                            'date': {
-                            '$ifNull': ['$task_info.actual_start_date', '0001-01-01T00:00:00Z']  # Replace null with a default date
-                        },
-                            'quantity': '$requested_quantity'
-                        }
-                    ]
-                }
-            }
-        }
-    }, {
-        '$project': {
-            'convertedPackageId': 0, 
-            'aircraft_info': 0, 
-            'effectiveDate': 0
-        }
+  {
+    $match: {
+      requested_part_number: part_id,
+      requested_stock_status: {
+        $ne: "Owned"
+      } // Exclude "Owned" parts
     }
+  },
+  {
+    $lookup: {
+      from: "task_description",
+      let: {
+        package_number: "$package_number",
+        task_number: "$task_number"
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
+                {
+                  $eq: [
+                    "$package_number",
+                    "$$package_number"
+                  ]
+                },
+                {
+                  $eq: [
+                    "$task_number",
+                    "$$task_number"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          $project: {
+            package_number: "$package_number",
+            actual_start_date: 1,
+            actual_end_date: 1,
+            description: 1,
+            _id: 0
+          }
+        }
+      ],
+      as: "task_info"
+    }
+  },
+  {
+    $unwind: {
+      path: "$task_info",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+  {
+    $match: {
+      $expr: {
+        $and: [
+          {
+            $gte: [
+              "$task_info.actual_start_date",
+              startDate
+            ]
+          },
+          {
+            $lt: [
+              "$task_info.actual_end_date",
+              endDate
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "aircraft_details",
+      localField: "package_number",
+      foreignField: "package_number",
+      as: "aircraft_info"
+    }
+  },
+  {
+    $unwind: {
+      path: "$aircraft_info",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+  {
+    $group: {
+      _id: "$requested_part_number",
+      partDescription: {
+        $first: "$part_description"
+      },
+      tasks: {
+        $push: {
+          taskId: "$task_number",
+          taskDescription:
+            "$task_info.description",
+          packages: [
+            {
+              packageId:
+                "$task_info.package_number",
+              date: "$task_info.actual_start_date",
+              quantity: "$requested_quantity",
+              requested_stock_status:
+                "$requested_stock_status",
+              aircraftModel:
+                "$aircraft_info.aircraft_model"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      convertedPackageId: 0,
+      aircraft_info: 0,
+      effectiveDate: 0
+    }
+  }
 ]
+
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-    {
-        '$match': {
-            'issued_part_number': part_id
-        }
-    }, {
-        '$lookup': {
-            'from': 'sub_task_description', 
-            'localField': 'package_number', 
-            'foreignField': 'package_number', 
-            'as': 'task_info', 
-            'pipeline': [
-                {
-                    '$project': {
-                        'convertedPackage': '$package_number', 
-                        'actual_start_date': 1, 
-                        'actual_end_date': 1, 
-                        'source_task_discrepancy_number': 1, 
-                        'log_item_number': 1, 
-                        '_id': 0
-                    }
-                }
-            ]
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_info', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$match': {
-            '$expr': {
-                '$and': [
-                    {
-                        '$eq': [
-                            '$task_info.convertedPackage', '$package_number'
-                        ]
-                    }, {
-                        '$gte': [
-                            '$task_info.actual_start_date', startDate
-                        ]
-                    }, {
-                        '$lt': [
-                            '$task_info.actual_end_date', endDate
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$lookup': {
-            'from': 'task_description', 
-            'localField': 'task_info.source_task_discrepancy_number', 
-            'foreignField': 'task_number', 
-            'as': 'task_desc', 
-            'pipeline': [
-                {
-                    '$project': {
-                        'Description': {
-                            '$ifNull': [
-                                '$description', ''
-                            ]
-                        }, 
-                        '_id': 0
-                    }
-                }
-            ]
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_desc', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$group': {
-            '_id': '$issued_part_number', 
-            'findings': {
-                '$push': {
-                    'taskId': '$task_number', 
-                    'taskDescription': '$task_desc.description', 
-                    'packages': [
-                        {
-                            'packageId': '$package_number', 
-                            'logItem': '$task_info.log_item_number', 
-                            'description': '$task_description', 
-                            # 'date': '$task_info.actual_start_date', 
-                            'date': {
-                            '$ifNull': ['$task_info.actual_start_date', '0001-01-01T00:00:00Z']  # Replace null with a default date
-                        }, 
-                            'quantity': '$used_quantity'
-                        }
-                    ]
-                }
-            }
-        }
-    }, {
-        '$project': {
-            'effectiveDate': 0
-        }
+  {
+    $match: {
+      requested_part_number: "740-5869-507",
+      requested_stock_status: {
+        $ne: "Owned"
+      } // Exclude "Owned" parts
     }
-]
-            sub_task_aircraft_details = [
+  },
+  {
+    $lookup: {
+      from: "task_description",
+      let: {
+        package_number: "$package_number",
+        task_number: "$task_number"
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
                 {
-        '$match': {
-            'issued_part_number': part_id
-        }
-    },
-            {
-                '$lookup': {
-                    'from': "aircraft_details",
-                    'localField': "package_number",
-                    'foreignField': "package_number",
-                    'as': "aircraft"
+                  $eq: [
+                    "$package_number",
+                    "$$package_number"
+                  ]
+                },
+                {
+                  $eq: [
+                    "$task_number",
+                    "$$task_number"
+                  ]
                 }
-            },
-            {
-                '$unwind': {
-                    'path': "$aircraft",
-                    'preserveNullAndEmptyArrays': True
-                }
-            },
-            {
-                '$facet': {
-                    'aircraftModels': [
-                        {
-                            '$group': {
-                                '_id': "$aircraft.aircraft_model",
-                                'count': {
-                                    '$sum': 1
-                                }
-                            }
-                        },
-                        {
-                            '$project': {
-                                '_id': 0,
-                                'aircraftModel': {
-                            '$ifNull': [
-                                '$_id', ''
-                            ]
-                        }, 
-                                'count': 1
-                            }
-                        }
-                    ],
-                    'statusCodes': [
-                        {
-                            '$group': {
-                                '_id': "$stock_status",
-                                'count': {
-                                    '$sum': 1
-                                }
-                            }
-                        },
-                        {
-                            '$project': {
-                                '_id': 0,
-                                'stockStatus': {
-                            '$ifNull': [
-                                '$_id', ''
-                            ]
-                        }, 
-                                'count': 1
-                            }
-                        }
-                    ]
-                }
-            },
-            {
-                '$project': {
-                    'aircraftModel': "$aircraftModels",
-                    'stockStatusCode': "$statusCodes"
-                }
+              ]
             }
+          }
+        },
+        {
+          $project: {
+            package_number: "$package_number",
+            actual_start_date: 1,
+            actual_end_date: 1,
+            description: 1,
+            _id: 0
+          }
+        }
+      ],
+      as: "task_info"
+    }
+  },
+  {
+    $unwind: {
+      path: "$task_info",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+  {
+    $match: {
+      $expr: {
+        $and: [
+          {
+            $gte: [
+              "$task_info.actual_start_date",
+              ISODate("2020-01-21T00:00:00.000Z")
+            ]
+          },
+          {
+            $lt: [
+              "$task_info.actual_end_date",
+              ISODate("2024-09-30T23:59:59.999Z")
+            ]
+          }
         ]
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "aircraft_details",
+      localField: "package_number",
+      foreignField: "package_number",
+      as: "aircraft_info"
+    }
+  },
+  {
+    $unwind: {
+      path: "$aircraft_info",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+  {
+    $group: {
+      _id: "$requested_part_number",
+      partDescription: {
+        $first: "$part_description"
+      },
+      tasks: {
+        $push: {
+          taskId: "$task_number",
+          taskDescription:
+            "$task_info.description",
+          packages: [
+            {
+              packageId:
+                "$task_info.package_number",
+              date: "$task_info.actual_start_date",
+              quantity: "$requested_quantity",
+              requested_stock_status:
+                "$requested_stock_status",
+              aircraftModel:
+                "$aircraft_info.aircraft_model"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      convertedPackageId: 0,
+      aircraft_info: 0,
+      effectiveDate: 0
+    }
+  }
+]
+          
             # Execute pipelines
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-            sub_task_aircraft_details_result = list(self.subtaskparts_collection.aggregate(sub_task_aircraft_details))
+
 
             logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
             logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
-            logger.info(f"Results of aircraft_details: {len(sub_task_aircraft_details_result)}\n")
+
 
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
