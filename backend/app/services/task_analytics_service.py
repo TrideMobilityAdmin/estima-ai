@@ -2491,7 +2491,13 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$issued_part_number', 
-                'partDescription': '$part_description'
+                'partDescription': {
+                    '$replaceAll': {
+                        'input': '$part_description', 
+                        'find': ' ', 
+                        'replacement': ''
+                    }
+                }
             }, 
             'totalFindingsQty': {
                 '$sum': '$used_quantity'
@@ -2577,7 +2583,13 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$issued_part_number', 
-                'partDescription': '$part_description'
+                'partDescription': {
+                    '$replaceAll': {
+                        'input': '$part_description', 
+                        'find': ' ', 
+                        'replacement': ''
+                    }
+                }
             }, 
             'totalFindingsQty': {
                 '$sum': '$used_quantity'
