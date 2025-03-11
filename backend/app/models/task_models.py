@@ -31,6 +31,8 @@ class Task(BaseModel):
     taskDescription: str
     partDescription: str
     packages: Package
+    aircraftModel:str
+    stockStatus: Optional[str] = None
 
 
 class Finding(BaseModel):
@@ -39,6 +41,8 @@ class Finding(BaseModel):
     packageId: str
     date: str
     quantity: Any  # Adjust type based on actual data (int/float)
+    aircraftModel:Optional[str] = None
+    
     stockStatus: Optional[str] = None
     priceUSD: Optional[float] = None
 

@@ -89,6 +89,21 @@ async def get_parts_usage(
     parts_usage=await task_service.get_parts_usage(part_id,startDate,endDate)
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
+@router.post("/multiple/parts/usage", response_model=Dict) 
+async def get_multiple_parts_usage(
+    part_ids: List[str],  
+    startDate: datetime,
+    endDate: datetime,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get parts usage for multiple part IDs.
+    """
+    parts_usage = await task_service.multiple_parts_usage(part_ids, startDate, endDate)
+    logging.info("Parts usage data: %s", parts_usage)
+    return parts_usage
+
 
 @router.post("/skills/analysis")
 async def post_skills_analysis(
