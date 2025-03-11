@@ -524,6 +524,7 @@ class TaskService:
         """
         Get parts usage for a specific part_id within a date range.
         """
+        
         try:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
@@ -988,7 +989,7 @@ class TaskService:
                                     'description': '$$hmvTask.task_description', 
                                     'date': {
                                         '$ifNull': [
-                                            '$$hmvTask.task_info.actual_start_date', startDate
+                                            '$$hmvTask.task_info.actual_start_date',datetime(1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
                                         ]
                                     }, 
                                     'stock_status': '$$hmvTask.stock_status', 
@@ -1048,8 +1049,7 @@ class TaskService:
         }
     }
 ]
-          
-            # Execute pipelines
+         
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
 
@@ -1061,13 +1061,13 @@ class TaskService:
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
-            # Construct final output
+           
             task_parts_aircraft_details = {
                 "aircraftModels": task_parts_result[0].get("summary", {}).get("aircraftModels", []),
                 "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
             }
 
-            # Extracting aircraft details from sub_task_parts_result
+           
             sub_task_parts_aircraft_details = {
                 "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
                 "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
@@ -1151,12 +1151,14 @@ class TaskService:
                     logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
             # Process findings
             logger.info("Processing findings to calculate date-wise quantities.")
-            # for finding in output["usage"]["findings"]:
-            #     logger.info(f"Processing finding: {finding['taskId']} - {finding['taskDescription']}")
-            #     for pkg in finding["packages"]:
-            #         date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"] # Extract date only
-            #         date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
-            #         logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+            for finding_type in ["hmvTasks", "nonHmvTasks"]:
+                for task in output["usage"]["findings"].get(finding_type, []):
+                    logger.info(f"Processing finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
+                    for pkg in task.get("packages", []):
+                        date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
+                        date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
+                        logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+
             output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
             logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
 
@@ -2327,4 +2329,287 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching estimate: {e}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
-    
+    async def multiple_parts_usage(self, part_ids: List[str], startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate, endDate}")
+        """
+        Get parts usage for multiple part IDs
+        """
+        logger.info(f"Fetching parts usage for multiple part IDs: {part_ids}")
+
+        task_parts_pipeline = [
+    {
+        '$match': {
+            'requested_part_number': {
+                '$in': part_ids
+            }, 
+            'requested_stock_status': {
+                '$ne': 'Owned'
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'task_description', 
+            'let': {
+                'package_number': '$package_number', 
+                'task_number': '$task_number'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$package_number', '$$package_number'
+                                    ]
+                                }, {
+                                    '$eq': [
+                                        '$task_number', '$$task_number'
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        'package_number': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'description': 1, 
+                        '_id': 0
+                    }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$requested_part_number', 
+                'partDescription': '$part_description'
+            }, 
+            'totalTasksQty': {
+                '$sum': '$requested_quantity'
+            }, 
+            'taskNumbers': {
+                '$push': '$task_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalTasksQty': 1, 
+            'totalTasks': {
+                '$size': '$taskNumbers'
+            }
+        }
+    }
+]
+        findings_HMV_parts_pipeline = [
+    {
+        '$match': {
+            'issued_part_number': {
+                '$in': part_ids
+            }
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
+                ]
+            }
+        }
+    }, {
+        '$match': {
+            'isHMV': 'HMV'
+        }
+    }, {
+        '$lookup': {
+            'from': 'sub_task_description', 
+            'localField': 'task_number', 
+            'foreignField': 'log_item_number', 
+            'as': 'task_info', 
+            'pipeline': [
+                {
+                    '$project': {
+                        'convertedPackage': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'source_task_discrepancy_number': 1, 
+                        'log_item_number': 1, 
+                        '_id': 0
+                    }
+                }
+            ]
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$issued_part_number', 
+                'partDescription': '$part_description'
+            }, 
+            'totalFindingsQty': {
+                '$sum': '$used_quantity'
+            }, 
+            'task_numbers': {
+                '$addToSet': '$task_info.log_item_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalFindingsQty': 1, 
+            'totalFindings': {
+                '$size': '$task_numbers'
+            }
+        }
+    }
+]
+        findings_nonHMV_parts_pipeline = [
+    {
+        '$match': {
+            'issued_part_number': {
+                '$in': part_ids
+            }
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
+                ]
+            }
+        }
+    }, {
+        '$match': {
+            'isHMV': {
+                '$ne': 'HMV'
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'sub_task_description', 
+            'localField': 'task_number', 
+            'foreignField': 'log_item_number', 
+            'as': 'task_info', 
+            'pipeline': [
+                {
+                    '$project': {
+                        'convertedPackage': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'source_task_discrepancy_number': 1, 
+                        'log_item_number': 1, 
+                        '_id': 0
+                    }
+                }
+            ]
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$issued_part_number', 
+                'partDescription': '$part_description'
+            }, 
+            'totalFindingsQty': {
+                '$sum': '$used_quantity'
+            }, 
+            'task_numbers': {
+                '$addToSet': '$task_info.log_item_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalFindingsQty': 1, 
+            'totalFindings': {
+                '$size': '$task_numbers'
+            }
+        }
+    }
+]
+        task_parts_results = list(self.taskparts_collection.aggregate(task_parts_pipeline))
+        logger.info(f"task_parts_results: {len(task_parts_results)}")
+        findings_HMV_results = list(self.subtaskparts_collection.aggregate(findings_HMV_parts_pipeline))
+        logger.info(f"findings_HMV_results: {len(findings_HMV_results)}")
+        findings_nonHMV_results = (self.subtaskparts_collection.aggregate(findings_nonHMV_parts_pipeline))
+        logger.info(f"findings_nonHMV_results fetched")
+        
+        combined_results = {
+        "taskParts": task_parts_results,
+        "findingsHMVParts": findings_HMV_results,
+        "findingsNonHMVTasks": findings_nonHMV_results
+    }
+        logger.info(f"Combined results: {combined_results}")
+        return combined_results
+        
