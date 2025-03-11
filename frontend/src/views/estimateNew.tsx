@@ -1,5 +1,5 @@
 // import { Grid, Title } from "@mantine/core";
-import { Accordion, ActionIcon, Avatar, Center, Checkbox, List, LoadingOverlay, Modal, MultiSelect, NumberInput, Paper, SegmentedControl, Select, Stack, Textarea, Tooltip } from "@mantine/core";
+import { Accordion, ActionIcon, Avatar, Center, Checkbox, Indicator, List, LoadingOverlay, Modal, MultiSelect, NumberInput, Paper, SegmentedControl, Select, Stack, Textarea, Tooltip } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
     Badge,
@@ -32,10 +32,11 @@ import {
     useEffect,
     useForm,
     XLSX,
+    useAtom,
 } from "../constants/GlobalImports";
 import { AreaChart } from "@mantine/charts";
 import '../App.css';
-import { IconChartArcs3, IconCheck, IconChecklist, IconChevronDown, IconChevronUp, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockHour4, IconClockShare, IconClockUp, IconDeselect, IconDownload, IconError404, IconFile, IconFileCheck, IconHourglass, IconListCheck, IconListDetails, IconLoader, IconMessage, IconMessage2Plus, IconMinimize, IconPercentage, IconPercentage66, IconPin, IconPlane, IconPlaneTilt, IconPlus, IconRecycle, IconReport, IconRowRemove, IconSettingsDollar, IconShadow, IconSquareCheck, IconStatusChange, IconTrash, IconX } from "@tabler/icons-react";
+import { IconChartArcs3, IconCheck, IconChecklist, IconChevronDown, IconChevronUp, IconCircleCheck, IconClipboard, IconClipboardCheck, IconClock, IconClockCheck, IconClockCode, IconClockDown, IconClockHour4, IconClockShare, IconClockUp, IconDeselect, IconDownload, IconError404, IconFile, IconFileCheck, IconFileDownload, IconHourglass, IconListCheck, IconListDetails, IconLoader, IconMessage, IconMessage2Plus, IconMinimize, IconPercentage, IconPercentage66, IconPin, IconPlane, IconPlaneTilt, IconPlus, IconRecycle, IconReport, IconRowRemove, IconSettingsDollar, IconShadow, IconSquareCheck, IconStatusChange, IconTrash, IconX } from "@tabler/icons-react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -53,14 +54,16 @@ import { showAppNotification } from "../components/showNotificationGlobally";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
 import { useMemo, useRef } from "react";
+import { userName } from "../components/tokenJotai";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export default function EstimateNew() {
-    const { postEstimateReport, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
+    const { postEstimateReport, updateRemarkByEstID, validateTasks, RFQFileUpload, getAllEstimatesStatus, getEstimateByID, downloadEstimatePdf, getProbabilityWiseDetails } = useApi();
     const { getAllDataExpertInsights } = useApi();
     const { getSkillAnalysis } = useApiSkillAnalysis();
+    const [currentUser] = useAtom(userName);
     const [value, setValue] = useState('estimate');
     const [opened, setOpened] = useState(false);
     const [probOpened, setProbOpened] = useState(false);
@@ -71,6 +74,7 @@ export default function EstimateNew() {
     const [selectedEstimateIdReport, setSelectedEstimateIdReport] = useState<any>();
     const [selectedEstimateIdProbability, setSelectedEstimateIdProbability] = useState<any>();
     const [selectedEstimateRemarks, setSelectedEstimateIdRemarks] = useState<any>();
+    const [selectedEstRemarksData, setSelectedEstRemarksData] = useState<any[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
     const [rfqSubmissionResponse, setRfqSubmissionResponse] = useState<any>(null);
@@ -98,6 +102,7 @@ export default function EstimateNew() {
     const [loading, setLoading] = useState(false); // Add loading state
     // const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
     // const [isLoading, setIsLoading] = useState(false);
+    console.log("selected remarks >>>>", selectedEstRemarksData);
 
 
     // const fetchEstimatesStatus = async () => {
@@ -171,12 +176,14 @@ export default function EstimateNew() {
     console.log("selected expert insights tasks obj >>>>", selectedExpertInsightTasks);
 
     // Handle file and extracted tasks
-    const handleFileChange = async (file: File | null, tasks: string[]) => {
+    const handleFileChange = async (file: File | null, tasks: string[], sheetInfo?: { sheetName: string, columnName: string }) => {
         setIsValidating(true);
         setSelectedFile(file);
         setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
         console.log("✅ Selected File:", file ? file.name : "None");
         console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+        console.log("From sheet:", sheetInfo?.sheetName);
+  console.log("From column:", sheetInfo?.columnName);
 
 
         console.log("Extracted Tasks:", tasks);
@@ -315,20 +322,20 @@ export default function EstimateNew() {
 
         validate: {
             // probability: (value) => (value ? null : "Probability is required"),
-            // operator: (value) => (value.trim() ? null : "Operator is not available, enter N/A"),
-            // aircraftRegNo: (value) => (value.trim() ? null : "RegNo is not available, enter N/A"),
+            operator: (value) => (value.trim() ? null : "Operator is not available, enter N/A"),
+            aircraftRegNo: (value) => (value.trim() ? null : "RegNo is not available, enter N/A"),
             // typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
-            operator: (value, values) => {
-                if (!value.trim() && !values.aircraftRegNo.trim()) {
-                    return "Either Operator or Aircraft Reg No is mandatory.";
-                }
-                return value.trim() ? null : "Operator is not available, enter N/A";
-            },
-            aircraftRegNo: (value, values) => {
-                if (!value.trim() && !values.operator.trim()) {
-                    return "Either Operator or Aircraft Reg No is mandatory.";
-                }
-            },
+            // operator: (value, values) => {
+            //     if (!value.trim() && !values.aircraftRegNo.trim()) {
+            //         return "Either Operator or Aircraft Reg No is mandatory.";
+            //     }
+            //     return value.trim() ? null : "Operator is not available, enter N/A";
+            // },
+            // aircraftRegNo: (value, values) => {
+            //     if (!value.trim() && !values.operator.trim()) {
+            //         return "Either Operator or Aircraft Reg No is mandatory.";
+            //     }
+            // },
             typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
             // aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
             // aircraftFlightHours: (value) => (value.trim() ? null : "Flight Hours are required"),
@@ -356,30 +363,31 @@ export default function EstimateNew() {
                 }
                 return; // Prevent submission if there are errors    
             }
-            if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
-                showAppNotification("warning", "Not both are N/A", "Any of them Mandatory of Reg Num or Operator");
-            }
+            
+        }
+
+        if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
+            showAppNotification("warning", "Both are N/A", "Reg Num or Operator Any of one is Mandatory");
         }
 
         if (!selectedFile) {
-            showNotification({
-                title: "Error",
-                message: "Please select a file",
-                color: "red",
-            });
+            showAppNotification("error", "Error", "Please Select File");
+            // showNotification({
+            //     title: "Error",
+            //     message: "Please select a file",
+            //     color: "red",
+            // });
             return;
         }
         const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
 
-        // Get the selected tasks from the MultiSelect
-        const miscLaborTasks = selectedExpertInsightTasks || [];
         // Ensure at least one empty additional task if none are added
         const defaultAdditionalTasks = additionalTasks.length > 0 ? additionalTasks : [{ taskID: "", taskDescription: "" }];
 
         // Ensure at least one empty misc labor task if none exist
         const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
             ? selectedExpertInsightTasks
-            : [{ taskID: "", taskDescription: "", manHours: 0, skill: "", spareParts: [{ partID: "", quantity: "" }] }];
+            : [{ taskID: "", taskDescription: "", manHours: 0, skill: "", spareParts: [{ partID: "", quantity: 0 }] }];
 
 
         const requestData = {
@@ -693,11 +701,11 @@ export default function EstimateNew() {
         );
     };
     const fields = [
-        { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={10} max={100} step={10} {...form.getInputProps("probability")} /> },
+        // { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={10} max={100} step={10} {...form.getInputProps("probability")} /> },
         { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
-        { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
-        { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
-        { label: "Check Type", name: "typeOfCheck", component: <Select size="xs" data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']} {...form.getInputProps("typeOfCheck")} /> },
+        // { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
+        // { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
+        // { label: "Check Type", name: "typeOfCheck", component: <Select size="xs" data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']} {...form.getInputProps("typeOfCheck")} /> },
         { label: "Flight Cycles", name: "aircraftFlightCycles", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftFlightCycles")} /> },
         { label: "Flight Hours", name: "aircraftFlightHours", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftFlightHours")} /> },
         { label: "Area of Operations", name: "areaOfOperations", component: <TextInput size="xs" placeholder="Ex: Area" {...form.getInputProps("areaOfOperations")} /> },
@@ -770,7 +778,7 @@ export default function EstimateNew() {
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
     // Sort remarks from oldest to newest (ensures scrolling from bottom)
-    const sortedRemarks = [...sampleRemarks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedRemarks = [...selectedEstRemarksData]?.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     useEffect(() => {
         if (remarksOpened && scrollAreaRef.current) {
@@ -782,60 +790,106 @@ export default function EstimateNew() {
 
     // Format date
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString(undefined, {
+        const date = new Date(dateString);
+
+        // Convert to IST by adding 5 hours 30 minutes
+        date.setHours(date.getHours() + 5);
+        date.setMinutes(date.getMinutes() + 30);
+
+        return date.toLocaleString("en-IN", {
             year: "numeric",
             month: "short",
             day: "numeric",
             hour: "2-digit",
             minute: "2-digit",
+            hour12: true, // Ensures AM/PM format
+            timeZone: "Asia/Kolkata" // Ensures IST format
         });
     };
+
     // Format date
 
+    const scrollAreaRefRemark = useRef<HTMLDivElement | null>(null);
+    const scrollViewportRefRemark = useRef<HTMLDivElement | null>(null);
+    const contentRefRemark = useRef<HTMLDivElement | null>(null);
 
-    const RemarkItem = ({ remark }: any) => {
-        const isCurrentUser = remark.userName === 'Current User';
+    // Add this effect to scroll to bottom when remarks change
+    useEffect(() => {
+        if (scrollViewportRefRemark.current) {
+            // Scroll to bottom of the chat
+            scrollViewportRefRemark.current.scrollTo({
+                top: scrollViewportRefRemark.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }, [selectedEstRemarksData]); // Dependency on remarks data
+    const [newRemark, setNewRemark] = useState('');
+    const handleRemark = async () => {
+        if (!newRemark.trim()) {
+            showNotification({
+                title: "Error",
+                message: "Remark cannot be empty",
+                color: "red",
+            });
+            return;
+        }
 
-        return (
-            <Flex
-                direction="column"
-                align={isCurrentUser ? 'flex-end' : 'flex-start'}
-                mb="xs"
-            >
-                <Paper
-                    p="xs"
-                    radius="md"
-                    withBorder
-                    bg={isCurrentUser ? '#e3f2fd' : 'white'}
-                    style={{
-                        maxWidth: '80%',
-                        alignSelf: 'flex-end',
-                    }}
-                >
-                    <Group justify="space-between" gap="xs" mb={5}>
-                        <Group gap="xs">
-                            <Avatar
-                                color={isCurrentUser ? "blue" : "cyan"}
-                                radius="xl"
-                                size="sm"
-                            >
-                                {remark.userName.charAt(0)}
-                            </Avatar>
-                            <Text size="sm" fw={500}>
-                                {remark.userName}
-                            </Text>
-                        </Group>
-                        <Text size="xs" c="dimmed">
-                            {formatDate(remark.date)}
-                        </Text>
-                    </Group>
-                    <Text size="sm" ml={30}>
-                        {remark.remark}
-                    </Text>
-                </Paper>
-            </Flex>
-        );
+        const data = { remark: newRemark };
+        const result = await updateRemarkByEstID(selectedEstimateRemarks, data);
+        console.log("result", result);
+        if (result) {
+            // Create a new remark object similar to what your API would return
+            const user = currentUser; // Replace with actual current user name or ID
+            const newRemarkObj = {
+                remark: newRemark,
+                updatedBy: user,
+                createdAt: new Date() // Current timestamp
+            };
+            setSelectedEstRemarksData(prevRemarks => [...prevRemarks, newRemarkObj]);
+            setNewRemark('');
+            fetchEstimatesStatus();
+        }
     };
+
+
+    const downloadEmptyExcel = () => {
+        const filename = 'Example_RFQ.xlsx'
+        const headers = [
+            'Task Id',
+            'Description'
+        ]
+        // Create a new workbook
+        const workbook = XLSX.utils.book_new();
+        
+        // Create an empty worksheet with just the headers
+        // We create an array with one empty row (just the headers)
+        const worksheetData = [headers];
+        
+        // Convert the data to a worksheet
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        
+        // Add the worksheet to the workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+        
+        // Write the workbook to a binary string
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        
+        // Create a Blob from the buffer
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        
+        // Create a download link and trigger the download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+    
 
     return (
         <>
@@ -1263,12 +1317,73 @@ export default function EstimateNew() {
             >
 
                 <Card h='50vh' withBorder bg='#f0eded' radius='lg'>
-                    <ScrollArea h="100%" viewportRef={scrollAreaRef} offsetScrollbars scrollbarSize={0}>
+                    <ScrollArea
+                        h="100%"
+                        ref={scrollAreaRefRemark}
+                        viewportRef={scrollViewportRefRemark}
+                        scrollbarSize={0}
+                        scrollHideDelay={0}
+
+                    >
                         <Stack justify="flex-start" h="100%" gap="md">
-                            {sortedRemarks.map((remark) => (
-                                <RemarkItem key={remark.id} remark={remark} />
-                            ))}
+                            {selectedEstRemarksData
+                                ?.filter((remark: any, index: number) => !(index === 0 && !remark.remark.trim())) // Remove first object if empty
+                                .length === 0 ? (
+                                // If all remarks are removed, show "No Remarks Found"
+                                <Text size="sm" c="dimmed" ta="center">
+                                    No Remarks Found
+                                </Text>
+                            ) : (
+                                selectedEstRemarksData
+                                    ?.filter((remark: any, index: number) => !(index === 0 && !remark.remark.trim())) // Remove first object if empty
+                                    .map((remark: any) => {
+                                        const isCurrentUser = remark.updatedBy === currentUser; // Adjust as needed
+
+                                        return (
+                                            <Flex
+                                                key={remark.createdAt}
+                                                direction="column"
+                                                align={isCurrentUser ? "flex-end" : "flex-start"}
+                                            >
+                                                <Paper
+                                                    p="xs"
+                                                    radius="md"
+                                                    withBorder
+                                                    bg="white"
+                                                    style={{
+                                                        maxWidth: "80%",
+                                                        minWidth: "50%",
+                                                        alignSelf: isCurrentUser ? "flex-end" : "flex-start",
+                                                    }}
+                                                >
+                                                    <Group justify="space-between" gap="xs" mb={5}>
+                                                        <Group gap="xs">
+                                                            <Avatar
+                                                                color={isCurrentUser ? "blue" : "cyan"}
+                                                                radius="xl"
+                                                                size="sm"
+                                                            >
+                                                                {remark.updatedBy.charAt(0)?.toUpperCase()}
+                                                            </Avatar>
+                                                            <Text size="sm" fw={500}>
+                                                                {remark.updatedBy?.toUpperCase() || "N/A"}
+                                                            </Text>
+                                                        </Group>
+                                                        <Text size="xs" c="dimmed">
+                                                            {formatDate(remark.createdAt)}
+                                                        </Text>
+                                                    </Group>
+                                                    <Text size="sm" ml={30}>
+                                                        {remark.remark}
+                                                    </Text>
+                                                </Paper>
+                                            </Flex>
+                                        );
+                                    })
+                            )}
                         </Stack>
+
+
                     </ScrollArea>
                 </Card>
                 <Divider
@@ -1292,6 +1407,8 @@ export default function EstimateNew() {
                     autosize
                     minRows={2}
                     maxRows={3}
+                    value={newRemark}
+                    onChange={(e) => setNewRemark(e.target.value)}
                 />
                 <Space h='xs' />
                 <Group justify="flex-end">
@@ -1299,6 +1416,7 @@ export default function EstimateNew() {
                         size="xs"
                         variant="gradient"
                         gradient={{ from: 'blue', to: 'green', deg: 90 }}
+                        onClick={handleRemark}
                     >
                         Submit
                     </Button>
@@ -1336,10 +1454,21 @@ export default function EstimateNew() {
                         {/* <Space h='xs'/> */}
                         <Card withBorder h='60vh' radius='md'>
                             <Group justify="space-between">
-                                <Text size="md" fw={500} >
+                            <Text size="md" fw={500} >
                                     Select Document
                                 </Text>
-                                {/* {
+
+                                <Group>
+                                <Tooltip label='Download RFQ Template Example'>
+                                <ActionIcon
+                                color="green"
+                                variant="light"
+                                onClick={downloadEmptyExcel}
+                                >
+                                    <IconFileDownload/>
+                                </ActionIcon>
+                                </Tooltip>
+                                    {/* {
                                     selectedFile && ( */}
                                 <Tooltip label={selectedFile ? "Show Tasks for Selected file" : "Select file for Tasks"}>
                                     <Button
@@ -1360,6 +1489,10 @@ export default function EstimateNew() {
                                 {/* )
                                 } */}
 
+                                
+
+                                </Group>
+                                
 
                             </Group>
 
@@ -1563,7 +1696,7 @@ export default function EstimateNew() {
                             </Group>
 
                             {expanded && (
-                                <ScrollArea scrollbarSize={0} style={{ maxHeight: "50vh", overflowX: 'hidden' }}>
+                                <ScrollArea scrollbarSize={0} style={{ height: "60vh", overflowX: 'hidden' }}>
                                     <SimpleGrid cols={1} spacing="xs">
                                         {fields.map((field) => (
                                             <Grid key={field.name} align="center">
@@ -1591,6 +1724,48 @@ export default function EstimateNew() {
                             )}
 
                             <ScrollArea style={{ flex: 1, overflow: "auto", marginTop: "10px" }} offsetScrollbars scrollHideDelay={1}>
+                                <SimpleGrid cols={2} >
+                                    <NumberInput
+                                        size="xs"
+                                        leftSection={<IconPercentage66 size={20} />}
+                                        placeholder="Ex: 0.5"
+                                        label="Select Probability"
+                                        defaultValue={50}
+                                        min={10}
+                                        max={100}
+                                        step={10}
+                                        //   precision={2}
+                                        {...form.getInputProps("probability")}
+                                    />
+                                    <Select
+                                        size="xs"
+                                        // width='12vw' 
+                                        searchable
+                                        label='Check Type'
+                                        placeholder="Check Type"
+                                        data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
+                                        // value={task.typeOfCheck}
+                                        // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
+                                        {...form.getInputProps("typeOfCheck")}
+                                    />
+                                    <TextInput
+                                        size="xs"
+                                        leftSection={<IconPlaneTilt size='20' />}
+                                        placeholder="Indigo, AirIndia"
+                                        label="Operator"
+                                        {...form.getInputProps("operator")}
+                                    />
+                                    <TextInput
+                                        ref={aircraftRegNoRef}
+                                        size="xs"
+                                        leftSection={<IconPlaneTilt size='20' />}
+                                        placeholder="Ex:N-64AB, SP-LR"
+                                        label="Aircraft Reg No"
+                                        {...form.getInputProps("aircraftRegNo")}
+                                    />
+
+                                </SimpleGrid>
+                                <Space h='xs' />
                                 <SimpleGrid cols={1} spacing="xs">
                                     <SimpleGrid cols={2}>
                                         {showFields
@@ -2104,6 +2279,16 @@ border-bottom: none;
                                                     </ActionIcon>
                                                 </Tooltip>
                                                 <Tooltip label="Remarks!">
+                                                {/* <Indicator 
+                                                label={val?.data?.remarks?.length || 0} 
+                                                disabled={val?.data?.remarks?.length === 0} 
+                                                color="red" 
+                                                size={12}
+                                                // withBorder
+                                                inline
+                                                 position="middle-end" 
+                                                //  radius="xs"
+                                                > */}
                                                     <ActionIcon
                                                         size={20}
                                                         color="blue"
@@ -2112,10 +2297,12 @@ border-bottom: none;
                                                         onClick={(values: any) => {
                                                             setRemarksOpened(true);
                                                             setSelectedEstimateIdRemarks(val?.data?.estID);
+                                                            setSelectedEstRemarksData(val?.data?.remarks);
                                                         }}
                                                     >
                                                         <IconMessage />
                                                     </ActionIcon>
+                                                    {/* </Indicator> */}
                                                 </Tooltip>
                                             </Group>
 
@@ -2201,19 +2388,32 @@ border-bottom: none;
                                         <Space h='sm' />
 
                                         <OverallEstimateReport
-                                            totalTATTime={44}
-                                            estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
-                                            cappingUnbilledCost={44}
+                                         totalTATTime={estimateReportData?.overallEstimateReport?.estimatedTatTime || 0}
+                                            estimatedManHrs={estimateReportData?.overallEstimateReport?.estimateManhrs || {}}
+                                            estimatedSparesCost={estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0}
+                                            cappingUnbilledCost={0}
                                             parts={[
                                                 { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
                                                 { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
                                             ]}
-                                            estimatedSparesCost={44}
                                             spareCostData={[
                                                 { date: "Min", Cost: 100 },
                                                 { date: "Estimated", Cost: 800 },
                                                 { date: "Max", Cost: 1000 },
                                             ]}
+                                            // totalTATTime={44}
+                                            // estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
+                                            // cappingUnbilledCost={44}
+                                            // parts={[
+                                            //     { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                            //     { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                            // ]}
+                                            // estimatedSparesCost={44}
+                                            // spareCostData={[
+                                            //     { date: "Min", Cost: 100 },
+                                            //     { date: "Estimated", Cost: 800 },
+                                            //     { date: "Max", Cost: 1000 },
+                                            // ]}
                                         />
                                         <Space h='xl' />
 
@@ -2235,9 +2435,6 @@ border-bottom: none;
                         </>
                     )
                 }
-
-
-
             </div>
         </>
     )
@@ -2268,11 +2465,15 @@ interface Task {
 }
 
 interface FindingDetail {
-    logItem: string;
-    probability: any;
+    logItem?: string;
     description: string;
+    probability?: number;
+    prob?: number; // Alternative name based on your data
     mhs: ManHours;
-    spareParts: any[];
+    spareParts?: SparePart[];
+    spare_parts?: any[]; // Alternative name based on your data
+    skill: string[];
+    cluster: string;
 }
 
 interface Finding {
@@ -2314,7 +2515,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
     parts,
     estimatedSparesCost,
     spareCostData,
-}) => {
+}:any) => {
     return (
         <SimpleGrid cols={3} spacing="xs">
             {/* Left Section */}
@@ -2350,7 +2551,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                                 </Grid.Col>
                                 <Grid.Col span={9}>
                                     <Group justify="flex-end" fz="xs" fw="600" c={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"}>
-                                        {value} Hrs
+                                        {value?.toFixed(0)} Hrs
                                     </Group>
                                     <Progress color={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"} value={value} />
                                 </Grid.Col>
@@ -2550,297 +2751,358 @@ border-bottom: none;
     );
 };
 
-const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ tasks, findings }) => {
-    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-    const [selectedFinding, setSelectedFinding] = useState<FindingDetail | null>(null);
+const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) => {
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+    const [selectedCluster, setSelectedCluster] = useState<any>(null);
+    const [selectedFindingDetail, setSelectedFindingDetail] = useState<FindingDetail | null>(null);
     const [taskSearch, setTaskSearch] = useState<string>('');
-    const [findingSearch, setFindingSearch] = useState<string>('');
+    const [clusterSearch, setClusterSearch] = useState<string>('');
+    const [tableOpened, setTableOpened] = useState(false);
+    const [flattenedData, setFlattenedData] = useState([]);
+    // Extract unique task IDs from findings
+    const uniqueTaskIds = useMemo(() => {
+        const taskIds = findings.map(finding => finding.taskId);
+        return [...new Set(taskIds)];
+    }, [findings]);
 
-    // Get findings for the selected task
-    const getFindingsForTask = (taskId: string) => {
-        return findings.find((finding) => finding.taskId === taskId)?.details || [];
-    };
+    // Filter tasks based on search
+    const filteredTasks = useMemo(() => {
+        if (!taskSearch.trim()) return uniqueTaskIds;
+        
+        return uniqueTaskIds.filter(taskId => 
+            taskId.toLowerCase().includes(taskSearch.toLowerCase())
+        );
+    }, [uniqueTaskIds, taskSearch]);
 
-    // Filter tasks based on search query
-    const filteredTasks = tasks?.filter((task) =>
-        task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
-    );
+    // Group tasks by the first special character
+    const groupedTasks = useMemo(() => {
+        return uniqueTaskIds.reduce((groups, taskId) => {
+            const firstSpecialCharIndex = Math.min(
+                taskId.indexOf('-') !== -1 ? taskId.indexOf('-') : Infinity,
+                taskId.indexOf('/') !== -1 ? taskId.indexOf('/') : Infinity,
+                taskId.indexOf(' ') !== -1 ? taskId.indexOf(' ') : Infinity,
+                taskId.indexOf('+') !== -1 ? taskId.indexOf('+') : Infinity
+            );
 
-    // Filter findings based on search query
-    const filteredFindings = selectedTask
-        ? getFindingsForTask(selectedTask.sourceTask)?.filter((finding) =>
-            finding.logItem.toLowerCase().includes(findingSearch.toLowerCase())
-        )
-        : [];
+            const groupKey = firstSpecialCharIndex !== Infinity ? taskId.substring(0, firstSpecialCharIndex) : taskId;
 
-    // Select the first task and its first finding by default
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+
+            groups[groupKey].push(taskId);
+            return groups;
+        }, {} as Record<string, string[]>);
+    }, [uniqueTaskIds]);
+
+    // Filter tasks based on search
+    const filteredGroups = useMemo(() => {
+        if (!taskSearch.trim()) return groupedTasks;
+
+        const filtered: Record<string, string[]> = {};
+
+        Object.keys(groupedTasks).forEach((groupKey) => {
+            const filteredTasks = groupedTasks[groupKey].filter(taskId =>
+                taskId.toLowerCase().includes(taskSearch.toLowerCase())
+            );
+
+            if (filteredTasks.length > 0) {
+                filtered[groupKey] = filteredTasks;
+            }
+        });
+
+        return filtered;
+    }, [groupedTasks, taskSearch]);
+    // Select the first task and its first cluster by default
     useEffect(() => {
-        if (tasks?.length > 0) {
-            const firstTask = tasks[0];
-            setSelectedTask(firstTask);
-            const firstTaskFindings = getFindingsForTask(firstTask.sourceTask);
-            if (firstTaskFindings.length > 0) {
-                setSelectedFinding(firstTaskFindings[0]);
+        if (Object.keys(filteredGroups).length > 0 && !selectedTaskId) {
+            const firstGroupKey = Object.keys(filteredGroups)[0];
+            const firstTaskId = filteredGroups[firstGroupKey][0];
+            setSelectedTaskId(firstTaskId);
+        }
+    }, [filteredGroups, selectedTaskId]);
+
+    // Get all group keys for default opened accordions
+    const defaultOpenValues = useMemo(() => {
+        return Object.keys(filteredGroups);
+    }, [filteredGroups]);
+
+     // Get all clusters for the selected task
+     const getClustersForTask = useMemo(() => {
+        if (!selectedTaskId) return [];
+        
+        // Find all findings with the selected taskId
+        const relatedFindings = findings.filter(f => f.taskId === selectedTaskId);
+        if (relatedFindings.length === 0) return [];
+        
+        // Extract all clusters from all findings with this taskId
+        const allClusters: string[] = [];
+        relatedFindings.forEach(finding => {
+            finding.details.forEach(detail => {
+                if (detail.cluster && !allClusters.includes(detail.cluster)) {
+                    allClusters.push(detail.cluster);
+                }
+            });
+        });
+        
+        return allClusters;
+    }, [findings, selectedTaskId]);
+
+    // Filter clusters based on search
+    const filteredClusters = useMemo(() => {
+        if (!clusterSearch.trim()) return getClustersForTask;
+        
+        return getClustersForTask.filter(cluster => 
+            cluster.toLowerCase().includes(clusterSearch.toLowerCase())
+        );
+    }, [getClustersForTask, clusterSearch]);
+
+    // Get finding detail for selected cluster
+    const getSelectedFindingDetail = useMemo(() => {
+        if (!selectedTaskId || !selectedCluster) return null;
+        
+        // Find the finding that contains the selected cluster
+        for (const finding of findings) {
+            if (finding.taskId === selectedTaskId) {
+                for (const detail of finding.details) {
+                    if (detail.cluster === selectedCluster) {
+                        return detail;
+                    }
+                }
             }
         }
-    }, [tasks, findings]);
+        
+        return null;
+    }, [findings, selectedTaskId, selectedCluster]);
+
+    // Select the first task and its first cluster by default
+    useEffect(() => {
+        if (filteredTasks.length > 0 && !selectedTaskId) {
+            const firstTaskId = filteredTasks[0];
+            setSelectedTaskId(firstTaskId);
+            
+            // Find clusters for this task
+            const taskFindings = findings.filter(f => f.taskId === firstTaskId);
+            if (taskFindings.length > 0 && taskFindings[0].details.length > 0) {
+                setSelectedCluster(taskFindings[0].details[0].cluster);
+                setSelectedFindingDetail(taskFindings[0].details[0]);
+            }
+        }
+    }, [filteredTasks, findings, selectedTaskId]);
+
+    // Update selected finding detail when cluster changes
+    useEffect(() => {
+        setSelectedFindingDetail(getSelectedFindingDetail);
+    }, [getSelectedFindingDetail]);
+
+    // Format spare parts for display
+    const formattedSpareParts = useMemo(() => {
+        if (!selectedFindingDetail) return [];
+        
+        // Check if using spareParts or spare_parts field based on data structure
+        const parts = selectedFindingDetail.spare_parts || [];
+        
+        return parts.map(part => ({
+            partId: part.partId,
+            desc: part.desc,
+            qty: part.qty || 1, // Default to 1 if not specified
+            unit: part.unit,
+            price: part.price || 0 // Default to 0 if not specified
+        }));
+    }, [selectedFindingDetail]);
+
+    // Flatten the data structure when findings change
+    useEffect(() => {
+        const flattened: any = [];
+
+        findings.forEach(finding => {
+            finding.details.forEach(detail => {
+                if (detail.spare_parts && detail.spare_parts.length > 0) {
+                    detail.spare_parts.forEach(part => {
+                        flattened.push({
+                            sourceTask: finding.taskId,
+                            description: detail.description,
+                            cluster_id: detail.cluster,
+                            mhsMin: detail.mhs.min,
+                            mhsMax: detail.mhs.max,
+                            mhsAvg: detail.mhs.avg,
+                            mhsEst: detail.mhs.est,
+                            partId: part.partId,
+                            partDesc: part.desc,
+                            unit: part.unit,
+                        });
+                    });
+                } else {
+                    flattened.push({
+                        sourceTask: finding.taskId,
+                        description: detail.description,
+                        cluster_id: detail.cluster,
+                        mhsMin: detail.mhs.min,
+                        mhsMax: detail.mhs.max,
+                        mhsAvg: detail.mhs.avg,
+                        mhsEst: detail.mhs.est,
+                        partId: '',
+                        partDesc: '',
+                        unit: '',
+                    });
+                }
+            });
+        });
+
+        setFlattenedData(flattened);
+    }, [findings]);
+
+
+    // Column definitions for the table
+    const columnDefs : ColDef[] = [
+        { headerName: 'Source Task', field: 'sourceTask', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150, pinned: 'left' },
+        { headerName: 'Description', field: 'description', filter: true, floatingFilter: true, resizable: true, width: 400 },
+        { headerName: 'Cluster ID', field: 'cluster_id', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 100 },
+        {
+            headerName: 'Man Hours',
+            field: 'mhsMin',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 4,
+            width: 300,
+            cellRenderer: (val: any) => {
+                return (
+
+                    <Flex direction='row' justify='space-between'>
+
+                        <Badge variant="light" color="teal" fullWidth>
+                            Min : {val?.data?.mhsMin?.toFixed(0)}
+                        </Badge>
+                        <Badge variant="light" color="blue" fullWidth>
+                            Avg : {val?.data?.mhsAvg?.toFixed(0)}
+                        </Badge>
+                        <Badge variant="light" color="violet" fullWidth>
+                            Max : {val?.data?.mhsMax?.toFixed(0)}
+                        </Badge>
+
+                    </Flex>
+                );
+            },
+        },
+        // { headerName: 'Man Hours Min', field: 'mhsMin', sortable: true, floatingFilter: true, resizable: true, width: 150 },
+        // { headerName: 'Man Hours Max', field: 'mhsMax', sortable: true, floatingFilter: true, resizable: true, width: 150 },
+        // { headerName: 'Man Hours Avg', field: 'mhsAvg', sortable: true, floatingFilter: true, resizable: true, width: 150 },
+        // { headerName: 'Man Hours Est', field: 'mhsEst', sortable: true, floatingFilter: true, resizable: true, width: 150 },
+        { headerName: 'Part Number', field: 'partId', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150 },
+        { headerName: 'Part Description', field: 'partDesc', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 200 },
+        { headerName: 'Unit', field: 'unit', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 100 },
+    ];
+
+    const downloadCSV = () => {
+        if (!flattenedData || flattenedData.length === 0) {
+            console.warn("No data available for CSV export");
+            return;
+        }
+
+        // Define CSV Headers (Column Titles)
+        const csvHeaders = [
+            "Source Task",
+            "Description",
+            "Cluster ID",
+            "MHS Min",
+            "MHS Max",
+            "MHS Avg",
+            "MHS Est",
+            "Part Number",
+            "Part Description",
+            "Unit",
+        ];
+
+        // Function to escape CSV fields
+        const escapeCSVField = (field: any) => {
+            if (field === null || field === undefined) return "-"; // Handle null or undefined
+            const stringField = String(field);
+            // If the field contains a comma, double quote, or newline, wrap it in double quotes
+            if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+                return `"${stringField.replace(/"/g, '""')}"`; // Escape double quotes by doubling them
+            }
+            return stringField;
+        };
+
+        // Map Flattened Data to CSV Format
+        const csvData = flattenedData.map((task: any) => [
+            escapeCSVField(task.sourceTask),
+            escapeCSVField(task.description),
+            escapeCSVField(task.cluster_id),
+            escapeCSVField(task.mhsMin),
+            escapeCSVField(task.mhsMax),
+            escapeCSVField(task.mhsAvg),
+            escapeCSVField(task.mhsEst),
+            escapeCSVField(task.partId),
+            escapeCSVField(task.partDesc),
+            escapeCSVField(task.unit),
+        ]);
+
+        // Convert array to CSV format
+        const csvContent =
+            "data:text/csv;charset=utf-8," +
+            [csvHeaders.map(escapeCSVField), ...csvData.map(row => row.map(escapeCSVField))].map((row) => row.join(",")).join("\n");
+
+        // Create a download link and trigger click
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Findings.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     return (
         <>
-            <>
-                <Card p={10} c='white' bg='#124076'>
-                    <Title order={4}>Findings</Title>
-                </Card>
-
-                <Card withBorder p={0} h="80vh" bg="none">
-                    <Space h="xs" />
-                    <Grid h="100%">
-                        {/* Left Section: Tasks List */}
-                        <Grid.Col span={3}>
-                            <Card h="100%" w="100%" p="md" bg="none">
-                                <Group>
-                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                        Total Source Tasks
-                                    </Text>
-                                    <Text size="md" fw={500} mb="xs">
-                                        {tasks?.length}
-                                    </Text>
-                                </Group>
-
-                                <TextInput
-                                    placeholder="Search tasks..."
-                                    value={taskSearch}
-                                    onChange={(e) => setTaskSearch(e.target.value)}
-                                    mb="md"
-                                />
-
-                                {/* Scrollable Tasks List */}
-                                <Card
-                                    bg="none"
-                                    p={0}
-                                    h="calc(80vh - 150px)"
-                                    style={{
-                                        overflowY: 'auto',
-                                        scrollbarWidth: 'thin',
-                                    }}
-                                >
-                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                        {filteredTasks?.map((task, taskIndex) => (
-                                            <Badge
-                                                fullWidth
-                                                key={taskIndex}
-                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
-                                                // color="#596FB7"
-                                                color="#4C7B8B"
-                                                size="lg"
-                                                mb='md'
-                                                h={35}
-                                                radius="md"
-                                                onClick={() => {
-                                                    setSelectedTask(task);
-                                                    setSelectedFinding(null); // Reset selected finding
-                                                }}
-                                            >
-                                                <Text fw={500}>{task.sourceTask}</Text>
-                                            </Badge>
-
-                                        ))}
-                                    </div>
-                                </Card>
-                            </Card>
-                        </Grid.Col>
-
-                        {/* Middle Section: Findings List */}
-                        <Grid.Col span={3}>
-                            <Card h="100%" w="100%" p="md" bg="none">
-                                <Group>
-                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                        Findings for
-                                    </Text>
-                                    <Text size="md" fw={500} mb="xs">
-                                        {selectedTask?.sourceTask || 'Selected Task'}
-                                    </Text>
-                                </Group>
-                                <TextInput
-                                    // leftSection={
-                                    //     <IconError404/>
-                                    // }
-                                    placeholder="Search findings..."
-                                    value={findingSearch}
-                                    onChange={(e) => setFindingSearch(e.target.value)}
-                                    mb="md"
-                                />
-
-                                {/* Scrollable Findings List */}
-                                <Card
-                                    bg="none"
-                                    p={0}
-                                    h="calc(80vh - 150px)"
-                                    style={{
-                                        overflowY: 'auto',
-                                        scrollbarWidth: 'thin',
-                                    }}
-                                >
-                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                        {
-                                            selectedTask ? (
-                                                filteredFindings?.map((finding, findingIndex) => (
-                                                    <Badge
-                                                        fullWidth
-                                                        key={findingIndex}
-                                                        variant={selectedFinding?.logItem === finding.logItem ? 'filled' : "light"}
-                                                        // color="#577BC1"
-                                                        color="#4C7B8B"
-                                                        size="lg"
-                                                        mb='md'
-                                                        h={35}
-                                                        radius="md"
-                                                        onClick={() => setSelectedFinding(finding)}
-                                                    >
-                                                        <Text fw={500}>{finding.logItem}</Text>
-                                                    </Badge>
-                                                ))
-                                            ) : (
-                                                <Text>Select a task to view findings.</Text>
-                                            )
-                                        }
-
-                                    </div>
-                                </Card>
-                            </Card>
-                        </Grid.Col>
-
-                        {/* Right Section: Selected Finding Details */}
-                        <Grid.Col span={6}>
-                            <Card
-                                radius="xl"
-                                h="100%"
-                                w="100%"
-                                shadow="sm"
-                                p="md"
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    overflow: 'hidden' // Prevents card from expanding
-                                }}
-                            >
-                                <Space h="lg" />
-                                <div
-                                    style={{
-                                        flex: 1,
-                                        overflowY: 'auto',
-                                        scrollbarWidth: 'none',
-                                        maxHeight: 'calc(70vh - 50px)',
-                                        // paddingRight: '10px'
-                                    }}
-                                >
-                                    {/* {selectedFinding ? (
-                                        <> */}
-                                    <Grid>
-                                        <Grid.Col span={2}>
-                                            <Text size="md" fw={500} c="dimmed">
-                                                Log Item
-                                            </Text>
-                                        </Grid.Col>
-                                        <Grid.Col span={10}>
-                                            <Text size="sm" fw={500}>
-                                                {selectedFinding?.logItem || "-"}
-                                            </Text>
-                                        </Grid.Col>
-                                    </Grid>
-
-                                    <Space h="sm" />
-                                    <Grid>
-                                        <Grid.Col span={2}>
-                                            <Text size="md" fw={500} c="dimmed">
-                                                Description
-                                            </Text>
-                                        </Grid.Col>
-                                        <Grid.Col span={10}>
-                                            <Text size="sm" fw={500}>
-                                                {selectedFinding?.description || "-"}
-                                            </Text>
-                                        </Grid.Col>
-                                    </Grid>
-
-                                    <Space h="lg" />
-                                    <Card shadow="0" bg="#f5f5f5">
-                                        <Grid grow justify="left" align="center">
-                                            <Grid.Col span={2}>
-                                                <Text size="md" fw={500} c="dimmed">
-                                                    Probability
-                                                </Text>
-                                            </Grid.Col>
-                                            <Grid.Col span={8}>
-                                                <Progress w="100%" color="#E07B39" radius="md" size="lg" value={selectedFinding?.probability} />
-                                            </Grid.Col>
-                                            <Grid.Col span={2}>
-                                                <Text size="sm" fw={600} c="#E07B39">
-                                                    {selectedFinding?.probability || 0} %
-                                                </Text>
-                                            </Grid.Col>
-                                        </Grid>
-                                    </Card>
-
-                                    <Space h="lg" />
-
-                                    <Text size="md" fw={500} c="dimmed">
-                                        Man Hours
-                                    </Text>
-                                    <SimpleGrid cols={4}>
-                                        <Card bg='#daf7de' shadow="0" radius='md'>
-                                            <Group justify="space-between" align="start">
-                                                <Flex direction='column'>
-                                                    <Text fz='xs'>Min</Text>
-                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.min?.toFixed(0) || 0} Hr</Text>
-                                                </Flex>
-                                                <IconClockDown color="green" size='25' />
-                                            </Group>
-                                        </Card>
-                                        <Card bg='#fcebeb' shadow="0" radius='md'>
-                                            <Group justify="space-between" align="start">
-                                                <Flex direction='column'>
-                                                    <Text fz='xs'>Max</Text>
-                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.max?.toFixed(0) || 0} Hr</Text>
-                                                </Flex>
-                                                <IconClockUp color="red" size='25' />
-                                            </Group>
-                                        </Card>
-                                        <Card bg='#f3f7da' shadow="0" radius='md'>
-                                            <Group justify="space-between" align="start">
-                                                <Flex direction='column'>
-                                                    <Text fz='xs'>Avg</Text>
-                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
-                                                </Flex>
-                                                <IconClockCode color="orange" size='25' />
-                                            </Group>
-                                        </Card>
-                                        <Card bg='#dae8f7' shadow="0" radius='md'>
-                                            <Group justify="space-between" align="start">
-                                                <Flex direction='column'>
-                                                    <Text fz='xs'>Est</Text>
-                                                    <Text fz='xl' fw={600}>{selectedFinding?.mhs?.est?.toFixed(0) || 0} Hr</Text>
-                                                </Flex>
-                                                <IconClockCheck color="indigo" size='25' />
-                                            </Group>
-                                        </Card>
-                                    </SimpleGrid>
-                                    <Space h="md" />
-
-                                    <Text size="md" mb="xs" fw={500} c="dimmed">
-                                        Spare parts
-                                    </Text>
-                                    <div
-                                        className="ag-theme-alpine"
-                                        style={{
-                                            width: "100%",
-                                            border: "none",
-                                            // height: "100%",
-
-                                        }}
-                                    >
-                                        <style>
-                                            {`
+        <Modal
+                opened={tableOpened}
+                onClose={() => {
+                    setTableOpened(false);
+                    //   form.reset();
+                }}
+                size='100%'
+                scrollAreaComponent={ScrollArea.Autosize}
+                title={
+                    <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <Title order={4} c='white'>
+                                MPD
+                            </Title>
+                            <Space w={50} />
+                            {/* <Text c='white'>
+                                Total Source Tasks - {uniqueTaskIds?.length}
+                            </Text> */}
+                            {/* <Space w={600}/> */}
+                            {/* Button aligned to the end */}
+                            <Button color="green" size="xs" onClick={downloadCSV} ml='60vw' >
+                                Download CSV
+                            </Button>
+                        </div>
+                    </>
+                }
+                styles={{
+                    header: {
+                        backgroundColor: "#124076", // Set header background color
+                        padding: "12px",
+                    },
+                    close: {
+                        color: 'white'
+                    },
+                }}
+            >
+                <div
+                    className="ag-theme-alpine"
+                    style={{
+                        width: "100%",
+                        border: "none",
+                        height: "auto",
+                    }}
+                >
+                    <style>
+                        {`
 /* Remove the borders and grid lines */
 .ag-theme-alpine .ag-root-wrapper, 
 .ag-theme-alpine .ag-root-wrapper-body,
@@ -2861,74 +3123,412 @@ box-shadow: none !important; /* Remove any box shadow */
 border-bottom: none;
 }
 `}
-                                        </style>
-                                        <AgGridReact
-                                            pagination
-                                            paginationPageSize={10}
-                                            domLayout="autoHeight" // Ensures height adjusts dynamically
-                                            rowData={selectedFinding?.spareParts || []}
-                                            columnDefs={[
-                                                {
-                                                    field: "partId",
-                                                    headerName: "Part Number",
-                                                    sortable: true,
-                                                    filter: true,
-                                                    floatingFilter: true,
-                                                    resizable: true,
-                                                    flex: 1
-                                                },
-                                                {
-                                                    field: "desc",
-                                                    headerName: "Description",
-                                                    sortable: true,
-                                                    filter: true,
-                                                    floatingFilter: true,
-                                                    resizable: true,
-                                                    flex: 1
-                                                },
-                                                {
-                                                    field: "qty",
-                                                    headerName: "Qty",
-                                                    sortable: true,
-                                                    // filter: true,
-                                                    // floatingFilter: true,
-                                                    resizable: true,
-                                                    flex: 1
-                                                },
-                                                {
-                                                    field: "unit",
-                                                    headerName: "Unit",
-                                                    sortable: true,
-                                                    // filter: true,
-                                                    // floatingFilter: true,
-                                                    resizable: true,
-                                                    flex: 1
-                                                },
-                                                {
-                                                    field: "price",
-                                                    headerName: "Price($)",
-                                                    sortable: true,
-                                                    // filter: true,
-                                                    // floatingFilter: true,
-                                                    resizable: true,
-                                                    flex: 1
-                                                },
-                                            ]}
-                                        />
-                                    </div>
-                                    {/* </>
-                                    ) : (
-                                        <Text>Select a finding to view details.</Text>
-                                    )} */}
+                    </style>
+
+                    <AgGridReact
+                        rowData={flattenedData}
+                        columnDefs={columnDefs}
+                        pagination={true}
+                        paginationPageSize={10}
+                        domLayout="autoHeight"
+                    // defaultColDef={{
+                    //   sortable: true,
+                    //   filter: true,
+                    //   resizable: true,
+                    //   minWidth: 100,
+                    //   flex: 1
+                    // }}
+                    />
+                </div>
+            </Modal>
+            <Card 
+            p={10} 
+            c='white' 
+            bg='#124076'
+            onClick={(values: any) => {
+                setTableOpened(true);
+            }}
+            style={{ cursor: 'pointer' }}
+            >
+                <Title order={4}>Findings</Title>
+            </Card>
+
+            <Card withBorder p={0} h="80vh" bg="none">
+                <Space h="xs" />
+                <Grid h="100%">
+                    {/* Left Section: Unique Task IDs List */}
+                    {/* <Grid.Col span={3}>
+                        <Card h="100%" w="100%" p="md" bg="none">
+                            <Group>
+                                <Text size="md" fw={500} mb="xs" c='dimmed'>
+                                    Total Source Tasks
+                                </Text>
+                                <Text size="md" fw={500} mb="xs">
+                                    {uniqueTaskIds.length}
+                                </Text>
+                            </Group>
+
+                            <TextInput
+                                placeholder="Search tasks..."
+                                value={taskSearch}
+                                onChange={(e) => setTaskSearch(e.target.value)}
+                                mb="md"
+                            />
+
+                          
+                            <Card
+                                bg="none"
+                                p={0}
+                                h="calc(80vh - 150px)"
+                            >
+                                <ScrollArea h="100%" scrollbarSize={6}>
+                                    {filteredTasks.map((taskId, index) => (
+                                        <Badge
+                                            fullWidth
+                                            key={index}
+                                            variant={selectedTaskId === taskId ? 'filled' : "light"}
+                                            color="#4C7B8B"
+                                            size="lg"
+                                            mb="md"
+                                            h={35}
+                                            radius="md"
+                                            onClick={() => {
+                                                setSelectedTaskId(taskId);
+                                                // Reset cluster selection when task changes
+                                                setSelectedCluster(null);
+                                                setSelectedFindingDetail(null);
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <Text fw={500}>{taskId}</Text>
+                                        </Badge>
+                                    ))}
+                                </ScrollArea>
+                            </Card>
+                        </Card>
+                    </Grid.Col> */}
+                    {/* Left Section: Grouped Task IDs List */}
+                    <Grid.Col span={3}>
+                        <Card h="100%" w="100%" p="md" bg="none">
+                            <Group>
+                                <Text size="md" fw={500} mb="xs" c="dimmed">
+                                    Total Source Tasks
+                                </Text>
+                                <Text size="md" fw={500} mb="xs">
+                                    {uniqueTaskIds.length}
+                                </Text>
+                            </Group>
+
+                            <TextInput
+                                placeholder="Search tasks..."
+                                value={taskSearch}
+                                onChange={(e) => setTaskSearch(e.target.value)}
+                                mb="md"
+                            />
+
+                            <Card bg="none" p={0} h="calc(80vh - 150px)">
+                                <ScrollArea h="100%" scrollbarSize={0}>
+                                    <Accordion defaultValue={defaultOpenValues} multiple>
+                                        {Object.keys(filteredGroups).map((groupKey) => (
+                                            <Accordion.Item key={groupKey} value={groupKey}>
+                                                <Accordion.Control>
+                                                    <Text fw={600}>{groupKey}</Text>
+                                                </Accordion.Control>
+                                                <Accordion.Panel>
+                                                    {filteredGroups[groupKey].map((taskId, index) => (
+                                                        // <Tooltip label={taskId}>
+                                                        <Badge
+                                                            fullWidth
+                                                            key={index}
+                                                            variant={selectedTaskId === taskId ? 'filled' : "light"}
+                                                            color="#4C7B8B"
+                                                            size="lg"
+                                                            mb="md"
+                                                            h={35}
+                                                            radius="md"
+                                                            onClick={() => {
+                                                                setSelectedTaskId(taskId);
+                                                                setSelectedCluster(null);
+                                                                setSelectedFindingDetail(null);
+                                                            }}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            <Text fw={500}>{taskId}</Text>
+                                                        </Badge>
+                                                        // </Tooltip>
+                                                    ))}
+                                                </Accordion.Panel>
+                                            </Accordion.Item>
+                                        ))}
+                                    </Accordion>
+                                </ScrollArea>
+                            </Card>
+                        </Card>
+                    </Grid.Col>
+
+                    {/* Middle Section: All Unique Clusters for Selected Task */}
+                    <Grid.Col span={3}>
+                        <Card h="100%" w="100%" p="md" bg="none">
+                            <Group>
+                                <Text size="md" fw={500} mb="xs" c='dimmed'>
+                                    Clusters for
+                                </Text>
+                                <Text size="md" fw={500} mb="xs">
+                                    {selectedTaskId || 'Selected Task'}
+                                </Text>
+                            </Group>
+                            <TextInput
+                                placeholder="Search clusters..."
+                                value={clusterSearch}
+                                onChange={(e) => setClusterSearch(e.target.value)}
+                                mb="md"
+                            />
+
+                            {/* Scrollable Clusters List */}
+                            <Card
+                                bg="none"
+                                p={0}
+                                h="calc(80vh - 150px)"
+                                style={{
+                                    overflowY: 'auto',
+                                    scrollbarWidth: 'thin',
+                                }}
+                            >
+                                <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+                                    {
+                                        selectedTaskId ? (
+                                            filteredClusters.length > 0 ? (
+                                                filteredClusters.map((cluster, clusterIndex) => (
+                                                    <Tooltip label={cluster}>
+                                                    <Badge
+                                                        fullWidth
+                                                        key={clusterIndex}
+                                                        variant={selectedCluster === cluster ? 'filled' : "light"}
+                                                        color="#4C7B8B"
+                                                        size="lg"
+                                                        mb='md'
+                                                        h={35}
+                                                        radius="md"
+                                                        onClick={() => setSelectedCluster(cluster)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        <Text fw={500}>{cluster}</Text>
+                                                    </Badge>
+                                                    </Tooltip>
+                                                ))
+                                            ) : (
+                                                <Text>No clusters found for this task.</Text>
+                                            )
+                                        ) : (
+                                            <Text>Select a task to view clusters.</Text>
+                                        )
+                                    }
                                 </div>
                             </Card>
-                        </Grid.Col>
+                        </Card>
+                    </Grid.Col>
 
+                    {/* Right Section: Selected Finding Details */}
+                    <Grid.Col span={6}>
+                        <Card
+                            radius="xl"
+                            h="100%"
+                            w="100%"
+                            shadow="sm"
+                            p="md"
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <Space h="lg" />
+                            <div
+                                style={{
+                                    flex: 1,
+                                    overflowY: 'auto',
+                                    scrollbarWidth: 'none',
+                                    maxHeight: 'calc(70vh - 50px)',
+                                }}
+                            >
+                                <Grid>
+                                    <Grid.Col span={2}>
+                                        <Text size="md" fw={500} c="dimmed">
+                                            Cluster
+                                        </Text>
+                                    </Grid.Col>
+                                    <Grid.Col span={10}>
+                                        <Text size="sm" fw={500}>
+                                            {selectedFindingDetail?.cluster || "-"}
+                                        </Text>
+                                    </Grid.Col>
+                                </Grid>
 
-                    </Grid>
-                </Card>
-            </>
+                                <Space h="sm" />
+                                <Grid>
+                                    <Grid.Col span={2}>
+                                        <Text size="md" fw={500} c="dimmed">
+                                            Description
+                                        </Text>
+                                    </Grid.Col>
+                                    <Grid.Col span={10}>
+                                        <Text size="sm" fw={500}>
+                                            {selectedFindingDetail?.description || "-"}
+                                        </Text>
+                                    </Grid.Col>
+                                </Grid>
 
+                                <Space h="lg" />
+                                <Card shadow="0" bg="#f5f5f5">
+                                    <Grid grow justify="left" align="center">
+                                        <Grid.Col span={2}>
+                                            <Text size="md" fw={500} c="dimmed">
+                                                Probability
+                                            </Text>
+                                        </Grid.Col>
+                                        <Grid.Col span={8}>
+                                            <Progress w="100%" color="#E07B39" radius="md" size="lg" 
+                                                value={selectedFindingDetail?.probability || selectedFindingDetail?.prob || 0} />
+                                        </Grid.Col>
+                                        <Grid.Col span={2}>
+                                            <Text size="sm" fw={600} c="#E07B39">
+                                                {selectedFindingDetail?.probability || selectedFindingDetail?.prob || 0} %
+                                            </Text>
+                                        </Grid.Col>
+                                    </Grid>
+                                </Card>
+
+                                <Space h="lg" />
+
+                                <Text size="md" fw={500} c="dimmed">
+                                    Man Hours
+                                </Text>
+                                <SimpleGrid cols={4}>
+                                    <Card bg='#daf7de' shadow="0" radius='md'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Min</Text>
+                                                <Text fz='xl' fw={600}>{selectedFindingDetail?.mhs?.min?.toFixed(0) || 0} Hr</Text>
+                                            </Flex>
+                                            <IconClockDown color="green" size='25' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#fcebeb' shadow="0" radius='md'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Max</Text>
+                                                <Text fz='xl' fw={600}>{selectedFindingDetail?.mhs?.max?.toFixed(0) || 0} Hr</Text>
+                                            </Flex>
+                                            <IconClockUp color="red" size='25' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#f3f7da' shadow="0" radius='md'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Avg</Text>
+                                                <Text fz='xl' fw={600}>{selectedFindingDetail?.mhs?.avg?.toFixed(0) || 0} Hr</Text>
+                                            </Flex>
+                                            <IconClockCode color="orange" size='25' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#dae8f7' shadow="0" radius='md'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Est</Text>
+                                                <Text fz='xl' fw={600}>{selectedFindingDetail?.mhs?.est?.toFixed(0) || 0} Hr</Text>
+                                            </Flex>
+                                            <IconClockCheck color="indigo" size='25' />
+                                        </Group>
+                                    </Card>
+                                </SimpleGrid>
+                                <Space h="md" />
+
+                                <Text size="md" mb="xs" fw={500} c="dimmed">
+                                    Spare parts
+                                </Text>
+                                <div
+                                    className="ag-theme-alpine"
+                                    style={{
+                                        width: "100%",
+                                        border: "none",
+                                    }}
+                                >
+                                    <style>
+                                        {`
+                                        /* Remove the borders and grid lines */
+                                        .ag-theme-alpine .ag-root-wrapper, 
+                                        .ag-theme-alpine .ag-root-wrapper-body,
+                                        .ag-theme-alpine .ag-header,
+                                        .ag-theme-alpine .ag-header-cell,
+                                        .ag-theme-alpine .ag-body-viewport {
+                                        border: none;
+                                        }
+
+                                        /* Remove the cell highlight (border) on cell click */
+                                        .ag-theme-alpine .ag-cell-focus {
+                                        outline: none !important; /* Remove focus border */
+                                        box-shadow: none !important; /* Remove any box shadow */
+                                        }
+
+                                        /* Remove row border */
+                                        .ag-theme-alpine .ag-row {
+                                        border-bottom: none;
+                                        }
+                                        `}
+                                    </style>
+                                    <AgGridReact
+                                        pagination
+                                        paginationPageSize={10}
+                                        domLayout="autoHeight" // Ensures height adjusts dynamically
+                                        rowData={formattedSpareParts}
+                                        columnDefs={[
+                                            {
+                                                field: "partId",
+                                                headerName: "Part Number",
+                                                sortable: true,
+                                                filter: true,
+                                                floatingFilter: true,
+                                                resizable: true,
+                                                flex: 1
+                                            },
+                                            {
+                                                field: "desc",
+                                                headerName: "Description",
+                                                sortable: true,
+                                                filter: true,
+                                                floatingFilter: true,
+                                                resizable: true,
+                                                flex: 1
+                                            },
+                                            {
+                                                field: "qty",
+                                                headerName: "Qty",
+                                                sortable: true,
+                                                resizable: true,
+                                                flex: 1
+                                            },
+                                            {
+                                                field: "unit",
+                                                headerName: "Unit",
+                                                sortable: true,
+                                                resizable: true,
+                                                flex: 1
+                                            },
+                                            {
+                                                field: "price",
+                                                headerName: "Price($)",
+                                                sortable: true,
+                                                resizable: true,
+                                                flex: 1
+                                            },
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                        </Card>
+                    </Grid.Col>
+                </Grid>
+            </Card>
         </>
     );
 };
@@ -2951,18 +3551,52 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     // }, [tasks]);
 
     // Group tasks by the first two digits before the first hyphen
+    // const groupedTasks = useMemo(() => {
+    //     if (!tasks) return {};
+
+    //     return tasks.reduce((groups, task) => {
+    //         // Extract the first group (first two digits before the first hyphen)
+    //         const taskId = task.sourceTask;
+    //         const groupKey = taskId.split('-')[0];
+
+    //         if (!groups[groupKey]) {
+    //             groups[groupKey] = [];
+    //         }
+
+    //         groups[groupKey].push(task);
+    //         return groups;
+    //     }, {});
+    // }, [tasks]);.
     const groupedTasks = useMemo(() => {
         if (!tasks) return {};
 
         return tasks.reduce((groups, task) => {
-            // Extract the first group (first two digits before the first hyphen)
+            // Extract the task ID
             const taskId = task.sourceTask;
-            const groupKey = taskId.split('-')[0];
 
+            // Find the first hyphen, first slash, and first space
+            const firstHyphenIndex = taskId.indexOf('-');
+            const firstSlashIndex = taskId.indexOf('/');
+            const firstSpaceIndex = taskId.indexOf(' ');
+            const firstPlusIndex = taskId.indexOf('+');
+
+            // Determine the end index for the group key
+            const endIndex = Math.min(
+                firstHyphenIndex !== -1 ? firstHyphenIndex : Infinity,
+                firstSlashIndex !== -1 ? firstSlashIndex : Infinity,
+                firstSpaceIndex !== -1 ? firstSpaceIndex : Infinity,
+                firstPlusIndex !== -1 ? firstPlusIndex : Infinity
+            );
+
+            // If no delimiters are found, use the entire taskId
+            const groupKey = endIndex !== Infinity ? taskId.substring(0, endIndex) : taskId;
+
+            // Initialize the group if it doesn't exist
             if (!groups[groupKey]) {
                 groups[groupKey] = [];
             }
 
+            // Add the task to the appropriate group
             groups[groupKey].push(task);
             return groups;
         }, {});
@@ -3010,8 +3644,8 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
         tasks.forEach(task => {
             // If task has spare parts, create a row for each spare part
-            if (task.spareParts && task.spareParts.length > 0) {
-                task.spareParts.forEach((part: any) => {
+            if (task.spare_parts && task.spare_parts.length > 0) {
+                task.spare_parts.forEach((part: any) => {
                     flattened.push({
                         sourceTask: task.sourceTask,
                         description: task.description,
@@ -3022,9 +3656,9 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                         mhsEst: task.mhs.est,
                         partId: part.partId,
                         partDesc: part.desc,
-                        qty: part.qty,
+                        // qty: part.qty,
                         unit: part.unit,
-                        price: part.price
+                        // price: part.price
                     });
                 });
             } else {
@@ -3039,9 +3673,9 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                     mhsEst: task.mhs.est,
                     partId: '',
                     partDesc: '',
-                    qty: '',
+                    // qty: '',
                     unit: '',
-                    price: ''
+                    // price: ''
                 });
             }
         });
@@ -3157,23 +3791,23 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             resizable: true,
             // flex: 1
         },
-        {
-            headerName: 'Quantity',
-            field: 'qty',
-            // filter: true,
-            sortable: true,
-            floatingFilter: true,
-            resizable: true,
-            // flex: 1
-            width: 150,
-            cellRenderer: (val: any) => {
-                return (
-                    <Text>
-                        {val?.data?.qty?.toFixed(2)}
-                    </Text>
-                );
-            },
-        },
+        // {
+        //     headerName: 'Quantity',
+        //     field: 'qty',
+        //     // filter: true,
+        //     sortable: true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     // flex: 1
+        //     width: 150,
+        //     cellRenderer: (val: any) => {
+        //         return (
+        //             <Text>
+        //                 {val?.data?.qty?.toFixed(2) || "-"}
+        //             </Text>
+        //         );
+        //     },
+        // },
         {
             headerName: 'Unit',
             field: 'unit',
@@ -3184,23 +3818,23 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             // flex: 1
             width: 150,
         },
-        {
-            headerName: 'Price',
-            field: 'price',
-            // filter: true,
-            sortable: true,
-            floatingFilter: true,
-            resizable: true,
-            // flex: 1
-            width: 150,
-            cellRenderer: (val: any) => {
-                return (
-                    <Text>
-                        {val?.data?.price?.toFixed(4)}
-                    </Text>
-                );
-            },
-        }
+        // {
+        //     headerName: 'Price',
+        //     field: 'price',
+        //     // filter: true,
+        //     sortable: true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     // flex: 1
+        //     width: 150,
+        //     cellRenderer: (val: any) => {
+        //         return (
+        //             <Text>
+        //                 {val?.data?.price?.toFixed(4)}
+        //             </Text>
+        //         );
+        //     },
+        // }
     ];
 
     const downloadCSV = () => {
@@ -3315,7 +3949,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
         // Write the file and trigger download
         XLSX.writeFile(workbook, "MPD_Tasks.xlsx");
-    };
+    };   
 
 
 
@@ -3532,7 +4166,7 @@ border-bottom: none;
                                                 </Grid.Col>
                                             </Grid>
 
-                                            <Space h="sm" />
+                                            {/* <Space h="sm" />
                                             <Grid>
                                                 <Grid.Col span={2}>
                                                     <Text size="md" fw={500} c="dimmed">
@@ -3544,7 +4178,7 @@ border-bottom: none;
                                                         {selectedTask?.cluster_id || "-"}
                                                     </Text>
                                                 </Grid.Col>
-                                            </Grid>
+                                            </Grid> */}
                                             <Space h="lg" />
                                             <Text size="md" fw={500} c="dimmed">
                                                 Man Hours
@@ -3628,7 +4262,7 @@ border-bottom: none;
                                                     pagination
                                                     paginationPageSize={10}
                                                     domLayout="autoHeight" // Ensures height adjusts dynamically
-                                                    rowData={selectedTask?.spareParts || []}
+                                                    rowData={selectedTask?.spare_parts || []}
                                                     columnDefs={[
                                                         {
                                                             field: "partId",
@@ -3648,22 +4282,22 @@ border-bottom: none;
                                                             resizable: true,
                                                             flex: 1
                                                         },
-                                                        {
-                                                            field: "qty",
-                                                            headerName: "Qty",
-                                                            sortable: true,
-                                                            // filter: true,
-                                                            // floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1,
-                                                            cellRenderer: (val: any) => {
-                                                                return (
-                                                                    <Text>
-                                                                        {val?.data?.qty?.toFixed(2) || 0}
-                                                                    </Text>
-                                                                );
-                                                            },
-                                                        },
+                                                        // {
+                                                        //     field: "qty",
+                                                        //     headerName: "Qty",
+                                                        //     sortable: true,
+                                                        //     // filter: true,
+                                                        //     // floatingFilter: true,
+                                                        //     resizable: true,
+                                                        //     flex: 1,
+                                                        //     cellRenderer: (val: any) => {
+                                                        //         return (
+                                                        //             <Text>
+                                                        //                 {val?.data?.qty?.toFixed(2) || 0}
+                                                        //             </Text>
+                                                        //         );
+                                                        //     },
+                                                        // },
                                                         {
                                                             field: "unit",
                                                             headerName: "Unit",
@@ -3673,22 +4307,22 @@ border-bottom: none;
                                                             resizable: true,
                                                             flex: 1
                                                         },
-                                                        {
-                                                            field: "price",
-                                                            headerName: "Price($)",
-                                                            sortable: true,
-                                                            // filter: true,
-                                                            // floatingFilter: true,
-                                                            resizable: true,
-                                                            flex: 1,
-                                                            cellRenderer: (val: any) => {
-                                                                return (
-                                                                    <Text>
-                                                                        {val?.data?.price?.toFixed(4) || 0}
-                                                                    </Text>
-                                                                );
-                                                            },
-                                                        },
+                                                        // {
+                                                        //     field: "price",
+                                                        //     headerName: "Price($)",
+                                                        //     sortable: true,
+                                                        //     // filter: true,
+                                                        //     // floatingFilter: true,
+                                                        //     resizable: true,
+                                                        //     flex: 1,
+                                                        //     cellRenderer: (val: any) => {
+                                                        //         return (
+                                                        //             <Text>
+                                                        //                 {val?.data?.price?.toFixed(4) || 0}
+                                                        //             </Text>
+                                                        //         );
+                                                        //     },
+                                                        // },
                                                     ]}
                                                 />
                                             </div>

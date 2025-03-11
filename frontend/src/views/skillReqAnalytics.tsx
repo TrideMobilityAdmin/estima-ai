@@ -1,9 +1,37 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput, Center } from "@mantine/core";
 import { IconAlertTriangle, IconClock, IconCube } from "@tabler/icons-react";
 import SkillsDonutChart from "../components/skillsDonut"; // Assuming this is your chart component
 
 const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
+    const [opened, setOpened] = useState<any>([]); 
+     // Track previous data to detect refreshes
+  const [prevData, setPrevData] = useState(skillAnalysisData);
+    // Function to handle accordion toggle
+    const handleAccordionChange = (value:any) => {
+        setOpened((prevOpened : any) => {
+            if (prevOpened.includes(value)) {
+                return prevOpened.filter((item : any) => item !== value); // Close the accordion
+            } else {
+                return [...prevOpened, value]; // Open the accordion
+            }
+        });
+    };
+
+    const [findingsOpened, setFindingsOpened] = useState<any>([]); 
+     // Track previous data to detect refreshes
+  const [findingsprevData, setFindingsPrevData] = useState(skillAnalysisData);
+    // Function to handle accordion toggle
+    const handleAccordionChangeFindings = (value:any) => {
+        setFindingsOpened((prevOpened : any) => {
+            if (prevOpened.includes(value)) {
+                return prevOpened.filter((item : any) => item !== value); // Close the accordion
+            } else {
+                return [...prevOpened, value]; // Open the accordion
+            }
+        });
+    };
+
     const totalTaskSkills = skillAnalysisData?.skillAnalysis?.tasks?.reduce((acc : any, task :any) => acc + task?.skills?.length, 0);
     const totalFindingSkills = skillAnalysisData?.skillAnalysis?.findings?.reduce((acc : any, finding : any) => acc + finding?.skills?.length, 0);
 
@@ -68,10 +96,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                     value={taskSearch}
                     onChange={(event) => setTaskSearch(event.currentTarget.value)}
                 />
-                <Accordion variant="separated">
+                <Accordion variant="separated" value={opened} onChange={setOpened}>
                     {filteredTasks?.map((task : any) => (
                         <Accordion.Item key={task.taskId} value={task.taskId}>
-                            <Accordion.Control>
+                            <Accordion.Control  onClick={() => handleAccordionChange(task.taskId)}>
                                 <Group>
                                     <IconCube color="#4E66DE" />
                                     {task.taskId}
@@ -126,10 +154,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                     value={findingSearch}
                     onChange={(event) => setFindingSearch(event.currentTarget.value)}
                 />
-                <Accordion variant="separated">
+                <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
                     {filteredFindings?.map((finding : any) => (
                         <Accordion.Item key={finding?.taskId} value={finding?.taskId}>
-                            <Accordion.Control>
+                            <Accordion.Control onClick={() => handleAccordionChangeFindings(finding?.taskId)}>
                                 <Group>
                                     <IconAlertTriangle color="#4E66DE" />
                                     {finding?.taskId}
@@ -211,10 +239,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                     value={skillSearch}
                     onChange={(event) => setSkillSearch(event.currentTarget.value)}
                 />
-                <Accordion variant="separated">
+                <Accordion variant="separated" value={opened} onChange={setOpened}>
                     {filteredSkills.map((skillGroup) => (
                         <Accordion.Item key={skillGroup?.skill} value={skillGroup?.skill}>
-                            <Accordion.Control>
+                            <Accordion.Control onClick={() => handleAccordionChange(skillGroup?.skill)}>
                                 <Group>
                                     <IconCube color="#4E66DE" />
                                     <div>
@@ -233,7 +261,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                                 </Group>
                             </Accordion.Control>
                             <Accordion.Panel>
-                                <ScrollArea h={400} scrollHideDelay={0}>
+                                <ScrollArea 
+                                h={400} 
+                                scrollHideDelay={0}
+                                >
                                     <Box p="md">
                                         {skillGroup?.tasks?.map((task : any) => (
                                             <Card key={task.taskId} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
@@ -301,10 +332,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                     value={skillSearch}
                     onChange={(event) => setSkillSearch(event.currentTarget.value)}
                 />
-                <Accordion variant="separated">
+                <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
                     {filteredSkills.map((skillGroup) => (
                         <Accordion.Item key={skillGroup?.skill} value={skillGroup.skill}>
-                            <Accordion.Control>
+                            <Accordion.Control onClick={() => handleAccordionChangeFindings(skillGroup?.skill)}>
                                 <Group>
                                     <IconAlertTriangle color="#4E66DE" />
                                     <div>
