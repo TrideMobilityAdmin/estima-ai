@@ -10,7 +10,7 @@ handlers:
     class: logging.FileHandler
     level: INFO
     formatter: simple
-    filename: data_pipeline/logs/info.log
+    filename: D:\Projects\gmr-mro\estima-ai\data_pipeline\logs\info.log
     mode: a
     encoding: utf-8
 
@@ -18,7 +18,7 @@ handlers:
     class: logging.FileHandler
     level: WARNING
     formatter: simple
-    filename: data_pipeline/logs/warning.log
+    filename: D:\Projects\gmr-mro\estima-ai\data_pipeline\logs\warning.log
     mode: a
     encoding: utf-8
 
@@ -26,7 +26,7 @@ handlers:
     class: logging.FileHandler
     level: ERROR
     formatter: simple
-    filename: data_pipeline/logs/error.log
+    filename: D:\Projects\gmr-mro\estima-ai\data_pipeline\logs\error.log
     mode: a
     encoding: utf-8
 

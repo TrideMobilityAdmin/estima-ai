@@ -1,9 +1,9 @@
 database:
   uri: "mongodb://admin:admin123@10.100.3.13:27017/"
-  database: "gmr-mro-staging"
+  database: "gmr-mro-staging-5y"
 
 excel_files:
-  data_path: "D:/Projects/gmr-mro/Data"
+  data_path: "D:/Projects/gmr-mro/estima-ai/Data"
 
 
 aircraft_details_columns:
@@ -17,6 +17,7 @@ aircraft_details_columns:
   - "Release Tracking #"
   - "Issue Date"
   - "Package Details"
+  - "CHECK CATEGORY"
   - "Type of Check"
   - "FH"
   - "FC"
@@ -347,16 +348,17 @@ aircraft_details_column_mappings:
   "Customer Name": "customer_name"
   "Package #": "package_number"
   "Aircraft Reg #": "aircraft_registration_number"
-  "A/C AGE ": "aircraft_age"
+  "A/C AGE": "aircraft_age"
   "Aircraft Model": "aircraft_model"
   "A/C AGE 2024": "aircraft_age_2024"
   "Release Tracking #": "release_tracking_number"
   "Issue Date": "issue_date"
   "Package Details": "package_details"
+  "CHECK CATEGORY": "check_category"
   "Type of Check": "type_of_check"
   "FH": "flight_hours"
   "FC": "flight_cycles"
-  "Start date ": "start_date"
+  "Start date": "start_date"
   "End date": "end_date"
   "TAT": "turnaround_time"
   "year": "year"
