@@ -11,11 +11,13 @@ class ManHrs(BaseModel):
     
 class TaskManHoursModel(BaseModel):
     sourceTask: str
-    desciption: str
+    description: str
+    cluster:int
     mhs :ManHrs
 class FindingsManHoursModel(BaseModel):
     logItem: str
-    desciption: str
+    description: str
+    prob:float
     mhs :ManHrs
 
 
@@ -29,6 +31,8 @@ class Task(BaseModel):
     taskDescription: str
     partDescription: str
     packages: Package
+    aircraftModel:str
+    stockStatus: Optional[str] = None
 
 
 class Finding(BaseModel):
@@ -37,6 +41,8 @@ class Finding(BaseModel):
     packageId: str
     date: str
     quantity: Any  # Adjust type based on actual data (int/float)
+    aircraftModel:Optional[str] = None
+    
     stockStatus: Optional[str] = None
     priceUSD: Optional[float] = None
 
@@ -73,6 +79,13 @@ class SkillAnalysisResponse(BaseModel):
     
 class SkillsAnalysisRequest(BaseModel):
     source_tasks: List[str]
+class EstProb(BaseModel):
+    prob:float
+    totalManhrs:float
+    totalSpareCost:float
+class ProbabilityWiseManhrsSpareCost(BaseModel):
+    estID:str
+    estProb:List[EstProb]
+class UpdateRemarksRequest(BaseModel):
+    remark: str
 
-
-    

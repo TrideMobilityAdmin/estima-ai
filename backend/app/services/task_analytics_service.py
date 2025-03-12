@@ -1,7 +1,7 @@
-from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,PartsUsageResponse,Package,Finding,Usage,SkillAnalysisResponse,TaskAnalysis,ManHours
+from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,ProbabilityWiseManhrsSpareCost
 from statistics import mean
 from fastapi import HTTPException,Depends,status
-from typing import List , Dict,Optional
+from typing import List , Dict,Optional,Any
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
@@ -10,6 +10,7 @@ from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
+from collections import defaultdict
 from app.models.estimates import (
     Estimate,
     EstimateResponse,
@@ -34,7 +35,7 @@ class TaskService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("spares-costing")
-        self.estimates_collection = self.mongo_client.get_collection("estimates")
+        self.estimates_collection = self.mongo_client.get_collection("estima_output")
         self.task_spareparts_collection=self.mongo_client.get_collection("task_parts")
         # self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
@@ -44,9 +45,9 @@ class TaskService:
         # self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
-        self.sub_task_collection=self.mongo_client.get_collection("predicted_data")
+        self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
-        
+        self.configurations_collection=self.mongo_client.get_collection("configurations")
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -134,21 +135,14 @@ class TaskService:
 
             # Query MongoDB to check which tasks exist
             existing_tasks_list = self.taskdescription_collection.find(
-                {"Task": {"$in": task_ids}}, {"_id": 0, "Task": 1}
+                {"task_number": {"$in": task_ids}}, {"_id": 0, "task_number": 1}
             )
-
-            # Convert cursor to list
-            existing_tasks_list = list(existing_tasks_list)  # Ensure it's a list
-
-            # Convert list to a set for faster lookups
-            existing_tasks = list(doc["Task"] for doc in existing_tasks_list)
-
-            # Prepare the response list
+            existing_tasks_list = list(existing_tasks_list)  
+            existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
             validated_tasks = [
                 ValidTasks(taskid=task, status=(task in existing_tasks))
                 for task in task_ids
             ]
-
             return validated_tasks
 
         except Exception as e:
@@ -157,22 +151,24 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
-    async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
-        """
-        Create a estimate status based on the provided tasks and parameters.
-        """
-        try:
-            estimate_id = await self._generate_estimateid()
-            estimate_status_doc = {
-                "estID": estimate_id,
-                "status":"Initiated"
-            }
-            self.estimates_status_collection.insert_one(estimate_status_doc)
-            response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
-            return response
-        except Exception as e:
-            logger.error(f"Error creating estimate status: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
+    
+    
+    # async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
+    #     """
+    #     Create a estimate status based on the provided tasks and parameters.
+    #     """
+    #     try:
+    #         estimate_id = await self._generate_estimateid()
+    #         estimate_status_doc = {
+    #             "estID": estimate_id,
+    #             "status":"Initiated"
+    #         }
+    #         self.estimates_status_collection.insert_one(estimate_status_doc)
+    #         response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
+    #         return response
+    #     except Exception as e:
+    #         logger.error(f"Error creating estimate status: {str(e)}")
+    #         raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
 
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
@@ -522,205 +518,659 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching man hours: {str(e)}"
             )
-
-
-            logger.error(f"Error fetching task description: {str(e)}")
-            return {"id": "", "description": ""}
-
-    # async def _generate_description(self, tasks: List[str]) -> str:
-    #     """
-    #     Helper method to generate a description for the estimate based on tasks
-    #     """
-    #     try:
-    #         descriptions = []
-    #         for task_id in tasks:
-    #             desc = await self._get_task_description(task_id)
-    #             if desc:
-    #                 descriptions.append(desc)
-    #         return " | ".join(descriptions) if descriptions else "No descriptions available"
-    #     except Exception as e:
-    #         logger.error(f"Error generating description: {str(e)}")
-    #         return "Error generating description"
     
-
-    async def get_parts_usage(self, part_id: str) -> Dict:
+    async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
         Get parts usage for a specific part_id within a date range.
         """
+        
         try:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
-            task_parts_pipeline = [
-                { "$match": { "RequestedPart": part_id } },
+            task_parts_pipeline =[
+    {
+        '$match': {
+            'requested_part_number': part_id, 
+            'requested_stock_status': {
+                '$ne': 'Owned'
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'task_description', 
+            'let': {
+                'package_number': '$package_number', 
+                'task_number': '$task_number'
+            }, 
+            'pipeline': [
                 {
-                    "$lookup": {
-                        "from": "task_description",
-                        "localField": "Task",
-                        "foreignField": "Task",
-                        "as": "task_details"
-                    }
-                },
-                { "$unwind": "$task_details" },
-                {
-                    "$addFields": {
-                        "convertedPackageId": {
-                            "$cond": {
-                                "if": { "$regexMatch": { "input": "$Package", "regex": "HMV(\\d{2})(\\d{6})(\\d{4})" } },
-                                "then": {
-                                    "$concat": [
-                                        { "$substrCP": [ "$Package", 7, 5 ] },
-                                        "/",
-                                        { "$substrCP": [ "$Package", 12, 6 ] },
-                                        "/",
-                                        { "$substrCP": [ "$Package", 18, 4 ] }
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$package_number', '$$package_number'
                                     ]
-                                },
-                                "else": "$Package"
-                            }
+                                }, {
+                                    '$eq': [
+                                        '$task_number', '$$task_number'
+                                    ]
+                                }
+                            ]
                         }
                     }
-                },
-                {
-                    "$lookup": {
-                        "from": "aircraft_details",
-                        "let": { "convertedPackage": "$convertedPackageId" },
-                        "pipeline": [
-                            {
-                                "$match": { "$expr": { "$eq": [ "$Package", "$$convertedPackage" ] } }
-                            },
-                            { "$project": { "IssueDate": 1, "_id": 0 } }
-                        ],
-                        "as": "aircraft_info"
+                }, {
+                    '$project': {
+                        'package_number': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'description': 1, 
+                        '_id': 0
                     }
-                },
-                { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
-                {
-                    "$addFields": {
-                        "effectiveDate": {
-                            "$cond": {
-                                "if": { "$ifNull": [ "$aircraft_info.IssueDate", "false" ] },
-                                "then": "$aircraft_info.IssueDate",
-                                "else": { "$toDate": "$IssueDate" }
-                            }
-                        }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
                     }
-                },
+                ]
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'aircraft_details', 
+            'localField': 'package_number', 
+            'foreignField': 'package_number', 
+            'as': 'aircraft_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$aircraft_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$facet': {
+            'mainData': [
                 {
-                    "$group": {
-                        "_id": "$RequestedPart",
-                        "tasks": {
-                            "$push": {
-                                "taskId": "$Task",
-                                "taskDescription": "$task_details.Description",
-                                "packages": [
+                    '$group': {
+                        '_id': '$requested_part_number', 
+                        'partDescription': {
+                            '$first': '$part_description'
+                        }, 
+                        'tasks': {
+                            '$push': {
+                                'taskId': '$task_number', 
+                                'taskDescription': '$task_info.description', 
+                                'packages': [
                                     {
-                                        "packageId": "$Package",
-                                        "date": "$effectiveDate",
-                                        "quantity": "$RequestedQty"
+                                        'packageId': '$task_info.package_number', 
+                                        'date': '$task_info.actual_start_date', 
+                                        'quantity': '$requested_quantity', 
+                                        'requested_stock_status': '$requested_stock_status', 
+                                        'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
                                 ]
                             }
                         }
                     }
-                },
-                { "$project": { "convertedPackageId": 0, "aircraft_info": 0, "effectiveDate": 0 } }
+                }
+            ], 
+            'aircraftModels': [
+                {
+                    '$group': {
+                        '_id': '$aircraft_info.aircraft_model', 
+                        'count': {
+                            '$sum': 1
+                        }
+                    }
+                }, {
+                    '$match': {
+                        '_id': {
+                            '$ne': None
+                        }
+                    }
+                }, {
+                    '$project': {
+                        'aircraftModel': '$_id', 
+                        'count': 1, 
+                        '_id': 0
+                    }
+                }, {
+                    '$sort': {
+                        'count': -1
+                    }
+                }
+            ], 
+            'stockStatuses': [
+                {
+                    '$group': {
+                        '_id': '$requested_stock_status', 
+                        'count': {
+                            '$sum': 1
+                        }
+                    }
+                }, {
+                    '$match': {
+                        '_id': {
+                            '$ne': None
+                        }
+                    }
+                }, {
+                    '$project': {
+                        'statusCode': '$_id', 
+                        'count': 1, 
+                        '_id': 0
+                    }
+                }, {
+                    '$sort': {
+                        'count': -1
+                    }
+                }
             ]
+        }
+    }, {
+        '$project': {
+            'partData': {
+                '$arrayElemAt': [
+                    '$mainData', 0
+                ]
+            }, 
+            'summary': {
+                'aircraftModels': '$aircraftModels', 
+                'stockStatuses': '$stockStatuses'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': '$partData._id', 
+            'partDescription': '$partData.partDescription', 
+            'tasks': '$partData.tasks', 
+            'summary': 1
+        }
+    }
+]
+
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
-            { "$match": { "IssuedPart": part_id } },
-            {
-                "$lookup": {
-                "from": "aircraft_details",
-                "let": { "package": "$Package" },
-                "pipeline": [
-                    {
-                    "$match": {
-                        "$expr": { "$eq": [ "$Package", "$$package" ] }
-                    }
-                    }
-                ],
-                "as": "aircraft_info"
-                }
-            },
-            { "$unwind": { "path": "$aircraft_info", "preserveNullAndEmptyArrays": True } },
-            {
-                "$addFields": {
-                "effectiveDate": {
-                    "$ifNull": [ "$aircraft_info.IssueDate", "$IssueDate" ]
-                }
-                }
-            },
-            {
-                "$group": {
-                "_id": "$IssuedPart",
-                "findings": {
-                    "$push": {
-                    "taskId": "$Task",
-                    "taskDescription": "$TaskDescription",
-                    "packages": [
-                        {
-                        "packageId": "$Package",
-                        "finding": "$Finding",
-                        "logItem": "$LogItem",
-                        "description": "$Description",
-                        "date": "$effectiveDate",
-                        "quantity": "$UsedQty"
-                        }
-                    ]
-                    }
-                }
-                }
-            },
-                { "$project": { "effectiveDate": 0 } } 
+    {
+        '$match': {
+            'issued_part_number': part_id
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
                 ]
-            # Execute pipelines
+            }
+        }
+    }, {
+        '$facet': {
+            'hmvTasks': [
+                {
+                    '$match': {
+                        'isHMV': 'HMV'
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'aircraft_details', 
+                        'localField': 'package_number', 
+                        'foreignField': 'package_number', 
+                        'as': 'aircraft_info'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$aircraft_info', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'sub_task_description', 
+                        'localField': 'task_number', 
+                        'foreignField': 'log_item_number', 
+                        'as': 'task_info', 
+                        'pipeline': [
+                            {
+                                '$project': {
+                                    'convertedPackage': '$package_number', 
+                                    'actual_start_date': 1, 
+                                    'actual_end_date': 1, 
+                                    'source_task_discrepancy_number': 1, 
+                                    'log_item_number': 1, 
+                                    '_id': 0
+                                }
+                            }
+                        ]
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_info', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$gte': [
+                                        '$task_info.actual_start_date', startDate
+                                    ]
+                                }, {
+                                    '$lt': [
+                                        '$task_info.actual_end_date', endDate
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'task_description', 
+                        'let': {
+                            'source_task': '$task_info.source_task_discrepancy_number', 
+                            'pkg_num': '$package_number'
+                        }, 
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {
+                                                '$eq': [
+                                                    '$task_number', '$$source_task'
+                                                ]
+                                            }, {
+                                                '$eq': [
+                                                    '$package_number', '$$pkg_num'
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }, {
+                                '$project': {
+                                    'Description': {
+                                        '$ifNull': [
+                                            '$description', ''
+                                        ]
+                                    }, 
+                                    '_id': 0
+                                }
+                            }
+                        ], 
+                        'as': 'task_desc'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_desc', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }
+            ], 
+            'nonHmvTasks': [
+                {
+                    '$match': {
+                        'isHMV': {
+                            '$ne': 'HMV'
+                        }
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'aircraft_details', 
+                        'localField': 'package_number', 
+                        'foreignField': 'package_number', 
+                        'as': 'aircraft_info'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$aircraft_info', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'task_description', 
+                        'let': {
+                            'task_num': '$task_number', 
+                            'pkg_num': '$package_number'
+                        }, 
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {
+                                                '$eq': [
+                                                    '$task_number', '$$task_num'
+                                                ]
+                                            }, {
+                                                '$eq': [
+                                                    '$package_number', '$$pkg_num'
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }, {
+                                '$project': {
+                                    'actual_start_date': 1, 
+                                    'actual_end_date': 1, 
+                                    'Description': {
+                                        '$ifNull': [
+                                            '$description', ''
+                                        ]
+                                    }, 
+                                    '_id': 0
+                                }
+                            }
+                        ], 
+                        'as': 'task_desc1'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_desc1', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$gte': [
+                                        '$task_desc1.actual_start_date', startDate
+                                    ]
+                                }, {
+                                    '$lt': [
+                                        '$task_desc1.actual_end_date',endDate
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$task_number', 
+                        'taskId': {
+                            '$first': '$task_number'
+                        }, 
+                        'taskDescription': {
+                            '$first': '$task_desc1.Description'
+                        }, 
+                        'packages': {
+                            '$push': {
+                                'packageId': '$package_number', 
+                                'logItem': '$task_number', 
+                                'description': '$task_description', 
+                                'date': '$task_desc1.actual_start_date', 
+                                'stock_status': '$stock_status', 
+                                'quantity': '$used_quantity', 
+                                'aircraft_model': '$aircraft_info.aircraft_model'
+                            }
+                        }
+                    }
+                }
+            ], 
+            'aircraftModels': [
+                {
+                    '$lookup': {
+                        'from': 'aircraft_details', 
+                        'localField': 'package_number', 
+                        'foreignField': 'package_number', 
+                        'as': 'aircraft_info'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$aircraft_info', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$aircraft_info.aircraft_model', 
+                        'count': {
+                            '$sum': 1
+                        }
+                    }
+                }, {
+                    '$match': {
+                        '_id': {
+                            '$ne': None
+                        }
+                    }
+                }
+            ], 
+            'stockStatuses': [
+                {
+                    '$group': {
+                        '_id': '$stock_status', 
+                        'count': {
+                            '$sum': 1
+                        }
+                    }
+                }, {
+                    '$match': {
+                        '_id': {
+                            '$ne': None
+                        }
+                    }
+                }
+            ]
+        }
+    }, {
+        '$project': {
+            'hmvFindings': {
+                '$map': {
+                    'input': '$hmvTasks', 
+                    'as': 'hmvTask', 
+                    'in': {
+                        '_id': '$$hmvTask.issued_part_number', 
+                        'findings': {
+                            'taskId': '$$hmvTask.task_info.source_task_discrepancy_number', 
+                            'taskDescription': '$$hmvTask.task_desc.Description', 
+                            'packages': [
+                                {
+                                    'packageId': '$$hmvTask.package_number', 
+                                    'logItem': '$$hmvTask.task_number', 
+                                    'description': '$$hmvTask.task_description', 
+                                    'date': {
+                                        '$ifNull': [
+                                            '$$hmvTask.task_info.actual_start_date',datetime(1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+                                        ]
+                                    }, 
+                                    'stock_status': '$$hmvTask.stock_status', 
+                                    'quantity': '$$hmvTask.used_quantity', 
+                                    'aircraft_model': '$$hmvTask.aircraft_info.aircraft_model'
+                                }
+                            ]
+                        }
+                    }
+                }
+            }, 
+            'nonHmvFindings': {
+                '$map': {
+                    'input': '$nonHmvTasks', 
+                    'as': 'nonHmvTask', 
+                    'in': {
+                        '_id': '$$nonHmvTask.issued_part_number', 
+                        'findings': {
+                            'taskId': '$$nonHmvTask.taskId', 
+                            'taskDescription': '$$nonHmvTask.taskDescription', 
+                            'packages': '$$nonHmvTask.packages'
+                        }
+                    }
+                }
+            }, 
+            'aircraftModels': '$aircraftModels', 
+            'stockStatuses': '$stockStatuses'
+        }
+    }, {
+        '$project': {
+            'findings': {
+                'hmvTasks': '$hmvFindings', 
+                'nonHmvTasks': '$nonHmvFindings'
+            }, 
+            'summary': {
+                'aircraftModels': {
+                    '$map': {
+                        'input': '$aircraftModels', 
+                        'as': 'model', 
+                        'in': {
+                            'aircraftModel': '$$model._id', 
+                            'count': '$$model.count'
+                        }
+                    }
+                }, 
+                'stockStatuses': {
+                    '$map': {
+                        'input': '$stockStatuses', 
+                        'as': 'status', 
+                        'in': {
+                            'statusCode': '$$status._id', 
+                            'count': '$$status.count'
+                        }
+                    }
+                }
+            }
+        }
+    }
+]
+         
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
-            logger.info(f"Results of task_parts: {task_parts_result}")
-            logger.info(f"Results of sub_task_parts: {sub_task_parts_result}")
+
+
+            logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
+            logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
+
+
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
-                return {}
-            # Construct final output
+                return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
+           
+            task_parts_aircraft_details = {
+                "aircraftModels": task_parts_result[0].get("summary", {}).get("aircraftModels", []),
+                "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+            }
+
+           
+            sub_task_parts_aircraft_details = {
+                "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
+                "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+            }
+
             output = {
                 "partId": part_id,
-                "partDescription": task_parts_result[0].get("tasks", [{}])[0].get("partDescription", "") if task_parts_result else "",
+                "partDescription": task_parts_result[0].get("partDescription", "") if task_parts_result else "",
                 "usage": {
                     "tasks": [
                         {
-                            "taskId": t["taskId"],
-                            "taskDescription": t["taskDescription"],
+                            "taskId": t.get("taskId",""),
+                            "taskDescription": t.get("taskDescription",""),
                             "packages": [
-                                {"packageId": pkg["packageId"], "date": pkg["date"], "quantity": pkg["quantity"]}
+                                {"packageId": pkg["packageId"],"requested_stock_status":pkg["requested_stock_status"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"]}
                                 for pkg in t.get("packages", [])
                             ]
                         }
                         for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
                     ],
-                    "findings": [
-                        {
-                            "taskId": f["taskId"],
-                            "taskDescription": f["taskDescription"],
-                            "packages": [
-                                {
-                                            "packageId": pkg["packageId"],
-                                            "finding": pkg.get("finding", ""),  # Use .get() to avoid KeyError
-                                            "logItem": pkg.get("logItem", ""),  # Use .get() to avoid KeyError
-                                            "description": pkg.get("description", ""),  # Use .get() to avoid KeyError
-                                            "date": pkg["date"],
-                                            "quantity": pkg["quantity"]
-                    }
-                                for pkg in f.get("packages", [])
-                            ]
-                        }
-                        for f in (sub_task_parts_result[0].get("findings", []) if sub_task_parts_result else [])
-                    ]
+                    "findings": {
+    "hmvTasks": [
+        {
+            "taskId": task.get("findings", {}).get("taskId", ""),
+            "taskDescription": task.get("findings", {}).get("taskDescription", ""),
+            "packages": [
+                {
+                    "packageId": pkg["packageId"],
+                    "logItem": pkg.get("logItem", ""),
+                    "description": pkg.get("description", ""),
+                    "date": pkg.get("date", "0001-01-01T00:00:00Z"),
+                    "stock_status": pkg.get("stock_status", ""),
+                    "quantity": pkg["quantity"]
                 }
+                for pkg in task.get("findings", {}).get("packages", [])
+            ]
+        }
+        for task in sub_task_parts_result[0].get("findings", {}).get("hmvTasks", [])
+    ] if sub_task_parts_result else [],
+    "nonHmvTasks": [
+        {
+            "taskId": task.get("findings", {}).get("taskId", ""),
+            "taskDescription": task.get("findings", {}).get("taskDescription", ""),
+            # "stock_status": task.get("stock_status", ""),
+            # "quantity": task.get("quantity", 0),
+            # "aircraft_model": task.get("aircraft_model", ""),
+            # "date": task.get("date", "0001-01-01T00:00:00Z"),
+            # "packageId": task.get("packageId", ""),
+
+
+            "packages": [
+                {
+                    "packageId": pkg["packageId"],
+                    "logItem": pkg.get("logItem", ""),
+                    "description": pkg.get("description", ""),
+                    "date": pkg.get("date", "0001-01-01T00:00:00Z"),
+                    "stock_status": pkg.get("stock_status", ""),
+                    "quantity": pkg["quantity"],
+                    "aircraft_model": pkg.get("aircraft_model", "")
+                }
+                 for pkg in task.get("findings", {}).get("packages", [])
+            ]
+        }
+        for task in sub_task_parts_result[0].get("findings", {}).get("nonHmvTasks", [])
+    ] if sub_task_parts_result else []
+}
+                },
+ "aircraftDetails": {
+        "task_parts_aircraft_details": task_parts_aircraft_details,
+        "sub_task_parts_aircraft_details": sub_task_parts_aircraft_details
+    }    
             }
-            return output
+
+            date_qty = defaultdict(lambda: {"tasksqty": 0, "findingsqty": 0})
+            logger.info("Processing tasks to calculate date-wise quantities.")
+            for task in output["usage"]["tasks"]:
+                logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
+                for pkg in task["packages"]:
+                    date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
+                    date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
+                    logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
+            # Process findings
+            logger.info("Processing findings to calculate date-wise quantities.")
+            for finding_type in ["hmvTasks", "nonHmvTasks"]:
+                for task in output["usage"]["findings"].get(finding_type, []):
+                    logger.info(f"Processing finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
+                    for pkg in task.get("packages", []):
+                        date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
+                        date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
+                        logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+
+            output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
+            logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
+
+
+            return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
-            logger.error(f"Error fetching parts usage: {str(e)}")
-            return None
+            logger.error(f"Error fetching parts usage for this api: {str(e)}")
+            return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
+    
+    
+            
+
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
         Analyzes skills required for multiple tasks.
@@ -731,54 +1181,159 @@ class TaskService:
         """
         try:
             logger.info(f"Analyzing skills for tasks: {source_tasks}")
+            logger.info(f"Analyzing skills for tasks: len={len(source_tasks)}")
 
             # MongoDB pipeline for tasks
             task_skill_pipeline = [
-                {"$match": {"Task": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"task_number": {"$in": source_tasks}}},  
                 {
-                    "$group": {
-                        "_id": "$Task",
-                        "taskDescription": {"$first": "$Description"},
-                        "skills": {
-                            "$push": {
-                                "skill": "$Skill",
-                                "manHours": {
-                                    "min": {"$min": "$ActualManHrs"},
-                                    "avg": {"$avg": "$ActualManHrs"},
-                                    "max": {"$max": "$ActualManHrs"}
-                                }
+        '$group': {
+            '_id': {
+                'task_number': '$task_number', 
+                'skill_number': '$skill_number'
+            }, 
+            'taskDescription': {
+                '$first': '$description'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.task_number', 
+            'taskDescription': {
+                '$first': '$taskDescription'
+            }, 
+            'skills': {
+                '$push': {
+                    'skill': '$_id.skill_number', 
+                    'manhours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 1, 
+            'taskDescription': 1, 
+            'skills': {
+                '$map': {
+                    'input': '$skills', 
+                    'as': 'skill', 
+                    'in': {
+                        'skill': '$$skill.skill', 
+                        'manhours': {
+                            'min': {
+                                '$round': [
+                                    '$$skill.manhours.min', 2
+                                ]
+                            }, 
+                            'max': {
+                                '$round': [
+                                    '$$skill.manhours.max', 2
+                                ]
+                            }, 
+                            'avg': {
+                                '$round': [
+                                    '$$skill.manhours.avg', 2
+                                ]
                             }
                         }
                     }
                 }
+            }
+        }
+    }
             ]
 
             # MongoDB pipeline for sub-task findings
             sub_tasks_skill_pipeline = [
-                {"$match": {"SourceTaskDiscrep": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"source_task_discrepancy_number": {"$in": source_tasks}}},  # Modified to use $in operator
                 {
-                    "$group": {
-                        "_id": "$SourceTaskDiscrep",
-                        "skills": {
-                            "$push": {
-                                "skill": "$Skill",
-                                "manHours": {
-                                    "min": {"$min": "$ActualManHrs"},
-                                    "avg": {"$avg": "$ActualManHrs"},
-                                    "max": {"$max": "$ActualManHrs"}
-                                }
+        '$group': {
+            '_id': {
+                'task_number': '$source_task_discrepancy_number', 
+                'skill_number': '$skill_number'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.task_number', 
+            'skills': {
+                '$push': {
+                    'skill': '$_id.skill_number', 
+                    'manhours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 1, 
+            'skills': {
+                '$map': {
+                    'input': '$skills', 
+                    'as': 'skill', 
+                    'in': {
+                        'skill': '$$skill.skill', 
+                        'manhours': {
+                            'min': {
+                                '$round': [
+                                    '$$skill.manhours.min', 2
+                                ]
+                            }, 
+                            'max': {
+                                '$round': [
+                                    '$$skill.manhours.max', 2
+                                ]
+                            }, 
+                            'avg': {
+                                '$round': [
+                                    '$$skill.manhours.avg', 2
+                                ]
                             }
                         }
                     }
                 }
+            }
+        }
+    }
             ]
 
             # Execute MongoDB queries
             task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
             
-            logger.info(f"Retrieved skill analysis for tasks: {task_skill_results}")
-            logger.info(f"Retrieved skill analysis for sub-tasks: {sub_task_skill_results}")
+            logger.info(f"Retrieved skill analysis for tasks: len={len(task_skill_results)}")
+            logger.info(f"Retrieved skill analysis for sub-tasks: len={len(sub_task_skill_results)}")
+            if not task_skill_results and not sub_task_skill_results:
+                logger.info("No data found for both tasks and sub-tasks")
+                return {
+                    "skillAnalysis": {},
+                    "response": {"statusCode": 404, "message": "No data found for the specified tasks"}
+                }
 
             # Process results into response format
             tasks = [
@@ -788,7 +1343,7 @@ class TaskService:
                     "skills": [
                         {
                             "skill": skill["skill"],
-                            "manHours": skill["manHours"]
+                            "manHours": skill["manhours"]
                         }
                         for skill in task["skills"]
                     ]
@@ -802,7 +1357,7 @@ class TaskService:
                     "skills": [
                         {
                             "skill": skill["skill"],
-                            "manHours": skill["manHours"]
+                            "manHours": skill["manhours"]
                         }
                         for skill in sub_task["skills"]
                     ]
@@ -810,8 +1365,8 @@ class TaskService:
                 for sub_task in sub_task_skill_results
             ]
 
-            logger.info(f"Processed skill analysis for tasks: {tasks}")
-            logger.info(f"Processed skill analysis for findings: {findings}")
+            logger.info(f"Processed skill analysis for tasks: len={len(tasks)}")
+            logger.info(f"Processed skill analysis for findings: len={len(findings)}")
 
             # Construct final response
             response = {
@@ -820,68 +1375,1253 @@ class TaskService:
                     "findings": findings
                 }
             }
-
-            return response
+            return response 
+            # return {"data": response, "response": {"statusCode": 200, "message": "skill_analysis processed successfully"}}
 
         except Exception as e:
             logger.error(f"Error fetching skills analysis: {str(e)}")
-            return {"error": f"An error occurred while processing the request: {str(e)}"}
+            return {
+                "skillAnalysis": {},
+            "response": {"statusCode": 404, "message": f"An error occurred while processing the request: {str(e)}"}
+            }
+            # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
-    async def get_estimate_by_id(self, estimate_id: str) -> EstimateResponse:
+   
+
+    def get_estimate_by_id(self, estimate_id: str) -> Dict[str, Any]:
         """
-        Get estimate by ID
+        Get estimate by ID with filtered findings based on probability comparison
+        Returns raw aggregation result directly from MongoDB
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
+        configurations = self.configurations_collection.find_one()
+        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        # valid_tasks_response =self.validate_tasks(current_user)
+        # valid_task_ids = [task.taskid for task in valid_tasks_response if task.status]
 
         try:
-            estimate_doc = self.estimates_collection.find_one(
-                {"estID": estimate_id}
-            )
-            if estimate_doc is None:
-                logger.warning(f"No estimate found for ID: {estimate_id}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No estimate found for ID: {estimate_id}"
-                )
-            return estimate_doc
-        except Exception as e:
-            logger.error(f"Error fetching estimate: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching estimate: {str(e)}"
-            )
-           
-    async def _generate_estimateid(self) -> str:
-        logger.info("Generating estimate ID")
-        try:
-            logger.info("Finding count of estimates")
-            count = self.estimates_status_collection.count_documents({})  # Await count
-            logger.info(f"Count of estimates: {count}")
+            pipeline = [
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_file_upload', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    },
+    #   {
+    #             # Match tasks based on valid task IDs after unwinding the estimate
+    #             '$match': {
+    #                 'tasks.SourceTask': { '$in': valid_task_ids }
+    #             }
+    #         },
+    {
+        '$addFields': {
+            'filteredFindings': {
+                '$filter': {
+                    'input': {
+                        '$ifNull': [
+                            '$findings', []
+                        ]
+                    }, 
+                    'as': 'finding', 
+                    'cond': {
+                        '$gt': [
+                            {
+                                '$max': {
+                                    '$map': {
+                                        'input': {
+                                            '$ifNull': [
+                                                '$$finding.details', []
+                                            ]
+                                        }, 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$ifNull': [
+                                                '$$detail.prob', 0
+                                            ]
+                                        }
+                                    }
+                                }
+                            }, {
+                                '$ifNull': [
+                                    '$estimate.probability', 0
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }, {
+        '$addFields': {
+            'aggregatedFilteredFindings': {
+                'totalMhs': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': '$$detail.mhs.avg'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }, 
+                'totalSpareCost': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$sum': {
+                                                '$map': {
+                                                    'input': '$$detail.spareParts', 
+                                                    'as': 'sparePart', 
+                                                    'in': {
+                                                        '$multiply': [
+                                                            '$$sparePart.price', '$$sparePart.qty'
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+     {
+        '$addFields': {
+            'estimate_manhrs': {
+                'min': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.min', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.min', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'max': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.max', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.max', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'avg': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.avg', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.avg', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }, 
+                'est': {
+                    '$sum': [
+                        {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$tasks', 
+                                    'as': 'task', 
+                                    'in': {
+                                        '$ifNull': [
+                                            '$$task.mhs.est', 0
+                                        ]
+                                    }
+                                }
+                            }
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$filteredFindings', 
+                                    'as': 'finding', 
+                                    'in': {
+                                        '$sum': {
+                                            '$map': {
+                                                'input': '$$finding.details', 
+                                                'as': 'detail', 
+                                                'in': {
+                                                    '$ifNull': [
+                                                        '$$detail.mhs.est', 0
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    },{
+        '$addFields': {
+            'tatTime': {
+                '$divide': [
+                    {
+                        '$add': [
+                            {
+                                '$ifNull': [
+                                    '$aggregatedTasks.totalMhs', 0
+                                ]
+                            }, {
+                                '$ifNull': [
+                                    '$aggregatedFilteredFindings.totalMhs', 0
+                                ]
+                            }
+                        ]
+                    }, man_hours_threshold
+                ]
+            }, 
+            'estimatedSpareCost': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$aggregatedTasks.totalSpareCost', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$aggregatedFilteredFindings.totalSpareCost', 0
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'description': 1, 
+             'overallEstimateReport': {
+                'estimatedTatTime': '$tatTime', 
+                'estimatedSpareCost': '$estimatedSpareCost', 
+                'estimateManhrs': '$estimate_manhrs'
+            }, 
+            'tasks': {
+                '$map': {
+                    'input': '$tasks', 
+                    'as': 'task', 
+                    'in': {
+                        '$mergeObjects': [
+                            '$$task', {
+                                '_id': '$$REMOVE'
+                            }
+                        ]
+                    }
+                }
+            }, 
+            'aggregatedTasks': 1, 
+            'findings': '$filteredFindings', 
+            'aggregatedFindings': '$aggregatedFilteredFindings',
+            'originalFilename': 1, 
+            'userID': {
+                '$toString': '$userID'
+            }, 
+            'createdAt': 1, 
+            'lastUpdated': 1, 
+            'createdBy': 1, 
+            'updatedBy': {
+                '$toString': '$updatedBy'
+            }
+        }
+    }
+]
 
-            if count == 0:
-                logger.info("No estimates found, starting with EST-001")
-                return "EST-001"
+            # Execute aggregation and get first result
+            result = list(self.estimates_collection.aggregate(pipeline))
+            if not result:
+                logger.warning(f"No estimate found with ID: {estimate_id}")
+                raise HTTPException(status_code=404, detail="Estimate not found")
 
-        # Fetch the last inserted estimate
-            last_estimate = self.estimates_status_collection.find_one(
-                {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
-                projection={"estID": 1}
-            )
-
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
-
-            if not last_estimate or "estID" not in last_estimate:
-                logger.warning("No estID found in the last estimate, defaulting to EST-001")
-                return "EST-001"
-
-            last_id_str = last_estimate["estID"]
-            last_id = int(last_id_str.split("-")[1])
-            new_id = f"EST-{last_id + 1:03d}"
+            # Return the first document
+            # logger.warning(f"estimated collection fetched: {result}")
+            # return result[0]
         
-            logger.info(f"Generated new estimate ID: {new_id}")
-            return new_id
+            estimate_data = result[0]
+            estimated_spare_parts = {}
+            for task in estimate_data.get('tasks', []):
+                for spare_part in task.get('spareParts', []):
+                    part_id = spare_part['partId']
+                    if part_id not in estimated_spare_parts:
+                        estimated_spare_parts[part_id] = {
+                            'desc': spare_part['desc'],
+                            'unit': spare_part['unit'],
+                            'qty': 0,
+                            'price': 0
+                        }
+                    estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+                    estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+
+            for finding in estimate_data.get('filteredFindings', []):
+                for detail in finding.get('details', []):
+                    for spare_part in detail.get('spareParts', []):
+                        part_id = spare_part['partId']
+                        if part_id not in estimated_spare_parts:
+                            estimated_spare_parts[part_id] = {
+                                'desc': spare_part['desc'],
+                                'unit': spare_part['unit'],
+                                'qty': 0,
+                                'price': 0
+                            }
+                        estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+                        estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+            estimated_spare_parts_list = [
+                {
+                    'partID': part_id,
+                    'desc': data['desc'],
+                    'unit': data['unit'],
+                    'qty': data['qty'],
+                    'price': data['price']
+                }
+                for part_id, data in estimated_spare_parts.items()
+            ]
+
+            # Step 3: Add estimated spare parts to the result
+            # Step 3: Add estimated spare parts to the overallEstimateReport
+            estimate_data['overallEstimateReport']['estimatedSpareParts'] = estimated_spare_parts_list
+            logger.info("Estimated collection fetched successfully")
+            return estimate_data
+
 
         except Exception as e:
-            logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
+            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+    def get_probability_wise_manhrsspareparts(self,estimate_id:str)->ProbabilityWiseManhrsSpareCost:
+        """
+        Get estimate by ID with filtered findings based on probability comparison
+        Returns raw aggregation result directly from MongoDB
+        """
+        logger.info(f"Fetching estimate by ID: {estimate_id}")
+        try:
+            # Define the aggregation pipeline
+            pipeline = [
+            {
+                '$match': {
+                    'estID': estimate_id
+                }
+            }, {
+                '$unwind': '$findings'
+            }, {
+                '$unwind': '$findings.details'
+            }, {
+                '$facet': {
+                    'prob01': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.1
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob02': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.2
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob03': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.3
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob04': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.4
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob05': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.5
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob06': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.6
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob07': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.7
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob08': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.8
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob09': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 0.9
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ], 
+                    'prob10': [
+                        {
+                            '$match': {
+                                'findings.details.prob': {
+                                    '$gte': 1.0
+                                }
+                            }
+                        }, {
+                            '$group': {
+                                '_id': None, 
+                                'totalMhs': {
+                                    '$sum': '$findings.details.mhs.avg'
+                                }, 
+                                'totalSpareCost': {
+                                    '$sum': {
+                                        '$reduce': {
+                                            'input': '$findings.details.spareParts', 
+                                            'initialValue': 0, 
+                                            'in': {
+                                                '$add': [
+                                                    '$$value', '$$this.price'
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }, {
+                '$project': {
+                    '_id': 0, 
+                    'estID': estimate_id, 
+                    'estProb': [
+                        {
+                            'prob': 0.1, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob01.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob01.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.2, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob02.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob02.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.3, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob03.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob03.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.4, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob04.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob04.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.5, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob05.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob05.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.6, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob06.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob06.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.7, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob07.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob07.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.8, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob08.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob08.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 0.9, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob09.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob09.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }, {
+                            'prob': 1.0, 
+                            'totalManhrs': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob10.totalMhs', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }, 
+                            'totalSpareCost': {
+                                '$ifNull': [
+                                    {
+                                        '$arrayElemAt': [
+                                            '$prob10.totalSpareCost', 0
+                                        ]
+                                    }, 0.0
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+            results = list(self.estimates_collection.aggregate(pipeline))
+            if results:
+                return ProbabilityWiseManhrsSpareCost(**results[0])
+            else:
+                raise HTTPException(status_code=404, detail="Estimate not found")
+        except Exception as e:
+            logger.error(f"Error fetching estimate: {e}")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+    async def multiple_parts_usage(self, part_ids: List[str], startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate, endDate}")
+        """
+        Get parts usage for multiple part IDs
+        """
+        logger.info(f"Fetching parts usage for multiple part IDs: {part_ids}")
+
+        task_parts_pipeline = [
+    {
+        '$match': {
+            'requested_part_number': {
+                '$in': part_ids
+            }, 
+            'requested_stock_status': {
+                '$ne': 'Owned'
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'task_description', 
+            'let': {
+                'package_number': '$package_number', 
+                'task_number': '$task_number'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$package_number', '$$package_number'
+                                    ]
+                                }, {
+                                    '$eq': [
+                                        '$task_number', '$$task_number'
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        'package_number': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'description': 1, 
+                        '_id': 0
+                    }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$requested_part_number', 
+                'partDescription': '$part_description'
+            }, 
+            'totalTasksQty': {
+                '$sum': '$requested_quantity'
+            }, 
+            'taskNumbers': {
+                '$push': '$task_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalTasksQty': 1, 
+            'totalTasks': {
+                '$size': '$taskNumbers'
+            }
+        }
+    }
+]
+        findings_HMV_parts_pipeline = [
+    {
+        '$match': {
+            'issued_part_number': {
+                '$in': part_ids
+            }
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
+                ]
+            }
+        }
+    }, {
+        '$match': {
+            'isHMV': 'HMV'
+        }
+    }, {
+        '$lookup': {
+            'from': 'sub_task_description', 
+            'localField': 'task_number', 
+            'foreignField': 'log_item_number', 
+            'as': 'task_info', 
+            'pipeline': [
+                {
+                    '$project': {
+                        'convertedPackage': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'source_task_discrepancy_number': 1, 
+                        'log_item_number': 1, 
+                        '_id': 0
+                    }
+                }
+            ]
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$issued_part_number', 
+                'partDescription': {
+                    '$replaceAll': {
+                        'input': '$part_description', 
+                        'find': ' ', 
+                        'replacement': ''
+                    }
+                }
+            }, 
+            'totalFindingsQty': {
+                '$sum': '$used_quantity'
+            }, 
+            'task_numbers': {
+                '$addToSet': '$task_info.log_item_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalFindingsQty': 1, 
+            'totalFindings': {
+                '$size': '$task_numbers'
+            }
+        }
+    }
+]
+        findings_nonHMV_parts_pipeline = [
+    {
+        '$match': {
+            'issued_part_number': {
+                '$in': part_ids
+            }
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
+                ]
+            }
+        }
+    }, {
+        '$match': {
+            'isHMV': {
+                '$ne': 'HMV'
+            }
+        }
+    }, {
+        '$lookup': {
+            'from': 'sub_task_description', 
+            'localField': 'task_number', 
+            'foreignField': 'log_item_number', 
+            'as': 'task_info', 
+            'pipeline': [
+                {
+                    '$project': {
+                        'convertedPackage': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'source_task_discrepancy_number': 1, 
+                        'log_item_number': 1, 
+                        '_id': 0
+                    }
+                }
+            ]
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'partId': '$issued_part_number', 
+                'partDescription': {
+                    '$replaceAll': {
+                        'input': '$part_description', 
+                        'find': ' ', 
+                        'replacement': ''
+                    }
+                }
+            }, 
+            'totalFindingsQty': {
+                '$sum': '$used_quantity'
+            }, 
+            'task_numbers': {
+                '$addToSet': '$task_info.log_item_number'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'partId': '$_id.partId', 
+            'partDescription': '$_id.partDescription', 
+            'totalFindingsQty': 1, 
+            'totalFindings': {
+                '$size': '$task_numbers'
+            }
+        }
+    }
+]
+        task_parts_results = list(self.taskparts_collection.aggregate(task_parts_pipeline))
+        logger.info(f"task_parts_results: {len(task_parts_results)}")
+        findings_HMV_results = list(self.subtaskparts_collection.aggregate(findings_HMV_parts_pipeline))
+        logger.info(f"findings_HMV_results: {len(findings_HMV_results)}")
+        findings_nonHMV_results = (self.subtaskparts_collection.aggregate(findings_nonHMV_parts_pipeline))
+        logger.info(f"findings_nonHMV_results fetched")
+        
+        combined_results = {
+        "taskParts": task_parts_results,
+        "findingsHMVParts": findings_HMV_results,
+        "findingsNonHMVTasks": findings_nonHMV_results
+    }
+        logger.info(f"Combined results: {combined_results}")
+        return combined_results
+        

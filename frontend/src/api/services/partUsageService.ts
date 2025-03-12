@@ -1,5 +1,5 @@
 import { showNotification } from "@mantine/notifications";
-import { getPartUsage_Url } from "../apiUrls";
+import { getMultiPartUsage_Url, getPartUsage_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
 
@@ -24,20 +24,94 @@ export const useApiPartUsage = () => {
     navigate("/", { replace: true });
   };
 
-    const getPartUsage = async (partId: string): Promise<any[]> => {
-        try {
-            const response = await axiosInstance.get(`${getPartUsage_Url}?part_id=${partId}`);
-            return response.data;
-        } catch (error:any) {
-            console.error("Task Validation API Error:", error);
-            // Check if authentication has expired
-      if (error.response?.data?.detail === "Invalid authentication credentials") {
-        handleSessionExpired();
-      }
+  const getPartUsage = async (partId: string,startDate:any, endDate:any): Promise<any[]> => {
+    try {
+        const response = await axiosInstance.get(`${getPartUsage_Url}?part_id=${partId}&startDate=${startDate}&endDate=${endDate}`);
 
-            return [];
+        console.log("response part single >>>>",response.data);
+        
+        if (Object.keys(response.data.data).length > 0) {
+            showNotification({
+                title: "Successful!",
+                message: "Part Usage Generated",
+                color: "green",
+                style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+            });
+        } else {
+            showNotification({
+                title: "Not Found!",
+                message: "No Part Found, Try another ID",
+                color: "red",
+                style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+            });
         }
-    };
 
-    return { getPartUsage };
+        return response.data.data;
+    } catch (error: any) {
+        console.error("Task Validation API Error:", error);
+
+        // Check if authentication has expired
+        if (error.response?.data?.detail === "Invalid authentication credentials") {
+            handleSessionExpired();
+        }
+
+        showNotification({
+            title: "Error!",
+            message: "Failed to fetch part usage. Please try again.",
+            color: "red",
+            style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+        });
+
+        return [];
+    }
+};
+
+
+const getMultiPartUsage = async (partIds: string[], startDate: any, endDate: any): Promise<any[]> => {
+    try {
+        // Prepare the request body
+        const requestBody = partIds;
+
+        // Make the POST request
+        const response = await axiosInstance.post(`${getMultiPartUsage_Url}?startDate=${startDate}&endDate=${endDate}`, requestBody);
+
+        if (response.data && response.data.data && response.data.data.length > 0) {
+            showNotification({
+                title: "Successful!",
+                message: "Part Usage Generated",
+                color: "green",
+                style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+            });
+        } else {
+            // showNotification({
+            //     title: "Not Found!",
+            //     message: "No Part Found, Try another ID",
+            //     color: "red",
+            //     style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+            // });
+        }
+
+        console.log("response multiple >>>>", response.data);
+
+        return response.data;
+    } catch (error: any) {
+        console.error("Task Validation API Error:", error);
+
+        // Check if authentication has expired
+        if (error.response?.data?.detail === "Invalid authentication credentials") {
+            handleSessionExpired();
+        }
+
+        showNotification({
+            title: "Error!",
+            message: "Failed to fetch part usage. Please try again.",
+            color: "red",
+            style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+        });
+
+        return [];
+    }
+};
+
+    return { getPartUsage, getMultiPartUsage};
 };

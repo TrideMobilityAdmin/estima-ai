@@ -7,9 +7,10 @@ from app.middleware.auth import get_current_user
 import logging
 from typing import List
 import shutil
+from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import TaskManHoursModel,FindingsManHoursModel,SkillsAnalysisRequest
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,SpareParts,SpareResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus
+from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost
+from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -77,15 +78,32 @@ async def get_all_estimates(
 
 async def get_parts_usage(
     part_id: str,
+    startDate:datetime,
+    endDate:datetime,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     """
     Get  parts usage for a part_id.
     """
-    parts_usage=await task_service.get_parts_usage(part_id)
+    parts_usage=await task_service.get_parts_usage(part_id,startDate,endDate)
     logging.info("Parts usage data: %s", parts_usage)
     return parts_usage
+@router.post("/multiple/parts/usage", response_model=Dict) 
+async def get_multiple_parts_usage(
+    part_ids: List[str],  
+    startDate: datetime,
+    endDate: datetime,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get parts usage for multiple part IDs.
+    """
+    parts_usage = await task_service.multiple_parts_usage(part_ids, startDate, endDate)
+    logging.info("Parts usage data: %s", parts_usage)
+    return parts_usage
+
 
 @router.post("/skills/analysis")
 async def post_skills_analysis(
@@ -109,13 +127,13 @@ async def post_skills_analysis(
     
     return skills_analysis
 
-@router.post("/estimate_status",response_model=EstimateStatus)
-async def estimate_status(
-    estimate_request: EstimateRequest,
-     current_user: dict = Depends(get_current_user),
-    task_service: TaskService = Depends()
-):
-     return await task_service.estimate_status(estimate_request,current_user)
+# @router.post("/estimate_status",response_model=EstimateStatus)
+# async def estimate_status(
+#     estimate_request: EstimateRequest,
+#      current_user: dict = Depends(get_current_user),
+#     task_service: TaskService = Depends()
+# ):
+#      return await task_service.estimate_status(estimate_request,current_user)
 # @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
 # async def create_estimate(
 #     estimate_request: EstimateRequest,
@@ -125,13 +143,13 @@ async def estimate_status(
 #     return await task_service.create_estimate(estimate_request,current_user)
 
 
-@router.get("/estimates/{estimate_id}", response_model=EstimateResponse)
+@router.get("/estimates/{estimate_id}")
 async def get_estimate_by_id(
     estimate_id: str,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    return await task_service.get_estimate_by_id(estimate_id)
+    return  task_service.get_estimate_by_id(estimate_id)
 
 excel_service = ExcelUploadService()
 # @router.post("/upload/excel/")
@@ -191,6 +209,7 @@ async def validate_tasks(
 @router.post("/upload-estimate/")
 async def upload_estimate(
     estimate_request: str = Form(...),
+    current_user: dict = Depends(get_current_user),
     file: UploadFile = File(...)
 ) -> Dict[str, Any]:
     
@@ -202,4 +221,24 @@ async def upload_estimate(
         raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
 
     return await excel_service.upload_estimate(estimate_request_data, file)
+
+@router.get("/estimate_file_status",response_model=List[EstimateStatusResponse])
+async def get_estimate_status(
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.estimate_status()
+@router.put("/estimates/{estID}/remarks", response_model=Dict[str, Any])
+async def update_remarks(
+    estID: str,
+    request: UpdateRemarksRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update remarks for a specific estimate
+    """
+    return await excel_service.update_estimate_status_remarks(estID, remark=request.remark,current_user=current_user)
+
+@router.get("/probability_wise_manhrs_sparecost/{estimate_id}",response_model=ProbabilityWiseManhrsSpareCost)
+async def get_probability_wise_manhrs_sparecost(estimate_id: str,current_user:dict=Depends(get_current_user), task_service: TaskService = Depends()):
+    return task_service.get_probability_wise_manhrsspareparts(estimate_id)
 
