@@ -415,7 +415,7 @@ const RFQUploadDropZoneExcel = ({
             </Paper>
             
             {isAnalyzing ? (
-              <Text size="xs" color="dimmed">Analyzing file...</Text>
+              <Text size="xs" c="dimmed">Analyzing file...</Text>
             ) : (
               <>
                 {availableSheets.length > 0 && (
