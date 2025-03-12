@@ -77,6 +77,7 @@ export default function EstimateNew() {
     const [selectedEstRemarksData, setSelectedEstRemarksData] = useState<any[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
+    const [sheetInfo, setSheetInfo] = useState<{ sheetName: string, columnName: string } | undefined>(undefined);
     const [rfqSubmissionResponse, setRfqSubmissionResponse] = useState<any>(null);
     const [rfqSubModalOpened, setRfqSubModalOpened] = useState(false);
     const [estimatesStatusData, setEstimatesStatusData] = useState<any[]>([]);
@@ -176,33 +177,41 @@ export default function EstimateNew() {
     console.log("selected expert insights tasks obj >>>>", selectedExpertInsightTasks);
 
     // Handle file and extracted tasks
-    const handleFileChange = async (file: File | null, tasks: string[], sheetInfo?: { sheetName: string, columnName: string }) => {
-        setIsValidating(true);
-        setSelectedFile(file);
-        setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
-        console.log("✅ Selected File:", file ? file.name : "None");
-        console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
-        console.log("From sheet:", sheetInfo?.sheetName);
-  console.log("From column:", sheetInfo?.columnName);
+const handleFileChange = async (
+    file: File | null,
+    tasks: string[],
+    fileSheetInfo?: { sheetName: string, columnName: string }
+  ) => {
+    setIsValidating(true);
+    setSelectedFile(file);
+    setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+    setSheetInfo(fileSheetInfo);
+      
+    console.log("✅ Selected File:", file ? file.name : "None");
+    console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+    console.log("From sheet:", fileSheetInfo?.sheetName);
+    console.log("From column:", fileSheetInfo?.columnName);
+      
+    if (tasks.length > 0) {
+      const response = await validateTasks(tasks);
+      setValidatedTasks(response);
+          
+      const invalidTasks = response.filter((task) => task.status === false);
+      if (invalidTasks.length > 0) {
+        showNotification({
+          title: "Tasks Not Available!",
+          message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
+          color: "orange",
+          style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+        });
+      }
+    } else {
+      setValidatedTasks([]);
+    }
+      
+    setIsValidating(false);
+  };
 
-
-        console.log("Extracted Tasks:", tasks);
-        const response = await validateTasks(tasks);
-        setValidatedTasks(response);
-        setIsValidating(false);
-
-        const invalidTasks = response?.filter((task) => task?.status === false);
-        if (invalidTasks.length > 0) {
-            showNotification({
-                title: "Tasks Not Available!",
-                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
-                color: "orange",
-                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-            });
-            // showAppNotification("warning", "Tasks Not Available!", invalidTasks.length + "tasks are not available. Only valid tasks will be used to Skill Analysis.");
-        }
-
-    };
 
     // 🟢 Function to validate tasks & update UI
     const handleValidateTasks = async (tasks: string[]) => {
@@ -1186,36 +1195,14 @@ export default function EstimateNew() {
 
                         </Group>
                         <Space h='sm' />
-                    </>
-                }
-                scrollAreaComponent={ScrollArea.Autosize}
-            >
-
-                <LoadingOverlay
-                    visible={isValidating}
-                    zIndex={1000}
-                    overlayProps={{ radius: 'sm', blur: 2 }}
-                    loaderProps={{ color: 'indigo', type: 'bars' }}
-                />
-
-                {/* <Group justify="space-between">
-                                <Group mb='xs' align="center" >
-                                    <Text size="md" fw={500}>
-                                        Tasks Available
-                                    </Text>
-                                    {
-                                        extractedTasks?.length > 0 ? (
-                                            <Badge ta='center' color="indigo" size="md" radius="lg">
-                                                {extractedTasks?.length || 0}
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
-                                                0
-                                            </Badge>
-                                        )
-                                    }
-                                </Group>
-                            </Group> */}
+                        {sheetInfo && (
+          <Group gap="xs" mb="xs">
+            <Text size="sm" c="dimmed">Sheet:</Text>
+            <Badge size="sm" color="black" variant="light">{sheetInfo.sheetName}</Badge>
+            <Text size="sm" c="dimmed">Column:</Text>
+            <Badge size="sm" color="black" variant="light">{sheetInfo.columnName}</Badge>
+          </Group>
+        )}
                 <Group justify="space-between">
                     <Group mb='xs' align="center" >
                         <Text size="md" fw={500}>
@@ -1252,6 +1239,37 @@ export default function EstimateNew() {
                         }
                     </Group>
                 </Group>
+                    </>
+                }
+                scrollAreaComponent={ScrollArea.Autosize}
+            >
+
+                <LoadingOverlay
+                    visible={isValidating}
+                    zIndex={1000}
+                    overlayProps={{ radius: 'sm', blur: 2 }}
+                    loaderProps={{ color: 'indigo', type: 'bars' }}
+                />
+
+                {/* <Group justify="space-between">
+                                <Group mb='xs' align="center" >
+                                    <Text size="md" fw={500}>
+                                        Tasks Available
+                                    </Text>
+                                    {
+                                        extractedTasks?.length > 0 ? (
+                                            <Badge ta='center' color="indigo" size="md" radius="lg">
+                                                {extractedTasks?.length || 0}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
+                                                0
+                                            </Badge>
+                                        )
+                                    }
+                                </Group>
+                            </Group> */}
+                            
                 {/* <ScrollArea
                                 style={{
                                     flex: 1, // Take remaining space for scrollable area
@@ -1476,7 +1494,7 @@ export default function EstimateNew() {
                                         color="#000480"
                                         radius='lg'
                                         variant="light"
-                                        disabled={selectedFile ? false : true}
+                                        disabled={!selectedFile}
                                         onClick={() => {
                                             setSelectedEstimateId(selectedFile?.name);
                                             setSelectedFileTasksOpened(true);
@@ -1506,13 +1524,13 @@ export default function EstimateNew() {
                                 scrollHideDelay={1}
                                 scrollbarSize={5}
                             >
-                                <RFQUploadDropZoneExcel
-                                    name="Excel Files"
-                                    changeHandler={handleFileChange}
-                                    selectedFile={selectedFile} // Pass selectedFile as prop
-                                    setSelectedFile={setSelectedFile} // Pass setSelectedFile as prop
-                                    color="green" // Optional custom border color
-                                />
+                               <RFQUploadDropZoneExcel
+  name="Excel or CSV file"
+  changeHandler={handleFileChange}
+  selectedFile={selectedFile}
+  setSelectedFile={setSelectedFile}
+  color="green"
+/>
                                 <Space h='sm' />
                                 <Group justify="space-between" pb='sm'>
                                     <Text size="md" fw={500} >
@@ -2759,6 +2777,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
     const [clusterSearch, setClusterSearch] = useState<string>('');
     const [tableOpened, setTableOpened] = useState(false);
     const [flattenedData, setFlattenedData] = useState([]);
+    
     // Extract unique task IDs from findings
     const uniqueTaskIds = useMemo(() => {
         const taskIds = findings.map(finding => finding.taskId);
@@ -2813,22 +2832,14 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
 
         return filtered;
     }, [groupedTasks, taskSearch]);
-    // Select the first task and its first cluster by default
-    useEffect(() => {
-        if (Object.keys(filteredGroups).length > 0 && !selectedTaskId) {
-            const firstGroupKey = Object.keys(filteredGroups)[0];
-            const firstTaskId = filteredGroups[firstGroupKey][0];
-            setSelectedTaskId(firstTaskId);
-        }
-    }, [filteredGroups, selectedTaskId]);
 
     // Get all group keys for default opened accordions
     const defaultOpenValues = useMemo(() => {
         return Object.keys(filteredGroups);
     }, [filteredGroups]);
 
-     // Get all clusters for the selected task
-     const getClustersForTask = useMemo(() => {
+    // Get all clusters for the selected task
+    const getClustersForTask = useMemo(() => {
         if (!selectedTaskId) return [];
         
         // Find all findings with the selected taskId
@@ -2875,20 +2886,33 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         return null;
     }, [findings, selectedTaskId, selectedCluster]);
 
-    // Select the first task and its first cluster by default
+    // Important: Auto-select first task from first accordion on initial load
     useEffect(() => {
-        if (filteredTasks.length > 0 && !selectedTaskId) {
-            const firstTaskId = filteredTasks[0];
-            setSelectedTaskId(firstTaskId);
+        if (Object.keys(filteredGroups).length > 0 && !selectedTaskId) {
+            const firstGroupKey = Object.keys(filteredGroups)[0];
+            const firstTaskId = filteredGroups[firstGroupKey][0];
             
-            // Find clusters for this task
-            const taskFindings = findings.filter(f => f.taskId === firstTaskId);
+            setSelectedTaskId(firstTaskId);
+        }
+    }, [filteredGroups, selectedTaskId]);
+
+    // Important: Auto-select first cluster when task changes or on initial selection
+    useEffect(() => {
+        if (selectedTaskId) {
+            // Get clusters for this task
+            const taskFindings = findings.filter(f => f.taskId === selectedTaskId);
+            
+            // If there are clusters available, select the first one
             if (taskFindings.length > 0 && taskFindings[0].details.length > 0) {
-                setSelectedCluster(taskFindings[0].details[0].cluster);
-                setSelectedFindingDetail(taskFindings[0].details[0]);
+                const firstCluster = taskFindings[0].details[0].cluster;
+                setSelectedCluster(firstCluster);
+            } else {
+                // Reset if no clusters found
+                setSelectedCluster(null);
+                setSelectedFindingDetail(null);
             }
         }
-    }, [filteredTasks, findings, selectedTaskId]);
+    }, [findings, selectedTaskId]);
 
     // Update selected finding detail when cluster changes
     useEffect(() => {
@@ -2952,26 +2976,21 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         setFlattenedData(flattened);
     }, [findings]);
 
-
     // Column definitions for the table
     const columnDefs : ColDef[] = [
-        { headerName: 'Source Task', field: 'sourceTask', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150, pinned: 'left' },
+        { headerName: 'Source Task', field: 'sourceTask', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 200, pinned: 'left' },
         { headerName: 'Description', field: 'description', filter: true, floatingFilter: true, resizable: true, width: 400 },
-        { headerName: 'Cluster ID', field: 'cluster_id', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 100 },
+        { headerName: 'Cluster ID', field: 'cluster_id', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 280 },
         {
             headerName: 'Man Hours',
             field: 'mhsMin',
-            // filter: true,
             sortable: true,
             floatingFilter: true,
             resizable: true,
-            // flex: 4,
             width: 300,
             cellRenderer: (val: any) => {
                 return (
-
                     <Flex direction='row' justify='space-between'>
-
                         <Badge variant="light" color="teal" fullWidth>
                             Min : {val?.data?.mhsMin?.toFixed(0)}
                         </Badge>
@@ -2981,15 +3000,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                         <Badge variant="light" color="violet" fullWidth>
                             Max : {val?.data?.mhsMax?.toFixed(0)}
                         </Badge>
-
                     </Flex>
                 );
             },
         },
-        // { headerName: 'Man Hours Min', field: 'mhsMin', sortable: true, floatingFilter: true, resizable: true, width: 150 },
-        // { headerName: 'Man Hours Max', field: 'mhsMax', sortable: true, floatingFilter: true, resizable: true, width: 150 },
-        // { headerName: 'Man Hours Avg', field: 'mhsAvg', sortable: true, floatingFilter: true, resizable: true, width: 150 },
-        // { headerName: 'Man Hours Est', field: 'mhsEst', sortable: true, floatingFilter: true, resizable: true, width: 150 },
         { headerName: 'Part Number', field: 'partId', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150 },
         { headerName: 'Part Description', field: 'partDesc', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 200 },
         { headerName: 'Unit', field: 'unit', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 100 },
@@ -3055,13 +3069,27 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         document.body.removeChild(link);
     };
 
+    // Function to handle task selection and auto-select the first cluster
+    const handleTaskSelection = (taskId: string) => {
+        setSelectedTaskId(taskId);
+        
+        // Auto-select first cluster for this task
+        const taskFindings = findings.filter(f => f.taskId === taskId);
+        if (taskFindings.length > 0 && taskFindings[0].details.length > 0) {
+            const firstCluster = taskFindings[0].details[0].cluster;
+            setSelectedCluster(firstCluster);
+        } else {
+            setSelectedCluster(null);
+            setSelectedFindingDetail(null);
+        }
+    };
+
     return (
         <>
-        <Modal
+            <Modal
                 opened={tableOpened}
                 onClose={() => {
                     setTableOpened(false);
-                    //   form.reset();
                 }}
                 size='100%'
                 scrollAreaComponent={ScrollArea.Autosize}
@@ -3072,11 +3100,6 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                 MPD
                             </Title>
                             <Space w={50} />
-                            {/* <Text c='white'>
-                                Total Source Tasks - {uniqueTaskIds?.length}
-                            </Text> */}
-                            {/* <Space w={600}/> */}
-                            {/* Button aligned to the end */}
                             <Button color="green" size="xs" onClick={downloadCSV} ml='60vw' >
                                 Download CSV
                             </Button>
@@ -3085,7 +3108,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                 }
                 styles={{
                     header: {
-                        backgroundColor: "#124076", // Set header background color
+                        backgroundColor: "#124076",
                         padding: "12px",
                     },
                     close: {
@@ -3103,26 +3126,26 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                 >
                     <style>
                         {`
-/* Remove the borders and grid lines */
-.ag-theme-alpine .ag-root-wrapper, 
-.ag-theme-alpine .ag-root-wrapper-body,
-.ag-theme-alpine .ag-header,
-.ag-theme-alpine .ag-header-cell,
-.ag-theme-alpine .ag-body-viewport {
-border: none;
-}
+                        /* Remove the borders and grid lines */
+                        .ag-theme-alpine .ag-root-wrapper, 
+                        .ag-theme-alpine .ag-root-wrapper-body,
+                        .ag-theme-alpine .ag-header,
+                        .ag-theme-alpine .ag-header-cell,
+                        .ag-theme-alpine .ag-body-viewport {
+                            border: none;
+                        }
 
-/* Remove the cell highlight (border) on cell click */
-.ag-theme-alpine .ag-cell-focus {
-outline: none !important; /* Remove focus border */
-box-shadow: none !important; /* Remove any box shadow */
-}
+                        /* Remove the cell highlight (border) on cell click */
+                        .ag-theme-alpine .ag-cell-focus {
+                            outline: none !important; /* Remove focus border */
+                            box-shadow: none !important; /* Remove any box shadow */
+                        }
 
-/* Remove row border */
-.ag-theme-alpine .ag-row {
-border-bottom: none;
-}
-`}
+                        /* Remove row border */
+                        .ag-theme-alpine .ag-row {
+                            border-bottom: none;
+                        }
+                        `}
                     </style>
 
                     <AgGridReact
@@ -3131,24 +3154,18 @@ border-bottom: none;
                         pagination={true}
                         paginationPageSize={10}
                         domLayout="autoHeight"
-                    // defaultColDef={{
-                    //   sortable: true,
-                    //   filter: true,
-                    //   resizable: true,
-                    //   minWidth: 100,
-                    //   flex: 1
-                    // }}
                     />
                 </div>
             </Modal>
+            
             <Card 
-            p={10} 
-            c='white' 
-            bg='#124076'
-            onClick={(values: any) => {
-                setTableOpened(true);
-            }}
-            style={{ cursor: 'pointer' }}
+                p={10} 
+                c='white' 
+                bg='#124076'
+                onClick={() => {
+                    setTableOpened(true);
+                }}
+                style={{ cursor: 'pointer' }}
             >
                 <Title order={4}>Findings</Title>
             </Card>
@@ -3156,57 +3173,6 @@ border-bottom: none;
             <Card withBorder p={0} h="80vh" bg="none">
                 <Space h="xs" />
                 <Grid h="100%">
-                    {/* Left Section: Unique Task IDs List */}
-                    {/* <Grid.Col span={3}>
-                        <Card h="100%" w="100%" p="md" bg="none">
-                            <Group>
-                                <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                    Total Source Tasks
-                                </Text>
-                                <Text size="md" fw={500} mb="xs">
-                                    {uniqueTaskIds.length}
-                                </Text>
-                            </Group>
-
-                            <TextInput
-                                placeholder="Search tasks..."
-                                value={taskSearch}
-                                onChange={(e) => setTaskSearch(e.target.value)}
-                                mb="md"
-                            />
-
-                          
-                            <Card
-                                bg="none"
-                                p={0}
-                                h="calc(80vh - 150px)"
-                            >
-                                <ScrollArea h="100%" scrollbarSize={6}>
-                                    {filteredTasks.map((taskId, index) => (
-                                        <Badge
-                                            fullWidth
-                                            key={index}
-                                            variant={selectedTaskId === taskId ? 'filled' : "light"}
-                                            color="#4C7B8B"
-                                            size="lg"
-                                            mb="md"
-                                            h={35}
-                                            radius="md"
-                                            onClick={() => {
-                                                setSelectedTaskId(taskId);
-                                                // Reset cluster selection when task changes
-                                                setSelectedCluster(null);
-                                                setSelectedFindingDetail(null);
-                                            }}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <Text fw={500}>{taskId}</Text>
-                                        </Badge>
-                                    ))}
-                                </ScrollArea>
-                            </Card>
-                        </Card>
-                    </Grid.Col> */}
                     {/* Left Section: Grouped Task IDs List */}
                     <Grid.Col span={3}>
                         <Card h="100%" w="100%" p="md" bg="none">
@@ -3236,7 +3202,6 @@ border-bottom: none;
                                                 </Accordion.Control>
                                                 <Accordion.Panel>
                                                     {filteredGroups[groupKey].map((taskId, index) => (
-                                                        // <Tooltip label={taskId}>
                                                         <Badge
                                                             fullWidth
                                                             key={index}
@@ -3246,16 +3211,11 @@ border-bottom: none;
                                                             mb="md"
                                                             h={35}
                                                             radius="md"
-                                                            onClick={() => {
-                                                                setSelectedTaskId(taskId);
-                                                                setSelectedCluster(null);
-                                                                setSelectedFindingDetail(null);
-                                                            }}
+                                                            onClick={() => handleTaskSelection(taskId)}
                                                             style={{ cursor: 'pointer' }}
                                                         >
                                                             <Text fw={500}>{taskId}</Text>
                                                         </Badge>
-                                                        // </Tooltip>
                                                     ))}
                                                 </Accordion.Panel>
                                             </Accordion.Item>
@@ -3299,21 +3259,20 @@ border-bottom: none;
                                         selectedTaskId ? (
                                             filteredClusters.length > 0 ? (
                                                 filteredClusters.map((cluster, clusterIndex) => (
-                                                    <Tooltip label={cluster}>
-                                                    <Badge
-                                                        fullWidth
-                                                        key={clusterIndex}
-                                                        variant={selectedCluster === cluster ? 'filled' : "light"}
-                                                        color="#4C7B8B"
-                                                        size="lg"
-                                                        mb='md'
-                                                        h={35}
-                                                        radius="md"
-                                                        onClick={() => setSelectedCluster(cluster)}
-                                                        style={{ cursor: 'pointer' }}
-                                                    >
-                                                        <Text fw={500}>{cluster}</Text>
-                                                    </Badge>
+                                                    <Tooltip key={clusterIndex} label={cluster}>
+                                                        <Badge
+                                                            fullWidth
+                                                            variant={selectedCluster === cluster ? 'filled' : "light"}
+                                                            color="#4C7B8B"
+                                                            size="lg"
+                                                            mb='md'
+                                                            h={35}
+                                                            radius="md"
+                                                            onClick={() => setSelectedCluster(cluster)}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            <Text fw={500}>{cluster}</Text>
+                                                        </Badge>
                                                     </Tooltip>
                                                 ))
                                             ) : (
@@ -3441,6 +3400,23 @@ border-bottom: none;
                                         </Group>
                                     </Card>
                                 </SimpleGrid>
+
+                                <Space h="lg" />
+
+                                <Text size="md" fw={500} c="dimmed">
+                                    Skills 
+                                </Text>
+                                
+                                <SimpleGrid cols={8}>
+                                    { 
+                                     selectedFindingDetail?.skill?.map((skl: any, index: number) => (
+                                        <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+                                            {skl}
+                                        </Badge>
+                                    ))
+                                    }
+                                </SimpleGrid>
+                                
                                 <Space h="md" />
 
                                 <Text size="md" mb="xs" fw={500} c="dimmed">
@@ -3478,7 +3454,7 @@ border-bottom: none;
                                     </style>
                                     <AgGridReact
                                         pagination
-                                        paginationPageSize={10}
+                                        paginationPageSize={6}
                                         domLayout="autoHeight" // Ensures height adjusts dynamically
                                         rowData={formattedSpareParts}
                                         columnDefs={[
@@ -3967,7 +3943,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                     <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <Title order={4} c='white'>
-                                MPD
+                                Findings
                             </Title>
                             <Space w={50} />
                             <Text c='white'>
@@ -4081,7 +4057,7 @@ border-bottom: none;
                                     p={0}
                                     h="calc(80vh - 150px)"
                                 >
-                                    <ScrollArea h="100%" scrollbarSize={6}>
+                                    <ScrollArea h="100%" scrollbarSize={0} scrollHideDelay={0}>
                                         <Accordion defaultValue={defaultOpenValues} multiple>
                                             {Object.keys(filteredGroups).map((groupKey) => (
                                                 <Accordion.Item key={groupKey} value={groupKey}>
@@ -4221,6 +4197,21 @@ border-bottom: none;
                                                     </Group>
                                                 </Card>
                                             </SimpleGrid>
+                                            <Space h="lg" />
+
+                                <Text size="md" fw={500} c="dimmed">
+                                    Skills  
+                                </Text>
+                                
+                                    <SimpleGrid cols={8}>
+                                   { selectedTask?.skill?.map((skl:any)=>
+                                        <>
+                                        <Badge fullWidth color="cyan" size="lg" radius="md">
+                                            {skl}
+                                        </Badge>
+                                        </>
+                                    )}
+                                    </SimpleGrid>
 
                                             <Space h="md" />
                                             <Text size="md" mb="xs" fw={500} c="dimmed">
@@ -4260,7 +4251,7 @@ border-bottom: none;
                                                 </style>
                                                 <AgGridReact
                                                     pagination
-                                                    paginationPageSize={10}
+                                                    paginationPageSize={6}
                                                     domLayout="autoHeight" // Ensures height adjusts dynamically
                                                     rowData={selectedTask?.spare_parts || []}
                                                     columnDefs={[
