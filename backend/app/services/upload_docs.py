@@ -494,7 +494,7 @@ class ExcelUploadService:
         # remove spaces
         type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
         logger.info(f"type of check is : {type_of_check_no_spaces}")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+        base_est_id = f"{estimate_request.aircraftRegNo.replace(" ","")}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
         logger.info(f"base_est_id: {base_est_id}")
         latest_version = 0
         version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
