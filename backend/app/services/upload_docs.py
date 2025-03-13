@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
+import os
 import json
 import re
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
@@ -19,7 +20,6 @@ from app.middleware.auth import get_current_user
 from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
-
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
@@ -103,6 +103,15 @@ class ExcelUploadService:
             logger.error(f"Data cleaning error: {str(e)}")
             raise
 
+    def read_excel_with_sheetName(self, content, file_extension):
+        config_file_path = os.path.join("app", "fileconfig", "config.json")
+        with open(config_file_path, 'r') as file:
+            config = json.load(file)
+        sheet_name = config['sheet_name']
+        columns = config['columns']
+        df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, usecols=columns, engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+        return df
+
     async def process_excel_file(self, file: UploadFile) -> List[Dict[Any, Any]]:
         try:
             content = await file.read()
@@ -180,7 +189,9 @@ class ExcelUploadService:
             file_extension = file.filename.split('.')[-1].lower()  # Get the file extension
 
             if file_extension in ['xls', 'xlsx', 'xlsm']:
-                excel_data = pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+                excel_data = self.read_excel_with_sheetName(content, file_extension)
+                logger.info(f"Excel data: {excel_data}")
+                 # pd.read_excel(io.BytesIO(content), engine='openpyxl' if file_extension != 'xls' else 'xlrd')
             elif file_extension == 'csv':
                 excel_data = pd.read_csv(io.BytesIO(content))
             else:
@@ -196,8 +207,8 @@ class ExcelUploadService:
                 )
 
             # Clean the data
-            cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
-            excel_data.rename(columns=cleaned_columns, inplace=True)
+            # cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
+            # excel_data.rename(columns=cleaned_columns, inplace=True)
             cleaned_data = self.clean_data(excel_data)
             processed_record = {}
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -478,78 +489,81 @@ class ExcelUploadService:
     
   
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
-        
-        logger.info(f"estimate_request: {estimate_request}")
-        await self.validate_excel_file(file)
-        
-        json_data = await self.process_file(file)
-        logger.info("json data came")
-
-        taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
-        logger.info(f"Hash of Estima: {taskUniqHash}")
-
-        current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
-    
-        formatted_date = current_time.strftime("%d%m%Y")
-        # remove spaces
-        type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
-        logger.info(f"type of check is : {type_of_check_no_spaces}")
-        base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
-        logger.info(f"base_est_id: {base_est_id}")
-        latest_version = 0
-        version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
-        
-        # Query for existing estimates with the same aircraft registration and base ID pattern
-        existing_estimates = self.estima_collection.find({
-            "aircraftRegNo": estimate_request.aircraftRegNo,
-            "estID": {"$regex": version_regex_pattern}
-        })
-        latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
-    
-        if latest_doc:
-            version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
-            if version_match:
-                latest_version = int(version_match.group(1))
-        new_version = latest_version + 1                             
-        est_id = f"{base_est_id}-V{new_version:02d}"
-        logger.info(f"estID is : {est_id}")
-        
-        data_to_insert = {
-            **json_data,
-            "estHashID":taskUniqHash,
-
-            "estID":est_id,
-            # "tasks": estimate_request.tasks,
-            "probability": estimate_request.probability,
-            "operator": estimate_request.operator,
-            "typeOfCheck": estimate_request.typeOfCheck,
-            "aircraftAge": estimate_request.aircraftAge,
-            "aircraftRegNo":estimate_request.aircraftRegNo,
-            "aircraftFlightHours": estimate_request.aircraftFlightHours,
-            "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
-            "areaOfOperations": estimate_request.areaOfOperations,
-            "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
-            "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-            "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
-
+        try:
+            logger.info(f"estimate_request: {estimate_request}")
+            # await self.validate_excel_file(file)
             
-              
-        }
+            json_data = await self.process_file(file)
+            logger.info("json data came")
+
+            taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
+            logger.info(f"Hash of Estima: {taskUniqHash}")
+
+            current_time = json_data.get("createdAt", datetime.utcnow().replace(tzinfo=timezone.utc))
         
-       
-        insert_result = self.estima_collection.insert_one(data_to_insert) 
-        logger.info("Length of document inserted")
+            formatted_date = current_time.strftime("%d%m%Y")
+            # remove spaces
+            type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+            logger.info(f"type of check is : {type_of_check_no_spaces}")
+            base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+            logger.info(f"base_est_id: {base_est_id}")
+            latest_version = 0
+            version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
+            
+            # Query for existing estimates with the same aircraft registration and base ID pattern
+            existing_estimates = self.estima_collection.find({
+                "aircraftRegNo": estimate_request.aircraftRegNo,
+                "estID": {"$regex": version_regex_pattern}
+            })
+            latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
         
+            if latest_doc:
+                version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
+                if version_match:
+                    latest_version = int(version_match.group(1))
+            new_version = latest_version + 1                             
+            est_id = f"{base_est_id}-V{new_version:02d}"
+            logger.info(f"estID is : {est_id}")
+            
+            data_to_insert = {
+                **json_data,
+                "estHashID":taskUniqHash,
+
+                "estID":est_id,
+                # "tasks": estimate_request.tasks,
+                "probability": estimate_request.probability,
+                "operator": estimate_request.operator,
+                "typeOfCheck": estimate_request.typeOfCheck,
+                "aircraftAge": estimate_request.aircraftAge,
+                "aircraftRegNo":estimate_request.aircraftRegNo,
+                "aircraftFlightHours": estimate_request.aircraftFlightHours,
+                "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
+                "areaOfOperations": estimate_request.areaOfOperations,
+                "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
+                "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
+                "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
+
+                
+                
+            }
+            
         
-        response = {
-            "estHashID":taskUniqHash,
-            "status": "Initiated",
-            "estID": est_id,
-            "msg": "File and estimated data inserted successfully",
-            "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-        }
-        
-        return response
+            insert_result = self.estima_collection.insert_one(data_to_insert) 
+            logger.info("Length of document inserted")
+            
+            
+            response = {
+                "estHashID":taskUniqHash,
+                "status": "Initiated",
+                "estID": est_id,
+                "msg": "File and estimated data inserted successfully",
+                "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+            }
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error uploading estimate: {str(e)}")
+            return None
     
     
     async def estimate_status(self) -> List[EstimateStatusResponse]:
