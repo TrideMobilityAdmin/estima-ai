@@ -57,7 +57,7 @@ export const useApi = () => {
       probability: data.probability,
       operator: data.operator,
       aircraftRegNo: data.aircraftRegNo,
-      // aircraftModel: data.aircraftModel, 
+      aircraftModel: data.aircraftModel, 
       aircraftAge: data.aircraftAge,
       aircraftFlightHours: data.aircraftFlightHours,
       aircraftFlightCycles: data.aircraftFlightCycles,
