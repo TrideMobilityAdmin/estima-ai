@@ -538,6 +538,7 @@ class ExcelUploadService:
                 "typeOfCheck": estimate_request.typeOfCheck,
                 "aircraftAge": estimate_request.aircraftAge,
                 "aircraftRegNo":estimate_request.aircraftRegNo,
+                "aircraftModel": estimate_request.aircraftModel,
                 "aircraftFlightHours": estimate_request.aircraftFlightHours,
                 "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
                 "areaOfOperations": estimate_request.areaOfOperations,
