@@ -55,6 +55,7 @@ import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
 import { useMemo, useRef } from "react";
 import { userName } from "../components/tokenJotai";
+import excelTemplateFile from '../assets/RFQ_Excel_Template.xlsx';  
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -119,14 +120,14 @@ export default function EstimateNew() {
         const data = await getAllEstimatesStatus();
         if (data) {
             const threeDaysAgo = new Date();
-            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 5);
 
             const filteredData = data.filter((item: any) => new Date(item.createdAt) >= threeDaysAgo);
             const sortedData = filteredData.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-            // setEstimatesStatusData(sortedData);
+            setEstimatesStatusData(sortedData);
 
-            setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            // setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         }
         setLoading(false);
     };
@@ -177,40 +178,40 @@ export default function EstimateNew() {
     console.log("selected expert insights tasks obj >>>>", selectedExpertInsightTasks);
 
     // Handle file and extracted tasks
-const handleFileChange = async (
-    file: File | null,
-    tasks: string[],
-    fileSheetInfo?: { sheetName: string, columnName: string }
-  ) => {
-    setIsValidating(true);
-    setSelectedFile(file);
-    setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
-    setSheetInfo(fileSheetInfo);
-      
-    console.log("✅ Selected File:", file ? file.name : "None");
-    console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
-    console.log("From sheet:", fileSheetInfo?.sheetName);
-    console.log("From column:", fileSheetInfo?.columnName);
-      
-    if (tasks.length > 0) {
-      const response = await validateTasks(tasks);
-      setValidatedTasks(response);
-          
-      const invalidTasks = response.filter((task) => task.status === false);
-      if (invalidTasks.length > 0) {
-        showNotification({
-          title: "Tasks Not Available!",
-          message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
-          color: "orange",
-          style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-        });
-      }
-    } else {
-      setValidatedTasks([]);
-    }
-      
-    setIsValidating(false);
-  };
+    const handleFileChange = async (
+        file: File | null,
+        tasks: string[],
+        fileSheetInfo?: { sheetName: string, columnName: string }
+    ) => {
+        setIsValidating(true);
+        setSelectedFile(file);
+        setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+        setSheetInfo(fileSheetInfo);
+        
+        console.log("✅ Selected File:", file ? file.name : "None");
+        console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+        console.log("From sheet:", fileSheetInfo?.sheetName);
+        console.log("From column:", fileSheetInfo?.columnName);
+        
+        if (tasks.length > 0) {
+        const response = await validateTasks(tasks);
+        setValidatedTasks(response);
+            
+        const invalidTasks = response.filter((task) => task.status === false);
+        if (invalidTasks.length > 0) {
+            showNotification({
+            title: "Tasks Not Available!",
+            message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
+            color: "orange",
+            style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+            });
+        }
+        } else {
+        setValidatedTasks([]);
+        }
+        
+        setIsValidating(false);
+    };
 
 
     // 🟢 Function to validate tasks & update UI
@@ -312,6 +313,7 @@ const handleFileChange = async (
             probability: 50,
             operator: "",
             aircraftRegNo: "",
+            aircraftModel:"",
             aircraftAge: "",
             aircraftFlightHours: "",
             aircraftFlightCycles: "",
@@ -330,25 +332,10 @@ const handleFileChange = async (
         },
 
         validate: {
-            // probability: (value) => (value ? null : "Probability is required"),
-            operator: (value) => (value.trim() ? null : "Operator is not available, enter N/A"),
-            aircraftRegNo: (value) => (value.trim() ? null : "RegNo is not available, enter N/A"),
-            // typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
-            // operator: (value, values) => {
-            //     if (!value.trim() && !values.aircraftRegNo.trim()) {
-            //         return "Either Operator or Aircraft Reg No is mandatory.";
-            //     }
-            //     return value.trim() ? null : "Operator is not available, enter N/A";
-            // },
-            // aircraftRegNo: (value, values) => {
-            //     if (!value.trim() && !values.operator.trim()) {
-            //         return "Either Operator or Aircraft Reg No is mandatory.";
-            //     }
-            // },
+            operator: (value) => (value.trim() ? null : "Operator is required"),
+            aircraftRegNo: (value) => (value.trim() ? null : "Aircraft Registration Number is required"),
             typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
-            // aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
-            // aircraftFlightHours: (value) => (value.trim() ? null : "Flight Hours are required"),
-            // aircraftFlightCycles: (value) => (value.trim() ? null : "Flight Cycles are required"),
+            aircraftModel: (value) => value.trim() ? null : "Aircraft Model is required",
         },
     });
 
@@ -364,28 +351,36 @@ const handleFileChange = async (
             if (validationErrors.errors.operator) {
                 showAppNotification("warning", "Validation Error", "Operator is required");
             }
+            if (validationErrors.errors.aircraftModel) {
+                showAppNotification("warning", "Validation Error", "Aircraft Model is required");
+            }
             if (validationErrors.errors.aircraftRegNo) {
-                showAppNotification("warning", "Aircraft Registration Number", "Please enter the Aircraft Registration Number");
+                showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
                 if (aircraftRegNoRef.current) {
                     aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-                    aircraftRegNoRef.current.focus(); // Optionally focus the input
+                    aircraftRegNoRef.current.focus(); // Focus on the input field
                 }
-                return; // Prevent submission if there are errors    
             }
-            
+            return;
         }
 
-        if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
-            showAppNotification("warning", "Both are N/A", "Reg Num or Operator Any of one is Mandatory");
+        // Check if aircraft reg no is N/A and type of check is empty
+        if (form.values.aircraftRegNo.trim().toLowerCase() === "n/a" && !form.values.typeOfCheck.trim()) {
+            showAppNotification("warning", "Validation Error", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
+            return;
         }
+        // Check if type of check is N/A and aircraft reg no is empty
+        // if (form.values.typeOfCheck.trim().toLowerCase() === "n/a" && !form.values.aircraftRegNo.trim()) {
+        //     showAppNotification("warning", "Validation Error", "When Type of Check is N/A, Aircraft Registration Number is mandatory");
+        //     return;
+        // }
+
+        // if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
+        //     showAppNotification("warning", "Both are N/A", "Reg Num or Operator Any of one is Mandatory");
+        // }
 
         if (!selectedFile) {
-            showAppNotification("error", "Error", "Please Select File");
-            // showNotification({
-            //     title: "Error",
-            //     message: "Please select a file",
-            //     color: "red",
-            // });
+            showAppNotification("warning", "Error", "Please Select File");
             return;
         }
         const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
@@ -401,9 +396,10 @@ const handleFileChange = async (
 
         const requestData = {
             tasks: validTasks || [],
-            probability: (Number(form.values.probability) / 100) || 0,
+            probability: (Number(form.values.probability)) || 0,
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
+            // aircraftModel: form.values.aircraftModel || "",
             aircraftAge: Number(form.values.aircraftAge) || 0,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
@@ -422,28 +418,34 @@ const handleFileChange = async (
 
         console.log("Submitting data:", requestData);
 
-        try {
-            setLoading(true);
-            const response = await RFQFileUpload(requestData, selectedFile);
-            console.log("RFQ API Response:", response);
+        // try {
+        //     setLoading(true);
+        //     const response = await RFQFileUpload(requestData, selectedFile);
+        //     console.log("RFQ API Response:", response);
 
-            if (response) {
-                setRfqSubmissionResponse(response);
-                setRfqSubModalOpened(true);
-                showAppNotification("success", "Success!", "Estimate report submitted successfully!");
-                setValidatedTasks([]);
-            }
-        } catch (error) {
-            console.error("API Error:", error);
-            showAppNotification("error", "Error!", "Failed to submit estimate report.!");
-            showNotification({
-                title: "Error",
-                message: "Failed to submit estimate report.",
-                color: "red",
-            });
-        } finally {
-            setLoading(false);
-        }
+        //     if (response) {
+        //         setRfqSubmissionResponse(response);
+        //         setRfqSubModalOpened(true);
+        //         showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+        //          // Reset form fields after successful submission
+        //         form.reset();
+        //         // Reset related state variables
+        //         setSelectedFile(null); // Reset the selected file
+        //         setValidatedTasks([]); // Reset validated tasks
+        //         setAdditionalTasks([]); // Reset additional tasks
+        //         setSelectedExpertInsightTasks([]); // Reset expert insight tasks
+        //     }
+        // } catch (error) {
+        //     console.error("API Error:", error);
+        //     showAppNotification("error", "Error!", "Failed to submit estimate report.!");
+        //     showNotification({
+        //         title: "Error",
+        //         message: "Failed to submit estimate report.",
+        //         color: "red",
+        //     });
+        // } finally {
+        //     setLoading(false);
+        // }
 
     };
 
@@ -551,7 +553,7 @@ const handleFileChange = async (
 
     // Transform data for the chart
     const transformedData = probabilityWiseData?.estProb?.map((item: any) => ({
-        prob: Math.round(item?.prob * 100), // Multiply by 100 and round
+        prob: item?.prob , // Multiply by 100 and round
         totalManhrs: item?.totalManhrs,
         totalSpareCost: item?.totalSpareCost,
     }));
@@ -710,7 +712,7 @@ const handleFileChange = async (
         );
     };
     const fields = [
-        // { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={10} max={100} step={10} {...form.getInputProps("probability")} /> },
+        { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={0} max={100} step={1} {...form.getInputProps("probability")} /> },
         { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
         // { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
         // { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
@@ -745,44 +747,6 @@ const handleFileChange = async (
         { label: "Capping Spares", name: "cappingSpares" },
     ];
 
-    const sampleRemarks = [
-        {
-            id: 1,
-            userName: 'John Doe',
-            date: '2025-03-05T14:30:00',
-            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
-        },
-        {
-            id: 2,
-            userName: 'Jane Smith',
-            date: '2025-03-06T09:15:00',
-            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
-        },
-        {
-            id: 1,
-            userName: 'John Doe',
-            date: '2025-03-05T14:30:00',
-            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
-        },
-        {
-            id: 2,
-            userName: 'Jane Smith',
-            date: '2025-03-06T09:15:00',
-            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
-        },
-        {
-            id: 1,
-            userName: 'John Doe',
-            date: '2025-03-05T14:30:00',
-            remark: 'We need to revise the estimation for component A. The complexity seems higher than initially anticipated.'
-        },
-        {
-            id: 2,
-            userName: 'Jane Smith',
-            date: '2025-03-06T09:15:00',
-            remark: 'I agree with John. Let\'s add an additional 4 hours to the estimation.'
-        }
-    ];
 
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -861,42 +825,88 @@ const handleFileChange = async (
     };
 
 
-    const downloadEmptyExcel = () => {
-        const filename = 'Example_RFQ.xlsx'
-        const headers = [
-            'Task Id',
-            'Description'
-        ]
-        // Create a new workbook
-        const workbook = XLSX.utils.book_new();
+    // const downloadEmptyExcel = () => {
+    //     const filename = 'Example_RFQ.xlsx'
+    //     const headers = [
+    //         'Task Id',
+    //         'Description'
+    //     ]
+    //     // Create a new workbook
+    //     const workbook = XLSX.utils.book_new();
         
-        // Create an empty worksheet with just the headers
-        // We create an array with one empty row (just the headers)
-        const worksheetData = [headers];
+    //     // Create an empty worksheet with just the headers
+    //     // We create an array with one empty row (just the headers)
+    //     const worksheetData = [headers];
         
-        // Convert the data to a worksheet
-        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    //     // Convert the data to a worksheet
+    //     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
         
-        // Add the worksheet to the workbook
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    //     // Add the worksheet to the workbook
+    //     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
         
-        // Write the workbook to a binary string
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    //     // Write the workbook to a binary string
+    //     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
         
-        // Create a Blob from the buffer
-        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    //     // Create a Blob from the buffer
+    //     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         
-        // Create a download link and trigger the download
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
+    //     // Create a download link and trigger the download
+    //     const url = URL.createObjectURL(blob);
+    //     const link = document.createElement('a');
+    //     link.href = url;
+    //     link.download = filename;
+    //     document.body.appendChild(link);
+    //     link.click();
         
-        // Clean up
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+    //     // Clean up
+    //     document.body.removeChild(link);
+    //     URL.revokeObjectURL(url);
+    //   };
+
+      const downloadEmptyExcel = async () => {
+        try {
+          // Fetch the file from your project assets
+          const response = await fetch(excelTemplateFile);
+          
+          if (!response.ok) {
+            throw new Error('Failed to load the template file');
+          }
+          
+          // Get the file as blob
+          const blob = await response.blob();
+          
+          // Create a URL for the blob
+          const url = window.URL.createObjectURL(blob);
+          
+          // Create a temporary anchor element to trigger the download
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'RFQ_Template.xlsx'; // Name that will appear when downloading
+          document.body.appendChild(a);
+          
+          // Trigger the download
+          a.click();
+          
+          // Clean up
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          
+          // Show success notification
+          showAppNotification(
+            'success',
+            'Successful!',
+            'RFQ template downloaded successfully',
+          );
+        } catch (error) {
+          console.error('Error downloading the template:', error);
+          
+          // Show error notification
+          showAppNotification(
+            'error',
+            'Failed!',
+            'Failed to download the template file',
+          );
+        }
       };
     
 
@@ -1525,16 +1535,16 @@ const handleFileChange = async (
                                 scrollbarSize={5}
                             >
                                <RFQUploadDropZoneExcel
-  name="Excel or CSV file"
-  changeHandler={handleFileChange}
-  selectedFile={selectedFile}
-  setSelectedFile={setSelectedFile}
-  color="green"
-/>
+                                    name="Excel or CSV file"
+                                    changeHandler={handleFileChange}
+                                    selectedFile={selectedFile}
+                                    setSelectedFile={setSelectedFile}
+                                    color="green"
+                                    />
                                 <Space h='sm' />
                                 <Group justify="space-between" pb='sm'>
                                     <Text size="md" fw={500} >
-                                        Add Additional Tasks
+                                        Add Tasks
                                     </Text>
                                     <Button size="xs" onClick={handleAddAdditionalTask} color="blue" variant="light" rightSection={<IconMessage2Plus size={18} />}>
                                         Add Task
@@ -1703,19 +1713,22 @@ const handleFileChange = async (
                     </Grid.Col> */}
 
                     <Grid.Col span={4}>
-                        <Card withBorder h="60vh" radius="md">
+                        <Card withBorder h="60vh" radius="md" >
+                            {/* <Card bg='#dce1fc'> */}
                             <Group justify="space-between" onClick={() => setExpanded(!expanded)} style={{ cursor: "pointer" }}>
-                                <Text size="md" mb='sm' fw={500}>
+                                <Text size="md" fw={500}>
                                     RFQ Parameters
                                 </Text>
                                 <Group>
                                     {expanded ? <IconChevronUp color="gray" /> : <IconChevronDown color="gray" />}
                                 </Group>
                             </Group>
+                            {/* </Card> */}
+                            
 
                             {expanded && (
-                                <ScrollArea scrollbarSize={0} style={{ height: "60vh", overflowX: 'hidden' }}>
-                                    <SimpleGrid cols={1} spacing="xs">
+                                <ScrollArea scrollbarSize={0} offsetScrollbars scrollHideDelay={1} style={{ height: "60vh"}}>
+                                    <SimpleGrid cols={1} spacing="xs" >
                                         {fields.map((field) => (
                                             <Grid key={field.name} align="center">
                                                 <Grid.Col span={8}>
@@ -1741,9 +1754,12 @@ const handleFileChange = async (
                                 </ScrollArea>
                             )}
 
-                            <ScrollArea style={{ flex: 1, overflow: "auto", marginTop: "10px" }} offsetScrollbars scrollHideDelay={1}>
+                            <ScrollArea style={{ flex: 1, overflow: "auto" }} offsetScrollbars scrollHideDelay={1}>
+                                <Text size="md" m='sm' fw={500} >
+                                    Required Parameters
+                                </Text>
                                 <SimpleGrid cols={2} >
-                                    <NumberInput
+                                    {/* <NumberInput
                                         size="xs"
                                         leftSection={<IconPercentage66 size={20} />}
                                         placeholder="Ex: 0.5"
@@ -1754,7 +1770,7 @@ const handleFileChange = async (
                                         step={10}
                                         //   precision={2}
                                         {...form.getInputProps("probability")}
-                                    />
+                                    /> */}
                                     <Select
                                         size="xs"
                                         // width='12vw' 
@@ -1781,9 +1797,29 @@ const handleFileChange = async (
                                         label="Aircraft Reg No"
                                         {...form.getInputProps("aircraftRegNo")}
                                     />
+                                    <TextInput
+                                        // ref={aircraftRegNoRef}
+                                        size="xs"
+                                        leftSection={<IconPlaneTilt size='20' />}
+                                        placeholder="Ex: A320"
+                                        label="Aircraft Model"
+                                        {...form.getInputProps("aircraftModel")}
+                                    />
 
                                 </SimpleGrid>
                                 <Space h='xs' />
+                                {
+                                    showFields?.length > 0 ? (
+                                        <>
+                                        <Text size="md" m='sm' fw={500}>
+                                    Optional Parameters
+                                </Text>
+                                {/* <Space h='sm'/> */}
+                                </>
+                                    ) : (
+                                        <></>
+                                    )
+                                }
                                 <SimpleGrid cols={1} spacing="xs">
                                     <SimpleGrid cols={2}>
                                         {showFields
@@ -2032,7 +2068,7 @@ const handleFileChange = async (
                             <IconReport />
                         </ThemeIcon>
                         <Title order={5} >
-                            Estimates Status
+                            Estimations
                         </Title>
                     </Group>
                     <Space h='sm' />
@@ -2170,7 +2206,7 @@ border-bottom: none;
                                         <Text
                                             mt='xs'
                                         >
-                                            {params.value.toFixed(2)}
+                                            {Math.round(params.value)}
                                         </Text>
                                     ),
                                 },
@@ -2413,6 +2449,19 @@ border-bottom: none;
                                             parts={[
                                                 { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
                                                 { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+
                                             ]}
                                             spareCostData={[
                                                 { date: "Min", Cost: 100 },
@@ -2614,7 +2663,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             </Flex>
 
             {/* Center Section - Estimated Parts Table */}
-            <Card withBorder>
+            <Card withBorder h='60vh'>
                 <Text size="md" fw={500} fz="h6" c="gray">
                     Estimated Parts
                 </Text>
@@ -2656,7 +2705,13 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         </Table.Tbody>
                     </Table>
                 </div> */}
-                <div
+                <ScrollArea
+                        h="100%"
+                        scrollbarSize={0}
+                        scrollHideDelay={0}
+
+                    >
+                        <div
                     className="ag-theme-alpine"
                     style={{
                         width: "100%",
@@ -2689,8 +2744,9 @@ border-bottom: none;
 `}
                     </style>
                     <AgGridReact
-                        // pagination
-                        // paginationPageSize={10}
+                        pagination
+                        paginationPageSize={6}
+                        paginationAutoPageSize
                         domLayout="autoHeight" // Ensures height adjusts dynamically
                         rowData={parts || []}
                         columnDefs={[
@@ -2742,6 +2798,8 @@ border-bottom: none;
                         ]}
                     />
                 </div>
+                    </ScrollArea>
+                
             </Card>
 
             {/* Right Section */}
@@ -2838,7 +2896,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         return Object.keys(filteredGroups);
     }, [filteredGroups]);
 
-    // Get all clusters for the selected task
+    // Get all clusters for the selected task with their probability values
     const getClustersForTask = useMemo(() => {
         if (!selectedTaskId) return [];
         
@@ -2846,25 +2904,30 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         const relatedFindings = findings.filter(f => f.taskId === selectedTaskId);
         if (relatedFindings.length === 0) return [];
         
-        // Extract all clusters from all findings with this taskId
-        const allClusters: string[] = [];
+        // Extract all clusters from all findings with this taskId along with their prob values
+        const clusterMap: { cluster: string, prob: number }[] = [];
+        
         relatedFindings.forEach(finding => {
             finding.details.forEach(detail => {
-                if (detail.cluster && !allClusters.includes(detail.cluster)) {
-                    allClusters.push(detail.cluster);
+                if (detail.cluster && !clusterMap.some(item => item.cluster === detail.cluster)) {
+                    clusterMap.push({
+                        cluster: detail.cluster,
+                        prob: detail.prob || 0 // Default to 0 if prob is not available
+                    });
                 }
             });
         });
         
-        return allClusters;
+        // Sort the clusters by prob value in descending order
+        return clusterMap.sort((a, b) => b.prob - a.prob);
     }, [findings, selectedTaskId]);
 
     // Filter clusters based on search
     const filteredClusters = useMemo(() => {
         if (!clusterSearch.trim()) return getClustersForTask;
         
-        return getClustersForTask.filter(cluster => 
-            cluster.toLowerCase().includes(clusterSearch.toLowerCase())
+        return getClustersForTask.filter(clusterItem => 
+            clusterItem.cluster.toLowerCase().includes(clusterSearch.toLowerCase())
         );
     }, [getClustersForTask, clusterSearch]);
 
@@ -2896,23 +2959,23 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         }
     }, [filteredGroups, selectedTaskId]);
 
-    // Important: Auto-select first cluster when task changes or on initial selection
+    // UPDATED: Auto-select highest probability cluster when task changes
     useEffect(() => {
         if (selectedTaskId) {
-            // Get clusters for this task
-            const taskFindings = findings.filter(f => f.taskId === selectedTaskId);
+            // Get sorted clusters for this task (already sorted by prob in getClustersForTask)
+            const sortedClusters = getClustersForTask;
             
-            // If there are clusters available, select the first one
-            if (taskFindings.length > 0 && taskFindings[0].details.length > 0) {
-                const firstCluster = taskFindings[0].details[0].cluster;
-                setSelectedCluster(firstCluster);
+            // If there are clusters available, select the one with highest probability (first in the sorted array)
+            if (sortedClusters.length > 0) {
+                const highestProbCluster = sortedClusters[0].cluster;
+                setSelectedCluster(highestProbCluster);
             } else {
                 // Reset if no clusters found
                 setSelectedCluster(null);
                 setSelectedFindingDetail(null);
             }
         }
-    }, [findings, selectedTaskId]);
+    }, [selectedTaskId, getClustersForTask]);
 
     // Update selected finding detail when cluster changes
     useEffect(() => {
@@ -2954,6 +3017,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                             partId: part.partId,
                             partDesc: part.desc,
                             unit: part.unit,
+                            qty: part.qty,
+                            price: part.price
                         });
                     });
                 } else {
@@ -2965,9 +3030,11 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                         mhsMax: detail.mhs.max,
                         mhsAvg: detail.mhs.avg,
                         mhsEst: detail.mhs.est,
-                        partId: '',
-                        partDesc: '',
-                        unit: '',
+                        partId: '-',
+                        partDesc: '-',
+                        unit: '-',
+                        qty: 0,
+                        price:0
                     });
                 }
             });
@@ -2992,13 +3059,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                 return (
                     <Flex direction='row' justify='space-between'>
                         <Badge variant="light" color="teal" fullWidth>
-                            Min : {val?.data?.mhsMin?.toFixed(0)}
+                            Min : {val?.data?.mhsMin?.toFixed(0)  || "-"}
                         </Badge>
                         <Badge variant="light" color="blue" fullWidth>
-                            Avg : {val?.data?.mhsAvg?.toFixed(0)}
+                            Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
                         </Badge>
                         <Badge variant="light" color="violet" fullWidth>
-                            Max : {val?.data?.mhsMax?.toFixed(0)}
+                            Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
                         </Badge>
                     </Flex>
                 );
@@ -3006,7 +3073,39 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         },
         { headerName: 'Part Number', field: 'partId', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150 },
         { headerName: 'Part Description', field: 'partDesc', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 200 },
+        { 
+            headerName: 'Quantity', 
+            field: 'qty', 
+            filter: true, 
+            sortable: true, 
+            floatingFilter: true, 
+            resizable: true, 
+            width: 200,
+            cellRenderer: (val :any) => {
+                return (
+                    <Text>
+                        {val?.data?.qty?.toFixed(2)  || "-"}
+                    </Text>
+                )
+            }
+        },
         { headerName: 'Unit', field: 'unit', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 100 },
+        { 
+            headerName: 'Price ($)', 
+            field: 'price', 
+            filter: true, 
+            sortable: true, 
+            floatingFilter: true, 
+            resizable: true, 
+            width: 200,
+            cellRenderer: (val :any) => {
+                return (
+                    <Text>
+                        {val?.data?.price?.toFixed(2) || "-"}
+                    </Text>
+                )
+            }
+        },
     ];
 
     const downloadCSV = () => {
@@ -3026,7 +3125,9 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             "MHS Est",
             "Part Number",
             "Part Description",
+            "Quantity",
             "Unit",
+            "Price"
         ];
 
         // Function to escape CSV fields
@@ -3051,7 +3152,9 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             escapeCSVField(task.mhsEst),
             escapeCSVField(task.partId),
             escapeCSVField(task.partDesc),
+            escapeCSVField(task.qty),
             escapeCSVField(task.unit),
+            escapeCSVField(task.price),
         ]);
 
         // Convert array to CSV format
@@ -3069,19 +3172,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         document.body.removeChild(link);
     };
 
-    // Function to handle task selection and auto-select the first cluster
+    // UPDATED: Function to handle task selection and auto-select highest probability cluster
     const handleTaskSelection = (taskId: string) => {
         setSelectedTaskId(taskId);
         
-        // Auto-select first cluster for this task
-        const taskFindings = findings.filter(f => f.taskId === taskId);
-        if (taskFindings.length > 0 && taskFindings[0].details.length > 0) {
-            const firstCluster = taskFindings[0].details[0].cluster;
-            setSelectedCluster(firstCluster);
-        } else {
-            setSelectedCluster(null);
-            setSelectedFindingDetail(null);
-        }
+        // We do not need to manually set the first cluster here as the useEffect will handle it
+        // The useEffect watching selectedTaskId and getClustersForTask will automatically 
+        // select the highest probability cluster when the task changes
     };
 
     return (
@@ -3097,7 +3194,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                     <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <Title order={4} c='white'>
-                                MPD
+                                Findings
                             </Title>
                             <Space w={50} />
                             <Button color="green" size="xs" onClick={downloadCSV} ml='60vw' >
@@ -3226,7 +3323,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                         </Card>
                     </Grid.Col>
 
-                    {/* Middle Section: All Unique Clusters for Selected Task */}
+                    {/* Middle Section: All Unique Clusters for Selected Task - UPDATED WITH SORTING */}
                     <Grid.Col span={3}>
                         <Card h="100%" w="100%" p="md" bg="none">
                             <Group>
@@ -3244,7 +3341,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                 mb="md"
                             />
 
-                            {/* Scrollable Clusters List */}
+                            {/* Scrollable Clusters List - Already sorted by prob in filteredClusters */}
                             <Card
                                 bg="none"
                                 p={0}
@@ -3258,20 +3355,24 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                     {
                                         selectedTaskId ? (
                                             filteredClusters.length > 0 ? (
-                                                filteredClusters.map((cluster, clusterIndex) => (
-                                                    <Tooltip key={clusterIndex} label={cluster}>
+                                                filteredClusters.map((clusterItem, clusterIndex) => (
+                                                    <Tooltip 
+                                                    key={clusterIndex} 
+                                                    label={clusterItem.cluster}
+                                                    // label={`${clusterItem.cluster} (Probability: ${clusterItem.prob.toFixed(2)}%)`}
+                                                    >
                                                         <Badge
                                                             fullWidth
-                                                            variant={selectedCluster === cluster ? 'filled' : "light"}
+                                                            variant={selectedCluster === clusterItem.cluster ? 'filled' : "light"}
                                                             color="#4C7B8B"
                                                             size="lg"
                                                             mb='md'
                                                             h={35}
                                                             radius="md"
-                                                            onClick={() => setSelectedCluster(cluster)}
+                                                            onClick={() => setSelectedCluster(clusterItem.cluster)}
                                                             style={{ cursor: 'pointer' }}
                                                         >
-                                                            <Text fw={500}>{cluster}</Text>
+                                                            <Text fw={500}>{clusterItem.cluster}</Text>
                                                         </Badge>
                                                     </Tooltip>
                                                 ))
@@ -3347,11 +3448,11 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                         </Grid.Col>
                                         <Grid.Col span={8}>
                                             <Progress w="100%" color="#E07B39" radius="md" size="lg" 
-                                                value={selectedFindingDetail?.probability || selectedFindingDetail?.prob || 0} />
+                                                value={selectedFindingDetail?.prob || 0} />
                                         </Grid.Col>
                                         <Grid.Col span={2}>
                                             <Text size="sm" fw={600} c="#E07B39">
-                                                {selectedFindingDetail?.probability || selectedFindingDetail?.prob || 0} %
+                                                { selectedFindingDetail?.prob || 0} %
                                             </Text>
                                         </Grid.Col>
                                     </Grid>
@@ -3481,7 +3582,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                                 headerName: "Qty",
                                                 sortable: true,
                                                 resizable: true,
-                                                flex: 1
+                                                flex: 1,
+                                                cellRenderer:(val:any)=>{
+                                                    return (
+                                                        <>
+                                                        <Text>
+                                                            {Math.round(val?.data?.qty) || "-"}
+                                                        </Text>
+                                                        </>
+                                                    )
+                                                }
                                             },
                                             {
                                                 field: "unit",
@@ -3495,7 +3605,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                                 headerName: "Price($)",
                                                 sortable: true,
                                                 resizable: true,
-                                                flex: 1
+                                                flex: 1,
+                                                cellRenderer:(val:any)=>{
+                                                    return (
+                                                        <>
+                                                        <Text>
+                                                            {val?.data?.price?.toFixed(2) || 0}
+                                                        </Text>
+                                                        </>
+                                                    )
+                                                }
                                             },
                                         ]}
                                     />
@@ -3632,9 +3751,9 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                         mhsEst: task.mhs.est,
                         partId: part.partId,
                         partDesc: part.desc,
-                        // qty: part.qty,
+                        qty: part.qty,
                         unit: part.unit,
-                        // price: part.price
+                        price: part.price
                     });
                 });
             } else {
@@ -3647,11 +3766,11 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                     mhsMax: task.mhs.max,
                     mhsAvg: task.mhs.avg,
                     mhsEst: task.mhs.est,
-                    partId: '',
-                    partDesc: '',
-                    // qty: '',
-                    unit: '',
-                    // price: ''
+                    partId: '-',
+                    partDesc: '-',
+                    qty: 0,
+                    unit: '-',
+                    price: 0
                 });
             }
         });
@@ -3682,17 +3801,17 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             // flex: 4,
             // pinned: 'left'
         },
-        {
-            headerName: 'Cluster ID',
-            field: 'cluster_id',
-            filter: true,
-            sortable: true,
-            floatingFilter: true,
-            resizable: true,
-            width: 100
-            // flex: 1,
-            // pinned:'left'
-        },
+        // {
+        //     headerName: 'Cluster ID',
+        //     field: 'cluster_id',
+        //     filter: true,
+        //     sortable: true,
+        //     floatingFilter: true,
+        //     resizable: true,
+        //     width: 100
+        //     // flex: 1,
+        //     // pinned:'left'
+        // },
 
         {
             headerName: 'Man Hours',
@@ -3709,13 +3828,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                     <Flex direction='row' justify='space-between'>
 
                         <Badge variant="light" color="teal" fullWidth>
-                            Min : {val?.data?.mhsMin?.toFixed(0)}
+                            Min : {val?.data?.mhsMin?.toFixed(0)  || "-"}
                         </Badge>
                         <Badge variant="light" color="blue" fullWidth>
-                            Avg : {val?.data?.mhsAvg?.toFixed(0)}
+                            Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
                         </Badge>
                         <Badge variant="light" color="violet" fullWidth>
-                            Max : {val?.data?.mhsMax?.toFixed(0)}
+                            Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
                         </Badge>
 
                     </Flex>
@@ -3767,23 +3886,23 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             resizable: true,
             // flex: 1
         },
-        // {
-        //     headerName: 'Quantity',
-        //     field: 'qty',
-        //     // filter: true,
-        //     sortable: true,
-        //     floatingFilter: true,
-        //     resizable: true,
-        //     // flex: 1
-        //     width: 150,
-        //     cellRenderer: (val: any) => {
-        //         return (
-        //             <Text>
-        //                 {val?.data?.qty?.toFixed(2) || "-"}
-        //             </Text>
-        //         );
-        //     },
-        // },
+        {
+            headerName: 'Quantity',
+            field: 'qty',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+            width: 150,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {Math.round(val?.data?.qty) || "-"}
+                    </Text>
+                );
+            },
+        },
         {
             headerName: 'Unit',
             field: 'unit',
@@ -3794,23 +3913,23 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             // flex: 1
             width: 150,
         },
-        // {
-        //     headerName: 'Price',
-        //     field: 'price',
-        //     // filter: true,
-        //     sortable: true,
-        //     floatingFilter: true,
-        //     resizable: true,
-        //     // flex: 1
-        //     width: 150,
-        //     cellRenderer: (val: any) => {
-        //         return (
-        //             <Text>
-        //                 {val?.data?.price?.toFixed(4)}
-        //             </Text>
-        //         );
-        //     },
-        // }
+        {
+            headerName: 'Price ($)',
+            field: 'price',
+            // filter: true,
+            sortable: true,
+            floatingFilter: true,
+            resizable: true,
+            // flex: 1
+            width: 150,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {val?.data?.price?.toFixed(2) || "-"}
+                    </Text>
+                );
+            },
+        }
     ];
 
     const downloadCSV = () => {
@@ -3823,7 +3942,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
         const csvHeaders = [
             "Source Task",
             "Description",
-            "Cluster ID",
+            // "Cluster ID",
             "MHS Min",
             "MHS Max",
             "MHS Avg",
@@ -3850,7 +3969,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
         const csvData = flattenedData.map((task: any) => [
             escapeCSVField(task.sourceTask),
             escapeCSVField(task.description),
-            escapeCSVField(task.cluster_id),
+            // escapeCSVField(task.cluster_id),
             escapeCSVField(task.mhsMin),
             escapeCSVField(task.mhsMax),
             escapeCSVField(task.mhsAvg),
@@ -3943,7 +4062,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                     <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <Title order={4} c='white'>
-                                Findings
+                                MPD
                             </Title>
                             <Space w={50} />
                             <Text c='white'>
@@ -4273,22 +4392,22 @@ border-bottom: none;
                                                             resizable: true,
                                                             flex: 1
                                                         },
-                                                        // {
-                                                        //     field: "qty",
-                                                        //     headerName: "Qty",
-                                                        //     sortable: true,
-                                                        //     // filter: true,
-                                                        //     // floatingFilter: true,
-                                                        //     resizable: true,
-                                                        //     flex: 1,
-                                                        //     cellRenderer: (val: any) => {
-                                                        //         return (
-                                                        //             <Text>
-                                                        //                 {val?.data?.qty?.toFixed(2) || 0}
-                                                        //             </Text>
-                                                        //         );
-                                                        //     },
-                                                        // },
+                                                        {
+                                                            field: "qty",
+                                                            headerName: "Qty",
+                                                            sortable: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
+                                                            resizable: true,
+                                                            flex: 1,
+                                                            cellRenderer: (val: any) => {
+                                                                return (
+                                                                    <Text>
+                                                                        {val?.data?.qty?.toFixed(2) || 0}
+                                                                    </Text>
+                                                                );
+                                                            },
+                                                        },
                                                         {
                                                             field: "unit",
                                                             headerName: "Unit",
@@ -4298,22 +4417,22 @@ border-bottom: none;
                                                             resizable: true,
                                                             flex: 1
                                                         },
-                                                        // {
-                                                        //     field: "price",
-                                                        //     headerName: "Price($)",
-                                                        //     sortable: true,
-                                                        //     // filter: true,
-                                                        //     // floatingFilter: true,
-                                                        //     resizable: true,
-                                                        //     flex: 1,
-                                                        //     cellRenderer: (val: any) => {
-                                                        //         return (
-                                                        //             <Text>
-                                                        //                 {val?.data?.price?.toFixed(4) || 0}
-                                                        //             </Text>
-                                                        //         );
-                                                        //     },
-                                                        // },
+                                                        {
+                                                            field: "price",
+                                                            headerName: "Price($)",
+                                                            sortable: true,
+                                                            // filter: true,
+                                                            // floatingFilter: true,
+                                                            resizable: true,
+                                                            flex: 1,
+                                                            cellRenderer: (val: any) => {
+                                                                return (
+                                                                    <Text>
+                                                                        {val?.data?.price?.toFixed(4) || 0}
+                                                                    </Text>
+                                                                );
+                                                            },
+                                                        },
                                                     ]}
                                                 />
                                             </div>

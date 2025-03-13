@@ -56,15 +56,16 @@ export const useApi = () => {
       tasks: data.tasks,
       probability: data.probability,
       operator: data.operator,
-      aircraftRegNo: data.aircraftRegNo, // Make sure this matches API's expected field name
+      aircraftRegNo: data.aircraftRegNo,
+      // aircraftModel: data.aircraftModel, 
       aircraftAge: data.aircraftAge,
       aircraftFlightHours: data.aircraftFlightHours,
       aircraftFlightCycles: data.aircraftFlightCycles,
-      areaOfOperations: data.areaOfOperations, // Ensure it's not empty
-            cappingDetails: data.cappingDetails,
-            additionalTasks: data.additionalTasks,
-            typeOfCheck: data.typeOfCheck, // Ensure it's not empty
-            miscLaborTasks: data.miscLaborTasks
+      areaOfOperations: data.areaOfOperations,
+      cappingDetails: data.cappingDetails,
+      additionalTasks: data.additionalTasks,
+      typeOfCheck: data.typeOfCheck, 
+      miscLaborTasks: data.miscLaborTasks
     };
 
     // Create FormData
