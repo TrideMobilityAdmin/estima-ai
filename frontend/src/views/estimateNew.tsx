@@ -399,7 +399,7 @@ export default function EstimateNew() {
             probability: (Number(form.values.probability)) || 0,
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
-            // aircraftModel: form.values.aircraftModel || "",
+            aircraftModel: form.values.aircraftModel || "",
             aircraftAge: Number(form.values.aircraftAge) || 0,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
