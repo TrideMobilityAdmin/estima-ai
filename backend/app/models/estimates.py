@@ -70,6 +70,7 @@ class EstimateRequest(BaseModel):
      typeOfCheck: str
      operator: str 
      aircraftRegNo:str
+     aircraftModel:str  
      additionalTasks: List[AdditionalTasks]
      miscLaborTasks: List[MiscLaborTask]
      

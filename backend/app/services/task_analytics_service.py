@@ -1400,7 +1400,7 @@ class TaskService:
         # valid_task_ids = [task.taskid for task in valid_tasks_response if task.status]
 
         try:
-            pipeline = [
+            pipeline =[
     {
         '$match': {
             'estID': estimate_id
@@ -1417,14 +1417,7 @@ class TaskService:
             'path': '$estimate', 
             'preserveNullAndEmptyArrays': True
         }
-    },
-    #   {
-    #             # Match tasks based on valid task IDs after unwinding the estimate
-    #             '$match': {
-    #                 'tasks.SourceTask': { '$in': valid_task_ids }
-    #             }
-    #         },
-    {
+    }, {
         '$addFields': {
             'filteredFindings': {
                 '$filter': {
@@ -1495,7 +1488,7 @@ class TaskService:
                                         'in': {
                                             '$sum': {
                                                 '$map': {
-                                                    'input': '$$detail.spareParts', 
+                                                    'input': '$$detail.spare_parts', 
                                                     'as': 'sparePart', 
                                                     'in': {
                                                         '$multiply': [
@@ -1513,8 +1506,7 @@ class TaskService:
                 }
             }
         }
-    },
-     {
+    }, {
         '$addFields': {
             'estimate_manhrs': {
                 'min': {
@@ -1667,7 +1659,7 @@ class TaskService:
                 }
             }
         }
-    },{
+    }, {
         '$addFields': {
             'tatTime': {
                 '$divide': [
@@ -1690,7 +1682,7 @@ class TaskService:
                 '$add': [
                     {
                         '$ifNull': [
-                            '$aggregatedTasks.totalSpareCost', 0
+                            '$aggregatedTasks.totalPartsCost', 0
                         ]
                     }, {
                         '$ifNull': [
@@ -1705,10 +1697,21 @@ class TaskService:
             '_id': 0, 
             'estID': 1, 
             'description': 1, 
-             'overallEstimateReport': {
+            'overallEstimateReport': {
                 'estimatedTatTime': '$tatTime', 
                 'estimatedSpareCost': '$estimatedSpareCost', 
-                'estimateManhrs': '$estimate_manhrs'
+                'estimateManhrs': '$estimate_manhrs', 
+                'spareParts': {
+                    '$filter': {
+                        'input': '$totalConsumption.totalParts', 
+                        'as': 'part', 
+                        'cond': {
+                            '$gt': [
+                                '$$part.qty', 1
+                            ]
+                        }
+                    }
+                }
             }, 
             'tasks': {
                 '$map': {
@@ -1725,7 +1728,7 @@ class TaskService:
             }, 
             'aggregatedTasks': 1, 
             'findings': '$filteredFindings', 
-            'aggregatedFindings': '$aggregatedFilteredFindings',
+            'aggregatedFindings': '$aggregatedFilteredFindings', 
             'originalFilename': 1, 
             'userID': {
                 '$toString': '$userID'
@@ -1740,58 +1743,51 @@ class TaskService:
     }
 ]
 
-            # Execute aggregation and get first result
             result = list(self.estimates_collection.aggregate(pipeline))
             if not result:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
-
-            # Return the first document
-            # logger.warning(f"estimated collection fetched: {result}")
-            # return result[0]
-        
+            
             estimate_data = result[0]
-            estimated_spare_parts = {}
-            for task in estimate_data.get('tasks', []):
-                for spare_part in task.get('spareParts', []):
-                    part_id = spare_part['partId']
-                    if part_id not in estimated_spare_parts:
-                        estimated_spare_parts[part_id] = {
-                            'desc': spare_part['desc'],
-                            'unit': spare_part['unit'],
-                            'qty': 0,
-                            'price': 0
-                        }
-                    estimated_spare_parts[part_id]['qty'] += spare_part['qty']
-                    estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+            # part-wise qty,price for task,findings calculation
+            # estimated_spare_parts = {}
+            # for task in estimate_data.get('tasks', []):
+            #     for spare_part in task.get('spareParts', []):
+            #         part_id = spare_part['partId']
+            #         if part_id not in estimated_spare_parts:
+            #             estimated_spare_parts[part_id] = {
+            #                 'desc': spare_part['desc'],
+            #                 'unit': spare_part['unit'],
+            #                 'qty': 0,
+            #                 'price': 0
+            #             }
+            #         estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+            #         estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
 
-            for finding in estimate_data.get('filteredFindings', []):
-                for detail in finding.get('details', []):
-                    for spare_part in detail.get('spareParts', []):
-                        part_id = spare_part['partId']
-                        if part_id not in estimated_spare_parts:
-                            estimated_spare_parts[part_id] = {
-                                'desc': spare_part['desc'],
-                                'unit': spare_part['unit'],
-                                'qty': 0,
-                                'price': 0
-                            }
-                        estimated_spare_parts[part_id]['qty'] += spare_part['qty']
-                        estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
-            estimated_spare_parts_list = [
-                {
-                    'partID': part_id,
-                    'desc': data['desc'],
-                    'unit': data['unit'],
-                    'qty': data['qty'],
-                    'price': data['price']
-                }
-                for part_id, data in estimated_spare_parts.items()
-            ]
-
-            # Step 3: Add estimated spare parts to the result
-            # Step 3: Add estimated spare parts to the overallEstimateReport
-            estimate_data['overallEstimateReport']['estimatedSpareParts'] = estimated_spare_parts_list
+            # for finding in estimate_data.get('filteredFindings', []):
+            #     for detail in finding.get('details', []):
+            #         for spare_part in detail.get('spareParts', []):
+            #             part_id = spare_part['partId']
+            #             if part_id not in estimated_spare_parts:
+            #                 estimated_spare_parts[part_id] = {
+            #                     'desc': spare_part['desc'],
+            #                     'unit': spare_part['unit'],
+            #                     'qty': 0,
+            #                     'price': 0
+            #                 }
+            #             estimated_spare_parts[part_id]['qty'] += spare_part['qty']
+            #             estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+            # estimated_spare_parts_list = [
+            #     {
+            #         'partID': part_id,
+            #         'desc': data['desc'],
+            #         'unit': data['unit'],
+            #         'qty': data['qty'],
+            #         'price': data['price']
+            #     }
+            #     for part_id, data in estimated_spare_parts.items()
+            # ]
+            # estimate_data['overallEstimateReport']['estimatedSpareParts'] = estimated_spare_parts_list
             logger.info("Estimated collection fetched successfully")
             return estimate_data
 
