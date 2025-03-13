@@ -16,6 +16,7 @@ export const getUserToken = atom((get) => get(userToken));
 export const userID = atom<any>(sessionStorage.getItem("userID") || null);
 export const roleID = atom<any>(sessionStorage.getItem("roleID") || null);
 export const entityID = atom<any>(sessionStorage.getItem("entityID") || null);
+export const userName = atom<any>(sessionStorage.getItem("username") || null);
 interface module {
   moduleID: string;
   moduleName: string;

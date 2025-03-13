@@ -60,6 +60,11 @@ export const useApi = () => {
       aircraftAge: data.aircraftAge,
       aircraftFlightHours: data.aircraftFlightHours,
       aircraftFlightCycles: data.aircraftFlightCycles,
+      areaOfOperations: data.areaOfOperations, // Ensure it's not empty
+            cappingDetails: data.cappingDetails,
+            additionalTasks: data.additionalTasks,
+            typeOfCheck: data.typeOfCheck, // Ensure it's not empty
+            miscLaborTasks: data.miscLaborTasks
     };
 
     // Create FormData
@@ -67,11 +72,14 @@ export const useApi = () => {
     formData.append("file", file);
     // Append the estimate_request as a JSON string
     formData.append("estimate_request", JSON.stringify(estimateRequest));
+    // formData.append("estimate_request", new Blob([JSON.stringify(estimateRequest)], { type: "application/json" }));
+
 
     try {
       const response = await axiosInstance.post(uploadEstimate_Url, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+          "Accept": "application/json"
         },
       });
 
@@ -147,7 +155,14 @@ export const useApi = () => {
         color: "orange",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
-      
+      if (error.response?.data?.detail === "Internal server error: 404: Estimate not found") {
+        showNotification({
+          title: "Not Found!",
+          message: "Estimate Not Found, Try another one",
+          color: "orange",
+          style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+        });
+      }
       // Check if authentication has expired
       if (error.response?.data?.detail === "Invalid authentication credentials") {
         handleSessionExpired();
@@ -399,6 +414,29 @@ export const useApi = () => {
     }
   };
 
+  const updateRemarkByEstID = async (estimateId:any,data: any) => {
+    try {
+      const response = await axiosInstance.put(getEstimateReport_Url+estimateId+'/remarks', data);
+      console.log("✅ API Response update remark:", response);
+      showNotification({
+        title: "Updated Successfully!",
+        message: "Successfully Updated Remark",
+        color: "green",
+        style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+
+      // Check if authentication has expired
+      // if (error.response?.data?.detail === "Invalid authentication credentials") {
+      //   handleSessionExpired();
+      // }
+
+      return null;
+    }
+  };
+
 
   return { 
     RFQFileUpload, 
@@ -411,6 +449,7 @@ export const useApi = () => {
     downloadEstimatePdf,
     getAllDataExpertInsights,
     getProbabilityWiseDetails,
-    updateProbabilityWiseDetails
+    updateProbabilityWiseDetails,
+    updateRemarkByEstID
   };
 };

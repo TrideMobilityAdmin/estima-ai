@@ -1,0 +1,609 @@
+{
+    "data": {
+        "partId": "425A200-5",
+        "partDescription": "DEMISTER",
+        "usage": {
+            "tasks": [
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "FUSELAGE - CENTER FUSELAGE - INSPECT MLG DOOR ACTUATOR\nFITTING ON KEEL BEAM",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-27T09:32:52",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "HYDRAULIC POWER - YELLOW MAIN HYDRAULIC POWER -                        INSPECTION OF BRACKET ON YELLOW ELECTRICAL MOTOR PUMP HP LINE",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-27T09:59:02",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:16:55",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:16:55",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:25:22",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:25:22",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE REHEATER FOR IN SHOP CLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATORS\n  EXPERIENCE, A LESS",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:31:51",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE REHEATER FOR IN SHOP CLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATORS\n  EXPERIENCE, A LESS",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:31:51",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "SWR - 007 , AS PER CUSTOMER REQUEST CARRYOUT CLEANING OF THE LH AIR CONDITIONING PACK-CONDENSER IAW AMM TASK 21-52-00-100-003-A.",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:43:45",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "SWR - 008 , AS PER CUSTOMER REQUEST CARRYOUT CLEANING OF THE RH AIR CONDITIONING PACK-CONDENSER IAW AMM TASK 21-52-00-100-003-A.",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:43:45",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "FUSELAGE - CENTER FUSELAGE - INSPECT MLG DOOR ACTUATOR\nFITTING ON KEEL BEAM",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-27T09:32:52",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "HYDRAULIC POWER - YELLOW MAIN HYDRAULIC POWER -                        INSPECTION OF BRACKET ON YELLOW ELECTRICAL MOTOR PUMP HP LINE",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-27T09:59:02",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:16:55",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:16:55",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:25:22",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE PRIMARY AND MAIN HEAT EXCHANGERS FOR IN SHOP\nCLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATO",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:25:22",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE REHEATER FOR IN SHOP CLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATORS\n  EXPERIENCE, A LESS",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:31:51",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "AIR CONDITIONING PACK\n\nREMOVE REHEATER FOR IN SHOP CLEANING.\n\nNOTE:\nINTERVAL:\n- DEPENDING ON OPERATING ENVIRONMENT AND OPERATORS\n  EXPERIENCE, A LESS",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:31:51",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "SWR - 007 , AS PER CUSTOMER REQUEST CARRYOUT CLEANING OF THE LH AIR CONDITIONING PACK-CONDENSER IAW AMM TASK 21-52-00-100-003-A.",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:43:45",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "SWR - 008 , AS PER CUSTOMER REQUEST CARRYOUT CLEANING OF THE RH AIR CONDITIONING PACK-CONDENSER IAW AMM TASK 21-52-00-100-003-A.",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "date": "2024-03-30T09:43:45",
+                            "quantity": 1
+                        }
+                    ]
+                }
+            ],
+            "findings": [
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "taskId": "212600-11-1",
+                    "taskDescription": "",
+                    "packages": [
+                        {
+                            "packageId": "HMV23/000211/0324",
+                            "logItem": "HMV23/000211/0324/1",
+                            "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                            "date": "2024-04-03T09:38:36",
+                            "quantity": 1
+                        }
+                    ]
+                }
+            ]
+        },
+        "aircraftDetails": {
+            "aircraftModels": [
+                {
+                    "count": 2,
+                    "aircraftModel": "A321"
+                },
+                {
+                    "count": 7,
+                    "aircraftModel": "A320"
+                }
+            ],
+            "stockStatusCodes": [
+                {
+                    "count": 9,
+                    "stockStatus": "Owned"
+                }
+            ]
+        },
+        "dateWiseQty": [
+            {
+                "date": "2024-03-27",
+                "tasksqty": 4,
+                "findingsqty": 0
+            },
+            {
+                "date": "2024-03-30",
+                "tasksqty": 16,
+                "findingsqty": 0
+            },
+            {
+                "date": "2024-04-03",
+                "tasksqty": 0,
+                "findingsqty": 26
+            }
+        ]
+    },
+    "response": {
+        "statusCode": 200,
+        "message": "Parts usage retrieved successfully"
+    }
+}
