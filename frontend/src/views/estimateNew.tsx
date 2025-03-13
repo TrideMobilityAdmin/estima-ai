@@ -1456,7 +1456,7 @@ export default function EstimateNew() {
             </Modal>
 
 
-            <div style={{ padding: 70 }}>
+            <div style={{ padding: 60 }}>
                 <Grid grow gutter="xs">
                     <Grid.Col span={4}>
                         {/* <Card withBorder
@@ -2417,14 +2417,11 @@ border-bottom: none;
                                         />
 
                                         <Group justify="space-between">
-                                            <Group>
+                                            {/* <Group>
                                                 <Title order={4} c='gray'>
                                                     Overall Estimate Report
                                                 </Title>
-                                                {/* <Title order={4}>
-                                                    {estimateReportData?.estID || "-"}
-                                                </Title> */}
-                                            </Group>
+                                            </Group> */}
 
                                             {/* <Button
                                                 size="xs"
@@ -2582,250 +2579,239 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
     parts,
     estimatedSparesCost,
     spareCostData,
-}:any) => {
+  }: any) => {
     return (
-        <SimpleGrid cols={3} spacing="xs">
-            {/* Left Section */}
-            <Flex justify="flex-start" align="flex-start" direction="column">
-                {/* Total TAT Time */}
-                {/* <Card withBorder w="100%" p={5}>
-                    <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
-                            <IconClockShare style={{ width: "70%", height: "70%" }} />
-                        </ThemeIcon>
-                        <Flex direction="column">
-                            <Text size="md" fw={500} fz="h6" c="gray">
-                                Total TAT Time
-                            </Text>
-                            <Text size="md" fw={600} fz="h3">
-                                {totalTATTime}
-                            </Text>
-                        </Flex>
-                    </Group>
-                </Card>
-                <Space h="sm" /> */}
-
-                {/* Estimated Man Hours */}
-                <Card withBorder w="100%" >
-                    <Flex gap="lg" direction="column">
-                        <Title order={6} c="gray">
-                            Est Man Hrs.
-                        </Title>
-                        {Object?.entries(estimatedManHrs)?.map(([key, value]: any) => (
-                            <Grid key={key} justify="flex-start" align="center">
-                                <Grid.Col span={3}>
-                                    <Text fz="sm">{key.charAt(0).toUpperCase() + key.slice(1)}</Text>
-                                </Grid.Col>
-                                <Grid.Col span={9}>
-                                    <Group justify="flex-end" fz="xs" fw="600" c={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"}>
-                                        {value?.toFixed(0)} Hrs
-                                    </Group>
-                                    <Progress color={key === "max" ? "blue.5" : key === "estimated" ? "indigo.5" : key === "capping" ? "cyan.5" : "teal.7"} value={value} />
-                                </Grid.Col>
-                            </Grid>
-                        ))}
-                    </Flex>
-                </Card>
-                <Space h="xs" />
-
-                {/* Capping Unbilled Cost */}
-                <Card withBorder w="100%" p={5}>
-                    <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
-                            <IconSettingsDollar style={{ width: "70%", height: "70%" }} />
-                        </ThemeIcon>
-                        <Flex direction="column">
-                            <Text size="md" fw={500} fz="h6" c="gray">
-                                Unbillable Cost ($)
-                            </Text>
-                            <Text size="md" fw={600} fz="h3">
-                                {cappingUnbilledCost}
-                            </Text>
-                        </Flex>
-                    </Group>
-                </Card>
-                <Space h="xs" />
-                <Card withBorder w="100%" p={5}>
-                    <Group p={0} gap="sm">
-                        <ThemeIcon variant="light" radius="md" size="60" color="#124076">
-                            <MdOutlineMiscellaneousServices style={{ width: "70%", height: "70%" }} />
-                        </ThemeIcon>
-                        <Flex direction="column">
-                            <Text size="md" fw={500} fz="h6" c="gray">
-                                Estimated Spares Cost ($)
-                            </Text>
-                            <Text size="md" fw={600} fz="h3">
-                                {estimatedSparesCost}
-                            </Text>
-                        </Flex>
-                    </Group>
-                </Card>
-            </Flex>
-
-            {/* Center Section - Estimated Parts Table */}
-            <Card withBorder h='60vh'>
-                <Text size="md" fw={500} fz="h6" c="gray">
-                    Estimated Parts
+      <Box>
+        <Title order={4} mb="md" fw={500} c="dimmed">Overall Estimate Report</Title>
+        <Grid gutter="xs">
+          {/* Left Section - Estimate Overview */}
+          <Grid.Col span={3}>
+            <Card withBorder radius="md" p="xs" h="100%">
+              {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
+              
+              {/* Estimated Man Hours */}
+              <Card withBorder radius="md" p="md" mb="md" bg="gray.0">
+                <Text size="sm" fw={500} c="dimmed" mb="md">
+                  Estimated Man Hours
                 </Text>
-                {/* <div style={{ position: "relative", height: "40vh", overflow: "hidden" }}>
-                    <Table stickyHeader striped highlightOnHover>
-                        <Table.Thead
-                            style={{
-                                position: "sticky",
-                                top: 0,
-                                backgroundColor: "white",
-                                zIndex: 1,
-                                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
-                            }}
-                        >
-                            <Table.Tr>
-                                <Table.Th>Part Desc</Table.Th>
-                                <Table.Th>Part Name</Table.Th>
-                                <Table.Th>Qty</Table.Th>
-                                <Table.Th>Price ($)</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {parts?.length > 0 ? (
-                                parts?.map((row: any, index: any) => (
-                                    <Table.Tr key={index}>
-                                        <Table.Td>{row.partDesc}</Table.Td>
-                                        <Table.Td>{row.partName}</Table.Td>
-                                        <Table.Td>{row.qty}</Table.Td>
-                                        <Table.Td>{row.price}</Table.Td>
-                                    </Table.Tr>
-                                ))
-                            ) : (
-                                <Table.Tr>
-                                    <Table.Td colSpan={4} style={{ textAlign: "center" }}>
-                                        No data available
-                                    </Table.Td>
-                                </Table.Tr>
-                            )}
-                        </Table.Tbody>
-                    </Table>
-                </div> */}
-                <ScrollArea
-                        h="100%"
-                        scrollbarSize={0}
-                        scrollHideDelay={0}
-
-                    >
-                        <div
-                    className="ag-theme-alpine"
-                    style={{
-                        width: "100%",
-                        border: "none",
-                        height: "100%",
-
-                    }}
-                >
-                    <style>
-                        {`
-/* Remove the borders and grid lines */
-.ag-theme-alpine .ag-root-wrapper, 
-.ag-theme-alpine .ag-root-wrapper-body,
-.ag-theme-alpine .ag-header,
-.ag-theme-alpine .ag-header-cell,
-.ag-theme-alpine .ag-body-viewport {
-border: none;
-}
-
-/* Remove the cell highlight (border) on cell click */
-.ag-theme-alpine .ag-cell-focus {
-outline: none !important; /* Remove focus border */
-box-shadow: none !important; /* Remove any box shadow */
-}
-
-/* Remove row border */
-.ag-theme-alpine .ag-row {
-border-bottom: none;
-}
-`}
-                    </style>
-                    <AgGridReact
-                        pagination
-                        paginationPageSize={6}
-                        paginationAutoPageSize
-                        domLayout="autoHeight" // Ensures height adjusts dynamically
-                        rowData={parts || []}
-                        columnDefs={[
-                            {
-                                field: "partName",
-                                headerName: "Part Number",
-                                sortable: true,
-                                filter: true,
-                                floatingFilter: true,
-                                resizable: true,
-                                flex: 2
-                            },
-                            {
-                                field: "partDesc",
-                                headerName: "Description                                                            ",
-                                sortable: true,
-                                filter: true,
-                                floatingFilter: true,
-                                resizable: true,
-                                flex: 2
-                            },
-                            {
-                                field: "qty",
-                                headerName: "Qty",
-                                sortable: true,
-                                // filter: true,
-                                // floatingFilter: true,
-                                resizable: true,
-                                flex: 1.5
-                            },
-                            {
-                                field: "unit",
-                                headerName: "Units",
-                                sortable: true,
-                                // filter: true,
-                                // floatingFilter: true,
-                                resizable: true,
-                                flex: 1.5
-                            },
-                            {
-                                field: "price",
-                                headerName: "Price($)",
-                                sortable: true,
-                                // filter: true,
-                                // floatingFilter: true,
-                                resizable: true,
-                                flex: 1.5
-                            },
-                        ]}
-                    />
-                </div>
-                    </ScrollArea>
-                
-            </Card>
-
-            {/* Right Section */}
-            <Flex justify="flex-start" align="flex-start" direction="column">
-                {/* Estimated Spares Cost */}
-
-
-                {/* Spare Cost Chart */}
-                <Card w="100%" withBorder >
-                    <Flex gap="lg" direction="column">
-                        <Title order={5}>Spare Cost ($)</Title>
-                        <AreaChart
-                            h={330}
-                            withGradient
-                            data={spareCostData}
-                            dataKey="date"
-                            series={[{ name: "Cost", color: "indigo.6" }]}
-                            curveType="natural"
-                            connectNulls
+                <Flex gap="md" direction="column">
+                  {Object.entries(estimatedManHrs || {}).map(([key, value]: any) => {
+                    // Determine color based on key
+                    const color = key === "min" ? "teal.6" : 
+                                  key === "max" ? "blue.6" :
+                                  key === "avg" ? "teal.6" : 
+                                  "green.6";
+                    
+                    // Format the label
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    
+                    return (
+                      <Box key={key}>
+                        <Group justify="apart" mb={5}>
+                          <Text fz="xs" fw={500}>{label}</Text>
+                          <Text fz="sm" fw={600} c={color}>
+                            {typeof value === 'number' ? value.toFixed(0) : value} Hrs
+                          </Text>
+                        </Group>
+                        <Progress 
+                          color={color}
+                          value={typeof value === 'number' ? Math.min(value / 100, 100) : 0} 
+                          size="md"
+                          radius="sm"
                         />
-                    </Flex>
-                </Card>
-            </Flex>
-        </SimpleGrid>
+                      </Box>
+                    );
+                  })}
+                </Flex>
+              </Card>
+  
+              {/* Unbillable Cost */}
+              <Card withBorder radius="md" p="xs" mb="md" bg="blue.0">
+                <Group gap="md">
+                  <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                    <IconSettingsDollar size={24} />
+                  </ThemeIcon>
+                  <Flex direction="column">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Unbillable Cost
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      ${cappingUnbilledCost || 0}
+                    </Text>
+                  </Flex>
+                </Group>
+              </Card>
+  
+              {/* Estimated Spares Cost */}
+              <Card withBorder radius="md" p="xs" bg="blue.0">
+                <Group  gap="md">
+                  <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                    <MdOutlineMiscellaneousServices size={24} />
+                  </ThemeIcon>
+                  <Flex direction="column">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Estimated Spares Cost
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      ${estimatedSparesCost?.toFixed(2) || 0}
+                    </Text>
+                  </Flex>
+                </Group>
+              </Card>
+            </Card>
+          </Grid.Col>
+  
+          {/* Center Section - Parts Table (6 columns width) */}
+          <Grid.Col span={6}>
+            <Card withBorder radius="md" p="md" h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
+              <Title order={5} mb="md" fw={500} c="dimmed">Estimated Parts</Title>
+              <Box style={{ flex: 1, height: '500px' }}>
+                <div
+                  className="ag-theme-alpine"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  <style>
+                    {`
+                      .ag-theme-alpine {
+                        --ag-header-background-color: #f8f9fa;
+                        --ag-odd-row-background-color: #ffffff;
+                        --ag-even-row-background-color: #f9f9f9;
+                        --ag-row-hover-color: #f1f3f5;
+                        --ag-border-color: #e9ecef;
+                        --ag-font-size: 13px;
+                      }
+                      
+                      .ag-theme-alpine .ag-header-cell {
+                        font-weight: 600;
+                        color: #495057;
+                      }
+                      
+                      .ag-theme-alpine .ag-row {
+                        border-bottom: 1px solid var(--ag-border-color);
+                      }
+  
+                      .ag-theme-alpine .ag-cell {
+                        padding: 8px;
+                      }
+                    `}
+                  </style>
+                  <AgGridReact
+                    rowData={parts || []}
+                    domLayout="normal"
+                    // defaultColDef={{
+                    //   sortable: true,
+                    //   resizable: true,
+                    //   filter: true,
+                    //   floatingFilter: true,
+
+                    // }}
+                    columnDefs={[
+                      {
+                        field: "partName",
+                        headerName: "Part Number",
+                        flex: 1.5,
+                        minWidth: 120,
+                        sortable: true,
+                        resizable: true,
+                        filter: true,
+                        floatingFilter: true,
+                      },
+                      {
+                        field: "partDesc",
+                        headerName: "Description",
+                        flex: 1.5,
+                        minWidth: 120,
+                        sortable: true,
+                        resizable: true,
+                        filter: true,
+                        floatingFilter: true,
+                      },
+                      {
+                        field: "qty",
+                        headerName: "Qty",
+                        flex: 0.8,
+                        minWidth: 80,
+                        filter: 'agNumberColumnFilter',
+                      },
+                      {
+                        field: "unit",
+                        headerName: "Units",
+                        flex: 0.8,
+                        minWidth: 80,
+                      },
+                      {
+                        field: "price",
+                        headerName: "Price ($)",
+                        flex: 1,
+                        minWidth: 90,
+                        filter: 'agNumberColumnFilter',
+                        valueFormatter: params => {
+                          if (params.value === null || params.value === undefined) return '';
+                          return `$${parseFloat(params.value).toFixed(2)}`;
+                        },
+                      },
+                    ]}
+                    pagination={true}
+                    paginationPageSize={10}
+                  />
+                </div>
+              </Box>
+            </Card>
+          </Grid.Col>
+  
+          {/* Right Section - Chart (3 columns width) */}
+          <Grid.Col span={3}>
+            <Card withBorder radius="md" p="xs" h="100%">
+              <Title order={5} mb="md" fw={500} c="dimmed">Spare Cost Analysis</Title>
+              
+              <Card withBorder radius="md" p="md" bg="blue.0">
+                {/* <Text size="sm" fw={500} c="dimmed" mb="md">
+                  Spare Cost Trend
+                </Text> */}
+                <AreaChart
+                  h={350}
+                  data={spareCostData || [
+                    { date: 'Min', Cost: 100 },
+                    { date: 'Estimated', Cost: 750 },
+                    { date: 'Max', Cost: 1000 }
+                  ]}
+                  dataKey="date"
+                  series={[{ name: "Cost", color: "blue.9" }]}
+                  curveType="monotone"
+                  withGradient
+                  connectNulls
+                  gridAxis="y"
+                  withLegend={false}
+                  tooltipProps={{
+                    content: ({ payload, label }) => {
+                      if (payload && payload.length > 0) {
+                        return (
+                          <Card p="xs" withBorder>
+                            <Text fw={500} size="sm">{label}</Text>
+                            <Text size="sm">${payload[0].value}</Text>
+                          </Card>
+                        );
+                      }
+                      return null;
+                    }
+                  }}
+                  yAxisProps={{
+                    tickFormatter: (value) => `$${value}`,
+                    domain: ['dataMin - 10', 'dataMax + 10']
+                  }}
+                />
+              </Card>
+            </Card>
+          </Grid.Col>
+        </Grid>
+      </Box>
     );
-};
+  };
+  
+  
 
 const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) => {
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
