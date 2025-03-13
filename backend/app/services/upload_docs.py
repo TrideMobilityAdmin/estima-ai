@@ -209,6 +209,7 @@ class ExcelUploadService:
             # Clean the data
             # cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
             # excel_data.rename(columns=cleaned_columns, inplace=True)
+            
             cleaned_data = self.clean_data(excel_data)
             processed_record = {}
             current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -217,6 +218,10 @@ class ExcelUploadService:
             for column in cleaned_data.columns:
                 column_values = cleaned_data[column].dropna().tolist()
                 processed_record[column] = column_values
+            if 'TASK NUMBER' in processed_record:
+                processed_record['task'] = processed_record.pop('TASK NUMBER')
+            if 'DESCRIPTION' in processed_record:
+                processed_record['description'] = processed_record.pop('DESCRIPTION')
 
             processed_record.update({
             "upload_timestamp": current_time,
@@ -491,11 +496,9 @@ class ExcelUploadService:
     async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
         try:
             logger.info(f"estimate_request: {estimate_request}")
-            # await self.validate_excel_file(file)
             
             json_data = await self.process_file(file)
             logger.info("json data came")
-
             taskUniqHash = generate_sha256_hash_from_json(json_data).upper()
             logger.info(f"Hash of Estima: {taskUniqHash}")
 
@@ -528,7 +531,6 @@ class ExcelUploadService:
             data_to_insert = {
                 **json_data,
                 "estHashID":taskUniqHash,
-
                 "estID":est_id,
                 # "tasks": estimate_request.tasks,
                 "probability": estimate_request.probability,
