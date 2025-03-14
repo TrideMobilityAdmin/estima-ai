@@ -418,34 +418,34 @@ export default function EstimateNew() {
 
         console.log("Submitting data:", requestData);
 
-        // try {
-        //     setLoading(true);
-        //     const response = await RFQFileUpload(requestData, selectedFile);
-        //     console.log("RFQ API Response:", response);
+        try {
+            setLoading(true);
+            const response = await RFQFileUpload(requestData, selectedFile);
+            console.log("RFQ API Response:", response);
 
-        //     if (response) {
-        //         setRfqSubmissionResponse(response);
-        //         setRfqSubModalOpened(true);
-        //         showAppNotification("success", "Success!", "Estimate report submitted successfully!");
-        //          // Reset form fields after successful submission
-        //         form.reset();
-        //         // Reset related state variables
-        //         setSelectedFile(null); // Reset the selected file
-        //         setValidatedTasks([]); // Reset validated tasks
-        //         setAdditionalTasks([]); // Reset additional tasks
-        //         setSelectedExpertInsightTasks([]); // Reset expert insight tasks
-        //     }
-        // } catch (error) {
-        //     console.error("API Error:", error);
-        //     showAppNotification("error", "Error!", "Failed to submit estimate report.!");
-        //     showNotification({
-        //         title: "Error",
-        //         message: "Failed to submit estimate report.",
-        //         color: "red",
-        //     });
-        // } finally {
-        //     setLoading(false);
-        // }
+            if (response) {
+                setRfqSubmissionResponse(response);
+                setRfqSubModalOpened(true);
+                showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+                 // Reset form fields after successful submission
+                form.reset();
+                // Reset related state variables
+                setSelectedFile(null); // Reset the selected file
+                setValidatedTasks([]); // Reset validated tasks
+                setAdditionalTasks([]); // Reset additional tasks
+                setSelectedExpertInsightTasks([]); // Reset expert insight tasks
+            }
+        } catch (error) {
+            console.error("API Error:", error);
+            showAppNotification("error", "Error!", "Failed to submit estimate report.!");
+            showNotification({
+                title: "Error",
+                message: "Failed to submit estimate report.",
+                color: "red",
+            });
+        } finally {
+            setLoading(false);
+        }
 
     };
 
