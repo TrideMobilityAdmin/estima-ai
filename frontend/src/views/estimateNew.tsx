@@ -310,7 +310,7 @@ export default function EstimateNew() {
     const form = useForm({
         initialValues: {
             tasks: [],
-            probability: 50,
+            probability: 0,
             operator: "",
             aircraftRegNo: "",
             aircraftModel:"",
