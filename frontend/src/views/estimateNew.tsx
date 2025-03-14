@@ -2443,23 +2443,13 @@ border-bottom: none;
                                             estimatedManHrs={estimateReportData?.overallEstimateReport?.estimateManhrs || {}}
                                             estimatedSparesCost={estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0}
                                             cappingUnbilledCost={0}
-                                            parts={[
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                                { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                                { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-
-                                            ]}
+                                            parts={
+                                                estimateReportData?.overallEstimateReport?.spareParts || []
+                                            //     [
+                                            //       { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                            //       { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                            //     ]
+                                        }
                                             spareCostData={[
                                                 { date: "Min", Cost: 100 },
                                                 { date: "Estimated", Cost: 800 },
@@ -2653,7 +2643,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       Estimated Spares Cost
                     </Text>
                     <Text size="xl" fw={700} c="blue.6">
-                      ${estimatedSparesCost?.toFixed(2) || 0}
+                        {new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                        }).format(estimatedSparesCost || 0)}
                     </Text>
                   </Flex>
                 </Group>
@@ -2710,7 +2703,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     // }}
                     columnDefs={[
                       {
-                        field: "partName",
+                        field: "partId",
                         headerName: "Part Number",
                         flex: 1.5,
                         minWidth: 120,
@@ -2720,7 +2713,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         floatingFilter: true,
                       },
                       {
-                        field: "partDesc",
+                        field: "desc",
                         headerName: "Description",
                         flex: 1.5,
                         minWidth: 120,
@@ -2735,6 +2728,17 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                         flex: 0.8,
                         minWidth: 80,
                         filter: 'agNumberColumnFilter',
+                        cellRenderer : (val:any) => {
+                            return (
+                                <>
+                                <Center>
+                                    <Text>
+                                        {Math.round(val?.data?.qty) || "-"}
+                                    </Text>
+                                </Center>
+                                </>
+                            )
+                        }
                       },
                       {
                         field: "unit",
