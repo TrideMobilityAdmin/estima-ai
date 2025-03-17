@@ -1078,10 +1078,14 @@ class TaskService:
                     "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
                 }
 
-            # Only update sub_task aircraft details if there are actual findings
+            # Only update sub_task aircraft details if there are actual findings and they're not empty
+            findings = sub_task_parts_result[0].get("findings", {}) if sub_task_parts_result else {}
+            hmv_tasks = findings.get("hmvTasks", [])
+            non_hmv_tasks = findings.get("nonHmvTasks", [])
+            
             if (sub_task_parts_result and 
-                (len(sub_task_parts_result[0].get("findings", {}).get("hmvTasks", [])) > 0 or 
-                 len(sub_task_parts_result[0].get("findings", {}).get("nonHmvTasks", [])) > 0)):
+                hmv_tasks and  # Check if hmvTasks is not empty
+                (len(hmv_tasks) > 0 or len(non_hmv_tasks) > 0)):  # Check if either type has tasks
                 sub_task_parts_aircraft_details = {
                     "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
                     "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
