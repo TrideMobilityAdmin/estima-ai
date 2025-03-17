@@ -2546,22 +2546,37 @@ class TaskService:
         }
     }, {
         '$lookup': {
-            'from': 'sub_task_description', 
-            'localField': 'task_number', 
-            'foreignField': 'log_item_number', 
-            'as': 'task_info', 
+            'from': 'task_description', 
+            'let': {
+                'task_num': '$task_number', 
+                'pkg_num': '$package_number'
+            }, 
             'pipeline': [
                 {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$task_number', '$$task_num'
+                                    ]
+                                }, {
+                                    '$eq': [
+                                        '$package_number', '$$pkg_num'
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
                     '$project': {
-                        'convertedPackage': '$package_number', 
                         'actual_start_date': 1, 
                         'actual_end_date': 1, 
-                        'source_task_discrepancy_number': 1, 
-                        'log_item_number': 1, 
                         '_id': 0
                     }
                 }
-            ]
+            ], 
+            'as': 'task_info'
         }
     }, {
         '$unwind': {
@@ -2596,11 +2611,11 @@ class TaskService:
                     }
                 }
             }, 
-            'totalFindingsQty': {
+            'totalTasksQty': {
                 '$sum': '$used_quantity'
             }, 
             'task_numbers': {
-                '$addToSet': '$task_info.log_item_number'
+                '$addToSet': '$task_number'
             }
         }
     }, {
@@ -2608,8 +2623,8 @@ class TaskService:
             '_id': 0, 
             'partId': '$_id.partId', 
             'partDescription': '$_id.partDescription', 
-            'totalFindingsQty': 1, 
-            'totalFindings': {
+            'totalTasksQty': 1, 
+            'totalTasks': {
                 '$size': '$task_numbers'
             }
         }
