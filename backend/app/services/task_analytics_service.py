@@ -1085,7 +1085,7 @@ class TaskService:
             
             if (sub_task_parts_result and 
                 hmv_tasks and  # Check if hmvTasks is not empty
-                (len(hmv_tasks) > 0 or len(non_hmv_tasks) > 0)):  # Check if either type has tasks
+                (len(hmv_tasks) > 0 or len(non_hmv_tasks) > 0)):
                 sub_task_parts_aircraft_details = {
                     "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
                     "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
