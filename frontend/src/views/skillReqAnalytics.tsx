@@ -42,7 +42,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
     };
 
     const totalAvgTimeTasks = Math.round(calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.tasks) || 0);
-const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings) || 0);
+    const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?.skillAnalysis?.findings) || 0);
 
     const [donutData, setDonutData] = useState([]);
 
@@ -200,37 +200,65 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
 
     const SkillTaskAccordion = ({ data } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
-
+        const [opened, setOpened] = useState<string | null>(null);
+    
+        const handleAccordionChange = (value: string | null) => {
+            setOpened(value);
+        };
+    
         const skillBasedTasks = useMemo(() => {
+            // Create a map to group tasks by skill
             const skillMap = new Map();
-
-            data?.forEach((task : any) => {
-                task?.skills?.forEach((skillData : any) => {
+    
+            // Handle null or empty data
+            if (!data || data.length === 0) return [];
+    
+            // Process each task
+            data.forEach((task : any) => {
+                // Handle tasks with no skills
+                if (!task.skills || task.skills.length === 0) return;
+    
+                // Process each skill in the task
+                task.skills.forEach((skillData : any) => {
+                    // Handle null skill name by assigning "Unknown Skill"
                     const skillName = skillData?.skill?.trim() || "Unknown Skill";
+                    
+                    // Create array for this skill if it doesn't exist
                     if (!skillMap.has(skillName)) {
                         skillMap.set(skillName, []);
                     }
+                    
+                    // Add this task to the skill's array
                     skillMap.get(skillName).push({
-                        taskId: task?.taskId || "Unknown Task ID",
-                        taskDescription: task?.taskDescription || "No description available",
-                        manHours: skillData?.manHours || { min: 0, avg: 0, max: 0 }
+                        taskId: task.taskId || "Unknown Task",
+                        taskDescription: task.taskDescription || "No description",
+                        manHours: skillData.manHours || { min: 0, avg: 0, max: 0 }
                     });
                 });
             });
-
-            return Array.from(skillMap.entries()).map(([skill, tasks]) => ({
-                skill,
-                tasks,
-                totalMinHours: tasks?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.min || 0), 0),
-                totalAvgHours: tasks?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.avg || 0), 0),
-                totalMaxHours: tasks?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.max || 0), 0)
-            }));
+    
+            // Convert the map to an array of skill groups with calculated totals
+            return Array.from(skillMap.entries()).map(([skill, tasks]) => {
+                // Calculate total hours for this skill group
+                const totalMinHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.min || 0), 0);
+                const totalAvgHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.avg || 0), 0);
+                const totalMaxHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.max || 0), 0);
+    
+                return {
+                    skill,
+                    tasks,
+                    totalMinHours,
+                    totalAvgHours,
+                    totalMaxHours
+                };
+            });
         }, [data]);
-
+    
+        // Filter skills based on search term
         const filteredSkills = skillBasedTasks.filter(item =>
-            item?.skill?.toLowerCase().includes(skillSearch?.toLowerCase())
+            item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
-
+    
         return (
             <>
                 <TextInput
@@ -241,33 +269,33 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                 />
                 <Accordion variant="separated" value={opened} onChange={setOpened}>
                     {filteredSkills.map((skillGroup) => (
-                        <Accordion.Item key={skillGroup?.skill} value={skillGroup?.skill}>
-                            <Accordion.Control onClick={() => handleAccordionChange(skillGroup?.skill)}>
+                        <Accordion.Item key={skillGroup.skill} value={skillGroup.skill}>
+                            <Accordion.Control onClick={() => handleAccordionChange(skillGroup.skill)}>
                                 <Group>
                                     <IconCube color="#4E66DE" />
                                     <div>
                                         <Group>
-                                            <Text>{skillGroup?.skill}</Text>
+                                            <Text>{skillGroup.skill}</Text>
                                             <Text size="sm" c="dimmed">
-                                                {skillGroup?.tasks?.length} tasks
+                                                {skillGroup.tasks.length} tasks
                                             </Text>
                                         </Group>
                                         <Group justify="space-between">
-                                            <Text size="sm" c="dimmed">Min: {skillGroup?.totalMinHours?.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Avg: {skillGroup?.totalAvgHours?.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Max: {skillGroup?.totalMaxHours?.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Min: {skillGroup.totalMinHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Avg: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Max: {skillGroup.totalMaxHours.toFixed(2)} Hr</Text>
                                         </Group>
                                     </div>
                                 </Group>
                             </Accordion.Control>
                             <Accordion.Panel>
                                 <ScrollArea 
-                                h={400} 
-                                scrollHideDelay={0}
+                                    h={400} 
+                                    scrollHideDelay={0}
                                 >
                                     <Box p="md">
-                                        {skillGroup?.tasks?.map((task : any) => (
-                                            <Card key={task.taskId} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
+                                        {skillGroup.tasks.map((task : any) => (
+                                            <Card key={task.taskId} shadow="0" p="sm" radius="md" mt="xs" bg="#f0f0f0">
                                                 <Text size="sm" fw={500}>{task.taskId}</Text>
                                                 <Text size="xs" c="dimmed" mb="xs">{task.taskDescription}</Text>
                                                 <Group justify="space-between">
@@ -275,10 +303,10 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                                                     <Text fz="xs" c="yellow" fw={700}>Avg {task.manHours.avg} Hr</Text>
                                                     <Text fz="xs" c="red" fw={700}>Max {task.manHours.max} Hr</Text>
                                                 </Group>
-                                                <Progress.Root>
-                                                    <Progress.Section value={task.manHours.min * 100} color="green" />
-                                                    <Progress.Section value={task.manHours.avg * 100} color="yellow" />
-                                                    <Progress.Section value={task.manHours.max * 100} color="red" />
+                                                <Progress.Root size="xs" mt="xs">
+                                                    <Progress.Section value={(task.manHours.min / (task.manHours.max || 1)) * 100} color="green" />
+                                                    <Progress.Section value={((task.manHours.avg - task.manHours.min) / (task.manHours.max || 1)) * 100} color="yellow" />
+                                                    <Progress.Section value={((task.manHours.max - task.manHours.avg) / (task.manHours.max || 1)) * 100} color="red" />
                                                 </Progress.Root>
                                             </Card>
                                         ))}
@@ -294,36 +322,64 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
 
     const SkillFindingAccordion = ({ data } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
-
+        const [findingsOpened, setFindingsOpened] = useState<string | null>(null);
+    
+        const handleAccordionChangeFindings = (value : any) => {
+            setFindingsOpened(value);
+        };
+    
         const skillBasedFindings = useMemo(() => {
+            // Create a map to group findings by skill
             const skillMap = new Map();
-
-            data?.forEach((finding : any) => {
-                finding?.skills?.forEach((skillData : any) => {
+    
+            // Handle null or empty data
+            if (!data || data.length === 0) return [];
+    
+            // Process each finding
+            data.forEach((finding : any) => {
+                // Handle findings with no skills
+                if (!finding.skills || finding.skills.length === 0) return;
+    
+                // Process each skill in the finding
+                finding.skills.forEach((skillData : any) => {
+                    // Handle null skill name by assigning "Unknown Skill"
                     const skillName = skillData?.skill?.trim() || "Unknown Skill";
+                    
+                    // Create array for this skill if it doesn't exist
                     if (!skillMap.has(skillName)) {
                         skillMap.set(skillName, []);
                     }
+                    
+                    // Add this finding to the skill's array
                     skillMap.get(skillName).push({
-                        taskId: finding?.taskId || "Unknown Task ID",
-                        manHours: skillData?.manHours || { min: 0, avg: 0, max: 0 }
+                        taskId: finding.taskId || "Unknown Task ID",
+                        manHours: skillData.manHours || { min: 0, avg: 0, max: 0 }
                     });
                 });
             });
-
-            return Array.from(skillMap?.entries()).map(([skill, findings]) => ({
-                skill,
-                findings,
-                totalMinHours: findings?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.min || 0), 0),
-                totalAvgHours: findings?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.avg || 0), 0),
-                totalMaxHours: findings?.reduce((sum : any, finding : any) => sum + (finding?.manHours?.max || 0), 0)
-            }));
+    
+            // Convert the map to an array of skill groups with calculated totals
+            return Array.from(skillMap.entries()).map(([skill, findings]) => {
+                // Calculate total hours for this skill group
+                const totalMinHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.min || 0), 0);
+                const totalAvgHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.avg || 0), 0);
+                const totalMaxHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.max || 0), 0);
+    
+                return {
+                    skill,
+                    findings,
+                    totalMinHours,
+                    totalAvgHours,
+                    totalMaxHours
+                };
+            });
         }, [data]);
-
+    
+        // Filter skills based on search term
         const filteredSkills = skillBasedFindings.filter(item =>
-            item?.skill?.toLowerCase().includes(skillSearch?.toLowerCase())
+            item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
-
+    
         return (
             <>
                 <TextInput
@@ -334,19 +390,19 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                 />
                 <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
                     {filteredSkills.map((skillGroup) => (
-                        <Accordion.Item key={skillGroup?.skill} value={skillGroup.skill}>
-                            <Accordion.Control onClick={() => handleAccordionChangeFindings(skillGroup?.skill)}>
+                        <Accordion.Item key={skillGroup.skill} value={skillGroup.skill}>
+                            <Accordion.Control onClick={() => handleAccordionChangeFindings(skillGroup.skill)}>
                                 <Group>
                                     <IconAlertTriangle color="#4E66DE" />
                                     <div>
                                         <Group>
-                                            <Text>{skillGroup?.skill}</Text>
-                                            <Text size="sm" c="dimmed">{skillGroup?.findings?.length} findings</Text>
+                                            <Text>{skillGroup.skill}</Text>
+                                            <Text size="sm" c="dimmed">{skillGroup.findings.length} findings</Text>
                                         </Group>
                                         <Group justify="space-between">
-                                            <Text size="sm" c="dimmed">Min: {skillGroup?.totalMinHours?.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Avg: {skillGroup?.totalAvgHours?.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Max: {skillGroup?.totalMaxHours?.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Min: {skillGroup.totalMinHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Avg: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Max: {skillGroup.totalMaxHours.toFixed(2)} Hr</Text>
                                         </Group>
                                     </div>
                                 </Group>
@@ -354,18 +410,18 @@ const totalAvgTimeFindings = Math.round(calculateTotalAvgTime(skillAnalysisData?
                             <Accordion.Panel>
                                 <ScrollArea h={400} scrollHideDelay={0}>
                                     <Box p="md">
-                                        {skillGroup?.findings?.map((finding : any) => (
-                                            <Card key={finding?.taskId} shadow="0" p="sm" radius='md' mt="xs" bg='#f0f0f0'>
-                                                <Text size="sm" fw={500}>{finding?.taskId || "-"}</Text>
+                                        {skillGroup.findings.map((finding : any) => (
+                                            <Card key={finding.taskId} shadow="0" p="sm" radius="md" mt="xs" bg="#f0f0f0">
+                                                <Text size="sm" fw={500}>{finding.taskId || "-"}</Text>
                                                 <Group justify="space-between">
-                                                    <Text fz="xs" c="green" fw={700}>Min {finding?.manHours?.min} Hr</Text>
-                                                    <Text fz="xs" c="yellow" fw={700}>Avg {finding?.manHours?.avg} Hr</Text>
-                                                    <Text fz="xs" c="red" fw={700}>Max {finding?.manHours?.max} Hr</Text>
+                                                    <Text fz="xs" c="green" fw={700}>Min {finding.manHours.min} Hr</Text>
+                                                    <Text fz="xs" c="yellow" fw={700}>Avg {finding.manHours.avg} Hr</Text>
+                                                    <Text fz="xs" c="red" fw={700}>Max {finding.manHours.max} Hr</Text>
                                                 </Group>
-                                                <Progress.Root>
-                                                    <Progress.Section value={finding?.manHours?.min * 100} color="green" />
-                                                    <Progress.Section value={finding?.manHours?.avg * 100} color="yellow" />
-                                                    <Progress.Section value={finding?.manHours?.max * 100} color="red" />
+                                                <Progress.Root size="xs" mt="xs">
+                                                    <Progress.Section value={(finding.manHours.min / (finding.manHours.max || 1)) * 100} color="green" />
+                                                    <Progress.Section value={((finding.manHours.avg - finding.manHours.min) / (finding.manHours.max || 1)) * 100} color="yellow" />
+                                                    <Progress.Section value={((finding.manHours.max - finding.manHours.avg) / (finding.manHours.max || 1)) * 100} color="red" />
                                                 </Progress.Root>
                                             </Card>
                                         ))}
