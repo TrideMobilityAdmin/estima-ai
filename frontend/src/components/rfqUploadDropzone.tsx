@@ -331,7 +331,9 @@ const RFQUploadDropZoneExcel = ({
       .split(/[,\n]/)
       .map((task: string) => task.trim())
       .filter((task: string) => task.length > 0)
-      .map((task: string) => task.replace(/[^\w\s-/#]/g, "")); // Allow hyphen, forward slash, and hash
+      .map((task: string) => task
+      // .replace(/[^\w\s-/#]/g, "")
+    ); // Allow hyphen, forward slash, and hash
 
     console.log("📌 Processed Tasks:", tasks);
     return tasks;

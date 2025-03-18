@@ -1,0 +1,33 @@
+{
+    "airlines": [
+      {
+        "name": "FLY DUBAI",
+        "primaryColor": "#006496"
+      },
+      {
+        "name": "FLYNAS",
+        "primaryColor": "#00ADEF"
+      },
+      {
+        "name": "Indigo EOL",
+        "primaryColor": "#4B0082"
+      },
+      {
+        "name": "SpiceJet",
+        "primaryColor": "#DA251D"
+      },
+      {
+        "name": "OMAN AIR",
+        "primaryColor": "#006B65"
+      },
+      {
+        "name": "INDIGO",
+        "primaryColor": "#4B0082"
+      },
+      {
+        "name": "US BANGLA",
+        "primaryColor": "#012169"
+      }
+    ]
+  }
+  
