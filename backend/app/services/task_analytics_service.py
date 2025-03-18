@@ -623,7 +623,7 @@ class TaskService:
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
                                         'quantity': '$requested_quantity', 
-                                        'requested_stock_status': '$requested_stock_status', 
+                                        'stockStatus': '$requested_stock_status', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
                                 ]
@@ -918,9 +918,9 @@ class TaskService:
                                 'logItem': '$task_number', 
                                 'description': '$task_description', 
                                 'date': '$task_desc1.actual_start_date', 
-                                'stock_status': '$stock_status', 
+                                'stockStatus': '$stock_status', 
                                 'quantity': '$used_quantity', 
-                                'aircraft_model': '$aircraft_info.aircraft_model'
+                                'aircraftModel': '$aircraft_info.aircraft_model'
                             }
                         }
                     }
@@ -992,9 +992,9 @@ class TaskService:
                                             '$$hmvTask.task_info.actual_start_date',datetime(1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
                                         ]
                                     }, 
-                                    'stock_status': '$$hmvTask.stock_status', 
+                                    'stockStatus': '$$hmvTask.stock_status', 
                                     'quantity': '$$hmvTask.used_quantity', 
-                                    'aircraft_model': '$$hmvTask.aircraft_info.aircraft_model'
+                                    'aircraftModel': '$$hmvTask.aircraft_info.aircraft_model'
                                 }
                             ]
                         }
@@ -1053,25 +1053,43 @@ class TaskService:
             task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
             sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
 
-
             logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
             logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
-
 
             if not task_parts_result and not sub_task_parts_result:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
            
+            # Initialize aircraft details with empty arrays as default
             task_parts_aircraft_details = {
-                "aircraftModels": task_parts_result[0].get("summary", {}).get("aircraftModels", []),
-                "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+                "aircraftModels": [],
+                "stockStatuses": []
             }
 
-           
             sub_task_parts_aircraft_details = {
-                "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
-                "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+                "aircraftModels": [],
+                "stockStatuses": []
             }
+
+            # Only update aircraft details if there are actual tasks
+            if task_parts_result and len(task_parts_result[0].get("tasks", [])) > 0:
+                task_parts_aircraft_details = {
+                    "aircraftModels": task_parts_result[0].get("summary", {}).get("aircraftModels", []),
+                    "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+                }
+
+            # Only update sub_task aircraft details if there are actual findings and they're not empty
+            findings = sub_task_parts_result[0].get("findings", {}) if sub_task_parts_result else {}
+            hmv_tasks = findings.get("hmvTasks", [])
+            non_hmv_tasks = findings.get("nonHmvTasks", [])
+            
+            if (sub_task_parts_result and 
+                hmv_tasks and  # Check if hmvTasks is not empty
+                (len(hmv_tasks) > 0 or len(non_hmv_tasks) > 0)):
+                sub_task_parts_aircraft_details = {
+                    "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
+                    "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+                }
 
             output = {
                 "partId": part_id,
@@ -1082,63 +1100,56 @@ class TaskService:
                             "taskId": t.get("taskId",""),
                             "taskDescription": t.get("taskDescription",""),
                             "packages": [
-                                {"packageId": pkg["packageId"],"requested_stock_status":pkg["requested_stock_status"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"]}
+                                {"packageId": pkg["packageId"],"stockStatus":pkg["stockStatus"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"]}
                                 for pkg in t.get("packages", [])
                             ]
                         }
                         for t in (task_parts_result[0].get("tasks", []) if task_parts_result else [])
                     ],
                     "findings": {
-    "hmvTasks": [
-        {
-            "taskId": task.get("findings", {}).get("taskId", ""),
-            "taskDescription": task.get("findings", {}).get("taskDescription", ""),
-            "packages": [
-                {
-                    "packageId": pkg["packageId"],
-                    "logItem": pkg.get("logItem", ""),
-                    "description": pkg.get("description", ""),
-                    "date": pkg.get("date", "0001-01-01T00:00:00Z"),
-                    "stock_status": pkg.get("stock_status", ""),
-                    "quantity": pkg["quantity"]
-                }
-                for pkg in task.get("findings", {}).get("packages", [])
-            ]
-        }
-        for task in sub_task_parts_result[0].get("findings", {}).get("hmvTasks", [])
-    ] if sub_task_parts_result else [],
-    "nonHmvTasks": [
-        {
-            "taskId": task.get("findings", {}).get("taskId", ""),
-            "taskDescription": task.get("findings", {}).get("taskDescription", ""),
-            # "stock_status": task.get("stock_status", ""),
-            # "quantity": task.get("quantity", 0),
-            # "aircraft_model": task.get("aircraft_model", ""),
-            # "date": task.get("date", "0001-01-01T00:00:00Z"),
-            # "packageId": task.get("packageId", ""),
-
-
-            "packages": [
-                {
-                    "packageId": pkg["packageId"],
-                    "logItem": pkg.get("logItem", ""),
-                    "description": pkg.get("description", ""),
-                    "date": pkg.get("date", "0001-01-01T00:00:00Z"),
-                    "stock_status": pkg.get("stock_status", ""),
-                    "quantity": pkg["quantity"],
-                    "aircraft_model": pkg.get("aircraft_model", "")
-                }
-                 for pkg in task.get("findings", {}).get("packages", [])
-            ]
-        }
-        for task in sub_task_parts_result[0].get("findings", {}).get("nonHmvTasks", [])
-    ] if sub_task_parts_result else []
-}
+                        "hmvTasks": [
+                            {
+                                "taskId": task.get("findings", {}).get("taskId", ""),
+                                "taskDescription": task.get("findings", {}).get("taskDescription", ""),
+                                "packages": [
+                                    {
+                                        "packageId": pkg["packageId"],
+                                        "logItem": pkg.get("logItem", ""),
+                                        "description": pkg.get("description", ""),
+                                        "date": pkg.get("date", "0001-01-01T00:00:00Z"),
+                                        "stockStatus": pkg.get("stockStatus", ""),
+                                        "quantity": pkg["quantity"]
+                                    }
+                                    for pkg in task.get("findings", {}).get("packages", [])
+                                ]
+                            }
+                            for task in sub_task_parts_result[0].get("findings", {}).get("hmvTasks", [])
+                        ] if sub_task_parts_result else [],
+                        "nonHmvTasks": [
+                            {
+                                "taskId": task.get("findings", {}).get("taskId", ""),
+                                "taskDescription": task.get("findings", {}).get("taskDescription", ""),
+                                "packages": [
+                                    {
+                                        "packageId": pkg["packageId"],
+                                        "logItem": pkg.get("logItem", ""),
+                                        "description": pkg.get("description", ""),
+                                        "date": pkg.get("date", "0001-01-01T00:00:00Z"),
+                                        "stockStatus": pkg.get("stockStatus", ""),
+                                        "quantity": pkg["quantity"],
+                                        "aircraftModel": pkg.get("aircraftModel", "")
+                                    }
+                                    for pkg in task.get("findings", {}).get("packages", [])
+                                ]
+                            }
+                            for task in sub_task_parts_result[0].get("findings", {}).get("nonHmvTasks", [])
+                        ] if sub_task_parts_result else []
+                    }
                 },
- "aircraftDetails": {
-        "task_parts_aircraft_details": task_parts_aircraft_details,
-        "sub_task_parts_aircraft_details": sub_task_parts_aircraft_details
-    }    
+                "aircraftDetails": {
+                    "task_parts_aircraft_details": task_parts_aircraft_details,
+                    "sub_task_parts_aircraft_details": sub_task_parts_aircraft_details
+                }    
             }
 
             date_qty = defaultdict(lambda: {"tasksqty": 0, "findingsqty": 0})
@@ -1149,25 +1160,23 @@ class TaskService:
                     date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
                     date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
                     logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
-            # Process findings
+
             logger.info("Processing findings to calculate date-wise quantities.")
             for finding_type in ["hmvTasks", "nonHmvTasks"]:
                 for task in output["usage"]["findings"].get(finding_type, []):
                     logger.info(f"Processing finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
                     for pkg in task.get("packages", []):
-                        date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
-                        date_qty[date_key]["findingsqty"] += pkg["quantity"]  # Sum the quantities
+                        date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]
+                        date_qty[date_key]["findingsqty"] += pkg["quantity"]
                         logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
 
             output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
             logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
 
-
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
             logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
-    
     
             
 
@@ -2537,22 +2546,37 @@ class TaskService:
         }
     }, {
         '$lookup': {
-            'from': 'sub_task_description', 
-            'localField': 'task_number', 
-            'foreignField': 'log_item_number', 
-            'as': 'task_info', 
+            'from': 'task_description', 
+            'let': {
+                'task_num': '$task_number', 
+                'pkg_num': '$package_number'
+            }, 
             'pipeline': [
                 {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$task_number', '$$task_num'
+                                    ]
+                                }, {
+                                    '$eq': [
+                                        '$package_number', '$$pkg_num'
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
                     '$project': {
-                        'convertedPackage': '$package_number', 
                         'actual_start_date': 1, 
                         'actual_end_date': 1, 
-                        'source_task_discrepancy_number': 1, 
-                        'log_item_number': 1, 
                         '_id': 0
                     }
                 }
-            ]
+            ], 
+            'as': 'task_info'
         }
     }, {
         '$unwind': {
@@ -2587,11 +2611,11 @@ class TaskService:
                     }
                 }
             }, 
-            'totalFindingsQty': {
+            'totalTasksQty': {
                 '$sum': '$used_quantity'
             }, 
             'task_numbers': {
-                '$addToSet': '$task_info.log_item_number'
+                '$addToSet': '$task_number'
             }
         }
     }, {
@@ -2599,8 +2623,8 @@ class TaskService:
             '_id': 0, 
             'partId': '$_id.partId', 
             'partDescription': '$_id.partDescription', 
-            'totalFindingsQty': 1, 
-            'totalFindings': {
+            'totalTasksQty': 1, 
+            'totalTasks': {
                 '$size': '$task_numbers'
             }
         }
