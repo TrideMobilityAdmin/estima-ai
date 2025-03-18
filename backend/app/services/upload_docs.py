@@ -581,8 +581,61 @@ class ExcelUploadService:
     {
         '$lookup': {
             'from': 'estima_output', 
-            'localField': 'estID', 
-            'foreignField': 'estID', 
+            'let': {
+                'estId': '$estID', 
+                'probThreshold': '$probability'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$eq': [
+                                '$estID', '$$estId'
+                            ]
+                        }
+                    }
+                }, {
+                    '$addFields': {
+                        'filteredFindings': {
+                            '$filter': {
+                                'input': {
+                                    '$ifNull': [
+                                        '$findings', []
+                                    ]
+                                }, 
+                                'as': 'finding', 
+                                'cond': {
+                                    '$gt': [
+                                        {
+                                            '$max': {
+                                                '$map': {
+                                                    'input': {
+                                                        '$ifNull': [
+                                                            '$$finding.details', []
+                                                        ]
+                                                    }, 
+                                                    'as': 'detail', 
+                                                    'in': {
+                                                        '$ifNull': [
+                                                            '$$detail.prob', 0
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }, '$$probThreshold'
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }, {
+                    '$project': {
+                        '_id': 0, 
+                        'aggregatedTasks': 1, 
+                        'filteredFindings': 1
+                    }
+                }
+            ], 
             'as': 'estimate'
         }
     }, {
@@ -591,15 +644,66 @@ class ExcelUploadService:
             'preserveNullAndEmptyArrays': True
         }
     }, {
+        '$addFields': {
+            'aggregatedFilteredFindings': {
+                'totalMhs': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$estimate.filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': '$$detail.mhs.avg'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }, 
+                'totalSpareCost': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$estimate.filteredFindings', 
+                            'as': 'finding', 
+                            'in': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': '$$finding.details', 
+                                        'as': 'detail', 
+                                        'in': {
+                                            '$sum': {
+                                                '$map': {
+                                                    'input': '$$detail.spare_parts', 
+                                                    'as': 'sparePart', 
+                                                    'in': {
+                                                        '$multiply': [
+                                                            '$$sparePart.price', '$$sparePart.qty'
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }, {
         '$lookup': {
-            'from': 'estimate_status_remarks',
-            'localField': 'estID',
-            'foreignField': 'estID',
+            'from': 'estimate_status_remarks', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
             'as': 'remarks_doc'
         }
     }, {
         '$unwind': {
-            'path': '$remarks_doc',
+            'path': '$remarks_doc', 
             'preserveNullAndEmptyArrays': True
         }
     }, {
@@ -612,7 +716,7 @@ class ExcelUploadService:
                         ]
                     }, {
                         '$ifNull': [
-                            '$estimate.aggregatedFindings.totalMhs', 0
+                            '$aggregatedFilteredFindings.totalMhs', 0
                         ]
                     }
                 ]
@@ -625,11 +729,11 @@ class ExcelUploadService:
                         ]
                     }, {
                         '$ifNull': [
-                            '$estimate.aggregatedFindings.totalPartsCost', 0
+                            '$aggregatedFilteredFindings.totalSpareCost', 0
                         ]
                     }
                 ]
-            },
+            }, 
             'tatTime': {
                 '$divide': [
                     {
@@ -638,24 +742,19 @@ class ExcelUploadService:
                                 '$ifNull': [
                                     '$estimate.aggregatedTasks.totalMhs', 0
                                 ]
-                            }, 
-                            {
+                            }, {
                                 '$ifNull': [
-                                    '$estimate.aggregatedFindings.totalMhs', 0
+                                    '$aggregatedFilteredFindings.totalMhs', 0
                                 ]
                             }
                         ]
-                    },
-                    man_hours_threshold 
+                    }, man_hours_threshold
                 ]
-            },
+            }, 
             'remarks': {
-                '$ifNull': ['$remarks_doc.remarks', []]
-            },
-            'remarksCount': {
-                '$size': {
-                    '$ifNull': ['$remarks_doc.remarks', []]
-                }
+                '$ifNull': [
+                    '$remarks_doc.remarks', ''
+                ]
             }
         }
     }, {
@@ -667,12 +766,13 @@ class ExcelUploadService:
             'status': '$status', 
             'totalMhs': 1, 
             'tatTime': {
-                '$ifNull': ['$tatTime', 0.0] 
-            },
+                '$ifNull': [
+                    '$tatTime', 0.0
+                ]
+            }, 
             'totalPartsCost': 1, 
-            'createdAt': '$createdAt',
-            'remarks': 1,
-            'remarksCount': 1
+            'createdAt': '$createdAt', 
+            'remarks': 1
         }
     }
 ]
