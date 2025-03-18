@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, List, Table, Text, Flex, Title, SimpleGrid, Group, Select, Space, Button } from '@mantine/core';
+import { Card, List, Table, Text, Flex, Title, SimpleGrid, Group, Select, Space, Button, Container, Stack } from '@mantine/core';
 import { AgGridReact } from 'ag-grid-react';
 import DropZoneExcel from '../components/fileDropZone';
 import { IconArrowMoveRight, IconClockCheck, IconCube, IconSettingsStar, IconUsers } from '@tabler/icons-react';
@@ -8,6 +8,7 @@ import { useApi } from '../api/services/estimateSrvice';
 import UploadDropZoneExcel from '../components/uploadExcelFile';
 import { showNotification } from '@mantine/notifications';
 import { showAppNotification } from '../components/showNotificationGlobally';
+import FlightDataVisualization from '../components/aircraftBarChart';
 
 export default function CompareEstimate() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -232,7 +233,14 @@ export default function CompareEstimate() {
   //   const percentage = (item.actual / item.estimated) * 100;
   //   return percentage > 100 ? 100 : Math.round(percentage); // Cap at 100%
   // });
-
+  // Sample data
+const flightData = [
+  { value: 123, percent: 82 },
+  { value: 60, percent: 23 },
+  { value: 95, percent: 67 },
+  { value: 75, percent: 59 },
+  { value: 60, percent: 48 }
+];
   return (
     <>
       <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
@@ -739,6 +747,21 @@ export default function CompareEstimate() {
 
 
       </div>
+      {/* <Space h={10}/>
+      <Container size="lg" py="xl">
+        <Stack gap="lg">
+          <Title order={1}>Flight Data Dashboard</Title>
+          <Text>
+            This dashboard displays flight data visualization using React, Mantine v7, and ECharts.
+          </Text>
+          
+          <FlightDataVisualization 
+            data={flightData} 
+            title="Flight Performance Metrics" 
+            height={500} 
+          />
+        </Stack>
+      </Container> */}
     </>
   )
 }

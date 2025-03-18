@@ -14,7 +14,8 @@ import { DateRangePicker } from '@mui/x-date-pickers-pro/DateRangePicker';
 import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { Box } from '@mui/material';
 import { AgGridReact } from "ag-grid-react";
-
+import { useMemo } from "react";
+import airlineColors from '../../src/assets/airlineColors.json';
 // import { useApiPartUsage } from "../api/services/partUsageService";
 
 export default function PartUsage() {
@@ -165,6 +166,12 @@ export default function PartUsage() {
         fetchData();
     }, [selectedPartId, dateRange]);
     console.log("partt usage data by single >>>>",partUsageData);
+
+    const getColorByAircraftModel = (model: string) => {
+        // Find the corresponding color in airlineColors
+        const airline = airlineColors.airlines.find((airline) => airline.name === model);
+        return airline ? airline.primaryColor : 'rgb(0, 23, 92)'; // Default color if no match
+      };
     
 
     // Prepare data for Daily trend analysis
@@ -179,7 +186,7 @@ export default function PartUsage() {
             return acc + task?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0);
         }, 0);
 
-        const totalFindings = data?.usage?.findings?.nonHmvTasks?.reduce((acc: any, finding: any) => {
+        const totalFindings = data?.usage?.findings?.hmvTasks?.reduce((acc: any, finding: any) => {
             return acc + finding?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0);
         }, 0);
 
@@ -196,13 +203,41 @@ export default function PartUsage() {
     };
 
 
-    // Search filter for tasks
-    const filteredTasks = partUsageData?.usage?.tasks?.filter((task: any) =>
+    // Combine tasks and nonHmvTasks arrays
+const combinedTasks = useMemo(() => {
+    if (!partUsageData?.usage) return [];
+    
+    const tasks = partUsageData.usage.tasks || [];
+    const nonHmvTasks = partUsageData.usage.findings?.nonHmvTasks || [];
+    
+    // Add a property to identify the source of each task
+    const tasksWithSource = tasks.map((task:any) => ({
+        ...task,
+        source: 'tasks'
+    }));
+    
+    const nonHmvTasksWithSource = nonHmvTasks.map((task:any) => ({
+        ...task,
+        source: 'nonHmvTasks'
+    }));
+    
+    // Combine both arrays
+    return [...tasksWithSource, ...nonHmvTasksWithSource];
+}, [partUsageData?.usage]);
+
+// Then filter the combined array
+const filteredTasks = useMemo(() => {
+    if (!taskSearch) return combinedTasks;
+    
+    return combinedTasks.filter((task) => 
         task?.taskId?.toLowerCase().includes(taskSearch?.toLowerCase())
     );
+}, [combinedTasks, taskSearch]);
+
+console.log("Combined tasks:", combinedTasks);
 
     // Search filter for findings
-    const filteredFindings = partUsageData?.usage?.findings?.nonHmvTasks?.filter((finding: any) =>
+    const filteredFindings = partUsageData?.usage?.findings?.hmvTasks?.filter((finding: any) =>
         finding?.taskId?.toLowerCase().includes(findingSearch?.toLowerCase())
     );
 
@@ -251,7 +286,7 @@ export default function PartUsage() {
     function calculateTotalTaskQuantity(tasks: any) {
         return tasks?.reduce((total: any, task: any) => {
             const taskQuantity = task?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0);
-            return total + taskQuantity;
+            return Math.round(total + taskQuantity);
         }, 0);
     }
 
@@ -297,6 +332,36 @@ export default function PartUsage() {
             </Tooltip>
         );
     };
+
+    // In your component:
+const [openItems, setOpenItems] = useState<string[]>([]);
+
+const handleAccordionChange = (value: string[]) => {
+  setOpenItems(value);
+};
+
+// First, create a mapping function that returns the color for each airline
+const getAirlineColor = (statusCode : any) => {
+    // Your airlines data
+    const airlines = [
+      { name: "FLY DUBAI", primaryColor: "#006496" },
+      { name: "FLYNAS", primaryColor: "#00B7AC" },
+      { name: "Indigo EOL", primaryColor: "#001B94" },
+      { name: "SpiceJet", primaryColor: "#ed1b23" },
+      { name: "OMAN AIR", primaryColor: "#006B65" },
+      { name: "INDIGO", primaryColor: "#001B94" },
+      { name: "US BANGLA", primaryColor: "#012169" },
+      { name: "OWNED", primaryColor: "#05154f" }
+    ];
+    
+    // Find matching airline by name (case insensitive)
+    const airline = airlines.find(
+      airline => airline.name.toLowerCase() === statusCode.toLowerCase()
+    );
+    
+    // Return the color if found, or a default color if not
+    return airline ? airline.primaryColor : "rgba(196, 147, 0, 1)";
+  };
 
 
     return (
@@ -400,125 +465,135 @@ border-bottom: none;
                         </style>
 
                         <AgGridReact
-                            pagination
-                            paginationPageSize={5}
-                            domLayout="autoHeight" // Ensures height adjusts dynamically
-                            rowData={multiPartMergedData || []}
-                            columnDefs={[
-
-                                {
-                                    field: "partId",
-                                    headerName: "Part ID",
-                                    // headerComponent: (params : any) => <CustomHeader defaultName="Part ID" tooltipName="Part ID" />,
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    flex: 1,
-                                },
-                                {
-                                    field: "partDescription",
-                                    headerName: "Description",
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    // width:600
-                                    flex: 4
-                                },
-                                {
-                                    field: "totalTasks",
-                                    headerName: "Tasks",
-                                    headerComponent: (params: any) => <CustomHeader defaultName="Tasks" tooltipName="Total Tasks" />,
-
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    // width:600
-                                    flex: 1
-                                },
-                                {
-                                    field: "totalTasksQty",
-                                    headerName: "Parts Qty",
-                                    headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Tasks Parts Qty" />,
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    // width:600
-                                    flex: 1
-                                },
-                                {
-                                    field: "findingsHMVParts",
-                                    headerName: "Findings",
-                                    headerComponent: (params: any) => <CustomHeader defaultName="Findings" tooltipName="Total Findings" />,
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    // width:600
-                                    flex: 1,
-                                    cellRenderer : (val : any) =>{
-                                        return (
-                                            <Text>
-                                                {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindings || 0), 0)}
-                                            </Text>
-                                        )
-                                    }
-                                },
-                                {
-                                    field: "findingsHMVParts",
-                                    headerName: "Parts Qty",
-                                    headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Findings Parts Qty" />,
-                                    sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
-                                    resizable: true,
-                                    // width:600
-                                    flex: 1,
-                                    cellRenderer : (val : any) =>{
-                                        return (
-                                            <Text>
-                                                {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0)}
-                                            </Text>
-                                        )
-                                    }
-                                },
-                                {
-                                    // field: "actions",
-                                    headerName: "Actions",
-                                    // sortable: true,
-                                    // filter: true,
-                                    // floatingFilter: true,
-                                    flex: 1,
-                                    resizable: true,
-                                    // editable: true,
-                                    cellRenderer: (val: any) => {
-                                        return (
-                                            <Group mt='xs' align="center" justify="center">
-
-                                                <Tooltip label="Get Part Data">
-                                                    <ActionIcon
-                                                        size={20}
-                                                        color="teal"
-                                                        variant="light"
-                                                        // loading={isLoading}
-                                                        // disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                                                        onClick={() => {
-                                                            setSelectedPartId(val.data.partId);
-                                                        }}
-                                                    >
-                                                        <IconSettingsDown />
-                                                    </ActionIcon>
-                                                </Tooltip>
-                                            </Group>
-
-                                        );
-                                    },
-                                },
-                            ]}
-                        />
+    pagination
+    paginationPageSize={5}
+    domLayout="autoHeight" // Ensures height adjusts dynamically
+    rowData={multiPartMergedData || []}
+    columnDefs={[
+        {
+            field: "partId",
+            headerName: "Part ID",
+            // headerComponent: (params : any) => <CustomHeader defaultName="Part ID" tooltipName="Part ID" />,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            flex: 1,
+        },
+        {
+            field: "partDescription",
+            headerName: "Description",
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            // width:600
+            flex: 4
+        },
+        {
+            field: "totalTasks",
+            headerName: "Tasks",
+            headerComponent: (params: any) => <CustomHeader defaultName="Tasks" tooltipName="Total Tasks" />,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            flex: 1,
+            cellRenderer: (val: any) => {
+                // Calculate the sum of totalTasks from the main data and findingsNonHMVTasks
+                const mainTasks = val.data.totalTasks || 0;
+                const nonHMVTasks = val.data.findingsNonHMVTasks?.reduce(
+                    (sum: number, f: any) => sum + (f?.totalTasks || 0), 
+                    0
+                ) || 0;
+                
+                // Return the combined total
+                return <Text>{mainTasks + nonHMVTasks}</Text>;
+            }
+        },
+        {
+            field: "totalTasksQty",
+            headerName: "Parts Qty",
+            headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Tasks Parts Qty" />,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            flex: 1,
+            cellRenderer: (val: any) => {
+                // Calculate the sum of totalTasksQty from the main data and findingsNonHMVTasks
+                const mainQty = val.data.totalTasksQty || 0;
+                const nonHMVQty = val.data.findingsNonHMVTasks?.reduce(
+                    (sum: number, f: any) => sum + (f?.totalTasksQty || 0), 
+                    0
+                ) || 0;
+                
+                // Return the combined total
+                return <Text>{Math.round(mainQty + nonHMVQty)}</Text>;
+            }
+        },
+        {
+            field: "findingsHMVParts",
+            headerName: "Findings",
+            headerComponent: (params: any) => <CustomHeader defaultName="Findings" tooltipName="Total Findings" />,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            flex: 1,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindings || 0), 0)}
+                    </Text>
+                )
+            }
+        },
+        {
+            field: "findingsHMVParts",
+            headerName: "Parts Qty",
+            headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Findings Parts Qty" />,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+            resizable: true,
+            flex: 1,
+            cellRenderer: (val: any) => {
+                return (
+                    <Text>
+                        {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0)}
+                    </Text>
+                )
+            }
+        },
+        {
+            // field: "actions",
+            headerName: "Actions",
+            flex: 1,
+            resizable: true,
+            cellRenderer: (val: any) => {
+                return (
+                    <Group mt='xs' align="center" justify="center">
+                        <Tooltip label="Get Part Data">
+                            <ActionIcon
+                                size={20}
+                                color="teal"
+                                variant="light"
+                                // loading={isLoading}
+                                // disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                onClick={() => {
+                                    setSelectedPartId(val.data.partId);
+                                }}
+                            >
+                                <IconSettingsDown />
+                            </ActionIcon>
+                        </Tooltip>
+                    </Group>
+                );
+            },
+        },
+    ]}
+/>
                     </div>
 
                 </Card>
@@ -573,7 +648,7 @@ border-bottom: none;
                                     Source Tasks
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                    {partUsageData?.usage?.tasks?.length || 0}
+                                    {combinedTasks?.length || 0}
                                 </Text>
                             </Flex>
                         </Group>
@@ -586,7 +661,7 @@ border-bottom: none;
                                     Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                    {calculateTotalTaskQuantity(partUsageData?.usage?.tasks) || 0}
+                                    {calculateTotalTaskQuantity(combinedTasks) || 0}
                                 </Text>
                             </Flex>
                         </Group>
@@ -599,7 +674,7 @@ border-bottom: none;
                                     Findings
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                    {partUsageData?.usage?.findings?.nonHmvTasks?.length || 0}
+                                    {partUsageData?.usage?.findings?.hmvTasks?.length || 0}
                                 </Text>
                             </Flex>
                         </Group>
@@ -612,7 +687,7 @@ border-bottom: none;
                                     Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
-                                    {calculateTotalFindingQuantity(partUsageData?.usage?.findings?.nonHmvTasks) || 0}
+                                    {calculateTotalFindingQuantity(partUsageData?.usage?.findings?.hmvTasks) || 0}
                                 </Text>
                             </Flex>
                         </Group>
@@ -622,39 +697,29 @@ border-bottom: none;
                 <Grid>
                     <Grid.Col span={8}>
                         <Card radius='md' h='50vh'>
-                            {/* <ReactApexChart
-                        type="area"
-                        height="100%"
-                        options={{
-                            chart: { type: "area", height: "100%", zoom: { enabled: false } },
-                            dataLabels: { enabled: false },
-                            stroke: { curve: "smooth", width: 2 },
-                            title: { text: "Daily Trend Analysis", align: "left" },
-                            grid: { row: { colors: ["#f3f3f3", "transparent"], opacity: 0.5 } },
-                            xaxis: { type: "category", categories: dates },
-                        }}
-                        series={[
-                            { name: "Tasks", data: taskData },
-                            { name: "Findings", data: findingData },
-                        ]}
-                    /> */}
+                            
                             <Title order={5} c='dimmed'>
                                 Daily Trend Analysis
                             </Title>
                             <AreaChart
-                                h={250}
-                                data={chartData}
-                                withLegend
-                                dataKey="date"
-                                xAxisLabel="Date"
-                                yAxisLabel="Count"
-                                series={[
-                                    { name: 'tasks', color: 'rgba(17, 166, 0, 1)' },
-                                    { name: 'findings', color: 'rgba(0, 149, 255, 1)' },
-                                ]}
-                                connectNulls
-                                curveType="natural"
-                            />
+        h={250}
+        data={chartData}
+        withLegend
+        dataKey="date"
+        xAxisLabel="Date"
+        yAxisLabel="Count"
+        xAxisProps={{
+          interval: 0, // Ensures all labels are displayed
+          angle: -45, // Rotates labels for better visibility
+          textAnchor: 'end',
+        }}
+        series={[
+          { name: 'tasks', color: 'rgba(17, 166, 0, 1)' },
+          { name: 'findings', color: 'rgba(0, 149, 255, 1)' },
+        ]}
+        connectNulls
+        curveType="natural"
+      />
 
                         </Card>
                     </Grid.Col>
@@ -698,58 +763,8 @@ border-bottom: none;
                 </Grid>
                 <Space h='md' />
                 <Grid>
-                    <Grid.Col span={7}>
+                    <Grid.Col span={6}>
                         <Card radius='md' h='60vh'>
-                            {/* <ReactApexChart
-                                type="bar"
-                                height='100%'
-                                options={{
-                                    chart: {
-                                        type: 'bar',
-                                        height: 350
-                                    },
-                                    title: { text: "Aircraft wise Qty", align: "left" },
-                                    plotOptions: {
-                                        bar: {
-                                            horizontal: false,
-                                            columnWidth: '20%',
-                                            borderRadius: 5,
-                                            borderRadiusApplication: 'end'
-                                        },
-                                    },
-                                    dataLabels: {
-                                        enabled: false
-                                    },
-                                    stroke: {
-                                        show: true,
-                                        width: 2,
-                                        colors: ['transparent']
-                                    },
-                                    xaxis: {
-                                        categories: partUsageData?.aircraftDetails?.aircraftModels?.map((ele : any)=> ele?.aircraftModel || "unknown")
-                                        // ['AIRBUS', 'ATR', 'BOEING MAX', 'BOEING NG'],
-                                    },
-                                    yaxis: {
-                                        title: {
-                                            text: 'Part Quantity'
-                                        }
-                                    },
-                                    fill: {
-                                        opacity: 1
-                                    },
-                                    tooltip: {
-                                        y: {
-                                            // formatter: function (val) {
-                                            //   return "$ " + val + " thousands"
-                                            // }
-                                        }
-                                    }
-                                }}
-                                series={[{
-                                    name: 'Air Craft',
-                                    data:  partUsageData?.aircraftDetails?.aircraftModels?.map((ele : any)=> ele?.count || 0)
-                                }]}
-                            /> */}
                             <Title order={5} c='dimmed'>
                                 MPD - Aircraft wise Quantity
                             </Title>
@@ -761,6 +776,11 @@ border-bottom: none;
                                 series={[
                                     { name: 'count', color: 'rgba(0, 49, 196, 1)' },
                                 ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
                                 tickLine="y"
                                 barProps={{ radius: 10 }}
                                 maxBarWidth={40} // Adjust the gap between categories
@@ -768,132 +788,8 @@ border-bottom: none;
                             />
                         </Card>
                     </Grid.Col>
-                    <Grid.Col span={5}>
+                    <Grid.Col span={6}>
                         <Card radius='md' h='60vh'>
-                            {/* <ReactApexChart
-                                type="bar"
-                                height='100%'
-                                options={{
-                                    chart: {
-                                        type: 'bar',
-                                        height: 350
-                                    },
-                                    title: { text: "Part Distribution", align: "left" },
-                                    plotOptions: {
-                                        bar: {
-                                            horizontal: false,
-                                            columnWidth: '30%',
-                                            borderRadius: 5,
-                                            borderRadiusApplication: 'end'
-                                        },
-                                    },
-                                    dataLabels: {
-                                        enabled: false
-                                    },
-                                    stroke: {
-                                        show: true,
-                                        width: 2,
-                                    },
-                                    xaxis: {
-                                        categories: partUsageData?.aircraftDetails?.stockStatusCodes?.map((ele: any) => ele?.stockStatus || "unknown")
-                                        // ['MRO', 'Customer',],
-                                    },
-                                    yaxis: {
-                                        title: {
-                                            text: 'Part Quantity'
-                                        }
-                                    },
-                                    fill: {
-                                        opacity: 1
-                                    },
-                                    tooltip: {
-                                        y: {
-                                            // formatter: function (val) {
-                                            //   return "$ " + val + " thousands"
-                                            // }
-                                        }
-                                    },
-                                    colors: ['#FF5733', '#33FF57']
-                                }}
-                                series={[{
-                                    name: 'Quantity',
-                                    data: partUsageData?.aircraftDetails?.stockStatusCodes?.map((ele: any) => ele?.count || 0)
-                                }]}
-                            /> */}
-                            <Title order={5} c='dimmed'>
-                                MPD - Part Supplied
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses || []}
-                                dataKey="statusCode"
-                                series={[
-                                    { name: 'count', color: 'rgba(196, 147, 0, 1)' },
-                                ]}
-                                tickLine="y"
-
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40} // Adjust the gap between categories
-                            // barGap={5} // Adjust the gap between bars
-                            />
-                        </Card>
-                    </Grid.Col>
-                </Grid>
-                <Space h='md' />
-                <Grid>
-                    <Grid.Col span={7}>
-                        <Card radius='md' h='60vh'>
-                            {/* <ReactApexChart
-                                type="bar"
-                                height='100%'
-                                options={{
-                                    chart: {
-                                        type: 'bar',
-                                        height: 350
-                                    },
-                                    title: { text: "Aircraft wise Qty", align: "left" },
-                                    plotOptions: {
-                                        bar: {
-                                            horizontal: false,
-                                            columnWidth: '20%',
-                                            borderRadius: 5,
-                                            borderRadiusApplication: 'end'
-                                        },
-                                    },
-                                    dataLabels: {
-                                        enabled: false
-                                    },
-                                    stroke: {
-                                        show: true,
-                                        width: 2,
-                                        colors: ['transparent']
-                                    },
-                                    xaxis: {
-                                        categories: partUsageData?.aircraftDetails?.aircraftModels?.map((ele : any)=> ele?.aircraftModel || "unknown")
-                                        // ['AIRBUS', 'ATR', 'BOEING MAX', 'BOEING NG'],
-                                    },
-                                    yaxis: {
-                                        title: {
-                                            text: 'Part Quantity'
-                                        }
-                                    },
-                                    fill: {
-                                        opacity: 1
-                                    },
-                                    tooltip: {
-                                        y: {
-                                            // formatter: function (val) {
-                                            //   return "$ " + val + " thousands"
-                                            // }
-                                        }
-                                    }
-                                }}
-                                series={[{
-                                    name: 'Air Craft',
-                                    data:  partUsageData?.aircraftDetails?.aircraftModels?.map((ele : any)=> ele?.count || 0)
-                                }]}
-                            /> */}
                             <Title order={5} c='dimmed'>
                                 Findings - Aircraft wise Quantity
                             </Title>
@@ -905,6 +801,11 @@ border-bottom: none;
                                 series={[
                                     { name: 'count', color: 'rgba(0, 49, 196, 1)' },
                                 ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
                                 tickLine="y"
                                 barProps={{ radius: 10 }}
                                 maxBarWidth={40} // Adjust the gap between categories
@@ -912,62 +813,69 @@ border-bottom: none;
                             />
                         </Card>
                     </Grid.Col>
-                    <Grid.Col span={5}>
+                    
+                </Grid>
+                <Space h='md' />
+                <Grid>
+                <Grid.Col span={6}>
                         <Card radius='md' h='60vh'>
-                            {/* <ReactApexChart
-                                type="bar"
-                                height='100%'
-                                options={{
-                                    chart: {
-                                        type: 'bar',
-                                        height: 350
-                                    },
-                                    title: { text: "Part Distribution", align: "left" },
-                                    plotOptions: {
-                                        bar: {
-                                            horizontal: false,
-                                            columnWidth: '30%',
-                                            borderRadius: 5,
-                                            borderRadiusApplication: 'end'
-                                        },
-                                    },
-                                    dataLabels: {
-                                        enabled: false
-                                    },
-                                    stroke: {
-                                        show: true,
-                                        width: 2,
-                                    },
-                                    xaxis: {
-                                        categories: partUsageData?.aircraftDetails?.stockStatusCodes?.map((ele: any) => ele?.stockStatus || "unknown")
-                                        // ['MRO', 'Customer',],
-                                    },
-                                    yaxis: {
-                                        title: {
-                                            text: 'Part Quantity'
-                                        }
-                                    },
-                                    fill: {
-                                        opacity: 1
-                                    },
-                                    tooltip: {
-                                        y: {
-                                            // formatter: function (val) {
-                                            //   return "$ " + val + " thousands"
-                                            // }
-                                        }
-                                    },
-                                    colors: ['#FF5733', '#33FF57']
-                                }}
-                                series={[{
-                                    name: 'Quantity',
-                                    data: partUsageData?.aircraftDetails?.stockStatusCodes?.map((ele: any) => ele?.count || 0)
-                                }]}
-                            /> */}
+                            <Title order={5} c='dimmed'>
+                                MPD - Part Supplied
+                            </Title>
+                            <BarChart
+  h={300}
+  withLegend
+  data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses?.map((status:any) => ({
+    ...status,
+    color: getAirlineColor(status.statusCode)
+  })) || []}
+  dataKey="statusCode"
+  series={[
+    { 
+      name: 'count',
+      color: 'blue'
+    },
+  ]}
+  tickLine="y"
+  xAxisProps={{
+    interval: 0, // Ensures all labels are displayed
+    angle: -45, // Rotates labels for better visibility
+    textAnchor: 'end',
+  }}
+  barProps={{ radius: 10 }}
+  maxBarWidth={40}
+/>
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
                             <Title order={5} c='dimmed'>
                                 Findings - Part Supplied
                             </Title>
                             <BarChart
+  h={300}
+  withLegend
+  data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses?.map((status:any) => ({
+    ...status,
+    color: getAirlineColor(status.statusCode)
+  })) || []}
+  dataKey="statusCode"
+  series={[
+    { 
+      name: 'count',
+      color: 'blue'
+    },
+  ]}
+  tickLine="y"
+  xAxisProps={{
+    interval: 0, // Ensures all labels are displayed
+    angle: -45, // Rotates labels for better visibility
+    textAnchor: 'end',
+  }}
+  barProps={{ radius: 10 }}
+  maxBarWidth={40}
+/>
+                            {/* <BarChart
                                 h={300}
                                 withLegend
                                 data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses || []}
@@ -976,11 +884,15 @@ border-bottom: none;
                                     { name: 'count', color: 'rgba(196, 147, 0, 1)' },
                                 ]}
                                 tickLine="y"
-
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
                                 barProps={{ radius: 10 }}
                                 maxBarWidth={40} // Adjust the gap between categories
                             // barGap={5} // Adjust the gap between bars
-                            />
+                            /> */}
                         </Card>
                     </Grid.Col>
                 </Grid>
@@ -993,7 +905,7 @@ border-bottom: none;
                         <Card
                             style={{
                                 width: "100%",
-                                height: "350px", // Increase the Card height
+                                height: "400px", // Increase the Card height
                                 overflowX: "auto", // Enable horizontal scrolling
                                 overflowY: "hidden", // Prevent vertical scrolling
                                 scrollbarWidth: 'thin',
@@ -1051,13 +963,18 @@ border-bottom: none;
                                 ]}
                             /> */}
                                 <BarChart
-                                    h={300}
+                                    h={350}
                                     data={tasksChartData}
                                     dataKey="taskId"
                                     series={[
                                         { name: 'packages', color: '#1445B6' },
                                         { name: 'quantity', color: '#D6B575' },
                                     ]}
+                                    xAxisProps={{
+                                        interval: 0, // Ensures all labels are displayed
+                                        angle: -45, // Rotates labels for better visibility
+                                        textAnchor: 'end',
+                                      }}
                                     maxBarWidth={40}
                                     xAxisLabel="Tasks"
                                     yAxisLabel="Count"
@@ -1075,7 +992,7 @@ border-bottom: none;
                         <Card
                             style={{
                                 width: "100%",
-                                height: "350px", // Increase the Card height
+                                height: "400px", // Increase the Card height
                                 overflowX: "auto", // Enable horizontal scrolling
                                 overflowY: "hidden", // Prevent vertical scrolling
                                 scrollbarWidth: 'thin',
@@ -1161,13 +1078,18 @@ border-bottom: none;
                                 ]}
                             /> */}
                                 <BarChart
-                                    h={300}
+                                    h={350}
                                     data={findingChartData}
                                     dataKey="findingId"
                                     series={[
                                         { name: 'packages', color: '#1445B6' },
                                         { name: 'quantity', color: '#D6B575' },
                                     ]}
+                                    xAxisProps={{
+                                        interval: 0, // Ensures all labels are displayed
+                                        angle: -45, // Rotates labels for better visibility
+                                        textAnchor: 'end',
+                                      }}
                                     maxBarWidth={40}
                                     xAxisLabel="Findings"
                                     yAxisLabel="Count"
@@ -1197,64 +1119,67 @@ border-bottom: none;
                         {
                             filteredTasks?.length > 0 ? (
                                 <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                                    <Accordion variant="separated" radius="md">
-                                        {filteredTasks?.map((task: any, index: number) => (
-                                            <Accordion.Item key={`${task?.taskId} - ${index}`} value={`${task?.taskId} - ${index}`}>
-                                                <Accordion.Control>
-                                                    <Group>
-                                                        <IconCube color="#4E66DE" />
-                                                        {task?.taskId || "-"}
-                                                    </Group>
+                                    <Accordion 
+          variant="separated" 
+          radius="md" 
+          multiple 
+          value={openItems}
+          onChange={handleAccordionChange}
+        >
+          {filteredTasks?.map((task: any, index: number) => {
+            const itemValue = `${task?.taskId} - ${index}`;
+            return (
+              <Accordion.Item key={itemValue} value={itemValue}>
+                <Accordion.Control>
+                  <Group>
+                    <IconCube color="#4E66DE" />
+                    {task?.taskId || "-"}
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
+                    <Text fz='xs'>
+                      <Text span c="gray" inherit>Description : </Text>
+                      {task?.taskDescription || "-"}
+                    </Text>
 
-                                                </Accordion.Control>
-                                                <Accordion.Panel>
-                                                    <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
+                    {task?.packages?.map((pkg: any) => (
+                      <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
+                        <Group justify="space-between" align="flex-start">
+                          <Flex direction='column'>
+                            <Group>
+                              <Text c='dimmed' fz='sm'>
+                                Package ID :
+                              </Text>
+                              <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
+                            </Group>
+                            <Group>
+                              <Text c='dimmed' fz='sm'>
+                                Aircraft Model :
+                              </Text>
+                              <Text fw={500} fz='sm'>{pkg?.aircraftModel || "-"}</Text>
+                            </Group>
+                            <Group>
+                              <Text c='dimmed' fz='sm'>
+                                Date :
+                              </Text>
+                              <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
+                            </Group>
+                          </Flex>
 
-
-                                                        <Text fz='xs'>
-                                                            <Text span c="gray" inherit>Description : </Text>
-                                                            {task?.taskDescription || "-"}
-                                                        </Text>
-
-
-                                                        {task?.packages?.map((pkg: any) => (
-                                                            <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
-                                                                <Group justify="space-between" align="flex-start">
-                                                                    <Flex direction='column'>
-                                                                        <Group>
-                                                                            <Text c='dimmed' fz='sm'>
-                                                                                Package ID :
-                                                                            </Text>
-                                                                            <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
-                                                                        </Group>
-                                                                        <Group>
-                                                                            <Text c='dimmed' fz='sm'>
-                                                                                Aircraft Model :
-                                                                            </Text>
-                                                                            <Text fw={500} fz='sm'>{pkg?.aircraftModel || "-"}</Text>
-                                                                        </Group>
-                                                                        <Group>
-                                                                            <Text c='dimmed' fz='sm'>
-                                                                                Date :
-                                                                            </Text>
-                                                                            <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
-                                                                        </Group>
-                                                                        
-                                                                    </Flex>
-
-                                                                    <Flex direction='column' align='end' gap='xs'>
-                                                                    <Badge fullWidth color="blue">Qty: {pkg?.quantity || "-"}</Badge>
-                                                                    <Badge fullWidth color="yellow"> {pkg?.requested_stock_status || "-"}</Badge>
-                                                                    </Flex>
-                                                                    
-                                                                </Group>
-                                                            </Card>
-                                                        ))}
-                                                    </ScrollArea>
-                                                </Accordion.Panel>
-                                            </Accordion.Item>
-                                        ))}
-                                    </Accordion>
+                          <Flex direction='column' align='end' gap='xs'>
+                            <Badge fullWidth color="blue">Qty: {pkg?.quantity || "-"}</Badge>
+                            <Badge fullWidth color="yellow"> {pkg?.stockStatus || "-"}</Badge>
+                          </Flex>
+                        </Group>
+                      </Card>
+                    ))}
+                  </ScrollArea>
+                </Accordion.Panel>
+              </Accordion.Item>
+            );
+          })}
+        </Accordion>
                                 </ScrollArea>
                             ) : (
                                 <>
@@ -1311,7 +1236,7 @@ border-bottom: none;
                                                                     </Text>
                                                                     <Text fw={500} fz='sm'>{pkg?.logItem || "-"}</Text>
                                                                     </Group>
-                                                                    <Badge color="yellow"> {pkg?.stock_status || "-"}</Badge>
+                                                                    <Badge color="yellow"> {pkg?.stockStatus || "-"}</Badge>
                                                                 </Group>
                                                                 <Group>
                                                                     <Text c='dimmed' fz='sm'>
