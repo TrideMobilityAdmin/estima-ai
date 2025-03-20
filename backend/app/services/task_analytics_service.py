@@ -48,6 +48,7 @@ class TaskService:
         self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
+        self.capping_data_collection=self.mongo_client.get_collection("capping_data")
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -1384,7 +1385,9 @@ class TaskService:
                     "findings": findings
                 }
             }
+            logger.info(f"response is {response}")
             return response 
+            
             # return {"data": response, "response": {"statusCode": 200, "message": "skill_analysis processed successfully"}}
 
         except Exception as e:
@@ -1405,8 +1408,13 @@ class TaskService:
         logger.info(f"Fetching estimate by ID: {estimate_id}")
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
-        # valid_tasks_response =self.validate_tasks(current_user)
-        # valid_task_ids = [task.taskid for task in valid_tasks_response if task.status]
+        capping_data=self.capping_data_collection.find_one({"name": "per_source_card"})
+        capping_CMH=capping_data.get("CMH",0)
+        capping_CMC=capping_data.get("CMC",0)
+        logger.info(f"capping_manhrs fetched per_source_card: {capping_CMH}")
+        logger.info(f"capping_cost fetched per_source_card: {capping_CMC}")
+        
+        
 
         try:
             pipeline =[
@@ -1417,8 +1425,25 @@ class TaskService:
     }, {
         '$lookup': {
             'from': 'estimate_file_upload', 
-            'localField': 'estID', 
-            'foreignField': 'estID', 
+            'let': {
+                'estIDLocal': '$estID'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$eq': [
+                                '$estID', '$$estIDLocal'
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        '_id': 0, 
+                        'probability': 1
+                    }
+                }
+            ], 
             'as': 'estimate'
         }
     }, {
@@ -1499,11 +1524,7 @@ class TaskService:
                                                 '$map': {
                                                     'input': '$$detail.spare_parts', 
                                                     'as': 'sparePart', 
-                                                    'in': {
-                                                        '$multiply': [
-                                                            '$$sparePart.price', '$$sparePart.qty'
-                                                        ]
-                                                    }
+                                                    'in': '$$sparePart.price'
                                                 }
                                             }
                                         }
@@ -1758,48 +1779,56 @@ class TaskService:
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
             estimate_data = result[0]
-            # part-wise qty,price for task,findings calculation
-            # estimated_spare_parts = {}
-            # for task in estimate_data.get('tasks', []):
-            #     for spare_part in task.get('spareParts', []):
-            #         part_id = spare_part['partId']
-            #         if part_id not in estimated_spare_parts:
-            #             estimated_spare_parts[part_id] = {
-            #                 'desc': spare_part['desc'],
-            #                 'unit': spare_part['unit'],
-            #                 'qty': 0,
-            #                 'price': 0
-            #             }
-            #         estimated_spare_parts[part_id]['qty'] += spare_part['qty']
-            #         estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
+                      
+            total_billable_mhs = 0
+            total_unbillable_mhs = 0
+            total_billable_cost = 0
+            total_unbillable_cost = 0
+            for task in estimate_data.get('tasks', []):
+                avg_mh = task.get('mhs', {}).get('avg', 0)
+                
+                if avg_mh >= capping_CMH:
+                    # If avg is >= 20, then:
+                    # - 20 hours go to unbillable
+                    # - remainder (avg-20) goes to billable
+                    billable_mhs = avg_mh - capping_CMH
+                    unbillable_mhs = capping_CMH
+                else:
+                    # If avg is < 20, then all hours go to unbillable
+                    billable_mhs = 0
+                    unbillable_mhs = avg_mh
+                
+                total_billable_mhs += billable_mhs
+                total_unbillable_mhs += unbillable_mhs
 
-            # for finding in estimate_data.get('filteredFindings', []):
-            #     for detail in finding.get('details', []):
-            #         for spare_part in detail.get('spareParts', []):
-            #             part_id = spare_part['partId']
-            #             if part_id not in estimated_spare_parts:
-            #                 estimated_spare_parts[part_id] = {
-            #                     'desc': spare_part['desc'],
-            #                     'unit': spare_part['unit'],
-            #                     'qty': 0,
-            #                     'price': 0
-            #                 }
-            #             estimated_spare_parts[part_id]['qty'] += spare_part['qty']
-            #             estimated_spare_parts[part_id]['price'] += spare_part['price'] * spare_part['qty']
-            # estimated_spare_parts_list = [
-            #     {
-            #         'partID': part_id,
-            #         'desc': data['desc'],
-            #         'unit': data['unit'],
-            #         'qty': data['qty'],
-            #         'price': data['price']
-            #     }
-            #     for part_id, data in estimated_spare_parts.items()
-            # ]
-            # estimate_data['overallEstimateReport']['estimatedSpareParts'] = estimated_spare_parts_list
+                task_spare_cost = 0
+                for spare_part in task.get('spare_parts', []):
+                    part_price = spare_part.get('price', 0)
+                    task_spare_cost += part_price
+                if task_spare_cost >= capping_CMC:
+                    billable_cost = task_spare_cost - capping_CMC
+                    unbillable_cost = capping_CMC
+                else:
+                    billable_cost = 0
+                    unbillable_cost = task_spare_cost
+                total_billable_cost += billable_cost
+                total_unbillable_cost += unbillable_cost
+
+            estimate_data['MPD_level_capping'] = {
+                "cappingManHrs":{
+                'billable_mhs': total_billable_mhs,
+                'unbillable_mhs': total_unbillable_mhs,
+                # 'total_avg_mh': total_billable + total_unbillable  # This should equal the total of all avg values
+            },
+            "cappingMaterialCost":{
+                'billable_cost': total_billable_cost,
+                'unbillable_cost': total_unbillable_cost,
+                # 'total_avg_mh': total_billable + total_unbillable  # This should equal the total of all avg values
+            }
+            }
+            
             logger.info("Estimated collection fetched successfully")
             return estimate_data
-
 
         except Exception as e:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")

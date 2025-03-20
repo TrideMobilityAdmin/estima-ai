@@ -89,3 +89,9 @@ class ProbabilityWiseManhrsSpareCost(BaseModel):
 class UpdateRemarksRequest(BaseModel):
     remark: str
 
+class CappingData(BaseModel):
+    name:str
+    CMH:int
+    CMC:float
+    
+    

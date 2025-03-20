@@ -9,7 +9,7 @@ from typing import List
 import shutil
 from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
-from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost
+from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost,CappingData
 from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
@@ -241,4 +241,10 @@ async def update_remarks(
 @router.get("/probability_wise_manhrs_sparecost/{estimate_id}",response_model=ProbabilityWiseManhrsSpareCost)
 async def get_probability_wise_manhrs_sparecost(estimate_id: str,current_user:dict=Depends(get_current_user), task_service: TaskService = Depends()):
     return task_service.get_probability_wise_manhrsspareparts(estimate_id)
+
+@router.get("/capping_data/", response_model=List[CappingData])
+async def get_all_capping_data(
+    current_user: dict = Depends(get_current_user)
+):
+    return await config_service.get_all_capping_data()
 
