@@ -255,136 +255,22 @@ class ExcelUploadService:
             'estID': estimate_id
         }
     }, {
-        '$lookup': {
-            'from': 'estimate_file_upload', 
-            'let': {
-                'estIDLocal': '$estID'
-            }, 
-            'pipeline': [
-                {
-                    '$match': {
-                        '$expr': {
-                            '$eq': [
-                                '$estID', '$$estIDLocal'
-                            ]
-                        }
-                    }
-                }, {
-                    '$project': {
-                        '_id': 0, 
-                        'probability': 1
-                    }
-                }
-            ], 
-            'as': 'estimate'
-        }
-    }, {
-        '$unwind': {
-            'path': '$estimate', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$addFields': {
-            'filteredFindings': {
-                '$filter': {
-                    'input': {
-                        '$ifNull': [
-                            '$findings', []
-                        ]
-                    }, 
-                    'as': 'finding', 
-                    'cond': {
-                        '$gt': [
-                            {
-                                '$max': {
-                                    '$map': {
-                                        'input': {
-                                            '$ifNull': [
-                                                '$$finding.details', []
-                                            ]
-                                        }, 
-                                        'as': 'detail', 
-                                        'in': {
-                                            '$ifNull': [
-                                                '$$detail.prob', 0
-                                            ]
-                                        }
-                                    }
-                                }
-                            }, {
-                                '$ifNull': [
-                                    '$estimate.probability', 0
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-    }, {
-        '$addFields': {
-            'aggregatedFilteredFindings': {
-                'totalMhs': {
-                    '$sum': {
-                        '$map': {
-                            'input': '$filteredFindings', 
-                            'as': 'finding', 
-                            'in': {
-                                '$sum': {
-                                    '$map': {
-                                        'input': '$$finding.details', 
-                                        'as': 'detail', 
-                                        'in': '$$detail.mhs.avg'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }, 
-                'totalSpareCost': {
-                    '$sum': {
-                        '$map': {
-                            'input': '$filteredFindings', 
-                            'as': 'finding', 
-                            'in': {
-                                '$sum': {
-                                    '$map': {
-                                        'input': '$$finding.details', 
-                                        'as': 'detail', 
-                                        'in': {
-                                            '$sum': {
-                                                '$map': {
-                                                    'input': '$$detail.spare_parts', 
-                                                    'as': 'sparePart', 
-                                                    'in': '$$sparePart.price'
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }, {
         '$addFields': {
             'estimatedManhrs': {
                 '$add': [
-                    '$aggregatedTasks.totalMhs', '$aggregatedFilteredFindings.totalMhs'
+                    '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
                 ]
             }, 
             'estimatedSparePartsCost': {
                 '$add': [
-                    '$aggregatedTasks.totalPartsCost', '$aggregatedFilteredFindings.totalSpareCost'
+                    '$aggregatedTasks.totalPartsCost', '$aggregatedFindings.totalPartsCost'
                 ]
             }, 
             'estimatedTatTime': {
                 '$divide': [
                     {
                         '$add': [
-                            '$aggregatedTasks.totalMhs', '$aggregatedFilteredFindings.totalMhs'
+                            '$aggregatedTasks.totalMhs', '$aggregatedFindings.totalMhs'
                         ]
                     }, man_hours_threshold
                 ]
@@ -691,13 +577,12 @@ class ExcelUploadService:
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
         
-        pipeline = pipeline = [
+        pipeline=[
     {
         '$lookup': {
             'from': 'estima_output', 
             'let': {
-                'estId': '$estID', 
-                'probThreshold': '$probability'
+                'estId': '$estID'
             }, 
             'pipeline': [
                 {
@@ -709,44 +594,10 @@ class ExcelUploadService:
                         }
                     }
                 }, {
-                    '$addFields': {
-                        'filteredFindings': {
-                            '$filter': {
-                                'input': {
-                                    '$ifNull': [
-                                        '$findings', []
-                                    ]
-                                }, 
-                                'as': 'finding', 
-                                'cond': {
-                                    '$gt': [
-                                        {
-                                            '$max': {
-                                                '$map': {
-                                                    'input': {
-                                                        '$ifNull': [
-                                                            '$$finding.details', []
-                                                        ]
-                                                    }, 
-                                                    'as': 'detail', 
-                                                    'in': {
-                                                        '$ifNull': [
-                                                            '$$detail.prob', 0
-                                                        ]
-                                                    }
-                                                }
-                                            }
-                                        }, '$$probThreshold'
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }, {
                     '$project': {
                         '_id': 0, 
                         'aggregatedTasks': 1, 
-                        'filteredFindings': 1
+                        'aggregatedFindings': 1
                     }
                 }
             ], 
@@ -756,54 +607,6 @@ class ExcelUploadService:
         '$unwind': {
             'path': '$estimate', 
             'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$addFields': {
-            'aggregatedFilteredFindings': {
-                'totalMhs': {
-                    '$sum': {
-                        '$map': {
-                            'input': '$estimate.filteredFindings', 
-                            'as': 'finding', 
-                            'in': {
-                                '$sum': {
-                                    '$map': {
-                                        'input': '$$finding.details', 
-                                        'as': 'detail', 
-                                        'in': '$$detail.mhs.avg'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }, 
-                'totalSpareCost': {
-                    '$sum': {
-                        '$map': {
-                            'input': '$estimate.filteredFindings', 
-                            'as': 'finding', 
-                            'in': {
-                                '$sum': {
-                                    '$map': {
-                                        'input': '$$finding.details', 
-                                        'as': 'detail', 
-                                        'in': {
-                                            '$sum': {
-                                                '$map': {
-                                                    'input': '$$detail.spare_parts', 
-                                                    'as': 'sparePart', 
-                                                    'in': '$$sparePart.price'
-                                                        
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }, {
         '$lookup': {
@@ -827,7 +630,7 @@ class ExcelUploadService:
                         ]
                     }, {
                         '$ifNull': [
-                            '$aggregatedFilteredFindings.totalMhs', 0
+                            '$estimate.aggregatedFindings.totalMhs', 0
                         ]
                     }
                 ]
@@ -840,7 +643,7 @@ class ExcelUploadService:
                         ]
                     }, {
                         '$ifNull': [
-                            '$aggregatedFilteredFindings.totalSpareCost', 0
+                            '$estimate.aggregatedFindings.totalPartsCost', 0
                         ]
                     }
                 ]
@@ -855,7 +658,7 @@ class ExcelUploadService:
                                 ]
                             }, {
                                 '$ifNull': [
-                                    '$aggregatedFilteredFindings.totalMhs', 0
+                                    '$estimate.aggregatedFindings.totalMhs', 0
                                 ]
                             }
                         ]
@@ -887,7 +690,6 @@ class ExcelUploadService:
         }
     }
 ]
-
         
         results = list(self.estima_collection.aggregate(pipeline))
         for result in results:
