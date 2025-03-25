@@ -1392,6 +1392,27 @@ class TaskService:
         capping_CMH=capping_data.get("CMH",0)
         capping_CMC=capping_data.get("CMC",0)
         line_item=per_line_item.get("CMC",0)
+
+        capping_pipeline=[
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'mh_type': '$cappingDetails.cappingTypeManhrs', 
+            'mhs': '$cappingDetails.cappingManhrs', 
+            'cost_type': '$cappingDetails.cappingTypeSpareCost', 
+            'mc': '$cappingDetails.cappingSpareCost'
+        }
+    }
+]
+        result = list(self.estimates_collection.aggregate(capping_pipeline))
+        capping_result = result[0]
+        logger.info(f"capping_result fetched: {capping_result}")
+
+
         logger.info(f"capping_manhrs fetched per_source_card: {capping_CMH}")
         logger.info(f"capping_cost fetched per_source_card: {capping_CMC}")
         logger.info(f"line_item_cost fetched per_line_item: {line_item}")
@@ -1743,16 +1764,13 @@ class TaskService:
                 total_spare_parts_unbillable += unbillable
 
             estimate_data['MPD_level_capping'] = {
-                "cappingManHrs":{
                 'billable_mhs': total_billable_mhs,
                 'unbillable_mhs': total_unbillable_mhs,
                 # 'total_avg_mh': total_billable + total_unbillable  # This should equal the total of all avg values
-            },
-            "cappingMaterialCost":{
                 'billable_cost': total_billable_cost,
                 'unbillable_cost': total_unbillable_cost,
                 # 'total_avg_mh': total_billable + total_unbillable  # This should equal the total of all avg values
-            }
+            
             }
             estimate_data['per_line_item_MC'] = {
                 'billable_cost': total_spare_parts_billable,
