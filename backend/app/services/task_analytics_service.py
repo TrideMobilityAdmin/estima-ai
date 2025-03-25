@@ -153,24 +153,6 @@ class TaskService:
                 detail=f"Error validating tasks: {str(e)}"
             )
     
-    
-    # async def estimate_status(self,estimate_request:EstimateRequest,current_user:dict=Depends(get_current_user))->EstimateStatus:
-    #     """
-    #     Create a estimate status based on the provided tasks and parameters.
-    #     """
-    #     try:
-    #         estimate_id = await self._generate_estimateid()
-    #         estimate_status_doc = {
-    #             "estID": estimate_id,
-    #             "status":"Initiated"
-    #         }
-    #         self.estimates_status_collection.insert_one(estimate_status_doc)
-    #         response = EstimateStatus(estID=estimate_id, status="Estimate status created successfully")
-    #         return response
-    #     except Exception as e:
-    #         logger.error(f"Error creating estimate status: {str(e)}")
-    #         raise HTTPException(status_code=422, detail=f"Error creating estimate status: {str(e)}")
-
     async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
         """
         Create a new estimate based on the provided tasks and parameters.
@@ -357,7 +339,6 @@ class TaskService:
             logger.error(f"Error fetching spare parts: {str(e)}")
             return []
     
-
     async def _get_estimate_description(self, tasks: List[str]) -> str:
         try:
             logger.info(f"Fetching estimate description for tasks: {tasks}")
@@ -1178,8 +1159,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
-    
-            
+           
 
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
@@ -1399,7 +1379,6 @@ class TaskService:
             # return {"data": {}, "response": {"statusCode": 404, "message": "An error occurred while processing the request"}}
 
    
-
     def get_estimate_by_id(self, estimate_id: str) -> Dict[str, Any]:
         """
         Get estimate by ID with filtered findings based on probability comparison
@@ -1672,6 +1651,8 @@ class TaskService:
             total_unbillable_mhs = 0
             total_billable_cost = 0
             total_unbillable_cost = 0
+
+        #MPD-level capping for man hours
             for task in estimate_data.get('tasks', []):
                 avg_mh = task.get('mhs', {}).get('avg', 0)
                 
@@ -1689,6 +1670,7 @@ class TaskService:
                 total_billable_mhs += billable_mhs
                 total_unbillable_mhs += unbillable_mhs
 
+        #MPD-level capping for material cost
                 task_spare_cost = 0
                 for spare_part in task.get('spare_parts', []):
                     part_price = spare_part.get('price', 0)
@@ -1701,7 +1683,41 @@ class TaskService:
                     unbillable_cost = task_spare_cost
                 total_billable_cost += billable_cost
                 total_unbillable_cost += unbillable_cost
-            
+
+        # findings-wise capping
+            total_cluster_billable_mhs = 0
+            total_cluster_unbillable_mhs = 0
+            total_cluster_billable_MC = 0
+            total_cluster_unbillable_MC = 0
+            for finding in estimate_data.get('findings', []):
+                for detail in finding.get('details', []):
+                    avg_mh = detail.get('mhs', {}).get('avg', 0)
+                    # cluster = detail.get('cluster', 'unknown')
+                    # Calculate billable and unbillable man-hours
+                    if avg_mh >= capping_CMH:
+                        billable_mhs = avg_mh - capping_CMH
+                        unbillable_mhs = capping_CMH
+                    else:
+                        billable_mhs = 0
+                        unbillable_mhs = avg_mh
+                    total_cluster_billable_mhs += billable_mhs
+                    total_cluster_unbillable_mhs += unbillable_mhs
+
+                    finding_spare_cost = 0
+                    for spare_part in detail.get('spare_parts', []):
+                        part_price = spare_part.get('price', 0)
+                        finding_spare_cost += part_price
+                    if finding_spare_cost >= capping_CMC:
+                        billable_cost = finding_spare_cost - capping_CMC
+                        unbillable_cost = capping_CMC
+                    else:
+                        billable_cost = 0
+                        unbillable_cost = finding_spare_cost
+                    total_cluster_billable_MC += billable_cost
+                    total_cluster_unbillable_MC += unbillable_cost
+
+                
+        #per line item capping for material cost
             grouped_parts = {}
             total_spare_parts_billable = 0
             total_spare_parts_unbillable = 0
@@ -1713,7 +1729,7 @@ class TaskService:
                     grouped_parts[key] = 0
                 grouped_parts[key] += part.get('price', 0)
             
-            # Calculate billable and unbillable in a single loop
+        #Calculate billable and unbillable in a single loop
             logger.info(f"Grouped parts:length={len(grouped_parts)}")
             for total_price in grouped_parts.values():
                 if total_price >= line_item:
@@ -1741,6 +1757,12 @@ class TaskService:
             estimate_data['per_line_item_MC'] = {
                 'billable_cost': total_spare_parts_billable,
                 'unbillable_cost': total_spare_parts_unbillable
+            }
+            estimate_data['cluster_level_capping'] = {
+                'billable_mhs': total_cluster_billable_mhs,
+                'unbillable_mhs': total_cluster_unbillable_mhs,
+                'billable_cost': total_cluster_billable_MC,
+                'unbillable_cost': total_cluster_unbillable_MC
             }
             
             logger.info("Estimated collection fetched successfully")
