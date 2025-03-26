@@ -1397,6 +1397,11 @@ class TaskService:
             }, {
                 '$project': {
                     '_id': 0, 
+                    'operator': 1, 
+                    'aircraftAge': 1, 
+                    'aircraftModel': 1, 
+                    'aircraftRegNo': 1, 
+                    'typeOfCheck': 1, 
                     'mh_type': '$cappingDetails.cappingTypeManhrs', 
                     'mhs': '$cappingDetails.cappingManhrs', 
                     'cost_type': '$cappingDetails.cappingTypeSpareCost', 
@@ -1682,6 +1687,12 @@ class TaskService:
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
             estimate_data = result[0]
+            estimate_data["operator"] = capping_result.get("operator")
+            logger.info(f"operator fetched: {capping_result.get('operator')}")
+            estimate_data["aircraftAge"] = capping_result.get("aircraftAge")
+            estimate_data["aircraftModel"] = capping_result.get("aircraftModel")
+            estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
+            estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
                       
             # total_billable_mhs = 0
             # total_unbillable_mhs = 0
@@ -2010,6 +2021,7 @@ class TaskService:
                     }
                 }       
             logger.info("Estimated collection fetched successfully")
+            
             return estimate_data
 
         except Exception as e:
