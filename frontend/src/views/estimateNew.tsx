@@ -41,7 +41,6 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-
 import { useApi } from "../api/services/estimateSrvice";
 import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
@@ -55,7 +54,9 @@ import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
 import { useMemo, useRef } from "react";
 import { userName } from "../components/tokenJotai";
-import excelTemplateFile from '../assets/RFQ_Excel_Template.xlsx';  
+import excelTemplateFile from '../assets/RFQ_Excel_Template.xlsx';
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -310,7 +311,7 @@ export default function EstimateNew() {
     const form = useForm({
         initialValues: {
             tasks: [],
-            probability: 0,
+            probability: 10,
             operator: "",
             aircraftRegNo: "",
             aircraftModel:"",
@@ -396,7 +397,7 @@ export default function EstimateNew() {
 
         const requestData = {
             tasks: validTasks || [],
-            probability: (Number(form.values.probability)) || 0,
+            probability: (Number(form.values.probability)) || 10,
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
             aircraftModel: form.values.aircraftModel || "",
@@ -824,45 +825,6 @@ export default function EstimateNew() {
         }
     };
 
-
-    // const downloadEmptyExcel = () => {
-    //     const filename = 'Example_RFQ.xlsx'
-    //     const headers = [
-    //         'Task Id',
-    //         'Description'
-    //     ]
-    //     // Create a new workbook
-    //     const workbook = XLSX.utils.book_new();
-        
-    //     // Create an empty worksheet with just the headers
-    //     // We create an array with one empty row (just the headers)
-    //     const worksheetData = [headers];
-        
-    //     // Convert the data to a worksheet
-    //     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-        
-    //     // Add the worksheet to the workbook
-    //     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-        
-    //     // Write the workbook to a binary string
-    //     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        
-    //     // Create a Blob from the buffer
-    //     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        
-    //     // Create a download link and trigger the download
-    //     const url = URL.createObjectURL(blob);
-    //     const link = document.createElement('a');
-    //     link.href = url;
-    //     link.download = filename;
-    //     document.body.appendChild(link);
-    //     link.click();
-        
-    //     // Clean up
-    //     document.body.removeChild(link);
-    //     URL.revokeObjectURL(url);
-    //   };
-
       const downloadEmptyExcel = async () => {
         try {
           // Fetch the file from your project assets
@@ -908,8 +870,364 @@ export default function EstimateNew() {
           );
         }
       };
-    
 
+
+//   const downloadExcelReport = () => {
+//     if (!estimateReportData || typeof estimateReportData !== 'object') {
+//         console.warn("No valid data available for Excel export");
+//         return;
+//     }
+
+//     // Define Excel Headers (Column Titles)
+//     const excelHeaders = [
+//         "S.NO", 
+//         "AIRCRAFT REGISTRATION", 
+//         "AGE", 
+//         "AIRCRAFT MODEL", 
+//         "CHECK TYPE",
+//         "MPD TASKS", 
+//         "MPD TASKS MH (WITHOUT FACTOR)", 
+//         "ADDITIONAL TASKS", 
+//         "ADDITIONAL TASKS MH",
+//         "AD/SB TASKS", 
+//         "AD/SB TASKS MH (WITHOUT FACTOR)", 
+//         "MISC MH", 
+//         "PRELOAD",
+//         "TAT (DAYS)", 
+//         "UNBILLABLE MH", 
+//         "UNBILLABLE MATERIAL COST", 
+//         "REMARKS"
+//     ];
+
+//     // Function to process and clean data
+//     const processField = (field : any) => (field === null || field === undefined ? "-" : field);
+
+//     // Ensure the object has a data array or convert it into an iterable format
+//     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
+    
+//     // Map Flattened Data to Excel Format
+//     const excelData = reportEntries.map((est:any, index:any) => ({
+//         "S.NO": index + 1,
+//         "AIRCRAFT REGISTRATION": processField(est.aircraftRegNo),
+//         "AGE": processField(est.aircraftAge),
+//         "AIRCRAFT MODEL": processField(est.aircraftModel),
+//         "CHECK TYPE": processField(est.typeOfCheck),
+//         "MPD TASKS": processField(est.tasks?.length),
+//         "MPD TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedTasks?.totalMhs),
+//         "ADDITIONAL TASKS": "N/A",
+//         "ADDITIONAL TASKS MH": "N/A",
+//         "AD/SB TASKS": processField(est.findings?.length),
+//         "AD/SB TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedFindings?.totalMhs),
+//         "MISC MH": "N/A",
+//         "PRELOAD": "N/A",
+//         "TAT (DAYS)": "-", 
+//         "UNBILLABLE MH": processField(est.capping?.unbillable_mhs), 
+//         "UNBILLABLE MATERIAL COST": processField(est.capping?.unbillable_cost), 
+//         "REMARKS": "N/A"
+//     }));
+
+//     // Create a new Workbook and Worksheet
+//     const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+//     // Apply styling to the header row
+//     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+//     for (let C = range.s.c; C <= range.e.c; C++) {
+//         const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+//         if (!worksheet[cellAddress]) continue;
+//         worksheet[cellAddress].s = {
+//             fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
+//             font: { bold: true, color: { rgb: "FFFFFF" } } // White text
+//         };
+//     }
+
+//     const workbook = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
+
+//     // Write the file and trigger download
+//     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
+// };
+
+// const downloadExcelReport = () => {
+//     if (!estimateReportData || typeof estimateReportData !== "object") {
+//         console.warn("No valid data available for Excel export");
+//         return;
+//     }
+
+//     // Define multi-row headers
+//     const mainHeader = ["WORK SCOPE REVIEW"]; // Merged main header
+//     const columnHeaders = [
+//         "S.NO",
+//         "AIRCRAFT REGISTRATION",
+//         "AGE",
+//         "AIRCRAFT MODEL",
+//         "CHECK TYPE",
+//         "MPD TASKS",
+//         "MPD TASKS MH (WITHOUT FACTOR)",
+//         "ADDITIONAL TASKS",
+//         "ADDITIONAL TASKS MH",
+//         "AD/SB TASKS",
+//         "AD/SB TASKS MH (WITHOUT FACTOR)",
+//         "MISC MH",
+//         "PRELOAD",
+//         "TAT (DAYS)",
+//         "UNBILLABLE MH",
+//         "UNBILLABLE MATERIAL COST",
+//         "REMARKS"
+//     ];
+
+//     // Function to process and clean data
+//     const processField = (field: any) => (field === null || field === undefined ? "-" : field);
+
+//     // Ensure the object has a data array or convert it into an iterable format
+//     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
+
+//     // Map Flattened Data to Excel Format
+//     const excelData = reportEntries.map((est: any, index: any) => ([
+//         index + 1,
+//         processField(est.aircraftRegNo),
+//         processField(est.aircraftAge),
+//         processField(est.aircraftModel),
+//         processField(est.typeOfCheck),
+//         processField(est.tasks?.length),
+//         processField(est.aggregatedTasks?.totalMhs),
+//         "N/A",
+//         "N/A",
+//         processField(est.findings?.length),
+//         processField(est.aggregatedFindings?.totalMhs),
+//         "N/A",
+//         "N/A",
+//         "-",
+//         processField(est.capping?.unbillable_mhs),
+//         processField(est.capping?.unbillable_cost),
+//         "N/A"
+//     ]));
+
+//     // Create a new Workbook
+//     const worksheet = XLSX.utils.aoa_to_sheet([mainHeader, columnHeaders, ...excelData]);
+
+//     // Merge the first row across all columns
+//     worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columnHeaders.length - 1 } }];
+
+//     // Apply styling
+//     const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+    
+//     for (let C = range.s.c; C <= range.e.c; C++) {
+//         const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
+//         const columnHeaderCell = XLSX.utils.encode_cell({ r: 1, c: C });
+
+//         if (worksheet[headerCell]) {
+//             worksheet[headerCell].s = {
+//                 fill: { fgColor: { rgb: "1F497D" } }, // Dark Blue color
+//                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+//                 alignment: { horizontal: "center", vertical: "center" }
+//             };
+//         }
+
+//         if (worksheet[columnHeaderCell]) {
+//             worksheet[columnHeaderCell].s = {
+//                 fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
+//                 font: { bold: true, color: { rgb: "FFFFFF" } },
+//                 alignment: { horizontal: "center", vertical: "center" }
+//             };
+//         }
+//     }
+
+//     const workbook = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
+
+//     // Write the file and trigger download
+//     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
+// };
+const downloadExcelReport = () => {
+    if (!estimateReportData || typeof estimateReportData !== "object") {
+        console.warn("No valid data available for Excel export");
+        return;
+    }
+
+    // Define headers
+    const mainHeader = "WORK SCOPE REVIEW"; // Merged main header
+    const columnHeaders = [
+        "S.NO",
+        "AIRCRAFT REGISTRATION",
+        "AGE",
+        "AIRCRAFT MODEL",
+        "CHECK TYPE",
+        "MPD TASKS",
+        "MPD TASKS MH (WITHOUT FACTOR)",
+        "ADDITIONAL TASKS",
+        "ADDITIONAL TASKS MH",
+        "AD/SB TASKS",
+        "AD/SB TASKS MH (WITHOUT FACTOR)",
+        "MISC MH",
+        "PRELOAD",
+        "TAT (DAYS)",
+        "UNBILLABLE MH",
+        "UNBILLABLE MATERIAL COST",
+        "REMARKS",
+    ];
+
+    // Function to process data fields
+    const processField = (field: any) => (field === null || field === undefined ? "-" : field);
+
+    // Ensure valid data format
+    const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
+
+    // Prepare data rows
+    const excelData = reportEntries.map((est: any, index: number) => [
+        index + 1,
+        processField(est.aircraftRegNo),
+        processField(est.aircraftAge),
+        processField(est.aircraftModel),
+        processField(est.typeOfCheck),
+        processField(est.tasks?.length),
+        processField(est.aggregatedTasks?.totalMhs),
+        "N/A",
+        "N/A",
+        processField(est.findings?.length),
+        processField(est.aggregatedFindings?.totalMhs),
+        "N/A",
+        "N/A",
+        "-",
+        processField(est.capping?.unbillable_mhs),
+        processField(est.capping?.unbillable_cost),
+        "N/A",
+    ]);
+
+    // Create a new workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("SUMMARY");
+
+    // Add main header (Merged)
+    worksheet.mergeCells("A1:Q1"); // Merge across columns A to Q
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = mainHeader;
+    titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFF" } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F497D" } }; // Dark Blue background
+
+    // Add column headers (Row 2)
+    const headerRow = worksheet.addRow(columnHeaders);
+    headerRow.height = 26; // Increased row height for better readability
+
+    headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFF" } };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; // Enable text wrapping
+
+        // Apply background color only to text cells, not the entire row
+        cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "4B0082" }, // Indigo background
+        };
+
+        // Apply borders to headers
+        cell.border = {
+            top: { style: "thin", color: { argb: "000000" } },
+            left: { style: "thin", color: { argb: "000000" } },
+            bottom: { style: "thin", color: { argb: "000000" } },
+            right: { style: "thin", color: { argb: "000000" } },
+        };
+    });
+
+    // Append data rows
+    excelData.forEach((row: any) => {
+        const dataRow = worksheet.addRow(row);
+        dataRow.eachCell((cell) => {
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            cell.border = {
+                top: { style: "thin", color: { argb: "000000" } },
+                left: { style: "thin", color: { argb: "000000" } },
+                bottom: { style: "thin", color: { argb: "000000" } },
+                right: { style: "thin", color: { argb: "000000" } },
+            };
+        });
+    });
+
+    // Adjust column widths
+    worksheet.columns.forEach((column) => {
+        column.width = 20; // Set uniform column width
+    });
+
+    // Generate and save the file
+    workbook.xlsx.writeBuffer().then((buffer) => {
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        saveAs(blob, "Estimate_Report.xlsx");
+    });
+};
+
+const downloadCSVReport = () => {
+    if (!estimateReportData || typeof estimateReportData !== "object") {
+        console.warn("No valid data available for CSV export");
+        return;
+    }
+
+    // Define headers
+    const columnHeaders = [
+        "S.NO",
+        "AIRCRAFT REGISTRATION",
+        "AGE",
+        "AIRCRAFT MODEL",
+        "CHECK TYPE",
+        "MPD TASKS",
+        "MPD TASKS MH (WITHOUT FACTOR)",
+        "ADDITIONAL TASKS",
+        "ADDITIONAL TASKS MH",
+        "AD/SB TASKS",
+        "AD/SB TASKS MH (WITHOUT FACTOR)",
+        "MISC MH",
+        "PRELOAD",
+        "TAT (DAYS)",
+        "UNBILLABLE MH",
+        "UNBILLABLE MATERIAL COST",
+        "REMARKS",
+    ];
+
+    // Function to process data fields
+    const processField = (field : any) => (field === null || field === undefined ? "-" : field);
+
+    // Ensure valid data format
+    const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
+
+    // Prepare data rows
+    const csvData = reportEntries.map((est : any, index : any) => [
+        index + 1,
+        processField(est.aircraftRegNo),
+        processField(est.aircraftAge),
+        processField(est.aircraftModel),
+        processField(est.typeOfCheck),
+        processField(est.tasks?.length),
+        processField(est.aggregatedTasks?.totalMhs),
+        "N/A",
+        "N/A",
+        processField(est.findings?.length),
+        processField(est.aggregatedFindings?.totalMhs),
+        "N/A",
+        "N/A",
+        "-",
+        processField(est.capping?.unbillable_mhs),
+        processField(est.capping?.unbillable_cost),
+        "N/A",
+    ]);
+
+    // Combine headers and data
+    const csvContent = [columnHeaders, ...csvData]
+        .map((row) => row.map((field : any) => `"${field}"`).join(","))
+        .join("\n");
+
+    // Create and download CSV file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Estimate_Report.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
+
+  
+    
     return (
         <>
             {/* Estimate success Modal */}
@@ -1844,7 +2162,7 @@ export default function EstimateNew() {
                                                     size="xs"
                                                     label="Man Hrs Capping Type"
                                                     placeholder="Select Capping Type"
-                                                    data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                    data={['per_source_card', 'per_IRC']}
                                                     allowDeselect
                                                     {...form.getInputProps("cappingDetails.cappingTypeManhrs")}
                                                 />
@@ -1868,7 +2186,7 @@ export default function EstimateNew() {
                                                     size="xs"
                                                     label="Spares Capping Type"
                                                     placeholder="Select Capping Type"
-                                                    data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                    data={['per_source_card', 'per_IRC','per_line_item']}
                                                     allowDeselect
                                                     {...form.getInputProps("cappingDetails.cappingTypeSpareCost")}
                                                 />
@@ -2417,57 +2735,57 @@ border-bottom: none;
                                         />
 
                                         <Group justify="space-between">
-                                            {/* <Group>
+                                            <Group>
                                                 <Title order={4} c='gray'>
                                                     Overall Estimate Report
                                                 </Title>
-                                            </Group> */}
-
-                                            {/* <Button
+                                            </Group> 
+                                            <Group>
+                                            <Button
                                                 size="xs"
                                                 variant="filled"
                                                 color="#1bb343"
-                                                leftSection={<MdPictureAsPdf size={14} />}
+                                                // leftSection={<MdPictureAsPdf size={14} />}
                                                 rightSection={<MdOutlineFileDownload size={14} />}
-                                                onClick={handleDownload}
-                                                loading={downloading}
+                                                onClick={downloadCSVReport}
+                                                // loading={downloading}
                                             >
-                                                {downloading ? "Downloading..." : "Download Estimate"}
-                                            </Button> */}
+                                                {downloading ? "Downloading..." : "Download CSV"}
+                                            </Button>
+                                            <Button
+                                                size="xs"
+                                                variant="filled"
+                                                color="violet"
+                                                // leftSection={<MdPictureAsPdf size={14} />}
+                                                rightSection={<MdOutlineFileDownload size={14} />}
+                                                onClick={downloadExcelReport}
+                                                // loading={downloading}
+                                            >
+                                                {downloading ? "Downloading..." : "Download Excel"}
+                                            </Button>
+                                            </Group>
+                                             
                                         </Group>
 
                                         <Space h='sm' />
 
                                         <OverallEstimateReport
-                                         totalTATTime={estimateReportData?.overallEstimateReport?.estimatedTatTime || 0}
+                                            totalTATTime={estimateReportData?.overallEstimateReport?.estimatedTatTime || 0}
                                             estimatedManHrs={estimateReportData?.overallEstimateReport?.estimateManhrs || {}}
+                                            capppingMhs={estimateReportData?.capping?.unbillable_mhs || 0}
                                             estimatedSparesCost={estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0}
-                                            cappingUnbilledCost={0}
-                                            parts={
-                                                estimateReportData?.overallEstimateReport?.spareParts || []
-                                            //     [
-                                            //       { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                            //       { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                            //     ]
-                                        }
+                                            cappingUnbilledCost={estimateReportData?.capping?.unbillable_cost || 0}
+                                            parts={estimateReportData?.overallEstimateReport?.spareParts || []
+                                                    // [
+                                                    //   { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
+                                                    //   { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
+                                                    // ]
+                                            }
                                             spareCostData={[
                                                 { date: "Min", Cost: 100 },
                                                 { date: "Estimated", Cost: 800 },
                                                 { date: "Max", Cost: 1000 },
                                             ]}
-                                            // totalTATTime={44}
-                                            // estimatedManHrs={{ min: 40, estimated: 66, max: 46, capping: 46 }}
-                                            // cappingUnbilledCost={44}
-                                            // parts={[
-                                            //     { partDesc: "Bolt", partName: "M12 Bolt", qty: 4.0, price: 10.00, unit: "" },
-                                            //     { partDesc: "Screw", partName: "Wood Screw", qty: 2.0, price: 5.00, unit: "" },
-                                            // ]}
-                                            // estimatedSparesCost={44}
-                                            // spareCostData={[
-                                            //     { date: "Min", Cost: 100 },
-                                            //     { date: "Estimated", Cost: 800 },
-                                            //     { date: "Max", Cost: 1000 },
-                                            // ]}
                                         />
                                         <Space h='xl' />
 
@@ -2556,6 +2874,7 @@ interface ChartData {
 interface TATDashboardProps {
     totalTATTime: number;
     estimatedManHrs: { min: number; estimated: number; max: number; capping: number };
+    capppingMhs : any;
     cappingUnbilledCost: number;
     parts: Part[];
     estimatedSparesCost: number;
@@ -2565,6 +2884,7 @@ interface TATDashboardProps {
 const OverallEstimateReport: React.FC<TATDashboardProps> = ({
     totalTATTime,
     estimatedManHrs,
+    capppingMhs,
     cappingUnbilledCost,
     parts,
     estimatedSparesCost,
@@ -2572,7 +2892,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
   }: any) => {
     return (
       <Box>
-        <Title order={4} mb="md" fw={500} c="dimmed">Overall Estimate Report</Title>
+        {/* <Title order={4} mb="md" fw={500} c="dimmed">Overall Estimate Report</Title> */}
         <Grid gutter="xs">
           {/* Left Section - Estimate Overview */}
           <Grid.Col span={3}>
@@ -2597,7 +2917,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     
                     return (
                       <Box key={key}>
-                        <Group justify="apart" mb={5}>
+                        <Group justify="space-between" mb={5}>
                           <Text fz="xs" fw={500}>{label}</Text>
                           <Text fz="sm" fw={600} c={color}>
                             {typeof value === 'number' ? value.toFixed(0) : value} Hrs
@@ -2612,6 +2932,20 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       </Box>
                     );
                   })}
+                  <Box>
+                        <Group justify="space-between" mb={5}>
+                          <Text fz="xs" fw={500}>Unbillable</Text>
+                          <Text fz="sm" fw={600} c={"green.6"}>
+                            {capppingMhs?.toFixed(0) || 0} Hrs
+                          </Text>
+                        </Group>
+                        <Progress 
+                          color={"green.6"}
+                          value={Math.min(capppingMhs / 100, 100) ?? 0} 
+                          size="md"
+                          radius="sm"
+                        />
+                      </Box>
                 </Flex>
               </Card>
   
@@ -2626,7 +2960,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       Unbillable Cost
                     </Text>
                     <Text size="xl" fw={700} c="blue.6">
-                      ${cappingUnbilledCost || 0}
+                    {new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                        }).format(cappingUnbilledCost || 0)}
                     </Text>
                   </Flex>
                 </Group>

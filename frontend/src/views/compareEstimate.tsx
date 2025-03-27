@@ -8,7 +8,6 @@ import { useApi } from '../api/services/estimateSrvice';
 import UploadDropZoneExcel from '../components/uploadExcelFile';
 import { showNotification } from '@mantine/notifications';
 import { showAppNotification } from '../components/showNotificationGlobally';
-import FlightDataVisualization from '../components/aircraftBarChart';
 
 export default function CompareEstimate() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -361,7 +360,7 @@ const flightData = [
         );
       })} */}
         {/* </SimpleGrid> */}
-        <SimpleGrid cols={3}>
+        <SimpleGrid cols={2}>
           <Card withBorder radius="md" bg="#e1e6f7" shadow="md">
             <Group>
               <IconUsers color="#4E66DE" size={39} />
@@ -388,6 +387,14 @@ const flightData = [
                   {manHours?.actual?.toFixed(0) - manHours?.estimated?.toFixed(0) || 0}
                 </Text>
               </Flex>
+              <Flex direction="column" justify="center" align="center">
+              <Text fw={400} fz="sm">Accuracy</Text>
+              <Text fw={600} fz="lg">
+                {manHours?.estimated
+                  ? `${((manHours.actual / manHours.estimated) * 100).toFixed(2)}%`
+                  : '0'}
+              </Text>
+            </Flex>
             </Group>
           </Card>
 
@@ -417,10 +424,19 @@ const flightData = [
                   {calculateDifference(spareCost)} $
                 </Text>
               </Flex>
+              <Flex direction="column" justify="center" align="center">
+              <Text fw={400} fz="sm">Accuracy</Text>
+              <Text fw={600} fz="lg">
+                {spareCost?.estimated
+                  ? `${((spareCost.actual / spareCost.estimated) * 100).toFixed(2)}%`
+                  : '0'}
+              </Text>
+            </Flex>
+
             </Group>
           </Card>
 
-          <Card withBorder radius="md" bg="#fcfbe3" shadow="md">
+          {/* <Card withBorder radius="md" bg="#fcfbe3" shadow="md">
             <Group>
               <IconClockCheck color="orange" size={39} />
               <Text fw={600} fz="md">TAT Time</Text>
@@ -442,12 +458,11 @@ const flightData = [
                   fz="lg"
                   c={Number(calculateDifference(tatTime)) >= 0 ? '#F20000' : '#088A45'}
                 >
-                  {/* {calculateDifference(tatTime)} Hrs */}
                   {tatTime?.actual?.toFixed(0) - tatTime?.estimated?.toFixed(0) || 0}
                 </Text>
               </Flex>
             </Group>
-          </Card>
+          </Card> */}
         </SimpleGrid>
         <Space h='md' />
         <SimpleGrid cols={2}>
