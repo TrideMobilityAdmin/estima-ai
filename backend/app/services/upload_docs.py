@@ -593,11 +593,12 @@ class ExcelUploadService:
    
     async def process_multiple_files(self, files: List[UploadFile], columnMappings:Dict, SheetName:str) -> pd.DataFrame:
         """
-        Asynchronously process multiple uploaded files concurrently
-        
+        Read and process an individual uploaded Excel or CSV file.
+
         Args:
-            files (List[UploadFile]): List of uploaded files to process
-        
+            file (UploadFile): The uploaded file.
+            sheet_names (List[str]): Expected sheet names.
+
         Returns:
             List[Dict[Any, Any]]: Combined processed records from all files
         """

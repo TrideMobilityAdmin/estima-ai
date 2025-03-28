@@ -8,6 +8,7 @@ import SkillRequirement from "../views/skillRequirement";
 import ExpertInsights from "../views/expertInsights";
 import { useEffect } from "react";
 import EstimateNew from "../views/estimateNew";
+import CompareEstimateNew from "../views/compareEstimateNew";
 
 const MainRoutes = () => {
   // const location = useLocation();
@@ -33,7 +34,7 @@ const MainRoutes = () => {
       <Route path="/" element={<Login />} />
       <Route path="/home" element={<Landing />}>
         <Route path="/home/estimate" element={<EstimateNew />} />
-        <Route path="/home/compare-estimate" element={<CompareEstimate />} />
+        <Route path="/home/compare-estimate" element={<CompareEstimateNew />} />
         <Route path="/home/part-usage" element={<PartUsage />} />
         <Route path="/home/skill-requirement" element={<SkillRequirement />} />
         <Route path="/home/expert-insights" element={<ExpertInsights />} />

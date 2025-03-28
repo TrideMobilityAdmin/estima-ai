@@ -610,7 +610,7 @@ border-bottom: none;
                 <Space h='sm' />
                 <Grid>
                     <Grid.Col span={8}>
-                        <Card radius='md' h='50vh'>
+                        <Card radius='md' h='60vh'>
 
                             <Title order={5} c='dimmed'>
                                 Daily Trend Analysis
@@ -638,7 +638,7 @@ border-bottom: none;
                         </Card>
                     </Grid.Col>
                     <Grid.Col span={4}>
-                        <Card radius='md' h='50vh'>
+                        <Card radius='md' h='60vh'>
                             <Title order={5} c='dimmed'>
                                 Distribution Analysis (%)
                             </Title>
@@ -788,10 +788,10 @@ border-bottom: none;
                 <Space h='md' />
                 <SimpleGrid cols={2}>
                     {/* MPD Chart */}
-                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey="taskId" />
+                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
 
                     {/* Findings Chart */}
-                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey="findingId" />
+                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
                 </SimpleGrid>
                 {/* <SimpleGrid cols={2}>
                     <Card>

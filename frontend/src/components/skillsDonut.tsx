@@ -1,94 +1,90 @@
-import React from 'react';
-import ReactApexChart from 'react-apexcharts';
-import { Center, Text } from '@mantine/core';
-import { ApexOptions } from 'apexcharts';
+import React, { useEffect, useRef } from "react";
+import * as echarts from "echarts/core";
+import { TooltipComponent, LegendComponent } from "echarts/components";
+import { PieChart } from "echarts/charts";
+import { LabelLayout } from "echarts/features";
+import { CanvasRenderer } from "echarts/renderers";
+import { Center, Text } from "@mantine/core";
 
-const chartConfig: ApexOptions = {
-    chart: {
-        background: 'transparent',
-        type: 'donut',
-    },
-    title: {
-        text: 'Skill Distribution',
-        align: 'center',
-        style: {
-            fontSize: '16px',
-            fontWeight: 500,
+// Register ECharts components
+echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout]);
+
+interface SkillsDonutChartProps {
+  task: {
+    skills: { skill: string; manHours?: { avg: number } }[];
+  };
+}
+
+const SkillsDonutChart: React.FC<SkillsDonutChartProps> = ({ task }) => {
+  const chartRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (chartRef.current) {
+      const myChart = echarts.init(chartRef.current);
+
+      const series = task?.skills
+        ?.map((skill) => skill?.manHours?.avg)
+        ?.filter((val) => typeof val === "number" && !isNaN(val)) || [];
+
+      const labels = task?.skills?.map((skill) => skill?.skill || "Unknown Skill") || [];
+
+      const option = {
+        tooltip: {
+          trigger: "item",
+          formatter: "{b}: {c} hrs ({d}%)",
         },
-    },
-    plotOptions: {
-        pie: {
-            donut: {
-                size: '65%',
-                labels: {
-                    show: true,
-                    value: {
-                        show: true,
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        formatter: (val: any) => `${val.toFixed(1)}%`,
-                    },
-                    total: {
-                        show: true,
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        formatter: (w: any) => {
-                            const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
-                            return `${total.toFixed(1)} hrs`;
-                        },
-                    },
-                },
+        legend: {
+          bottom: "5%",
+          left: "center",
+        },
+        series: [
+          {
+            name: "Skill Distribution",
+            type: "pie",
+            radius: ["40%", "70%"],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 10,
+              borderColor: "#fff",
+              borderWidth: 2,
             },
-        },
-    },
-    dataLabels: {
-        enabled: true,
-        formatter: (val: number) => `${val.toFixed(1)}%`,
-        style: {
-            fontSize: '14px',
-            fontWeight: 600,
-        },
-    },
-    legend: {
-        position: 'bottom',
-        fontSize: '14px',
-    },
-    stroke: {
-        width: 0,
-    },
-    tooltip: {
-        enabled: true,
-        y: {
-            formatter: (val: number) => `${val.toFixed(1)} hrs`,
-        },
-    },
-};
+            label: {
+              show: false,
+              position: "center",
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 16,
+                fontWeight: "bold",
+              },
+            },
+            labelLine: {
+              show: false,
+            },
+            data: labels.map((label, index) => ({
+              value: series[index],
+              name: label,
+            })),
+          },
+        ],
+      };
 
-const SkillsDonutChart = ({ task } :any) => {
-    const series = task?.skills
-        ?.map((skill : any) => skill?.manHours?.avg)
-        ?.filter((val : any) => typeof val === "number" && !isNaN(val)) || [];
+      myChart.setOption(option);
+    }
+  }, [task]);
 
-    const labels = task?.skills?.map((skill : any) => skill?.skill || "Unknown Skill") || [];
-
-    return (
-        <Center mb="lg">
-            <div style={{ width: 300, height: 300 }}>
-                {series.length ? (
-                    <ReactApexChart
-                        type="donut"
-                        height={280}
-                        width={280}
-                        options={chartConfig}
-                        labels={labels}
-                        series={series}
-                    />
-                ) : (
-                    <Text>No data available</Text>
-                )}
-            </div>
-        </Center>
-    );
+  return (
+    <Center mb="lg">
+      <div style={{ width: 300, height: 300 }}>
+        {task?.skills?.length ? (
+          <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
+        ) : (
+          <Text>No data available</Text>
+        )}
+      </div>
+    </Center>
+  );
 };
 
 export default SkillsDonutChart;
