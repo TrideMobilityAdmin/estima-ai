@@ -34,7 +34,7 @@ const SkillsDonutChart: React.FC<SkillsDonutChartProps> = ({ task }) => {
           formatter: "{b}: {c} hrs ({d}%)",
         },
         legend: {
-          top: "5%",
+          bottom: "5%",
           left: "center",
         },
         series: [
