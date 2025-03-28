@@ -1432,21 +1432,21 @@ class TaskService:
         elif capping_result.get("cost_type") == "per_line_item":
             line_item = capping_result.get("mc")
             capping_type = "per_line_item"
-        elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type") is None:
+        elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="":
             SCMH = capping_result.get("mhs")
             capping_type="per_source_card_no_cost"
-        elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type") is None:
+        elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type")=="":
             FMH = capping_result.get("mhs")
             FMC = 500
             capping_type="per_IRC_no_cost"
-        elif capping_result.get("cost_type")=="per_IRC" and capping_result.get("mh_type") is None:
+        elif capping_result.get("cost_type")=="per_IRC" and capping_result.get("mh_type")=="":
             FMC = capping_result.get("mc")
             FMH=20
             capping_type="no_manhours_per_IRC"
-        elif capping_result.get("mh_type") is None and capping_result.get("cost_type")=="per_source_card":
+        elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="per_source_card":
             SCMC = capping_result.get("mc")
             capping_type="no_manhours_per_source_card" 
-        elif capping_result.get("mh_type") is None and capping_result.get("cost_type") is None:
+        elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="":
             capping_type = "N/A"
         elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="per_IRC":
             SCMH=capping_result.get("mhs")

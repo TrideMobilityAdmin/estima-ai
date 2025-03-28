@@ -54,9 +54,9 @@ class AdditionalTasks(BaseModel):
     taskID: str
     taskDescription: str
 class Capping(BaseModel):
-    cappingTypeManhrs: str
+    cappingTypeManhrs: str=""
     cappingManhrs: float
-    cappingTypeSpareCost: str
+    cappingTypeSpareCost: str=""
     cappingSpareCost: float
 
 class EstimateRequest(BaseModel):
