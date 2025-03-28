@@ -2436,7 +2436,7 @@ border-bottom: none;
                                     filter: true,
                                     floatingFilter: true,
                                     resizable: true,
-                                    flex: 1,
+                                    flex: 1.8,
                                     cellRenderer: (params: any) => {
                                         if (!params.value) return null; // Handle empty values
 
@@ -2619,7 +2619,7 @@ border-bottom: none;
                                                         <IconReport />
                                                     </ActionIcon>
                                                 </Tooltip>
-                                                <Tooltip label="Download Estimate">
+                                                {/* <Tooltip label="Download Estimate">
                                                     <ActionIcon
                                                         size={20}
                                                         color="lime"
@@ -2635,7 +2635,7 @@ border-bottom: none;
                                                     >
                                                         <IconDownload />
                                                     </ActionIcon>
-                                                </Tooltip>
+                                                </Tooltip> */}
                                                 <Tooltip label="Probability Details">
                                                     <ActionIcon
                                                         size={20}
