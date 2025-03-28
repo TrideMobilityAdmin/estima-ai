@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput, Center } from "@mantine/core";
-import { IconAlertTriangle, IconClock, IconCube } from "@tabler/icons-react";
+import { IconAlertTriangle, IconClock, IconClockCode, IconClockDown, IconClockUp, IconCube } from "@tabler/icons-react";
 import SkillsDonutChart from "../components/skillsDonut"; // Assuming this is your chart component
 
 const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
@@ -298,16 +298,46 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                             <Card key={task.taskId} shadow="0" p="sm" radius="md" mt="xs" bg="#f0f0f0">
                                                 <Text size="sm" fw={500}>{task.taskId}</Text>
                                                 <Text size="xs" c="dimmed" mb="xs">{task.taskDescription}</Text>
-                                                <Group justify="space-between">
+                                                {/* <Group justify="space-between">
                                                     <Text fz="xs" c="green" fw={700}>Min {task.manHours.min} Hr</Text>
                                                     <Text fz="xs" c="yellow" fw={700}>Avg {task.manHours.avg} Hr</Text>
                                                     <Text fz="xs" c="red" fw={700}>Max {task.manHours.max} Hr</Text>
-                                                </Group>
-                                                <Progress.Root size="xs" mt="xs">
+                                                </Group> */}
+                                                <SimpleGrid cols={3}>
+                                                <Card bg='#daf7de' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Min</Text>
+                                                <Text fz='lg' fw={600}>{task.manHours.min} Hr</Text>
+                                            </Flex>
+                                            <IconClockDown color="green" size='20' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#fcebeb' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Max</Text>
+                                                <Text fz='lg' fw={600}>{task.manHours.min} Hr</Text>
+                                            </Flex>
+                                            <IconClockUp color="red" size='20' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#f3f7da' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Avg</Text>
+                                                <Text fz='lg' fw={600}>{task.manHours.max} Hr</Text>
+                                            </Flex>
+                                            <IconClockCode color="orange" size='20' />
+                                        </Group>
+                                    </Card>
+
+                                                </SimpleGrid>
+                                                {/* <Progress.Root size="xs" mt="xs">
                                                     <Progress.Section value={(task.manHours.min / (task.manHours.max || 1)) * 100} color="green" />
                                                     <Progress.Section value={((task.manHours.avg - task.manHours.min) / (task.manHours.max || 1)) * 100} color="yellow" />
                                                     <Progress.Section value={((task.manHours.max - task.manHours.avg) / (task.manHours.max || 1)) * 100} color="red" />
-                                                </Progress.Root>
+                                                </Progress.Root> */}
                                             </Card>
                                         ))}
                                     </Box>
@@ -413,7 +443,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         {skillGroup.findings.map((finding : any) => (
                                             <Card key={finding.taskId} shadow="0" p="sm" radius="md" mt="xs" bg="#f0f0f0">
                                                 <Text size="sm" fw={500}>{finding.taskId || "-"}</Text>
-                                                <Group justify="space-between">
+                                                {/* <Group justify="space-between">
                                                     <Text fz="xs" c="green" fw={700}>Min {finding.manHours.min} Hr</Text>
                                                     <Text fz="xs" c="yellow" fw={700}>Avg {finding.manHours.avg} Hr</Text>
                                                     <Text fz="xs" c="red" fw={700}>Max {finding.manHours.max} Hr</Text>
@@ -422,7 +452,37 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                                     <Progress.Section value={(finding.manHours.min / (finding.manHours.max || 1)) * 100} color="green" />
                                                     <Progress.Section value={((finding.manHours.avg - finding.manHours.min) / (finding.manHours.max || 1)) * 100} color="yellow" />
                                                     <Progress.Section value={((finding.manHours.max - finding.manHours.avg) / (finding.manHours.max || 1)) * 100} color="red" />
-                                                </Progress.Root>
+                                                </Progress.Root> */}
+                                                 <SimpleGrid cols={3}>
+                                                <Card bg='#daf7de' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Min</Text>
+                                                <Text fz='lg' fw={600}>{finding.manHours.min} Hr</Text>
+                                            </Flex>
+                                            <IconClockDown color="green" size='20' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#fcebeb' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Max</Text>
+                                                <Text fz='lg' fw={600}>{finding.manHours.min} Hr</Text>
+                                            </Flex>
+                                            <IconClockUp color="red" size='20' />
+                                        </Group>
+                                    </Card>
+                                    <Card bg='#f3f7da' shadow="0" radius='md' p='xs'>
+                                        <Group justify="space-between" align="start">
+                                            <Flex direction='column'>
+                                                <Text fz='xs'>Avg</Text>
+                                                <Text fz='lg' fw={600}>{finding.manHours.max} Hr</Text>
+                                            </Flex>
+                                            <IconClockCode color="orange" size='20' />
+                                        </Group>
+                                    </Card>
+
+                                                </SimpleGrid>
                                             </Card>
                                         ))}
                                     </Box>

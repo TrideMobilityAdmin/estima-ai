@@ -1,0 +1,74 @@
+{
+    "tasks": [
+        {
+            "package_number": "HMV24/000070/0524",
+            "task_number": "BRIDGING CHECK",
+
+            "actual_man_hours_actual": 2.0,
+            "actual_man_hours_pred": 3.8,
+            "diff_avg_mh": 1.8,
+            "accuracy_avg_mh": 1.8,
+
+            "task_part_consumption_actual": 193.1377102335,
+            "task_part_consumption_pred": 237.1611448388,
+            "diff_total_billable_value_usd_tasks": 44.0234346053,
+            "accuracy_total_billable_value_usd_tasks": 44.0234346053,
+
+            "actual_man_hours_findings_actual": 0,
+            "actual_man_hours_findings_pred": 1.0,
+            "diff_avg_mh_findings": 1.0,
+            "accuracy_avg_mh_findings": 1.0,
+
+            "findings_part_consumption_actual": 0,
+            "findings_part_consumption_pred": 30.05,
+            "diff_total_billable_value_usd_findings": 30.05,
+            "accuracy_total_billable_value_usd_findings" : 60
+        },
+        {
+            "package_number": "HMV24/000070/0524",
+            "task_number": "BRIDGING CHECK",
+
+            "actual_man_hours_actual": 2.0,
+            "actual_man_hours_pred": 3.8,
+            "diff_avg_mh": 1.8,
+            "accuracy_avg_mh": 1.8,
+
+            "task_part_consumption_actual": 193.1377102335,
+            "task_part_consumption_pred": 237.1611448388,
+            "diff_total_billable_value_usd_tasks": 44.0234346053,
+            "accuracy_total_billable_value_usd_tasks": 44.0234346053,
+
+            "actual_man_hours_findings_actual": 0,
+            "actual_man_hours_findings_pred": 1.0,
+            "diff_avg_mh_findings": 1.0,
+            "accuracy_avg_mh_findings": 1.0,
+
+            "findings_part_consumption_actual": 0,
+            "findings_part_consumption_pred": 30.05,
+            "diff_total_billable_value_usd_findings": 30.05,
+            "accuracy_total_billable_value_usd_findings" : 60
+        }
+    ],
+    "aggregatedTasklevel": {
+        "avg_mh_actual":60,
+        "avg_mh_pred":60,
+        "diff_avg_mh": 60,
+        "accuracy_mh" : 60,
+
+        "total_billable_value_usd_tasks_actual" : 60,
+        "total_billable_value_usd_tasks_Pred" : 60,
+        "diff_total_billable_value_usd_tasks": 60,
+        "accuracy_total_billable_value_usd_tasks" : 60
+    },
+    "aggregatedFindingslevel": {
+        "avg_mh_findings_actual":60,
+        "avg_mh_findings_pred":60,
+        "diff_avg_mh": 60,
+        "accuracy_mh" : 60,
+
+        "total_billable_value_usd_findings_actual" : 60,
+        "total_billable_value_usd_findings_Pred" : 60,
+        "diff_total_billable_value_usd_findings": 60,
+        "accuracy_total_billable_value_usd_findings" : 60
+    }
+}

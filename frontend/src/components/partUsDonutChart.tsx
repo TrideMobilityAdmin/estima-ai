@@ -84,9 +84,9 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
         {/* <Title order={5} c="dimmed">
           Distribution Analysis (%)
         </Title> */}
-        <Center>
+        {/* <Center> */}
           <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
-        </Center>
+        {/* </Center> */}
       </Card>
   );
 };

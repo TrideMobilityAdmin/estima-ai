@@ -8,6 +8,7 @@ import SkillRequirement from "../views/skillRequirement";
 import ExpertInsights from "../views/expertInsights";
 import { useEffect } from "react";
 import EstimateNew from "../views/estimateNew";
+import CompareEstimateNew from "../views/compareEstimateNew";
 
 const MainRoutes = () => {
   // const location = useLocation();
