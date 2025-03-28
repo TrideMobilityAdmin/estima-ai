@@ -592,121 +592,438 @@ class ExcelUploadService:
             raise HTTPException(status_code=500, detail="Failed to update remarks")
    
 
-async def read_and_process_uploaded_file(file: UploadFile, sheet_names: List[str]) -> Dict[str, pd.DataFrame]:
-    """
-    Read and process an individual uploaded Excel or CSV file.
+    async def read_and_process_uploaded_file(self,file: UploadFile, sheet_names: List[str]) -> Dict[str, pd.DataFrame]:
+        """
+        Read and process an individual uploaded Excel or CSV file.
 
-    Args:
-        file (UploadFile): The uploaded file.
-        sheet_names (List[str]): Expected sheet names.
+        Args:
+            file (UploadFile): The uploaded file.
+            sheet_names (List[str]): Expected sheet names.
 
-    Returns:
-        Dict[str, pd.DataFrame]: A dictionary mapping sheet names to DataFrames.
-    """
-    file_extension = file.filename.split('.')[-1].lower()
-    content = await file.read()
+        Returns:
+            Dict[str, pd.DataFrame]: A dictionary mapping sheet names to DataFrames.
+        """
+        file_extension = file.filename.split('.')[-1].lower()
+        content = await file.read()
 
-    dataframes = {}
-    if file_extension in ['xls', 'xlsx', 'xlsm']:
-        for sheet_name in sheet_names:
+        dataframes = {}
+        if file_extension in ['xls', 'xlsx', 'xlsm']:
+            for sheet_name in sheet_names:
+                try:
+                    df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name,
+                                        engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+                    df.columns = df.iloc[0].astype(str).str.strip()  # Normalize column names
+                    df = df[1:].reset_index(drop=True)
+                    df = df.loc[:, ~df.columns.duplicated()].copy()
+                    dataframes[sheet_name] = df
+                except Exception as e:
+                    # Assuming you have a logger defined
+                    # logger.warning(f"Error reading sheet '{sheet_name}' in file {file.filename}: {e}")
+                    print(f"Error reading sheet '{sheet_name}' in file {file.filename}: {e}") #For test purposes if the logger is not implemented.
+
+        elif file_extension == 'csv':
             try:
-                df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name,
-                                    engine='openpyxl' if file_extension != 'xls' else 'xlrd')
-                df.columns = df.iloc[0].astype(str).str.strip()  # Normalize column names
-                df = df[1:].reset_index(drop=True)
-                df = df.loc[:, ~df.columns.duplicated()].copy()
-                dataframes[sheet_name] = df
+                df = pd.read_csv(io.BytesIO(content))
+                dataframes["csv"] = df
             except Exception as e:
-                # Assuming you have a logger defined
-                # logger.warning(f"Error reading sheet '{sheet_name}' in file {file.filename}: {e}")
-                print(f"Error reading sheet '{sheet_name}' in file {file.filename}: {e}") #For test purposes if the logger is not implemented.
+                # logger.warning(f"Error reading CSV file {file.filename}: {e}")
+                print(f"Error reading CSV file {file.filename}: {e}") #For test purposes if the logger is not implemented.
 
-    elif file_extension == 'csv':
-        try:
-            df = pd.read_csv(io.BytesIO(content))
-            dataframes["csv"] = df
-        except Exception as e:
-            # logger.warning(f"Error reading CSV file {file.filename}: {e}")
-            print(f"Error reading CSV file {file.filename}: {e}") #For test purposes if the logger is not implemented.
-
-    return dataframes
+        return dataframes
 
 
-async def compare_estimates(files: List[UploadFile], estID: str) -> Dict:
-    """
-    Process multiple uploaded files and organize them into categories based on file prefixes.
+    async def compare_estimates(self,estID: str,files: List[UploadFile]) :
+        """
+        Process multiple uploaded files and organize them into categories based on file prefixes.
 
-    Args:
-        files (List[UploadFile]): List of uploaded files.
-        estID (str): estimate ID.
+        Args:
+            files (List[UploadFile]): List of uploaded files.
+            estID (str): estimate ID.
 
-    Returns:
-        Dict: Processed DataFrames categorized by prefix.
-    """
-    # logger.info(f"Processing {len(files)} files")
-    print(f"Processing {len(files)} files") #For test purposes if the logger is not implemented.
+        Returns:
+            Dict: Processed DataFrames categorized by prefix.
+        """
+        # logger.info(f"Processing {len(files)} files")
+        print(f"Processing {len(files)} files") #For test purposes if the logger is not implemented.
 
-    # Load configuration file
-    config_file_path = os.path.join("app", "config", "config.yaml")
-    with open(config_file_path, 'r') as file:
-        config = yaml.safe_load(file)
+        # Load configuration file
+        config_file_path = os.path.join("app", "config", "config.yaml")
+        with open(config_file_path, 'r') as file:
+            config = yaml.safe_load(file)
 
-    # Define categories based on prefixes
-    categories = {
-        "mltaskmlsec1": ["mltaskmlsec1"],
-        "mldpmlsec1": ["mldpmlsec1"],
-        "Material": ["PRICING", "Sheet1", "sheet1", "Pricing", "Price"]
-    }
+        # Define categories based on prefixes
+        categories = {
+            "mltaskmlsec1": ["mltaskmlsec1"],
+            "mldpmlsec1": ["mldpmlsec1"],
+            "Material": ["PRICING", "Sheet1", "sheet1", "Pricing", "Price"]
+        }
 
-    sub_task_parts = None
-    task_description = None
-    sub_task_description = None
+        sub_task_parts = None
+        task_description = None
+        sub_task_description = None
 
-    for file in files:
-        prefix_found = None
-        for prefix in categories.keys():
-            if file.filename.startswith(prefix):
-                prefix_found = prefix
-                break
+        for file in files:
+            prefix_found = None
+            for prefix in categories.keys():
+                if file.filename.startswith(prefix):
+                    prefix_found = prefix
+                    break
 
-        if prefix_found:
-            sheet_names = categories[prefix_found]
-            df_dict = await read_and_process_uploaded_file(file, sheet_names)
-            if df_dict:
-                if prefix_found == "Material":
-                    df = list(df_dict.values())[0] #Take the first dataframe from the dict.
-                    df.rename(columns={k: v for k, v in config['material_columns_mappings'].items() if k in df.columns}, inplace=True)
-                    expected_columns = list(config['material_columns_mappings'].values())
-                    missing_columns = [col for col in expected_columns if col not in df.columns]
-                    for col in missing_columns:
-                        df[col] = None
-                    sub_task_parts = df
+            if prefix_found:
+                sheet_names = categories[prefix_found]
+                df_dict = await self.read_and_process_uploaded_file(file, sheet_names)
+                if df_dict:
+                    if prefix_found == "Material":
+                        df = list(df_dict.values())[0] #Take the first dataframe from the dict.
+                        df.rename(columns={k: v for k, v in config['sub_task_parts_column_mappings'].items() if k in df.columns}, inplace=True)
+                        expected_columns = list(config['sub_task_parts_column_mappings'].values())
+                        missing_columns = [col for col in expected_columns if col not in df.columns]
+                        for col in missing_columns:
+                            df[col] = None
+                        sub_task_parts = df
 
-                elif prefix_found == "mltaskmlsec1":
-                    df = list(df_dict.values())[0]
-                    df.rename(columns={k: v for k, v in config['task_description_columns_mappings'].items() if k in df.columns}, inplace=True)
-                    expected_columns = list(config['task_description_columns_mappings'].values())
-                    missing_columns = [col for col in expected_columns if col not in df.columns]
-                    for col in missing_columns:
-                        df[col] = None
-                    task_description = df
+                    elif prefix_found == "mltaskmlsec1":
+                        df = list(df_dict.values())[0]
+                        df.rename(columns={k: v for k, v in config['task_description_columns_mappings'].items() if k in df.columns}, inplace=True)
+                        expected_columns = list(config['task_description_columns_mappings'].values())
+                        missing_columns = [col for col in expected_columns if col not in df.columns]
+                        for col in missing_columns:
+                            df[col] = None
+                        task_description = df
 
-                elif prefix_found == "mldpmlsec1":
-                    df = list(df_dict.values())[0]
-                    df.rename(columns={k: v for k, v in config['sub_task_description_columns_mappings'].items() if k in df.columns}, inplace=True)
-                    expected_columns = list(config['sub_task_description_columns_mappings'].values())
-                    missing_columns = [col for col in expected_columns if col not in df.columns]
-                    for col in missing_columns:
-                        df[col] = None
-                    sub_task_description = df
+                    elif prefix_found == "mldpmlsec1":
+                        df = list(df_dict.values())[0]
+                        df.rename(columns={k: v for k, v in config['sub_task_description_columns_mappings'].items() if k in df.columns}, inplace=True)
+                        expected_columns = list(config['sub_task_description_columns_mappings'].values())
+                        missing_columns = [col for col in expected_columns if col not in df.columns]
+                        for col in missing_columns:
+                            df[col] = None
+                        sub_task_description = df
+            else:
+                print(f"File {file.filename} does not match any prefix.")
+
+        if task_description is not None and sub_task_parts is not None and sub_task_description is not None:
+            results = self.testing(task_description, sub_task_parts, sub_task_description, estID)
+            return results
         else:
-            print(f"File {file.filename} does not match any prefix.")
+            return {"error": "Missing required files."}
+    
+    def convert_numpy_types(self,obj):
+        """
+        Recursively convert NumPy types to Python native types.
+        
+        Args:
+            obj: Input object to convert
+        
+        Returns:
+            Converted object with NumPy types replaced by native Python types
+        """
+        import numpy as np
+        
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {k: self.convert_numpy_types(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.convert_numpy_types(v) for v in obj]
+        return obj
+    
+        
+    def testing(self,task_description, sub_task_parts,sub_task_description,estID):
+        # Fetch predicted data
+            pred_data = list(self.estimate_output.find({"estID": estID}))
+            if not pred_data :  # Check for empty or missing tasks
+                print("No predicted data found for the given estID.")
+                return pd.DataFrame()  # Return an empty DataFrame if no valid data
+            pred_tasks_data = pd.DataFrame(pred_data[0]["tasks"])
+            # Extract 'avg', 'max', and 'min' from 'mhs' dictionary
+            pred_tasks_data["avg_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("avg") if isinstance(x, dict) else None)
+            pred_tasks_data["max_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("max") if isinstance(x, dict) else None)
+            pred_tasks_data["min_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("min") if isinstance(x, dict) else None)
+            # Compute total billable value from spare_parts
+            pred_tasks_data["total_billable_value_usd"] = pred_tasks_data["spare_parts"].apply(
+                lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
+            )
+            # Fetch actual package data
+            pkg_tasks_data = task_description[task_description["package_number"] == "package_number"]
+            pkg_tasks_data = pkg_tasks_data[~pkg_tasks_data["task_number"].str.startswith("AWR")]
+            # Filter sub_task_parts for tasks belonging to the specific package_number
+            filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+            # Compute actual task part consumption
+            task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
+                task_part_consumption=("billable_value_usd", "sum")
+            )
+            # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
+            pkg_tasks_data = pkg_tasks_data.merge(task_parts_consumption, left_on="task_number", right_on="task_number", how="left")
+            # Fill missing values to avoid NaN issues
+            pkg_tasks_data.loc[:, "task_part_consumption"] = pkg_tasks_data["task_part_consumption"].fillna(0)
+            # Ensure data types match for merging
+            pkg_tasks_data["task_number"] = pkg_tasks_data["task_number"].astype(str)
+            pred_tasks_data["task_number"] = pred_tasks_data["sourceTask"].astype(str)
+            pred_tasks_data.rename(columns={"avg_mh": "actual_man_hours", "total_billable_value_usd": "task_part_consumption"}, inplace=True)
+            pred_findings_data = pd.DataFrame(pred_data[0]["findings"])
+            if "details" in pred_findings_data.columns:
+                pred_findings_data["avg_mh_findings"] = pred_findings_data["details"].apply(
+                lambda x: x[0]["mhs"].get("avg") if isinstance(x, list) and len(x) > 0 else None
+                )
+                pred_findings_data["max_mh_findings"] = pred_findings_data["details"].apply(
+                    lambda x: x[0]["mhs"].get("max") if isinstance(x, list) and len(x) > 0 else None
+                )
+                pred_findings_data["min_mh_findings"] = pred_findings_data["details"].apply(
+                    lambda x: x[0]["mhs"].get("min") if isinstance(x, list) and len(x) > 0 else None
+                )
+                # Compute total billable value from spare_parts
+                pred_findings_data["findings_part_consumption"] = pred_findings_data["details"].apply(
+                    lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
+                )
+                pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
+                pkg_findings_data = sub_task_description[sub_task_description["package_number"] == "package_number"]
+                pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number_updated"].str.startswith("AWR")]
+                pkg_findings_data["source_task_discrepancy_number_updated"].dropna(inplace=True)
+                # Filter sub_task_parts for tasks belonging to the specific package_number
+                filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+                filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
+                filtered_sub_task_parts = filtered_sub_task_parts.merge(
+                pkg_findings_data[["log_item_number", "source_task_discrepancy_number_updated"]],
+                left_on="task_number",
+                right_on="log_item_number",
+                how="left"
+                )
+                filtered_sub_task_parts["source_task_discrepancy_number_updated"].dropna(inplace=True)
+                filtered_sub_task_parts["source_task_discrepancy_number_updated"] = (
+                filtered_sub_task_parts["source_task_discrepancy_number_updated"].astype(str)
+                )
+                # Filter out rows where "source_task_discrepancy_number_updated" starts with "AWR"
+                filtered_sub_task_parts = filtered_sub_task_parts[
+                    ~filtered_sub_task_parts["source_task_discrepancy_number_updated"].str.startswith("AWR", na=False)
+                ]
+                # Compute actual task part consumption
+                findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
+                    findings_part_consumption=("billable_value_usd", "sum")
+                )
+                # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
+                pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
+                # Fill missing values to avoid NaN issues
+                pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
+                pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number_updated"])[["actual_man_hours", "findings_part_consumption"]].sum()
+                pred_findings_data.rename(columns={"avg_mh_findings": "actual_man_hours_findings","taskId":"task_number"}, inplace=True)
+                pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
+                pkg_findings_data.rename(
+                    columns={
+                        "actual_man_hours": "actual_man_hours_findings",
+                        "source_task_discrepancy_number_updated": "task_number"
+                    },
+                    inplace=True
+                )
+                pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
+                pred_findings_data["task_number"] = pred_findings_data["task_number"].astype(str)
+                pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
+                pred_tasks_data = pred_tasks_data.merge(pred_findings_data, on="task_number", how="left")
+                # Compute differences safely
+                results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
+                results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
+                results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
+                # Merge predicted and actual data
+                results["diff_avg_mh_findings"] = results["actual_man_hours_findings_pred"].fillna(0) - results["actual_man_hours_findings_actual"].fillna(0)
+                results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
+                # Assuming 'results' is a DataFrame
+                results_df = results[[
+                    'package_number', 'task_number', 'actual_man_hours_actual',
+                    'task_part_consumption_actual', 'actual_man_hours_pred',
+                    'task_part_consumption_pred', 'actual_man_hours_findings_actual',
+                    'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
+                    'findings_part_consumption_pred', 'diff_avg_mh',
+                    'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
+                    'diff_total_billable_value_usd_findings'
+                ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
+                
+                results_df.fillna(0, inplace=True)
+                # Convert all int64 columns to Python int
+                results_df = results_df.apply(lambda x: x.astype(int) if x.dtype == np.int64 else x)
 
-    if task_description is not None and sub_task_parts is not None and sub_task_description is not None:
-        results = testing(task_description, sub_task_parts, sub_task_description, estID)
-        return results
-    else:
-        return {"error": "Missing required files."}
+                
+                tasks = []  # List to store task dictionaries
+                
+                for _, row in results_df.iterrows():
+                    task = {
+                        "package_number": row["package_number"],
+                        "task_number": row["task_number"],
+                        "actual_man_hours_actual": row["actual_man_hours_actual"],
+                        "task_part_consumption_actual": row["task_part_consumption_actual"],
+                        "actual_man_hours_pred": row["actual_man_hours_pred"],
+                        "task_part_consumption_pred": row["task_part_consumption_pred"],
+                        "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
+                        "findings_part_consumption_actual": row["findings_part_consumption_actual"],
+                        "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
+                        "findings_part_consumption_pred": row["findings_part_consumption_pred"],
+                        "diff_avg_mh": row["diff_avg_mh"],
+                        "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
+                        "diff_avg_mh_findings": row["diff_avg_mh_findings"],
+                        "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
+                        "accuracy": 100 - (
+                            abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
+                            row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
+                        ) / (
+                            row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
+                            row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
+                        ) * 100 if (
+                            row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
+                            row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
+                        ) > 0 else 0  # Avoid division by zero
+                    }
+                    tasks.append(task)
+                
+                # Compute aggregated accuracy
+                actual_mh_total = results_df["actual_man_hours_actual"].sum()
+                pred_mh_total = results_df["actual_man_hours_pred"].sum()
+                actual_billable_total = results_df["task_part_consumption_actual"].sum()
+                pred_billable_total = results_df["task_part_consumption_pred"].sum()
+                
+                accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
+                accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
+                
+                results = {
+                    "tasks": tasks,
+                    "aggregatedTasklevel": {
+                        "avg_mh_actual": actual_mh_total,
+                        "total_billable_value_usd_tasks_actual": actual_billable_total,
+                        "avg_mh_pred": pred_mh_total,
+                        "total_billable_value_usd_tasks_pred": pred_billable_total,
+                        "diff_avg_mh": results_df["diff_avg_mh"].sum(),
+                        "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
+                        "accuracy_mh": accuracy_mh,
+                        "accuracy_total_billable_value_usd_tasks": accuracy_billable
+                    },
+                    "aggregatedFindingslevel": {
+                        "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
+                        "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
+                        "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
+                        "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
+                        "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
+                        "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
+                        "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
+                                        / results_df["actual_man_hours_findings_actual"].sum()) * 100
+                                        if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
+                        "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
+                                                                    / results_df["findings_part_consumption_actual"].sum()) * 100
+                                                                    if results_df["findings_part_consumption_actual"].sum() > 0 else 0
+                    }
+                }
+
+                
+                
+                results = self.convert_numpy_types(results)
+                return results
+                
+
+            else:
+                    # Compute differences safely
+                results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
+                results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
+                results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
+                columns_to_add = ['actual_man_hours_findings_actual', 'findings_part_consumption_actual',
+                                'actual_man_hours_findings_pred', 'findings_part_consumption_pred',
+                                'diff_avg_mh_findings', 'diff_total_billable_value_usd_findings']
+                # Ensure all columns exist
+                results = results.reindex(columns=results.columns.union(columns_to_add, sort=False), fill_value=0)
+                
+                
+                # Assuming 'results' is a DataFrame
+                results_df = results[[
+                    'package_number', 'task_number', 'actual_man_hours_actual',
+                    'task_part_consumption_actual', 'actual_man_hours_pred',
+                    'task_part_consumption_pred', 'actual_man_hours_findings_actual',
+                    'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
+                    'findings_part_consumption_pred', 'diff_avg_mh',
+                    'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
+                    'diff_total_billable_value_usd_findings'
+                ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
+                
+                results_df.fillna(0, inplace=True)
+                # Convert all int64 columns to Python int
+                # Convert NumPy int64 to Python int
+                results_df = results_df.apply(lambda x: x.astype(int) if x.dtype == np.int64 else x)
+
+                
+                tasks = []  # List to store task dictionaries
+                
+                for _, row in results_df.iterrows():
+                    task = {
+                        "package_number": row["package_number"],
+                        "task_number": row["task_number"],
+                        "actual_man_hours_actual": row["actual_man_hours_actual"],
+                        "task_part_consumption_actual": row["task_part_consumption_actual"],
+                        "actual_man_hours_pred": row["actual_man_hours_pred"],
+                        "task_part_consumption_pred": row["task_part_consumption_pred"],
+                        "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
+                        "findings_part_consumption_actual": row["findings_part_consumption_actual"],
+                        "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
+                        "findings_part_consumption_pred": row["findings_part_consumption_pred"],
+                        "diff_avg_mh": row["diff_avg_mh"],
+                        "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
+                        "diff_avg_mh_findings": row["diff_avg_mh_findings"],
+                        "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
+                        "accuracy": 100 - (
+                            abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
+                            row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
+                        ) / (
+                            row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
+                            row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
+                        ) * 100 if (
+                            row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
+                            row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
+                        ) > 0 else 0  # Avoid division by zero
+                    }
+                    tasks.append(task)
+                
+                # Compute aggregated accuracy
+                actual_mh_total = results_df["actual_man_hours_actual"].sum()
+                pred_mh_total = results_df["actual_man_hours_pred"].sum()
+                actual_billable_total = results_df["task_part_consumption_actual"].sum()
+                pred_billable_total = results_df["task_part_consumption_pred"].sum()
+                
+                accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
+                accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
+                
+                results = {
+                    "tasks": tasks,
+                    "aggregatedTasklevel": {
+                        "avg_mh_actual": actual_mh_total,
+                        "total_billable_value_usd_tasks_actual": actual_billable_total,
+                        "avg_mh_pred": pred_mh_total,
+                        "total_billable_value_usd_tasks_pred": pred_billable_total,
+                        "diff_avg_mh": results_df["diff_avg_mh"].sum(),
+                        "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
+                        "accuracy_mh": accuracy_mh,
+                        "accuracy_total_billable_value_usd_tasks": accuracy_billable
+                    },
+                    "aggregatedFindingslevel": {
+                        "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
+                        "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
+                        "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
+                        "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
+                        "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
+                        "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
+                        "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
+                                        / results_df["actual_man_hours_findings_actual"].sum()) * 100
+                                        if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
+                        "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
+                                                                    / results_df["findings_part_consumption_actual"].sum()) * 100
+                                                                    if results_df["findings_part_consumption_actual"].sum() > 0 else 0
+                    }
+                }
+
+                
+                
+                results = self.convert_numpy_types(results)
+                return results
+
+
+    
 
     
 def convert_hash_to_ack_id(hash_hex: str) -> str:
@@ -726,286 +1043,5 @@ def datetime_to_str(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
     raise TypeError("Object of type 'datetime' is not JSON serializable")
-def testing(self,task_description, sub_task_parts,sub_task_description,estID):
-    # Fetch predicted data
-        pred_data = list(self.estimate_output.find({"estID": estID}))
-        if not pred_data :  # Check for empty or missing tasks
-            return pd.DataFrame()  # Return an empty DataFrame if no valid data
-        pred_tasks_data = pd.DataFrame(pred_data[0]["tasks"])
-        # Extract 'avg', 'max', and 'min' from 'mhs' dictionary
-        pred_tasks_data["avg_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("avg") if isinstance(x, dict) else None)
-        pred_tasks_data["max_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("max") if isinstance(x, dict) else None)
-        pred_tasks_data["min_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("min") if isinstance(x, dict) else None)
-        # Compute total billable value from spare_parts
-        pred_tasks_data["total_billable_value_usd"] = pred_tasks_data["spare_parts"].apply(
-            lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
-        )
-        # Fetch actual package data
-        pkg_tasks_data = task_description[task_description["package_number"] == "package_number"]
-        pkg_tasks_data = pkg_tasks_data[~pkg_tasks_data["task_number"].str.startswith("AWR")]
-        # Filter sub_task_parts for tasks belonging to the specific package_number
-        filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
-        # Compute actual task part consumption
-        task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
-            task_part_consumption=("billable_value_usd", "sum")
-        )
-        # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
-        pkg_tasks_data = pkg_tasks_data.merge(task_parts_consumption, left_on="task_number", right_on="task_number", how="left")
-        # Fill missing values to avoid NaN issues
-        pkg_tasks_data.loc[:, "task_part_consumption"] = pkg_tasks_data["task_part_consumption"].fillna(0)
-        # Ensure data types match for merging
-        pkg_tasks_data["task_number"] = pkg_tasks_data["task_number"].astype(str)
-        pred_tasks_data["task_number"] = pred_tasks_data["sourceTask"].astype(str)
-        pred_tasks_data.rename(columns={"avg_mh": "actual_man_hours", "total_billable_value_usd": "task_part_consumption"}, inplace=True)
-        pred_findings_data = pd.DataFrame(pred_data[0]["findings"])
-        if "details" in pred_findings_data.columns:
-            pred_findings_data["avg_mh_findings"] = pred_findings_data["details"].apply(
-            lambda x: x[0]["mhs"].get("avg") if isinstance(x, list) and len(x) > 0 else None
-            )
-            pred_findings_data["max_mh_findings"] = pred_findings_data["details"].apply(
-                lambda x: x[0]["mhs"].get("max") if isinstance(x, list) and len(x) > 0 else None
-            )
-            pred_findings_data["min_mh_findings"] = pred_findings_data["details"].apply(
-                lambda x: x[0]["mhs"].get("min") if isinstance(x, list) and len(x) > 0 else None
-            )
-            # Compute total billable value from spare_parts
-            pred_findings_data["findings_part_consumption"] = pred_findings_data["details"].apply(
-                lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
-            )
-            pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
-            pkg_findings_data = sub_task_description[sub_task_description["package_number"] == "package_number"]
-            pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number_updated"].str.startswith("AWR")]
-            pkg_findings_data["source_task_discrepancy_number_updated"].dropna(inplace=True)
-            # Filter sub_task_parts for tasks belonging to the specific package_number
-            filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
-            filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
-            filtered_sub_task_parts = filtered_sub_task_parts.merge(
-            pkg_findings_data[["log_item_number", "source_task_discrepancy_number_updated"]],
-            left_on="task_number",
-            right_on="log_item_number",
-            how="left"
-            )
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"].dropna(inplace=True)
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"] = (
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"].astype(str)
-            )
-            # Filter out rows where "source_task_discrepancy_number_updated" starts with "AWR"
-            filtered_sub_task_parts = filtered_sub_task_parts[
-                ~filtered_sub_task_parts["source_task_discrepancy_number_updated"].str.startswith("AWR", na=False)
-            ]
-            # Compute actual task part consumption
-            findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
-                findings_part_consumption=("billable_value_usd", "sum")
-            )
-            # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
-            pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
-            # Fill missing values to avoid NaN issues
-            pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
-            pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number_updated"])[["actual_man_hours", "findings_part_consumption"]].sum()
-            pred_findings_data.rename(columns={"avg_mh_findings": "actual_man_hours_findings","taskId":"task_number"}, inplace=True)
-            pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
-            pkg_findings_data.rename(
-                columns={
-                    "actual_man_hours": "actual_man_hours_findings",
-                    "source_task_discrepancy_number_updated": "task_number"
-                },
-                inplace=True
-            )
-            pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
-            pred_findings_data["task_number"] = pred_findings_data["task_number"].astype(str)
-            pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
-            pred_tasks_data = pred_tasks_data.merge(pred_findings_data, on="task_number", how="left")
-            # Compute differences safely
-            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
-            results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
-            results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
-            # Merge predicted and actual data
-            results["diff_avg_mh_findings"] = results["actual_man_hours_findings_pred"].fillna(0) - results["actual_man_hours_findings_actual"].fillna(0)
-            results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
-            # Assuming 'results' is a DataFrame
-            results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
-                'task_part_consumption_actual', 'actual_man_hours_pred',
-                'task_part_consumption_pred', 'actual_man_hours_findings_actual',
-                'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
-                'findings_part_consumption_pred', 'diff_avg_mh',
-                'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
-                'diff_total_billable_value_usd_findings'
-            ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
-            
-            results_df.fillna(0, inplace=True)
-            
-            tasks = []  # List to store task dictionaries
-            
-            for _, row in results_df.iterrows():
-                task = {
-                    "package_number": row["package_number"],
-                    "task_number": row["task_number"],
-                    "actual_man_hours_actual": row["actual_man_hours_actual"],
-                    "task_part_consumption_actual": row["task_part_consumption_actual"],
-                    "actual_man_hours_pred": row["actual_man_hours_pred"],
-                    "task_part_consumption_pred": row["task_part_consumption_pred"],
-                    "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
-                    "findings_part_consumption_actual": row["findings_part_consumption_actual"],
-                    "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
-                    "findings_part_consumption_pred": row["findings_part_consumption_pred"],
-                    "diff_avg_mh": row["diff_avg_mh"],
-                    "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
-                    "diff_avg_mh_findings": row["diff_avg_mh_findings"],
-                    "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": 100 - (
-                        abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
-                        row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
-                    ) / (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) * 100 if (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) > 0 else 0  # Avoid division by zero
-                }
-                tasks.append(task)
-            
-            # Compute aggregated accuracy
-            actual_mh_total = results_df["actual_man_hours_actual"].sum()
-            pred_mh_total = results_df["actual_man_hours_pred"].sum()
-            actual_billable_total = results_df["task_part_consumption_actual"].sum()
-            pred_billable_total = results_df["task_part_consumption_pred"].sum()
-            
-            accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
-            accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
-            
-            results = {
-                "tasks": tasks,
-                "aggregatedTasklevel": {
-                    "avg_mh_actual": actual_mh_total,
-                    "total_billable_value_usd_tasks_actual": actual_billable_total,
-                    "avg_mh_pred": pred_mh_total,
-                    "total_billable_value_usd_tasks_pred": pred_billable_total,
-                    "diff_avg_mh": results_df["diff_avg_mh"].sum(),
-                    "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
-                    "accuracy_mh": accuracy_mh,
-                    "accuracy_total_billable_value_usd_tasks": accuracy_billable
-                },
-                "aggregatedFindingslevel": {
-                    "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
-                    "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
-                    "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
-                    "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
-                    "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
-                                    / results_df["actual_man_hours_findings_actual"].sum()) * 100
-                                    if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
-                                                                / results_df["findings_part_consumption_actual"].sum()) * 100
-                                                                if results_df["findings_part_consumption_actual"].sum() > 0 else 0
-                }
-            }
-
-            
-            
-            
-            return results
-            
-
-        else:
-                # Compute differences safely
-            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
-            results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
-            results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
-            columns_to_add = ['actual_man_hours_findings_actual', 'findings_part_consumption_actual',
-                            'actual_man_hours_findings_pred', 'findings_part_consumption_pred',
-                            'diff_avg_mh_findings', 'diff_total_billable_value_usd_findings']
-            # Ensure all columns exist
-            results = results.reindex(columns=results.columns.union(columns_to_add, sort=False), fill_value=0)
-            
-            
-            # Assuming 'results' is a DataFrame
-            results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
-                'task_part_consumption_actual', 'actual_man_hours_pred',
-                'task_part_consumption_pred', 'actual_man_hours_findings_actual',
-                'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
-                'findings_part_consumption_pred', 'diff_avg_mh',
-                'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
-                'diff_total_billable_value_usd_findings'
-            ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
-            
-            results_df.fillna(0, inplace=True)
-            
-            tasks = []  # List to store task dictionaries
-            
-            for _, row in results_df.iterrows():
-                task = {
-                    "package_number": row["package_number"],
-                    "task_number": row["task_number"],
-                    "actual_man_hours_actual": row["actual_man_hours_actual"],
-                    "task_part_consumption_actual": row["task_part_consumption_actual"],
-                    "actual_man_hours_pred": row["actual_man_hours_pred"],
-                    "task_part_consumption_pred": row["task_part_consumption_pred"],
-                    "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
-                    "findings_part_consumption_actual": row["findings_part_consumption_actual"],
-                    "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
-                    "findings_part_consumption_pred": row["findings_part_consumption_pred"],
-                    "diff_avg_mh": row["diff_avg_mh"],
-                    "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
-                    "diff_avg_mh_findings": row["diff_avg_mh_findings"],
-                    "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": 100 - (
-                        abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
-                        row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
-                    ) / (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) * 100 if (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) > 0 else 0  # Avoid division by zero
-                }
-                tasks.append(task)
-            
-            # Compute aggregated accuracy
-            actual_mh_total = results_df["actual_man_hours_actual"].sum()
-            pred_mh_total = results_df["actual_man_hours_pred"].sum()
-            actual_billable_total = results_df["task_part_consumption_actual"].sum()
-            pred_billable_total = results_df["task_part_consumption_pred"].sum()
-            
-            accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
-            accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
-            
-            results = {
-                "tasks": tasks,
-                "aggregatedTasklevel": {
-                    "avg_mh_actual": actual_mh_total,
-                    "total_billable_value_usd_tasks_actual": actual_billable_total,
-                    "avg_mh_pred": pred_mh_total,
-                    "total_billable_value_usd_tasks_pred": pred_billable_total,
-                    "diff_avg_mh": results_df["diff_avg_mh"].sum(),
-                    "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
-                    "accuracy_mh": accuracy_mh,
-                    "accuracy_total_billable_value_usd_tasks": accuracy_billable
-                },
-                "aggregatedFindingslevel": {
-                    "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
-                    "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
-                    "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
-                    "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
-                    "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
-                                    / results_df["actual_man_hours_findings_actual"].sum()) * 100
-                                    if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
-                                                                / results_df["findings_part_consumption_actual"].sum()) * 100
-                                                                if results_df["findings_part_consumption_actual"].sum() > 0 else 0
-                }
-            }
-
-            
-            
-            
-            return results
-
 
     
