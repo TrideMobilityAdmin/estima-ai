@@ -4,7 +4,7 @@ import { TooltipComponent, LegendComponent } from "echarts/components";
 import { PieChart } from "echarts/charts";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
-import { Card, Grid, Title, Center } from "@mantine/core";
+import { Card } from "@mantine/core";
 
 // Register required ECharts components
 echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout]);
@@ -40,7 +40,7 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
     if (chartRef.current) {
       const myChart = echarts.init(chartRef.current);
       const option = {
-        tooltip: { trigger: "item" },
+        tooltip: { trigger: "item", formatter: "{b}: {c}%" },
         legend: { bottom: "5%", left: "center" },
         series: [
           {
@@ -53,8 +53,15 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
               borderColor: "#fff",
               borderWidth: 2,
             },
-            label: { show: true, formatter: "{b}: {c}%" },
-            labelLine: { show: true },
+            label: {
+              show: true,
+              position: "inside", // Show values inside the donut
+              fontSize: 12,
+              fontWeight: "bold",
+              color: "#050505", // White text for better visibility
+              formatter: "{c}%", // Show name and percentage
+            },
+            labelLine: { show: false }, // Hide connecting lines
             data: donutData.map((item) => ({
               name: item.name,
               value: item.value.toFixed(2), // Ensure percentage formatting
@@ -80,14 +87,9 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
   }, [donutData]);
 
   return (
-      <Card radius="md" h="50vh">
-        {/* <Title order={5} c="dimmed">
-          Distribution Analysis (%)
-        </Title> */}
-        {/* <Center> */}
-          <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
-        {/* </Center> */}
-      </Card>
+    <Card radius="md" h="50vh">
+      <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+    </Card>
   );
 };
 

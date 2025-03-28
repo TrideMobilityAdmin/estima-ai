@@ -127,7 +127,7 @@ export default function SkillRequirement() {
 
     return (
         <>
-            <div style={{ paddingLeft: 150, paddingRight: 150, paddingTop: 20, paddingBottom: 20 }}>
+            <div style={{ paddingLeft: 70, paddingRight: 70, paddingTop: 20, paddingBottom: 20 }}>
                 <SimpleGrid cols={2}>
                     <Card
                         withBorder

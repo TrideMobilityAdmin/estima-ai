@@ -610,7 +610,7 @@ border-bottom: none;
                 <Space h='sm' />
                 <Grid>
                     <Grid.Col span={8}>
-                        <Card radius='md' h='50vh'>
+                        <Card radius='md' h='60vh'>
 
                             <Title order={5} c='dimmed'>
                                 Daily Trend Analysis
@@ -638,7 +638,7 @@ border-bottom: none;
                         </Card>
                     </Grid.Col>
                     <Grid.Col span={4}>
-                        <Card radius='md' h='50vh'>
+                        <Card radius='md' h='60vh'>
                             <Title order={5} c='dimmed'>
                                 Distribution Analysis (%)
                             </Title>
