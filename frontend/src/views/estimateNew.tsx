@@ -404,15 +404,15 @@ export default function EstimateNew() {
             aircraftAge: Number(form.values.aircraftAge) || 0,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-            areaOfOperations: form.values.areaOfOperations || "N/A", // Ensure it's not empty
+            areaOfOperations: form.values.areaOfOperations || "", // Ensure it's not empty
             cappingDetails: {
-                cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || null,
+                cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
                 cappingManhrs: form.values.cappingDetails.cappingManhrs || 0,
-                cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || null,
+                cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
                 cappingSpareCost: form.values.cappingDetails.cappingSpareCost || 0,
             },
             additionalTasks: defaultAdditionalTasks,
-            typeOfCheck: form.values.typeOfCheck || "N/A", // Ensure it's not empty
+            typeOfCheck: form.values.typeOfCheck || "", // Ensure it's not empty
             miscLaborTasks: defaultMiscLaborTasks
         };
 
