@@ -4,8 +4,8 @@
 #Data files
 # Ignore all files inside the Data/ directory
 Data/
-
-
+2019/
+.gitignore
 ##Data Directory
 Data/
 ### Python ###

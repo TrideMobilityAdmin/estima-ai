@@ -43,9 +43,9 @@ async def main():
         
 
         #data_path = os.path.join(dir,"..","..", "Data")
-        data_path="D:\Projects\gmr-mro\estima-ai\Data"
+        data_path=r"D:\Projects\gmr-mro\estima-ai\Data"
         aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts = await get_processed_files(
-            data_path,"AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material Consumption Pricing"
+            data_path,"AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material"
         )
 
         collections_to_process = [

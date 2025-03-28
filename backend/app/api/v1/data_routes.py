@@ -159,12 +159,12 @@ excel_service = ExcelUploadService()
 #     """
 #     return await excel_service.upload_excel(file)
 
-@router.post("/estimates/{estimate_id}/compare",response_model=ComparisonResponse)
-async def compare_estimates(estimate_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+@router.post("/estimates/{estimate_id}/compare")
+async def compare_estimates(estimate_id: str, files: List[UploadFile] = File(...), current_user: dict = Depends(get_current_user)):
     """
     Compare uploaded Excel file with existing estimate
     """
-    return await excel_service.compare_estimates(estimate_id, file)
+    return await excel_service.compare_estimates(estimate_id, files)
 
 
 @router.get("/estimates/{estimate_id}/download", summary="Download estimate as PDF")
