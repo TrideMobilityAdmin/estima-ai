@@ -591,7 +591,7 @@ class ExcelUploadService:
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
    
-    async def process_multiple_files(self, files: List[UploadFile]) -> List[Dict[Any, Any]]:
+    async def process_multiple_files(self, files: List[UploadFile], columnMappings:Dict, SheetName:str) -> pd.DataFrame:
         """
         Asynchronously process multiple uploaded files concurrently
         
@@ -602,42 +602,28 @@ class ExcelUploadService:
             List[Dict[Any, Any]]: Combined processed records from all files
         """
         logger.info(f"Processing {len(files)} files")
-        config_file_path = os.path.join("app", "fileconfig", "configuration.json")
-        with open(config_file_path, 'r') as file:
-            config = json.load(file)
-
-        processed_data = []
-        sheet_names=[]
-        sheet_mapping = {sheet['sheet_name']: None for sheet in config['sheets']}
-        logger.info(f"sheet mapping is : {sheet_mapping}")
+        logger.info(f"columnMappings: {columnMappings}")
+        
         for file in files:
             content = await file.read()
             file_extension = file.filename.split('.')[-1].lower()  
-
+            # check ig input file contains the sheet name expected
             # Determine the sheet name based on the file name
-            sheet_name = None
-            for key in sheet_mapping.keys():
-                if key.lower() in file.filename.lower():  # Check if the sheet name is in the file name
-                    sheet_name = key
-                    break
-
-            if sheet_name is None:
-                logger.warning(f"File {file.filename} does not have a specified sheet in the configuration.")
-                continue  # Skip this file if it doesn't match
-            logger.info(f"sheet name is : {sheet_name} for the file {file.filename}")
+            logger.info(f"sheet name is : {SheetName} for the file {file.filename}")
             # Read the specific sheet from the file
             if file_extension in ['xls', 'xlsx', 'xlsm']:
-                df = self.read_excel_with_multiple_sheetnames(content, file_extension, sheet_name)
-                logger.info(f"column names in sheet {sheet_name} are : {df.columns}")
-                processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
-                sheet_names.append(sheet_name)
-            elif file_extension == 'csv':
-                df = pd.read_csv(io.BytesIO(content))
-                logger.info(f"column names in sheet {sheet_name} are : {df.columns}")
-                processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
-                sheet_names.append(sheet_name)
-        return processed_data,sheet_names
-    
+                df = self.read_excel_with_multiple_sheetnames(content, file_extension, SheetName)
+                logger.info(f"df: {df}")
+                df.rename(columns=columnMappings, inplace=True)
+                logger.info(f"renamed df: {df}")
+                logger.info(f"column names in sheet {SheetName} are : {df.columns}")
+                #processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
+                
+                return df
+                #processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
+                
+        return None
+       
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
@@ -651,26 +637,37 @@ class ExcelUploadService:
         """
         logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
         # Process files and extract actual data
-        actual_data,sheet_names = await self.process_multiple_files(files)
-        actual_data_length = len(actual_data)
-        logger.info(f"Actual data extracted: {len(actual_data)} records")
-        logger.info(f"sheet names are : {sheet_names}")
 
+        
         config_file_path = os.path.join("app", "config", "config.yaml")
         with open(config_file_path, 'r') as file:
-            config = yaml.safe_load(file)
-        logger.info(f"config file data: {config}")
+            columnMappings = yaml.safe_load(file)
+        logger.info("config file data fetched sucessfully")
 
-        task_description = any(sheet == "mltaskmlsec1" for sheet in sheet_names)
-        sub_task_description = any(sheet == "mldpmlsec1" for sheet in sheet_names)
-        sub_task_parts = any(sheet == "PRICING" for sheet in sheet_names)
-        logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
+
         
+        sub_task_description =  await self.process_multiple_files(files, columnMappings['sub_task_description_columns_mappings'], "mldpmlsec1")
+        if not sub_task_description:
+            raise ValueError("Error: 'mldpmlsec1' not found in the uploaded files.")
+        sub_task_parts =  await self.process_multiple_files(files, columnMappings['sub_task_parts_column_mappings'], "PRICING")
+        if not sub_task_parts:
+            raise ValueError("Error: 'PRICING' not found in the uploaded files.")
+        task_description =  await self.process_multiple_files(files, columnMappings['task_description_columns_mappings'], "mltaskmlsec1")
+        if not task_description:
+            raise ValueError("Error: 'mltaskmlsec1' not found in the uploaded files.")
+        logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
+
+        compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
+        logger.info(f"compare_result: {compare_result}")
+
+        return compare_result
     
-        return actual_data_length
-    def read_excel_with_multiple_sheetnames(self, content, file_extension, sheet_name):
-        df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name,
+    def read_excel_with_multiple_sheetnames(self, content, file_extension, SheetName):
+        df = pd.read_excel(io.BytesIO(content), sheet_name=SheetName,
                         engine='openpyxl' if file_extension != 'xls' else 'xlrd')
+        logger.info(f"frpm read_excel_with_multiple_sheetnames df: {df.head()}")
+        logger.info(f"frpm read_excel_with_multiple_sheetnames headers: {df.columns}")
+
         return df 
 
     
