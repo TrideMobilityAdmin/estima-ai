@@ -2743,25 +2743,31 @@ border-bottom: none;
                                             <Group>
                                             <Button
                                                 size="xs"
-                                                variant="filled"
-                                                color="#1bb343"
+                                                // variant="filled"
+                                                // color="#124076"
+                                                variant="gradient"
+                                                gradient={{ from: 'rgba(67, 143, 230, 1)', to: 'rgba(0, 50, 107, 1)', deg: 184 }}
+                                                // radius='lg'
                                                 // leftSection={<MdPictureAsPdf size={14} />}
                                                 rightSection={<MdOutlineFileDownload size={14} />}
                                                 onClick={downloadCSVReport}
                                                 // loading={downloading}
                                             >
-                                                {downloading ? "Downloading..." : "Download CSV"}
+                                                {downloading ? "Downloading..." : "CSV"}
                                             </Button>
                                             <Button
                                                 size="xs"
-                                                variant="filled"
-                                                color="violet"
+                                                variant="gradient"
+                                                gradient={{ from: 'rgba(67, 143, 230, 1)', to: 'rgba(0, 50, 107, 1)', deg: 184 }}
+                                                // variant="filled"
+                                                // color="#124076"
+                                                // radius='lg'
                                                 // leftSection={<MdPictureAsPdf size={14} />}
                                                 rightSection={<MdOutlineFileDownload size={14} />}
                                                 onClick={downloadExcelReport}
                                                 // loading={downloading}
                                             >
-                                                {downloading ? "Downloading..." : "Download Excel"}
+                                                {downloading ? "Downloading..." : "Excel"}
                                             </Button>
                                             </Group>
                                              
@@ -3616,8 +3622,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                 mb="md"
                             />
 
-                            <Card bg="none" p={0} h="calc(80vh - 150px)">
-                                <ScrollArea h="100%" scrollbarSize={0}>
+                            <Card bg="none" p={0} h="calc(80vh - 150px)" >
+                                <ScrollArea h="100%" scrollbarSize={0} >
                                     <Accordion defaultValue={defaultOpenValues} multiple>
                                         {Object.keys(filteredGroups).map((groupKey) => (
                                             <Accordion.Item key={groupKey} value={groupKey}>
@@ -3631,7 +3637,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                                             key={index}
                                                             variant={selectedTaskId === taskId ? 'filled' : "light"}
                                                             color="#4C7B8B"
-                                                            size="lg"
+                                                            // size="lg"
                                                             mb="md"
                                                             h={35}
                                                             radius="md"

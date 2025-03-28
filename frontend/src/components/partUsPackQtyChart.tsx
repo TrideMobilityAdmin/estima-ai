@@ -1,55 +1,89 @@
 import React, { useEffect, useRef } from "react";
 import * as echarts from "echarts/core";
-import { TooltipComponent, LegendComponent, GridComponent } from "echarts/components";
-import { BarChart, LineChart } from "echarts/charts";
+import {
+  TooltipComponent,
+  GridComponent,
+  LegendComponent
+} from "echarts/components";
+import { LineChart } from "echarts/charts";
 import { CanvasRenderer } from "echarts/renderers";
 import { Card, Title } from "@mantine/core";
 
-// Register ECharts components
-echarts.use([TooltipComponent, LegendComponent, GridComponent, BarChart, LineChart, CanvasRenderer]);
+// Register required ECharts components
+echarts.use([
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  LineChart,
+  CanvasRenderer
+]);
 
 interface MixedChartProps {
   title: string;
   data: any[];
-  dataKey: string; // The key for the x-axis (taskId or findingId)
+  dataKey1: string; // Bottom x-axis key (taskId)
 }
 
-const MixedChartComponent: React.FC<MixedChartProps> = ({ title, data, dataKey }) => {
+const MixedChartComponent: React.FC<MixedChartProps> = ({ title, data, dataKey1 }) => {
   const chartRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (chartRef.current) {
       const myChart = echarts.init(chartRef.current);
+      const colors = ["#5470C6", "#EE6666"];
+
       const option = {
-        tooltip: { trigger: "axis" },
-        legend: { top: "5%", left: "center" },
-        xAxis: {
-          type: "category",
-          data: data.map((item) => item[dataKey]), // X-axis values (Task IDs or Finding IDs)
-          axisLabel: { rotate: -45, textStyle: { fontSize: 12 } },
+        color: colors,
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "cross" }
         },
-        yAxis: { type: "value" },
+        legend: {
+          top: "5%"
+        },
+        grid: {
+          top: 70,
+          bottom: 50
+        },
+        xAxis: [
+          {
+            type: "category",
+            axisTick: { show: false }, // Hide tick marks
+            axisLine: { show: false }, // Hide axis line
+            axisLabel: { show: false }, // Hide labels
+            data: data.map((item) => item[dataKey1]) // Bottom x-axis
+          },
+          {
+            type: "category",
+            axisTick: { show: false }, // Hide tick marks
+            axisLine: { show: false }, // Hide axis line
+            axisLabel: { show: false }, // Hide labels
+            data: data.map((item) => item[dataKey1]) // Top x-axis
+          }
+        ],
+        yAxis: {
+          type: "value"
+        },
         series: [
           {
             name: "Packages",
             type: "line",
-            data: data.map((item) => item.packages),
-            itemStyle: { color: "#1445B6" },
-            barWidth: 40,
+            xAxisIndex: 1,
+            smooth: true,
+            data: data.map((item) => item.packages)
           },
           {
             name: "Quantity",
-            type: "bar",
-            data: data.map((item) => item.quantity),
-            itemStyle: { color: "#D6B575" },
-            lineStyle: { width: 2 },
-            symbolSize: 8,
-          },
-        ],
+            type: "line",
+            smooth: true,
+            data: data.map((item) => item.quantity)
+          }
+        ]
       };
+
       myChart.setOption(option);
     }
-  }, [data]);
+  }, [data, dataKey1]);
 
   return (
     <Card radius="md" h="400px">
