@@ -1,12 +1,13 @@
 database:
-  uri: "mongodb://admin:admin123@10.100.3.13:27017/"
-  database: "gmr-mro-staging-5y"
+  uri: "mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl"
+  database: "gmr-mro-ml-training"
 
 excel_files:
   data_path: "D:/Projects/gmr-mro/estima-ai/Data"
 
 
 aircraft_details_columns:
+
   - "Customer Order #"
   - "Customer Name"
   - "Package #"
@@ -24,6 +25,7 @@ aircraft_details_columns:
   - "Start date"
   - "End date"
   - "TAT"
+
 
 
 task_parts_columns:
@@ -285,6 +287,7 @@ sub_task_description_columns_mappings:
   "Action": "action_taken"
   "Status": "task_status"
   "Source Task/Discrep. #": "source_task_discrepancy_number"
+  "source_task_discrepancy_number_updated": "source_task_discrepancy_number_updated"
   "Source Tracking #": "source_tracking_number"
   "Work Center #": "work_center_number"
   "Sign Off Status": "sign_off_status"
