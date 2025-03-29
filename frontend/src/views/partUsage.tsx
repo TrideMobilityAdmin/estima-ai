@@ -307,7 +307,7 @@ export default function PartUsage() {
         </LocalizationProvider> */}
                     <DatePickerInput
                         size="xs"
-                        w='18vw'
+                        w='21vw'
                         type="range"
                         label="Pick dates range"
                         placeholder="Pick dates range"
@@ -615,7 +615,9 @@ border-bottom: none;
                             <Title order={5} c='dimmed'>
                                 Daily Trend Analysis
                             </Title>
-                            <AreaChart
+                            {
+                                chartData?.length > 0 ? (
+                                    <AreaChart
                                 h={250}
                                 data={chartData}
                                 withLegend
@@ -635,6 +637,16 @@ border-bottom: none;
                                 curveType="natural"
                             />
 
+                                ) : (
+                                    <Center>
+                                        <Text c='dimmed' pt={150}>
+                                            No Data Found
+                                        </Text>
+                                    </Center>
+                                    
+                                )
+                            }
+                            
                         </Card>
                     </Grid.Col>
                     <Grid.Col span={4}>

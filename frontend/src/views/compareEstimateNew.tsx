@@ -18,7 +18,6 @@ import CompareUploadDropZoneExcelNew from '../components/compareUploadFilesNew';
 export default function CompareEstimateNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
 
-
   const [estimates, setEstimates] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedEstID, setSelectedEstID] = useState<string | null>(null);
@@ -42,7 +41,6 @@ export default function CompareEstimateNew() {
     fetchEstimates();
   }, []);
   console.log("all estimates>>>", estimates);
-
 
 
   const handleFileChange = (files: File[]) => {
@@ -191,7 +189,7 @@ export default function CompareEstimateNew() {
           />
 
           <StatsCard
-            title="Tasks - Billable Value"
+            title="Tasks - Spares"
             icon={IconCurrencyDollar}
             actual={compareEstimatedData?.aggregatedTasklevel?.total_billable_value_usd_tasks_actual?.toFixed(2) || 0}
             predicted={compareEstimatedData?.aggregatedTasklevel?.total_billable_value_usd_tasks_pred?.toFixed(2) || 0}
@@ -211,7 +209,7 @@ export default function CompareEstimateNew() {
           />
 
           <StatsCard
-            title="Findings - Billable Value"
+            title="Findings - Spares"
             icon={IconCurrencyDollar}
             actual={compareEstimatedData?.aggregatedFindingslevel?.total_billable_value_usd_findings_actual?.toFixed(2) || 0}
             predicted={compareEstimatedData?.aggregatedFindingslevel?.total_billable_value_usd_findings_pred?.toFixed(2) || 0}

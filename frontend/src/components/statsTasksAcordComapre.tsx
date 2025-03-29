@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Accordion,
     Card,
@@ -41,27 +41,30 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const [openedAccordion, setOpenedAccordion] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+    const taskListRef = useRef<HTMLDivElement>(null);
 
-    // Filter tasks based on the search query
     const filteredTasks = useMemo(() => {
         const search = taskSearch?.trim()?.toLowerCase();
         if (!search) return tasks;
         return tasks?.filter(task => task?.task_number?.toLowerCase()?.includes(search));
     }, [tasks, taskSearch]);
 
-    // Reset pagination when searching
     useEffect(() => {
         setCurrentPage(1);
     }, [taskSearch]);
 
-    // Paginate the filtered tasks
     const paginatedTasks = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
         return filteredTasks?.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredTasks, currentPage]);
 
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        taskListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
     return (
-        <Card radius='md' >
+        <Card radius='md'  ref={taskListRef}>
             <Group justify="space-between">
                 <Flex direction='column'>
                     <Title order={3}>Task Analysis</Title>
@@ -124,7 +127,7 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             {/* Man Hours Analysis */}
                                             <Grid.Col span={3}>
                                                 <Card bg="#e7e6e8">
-                                                    <Title order={5}>Man Hours</Title>
+                                                    <Title order={5}>Task - MH</Title>
                                                     <Group justify="space-between">
                                                         <Text size="sm">Actual</Text>
                                                         <Text fw={600} fz="md">{Math.round(task?.actual_man_hours_actual) || 0} hr</Text>
@@ -143,7 +146,7 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             {/* Part Consumption */}
                                             <Grid.Col span={3}>
                                                 <Card bg="#e7e6e8">
-                                                    <Title order={5}>Part Consumption</Title>
+                                                    <Title order={5}>Task - Spares</Title>
                                                     <Group justify="space-between">
                                                         <Text size="sm">Actual</Text>
                                                         <Text fw={600} fz="md">{task?.task_part_consumption_actual.toFixed(2) || 0} $</Text>
@@ -162,7 +165,7 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             {/* Findings - Man Hours Analysis */}
                                             <Grid.Col span={3}>
                                                 <Card bg="#e7e6e8">
-                                                    <Title order={5}>Finding - Man Hours</Title>
+                                                    <Title order={5}>Findings - MH</Title>
                                                     <Group justify="space-between">
                                                         <Text size="sm">Actual</Text>
                                                         <Text fw={600} fz="md">{Math.round(task?.actual_man_hours_findings_actual) || 0} hr</Text>
@@ -181,7 +184,7 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
                                             {/* Finding - Part Consumption */}
                                             <Grid.Col span={3}>
                                                 <Card bg="#e7e6e8">
-                                                    <Title order={5}>Finding - Consumption</Title>
+                                                    <Title order={5}>Findings - Spares</Title>
                                                     <Group justify="space-between">
                                                         <Text size="sm">Actual</Text>
                                                         <Text fw={600} fz="md">{task?.findings_part_consumption_actual.toFixed(2) || 0} $</Text>
@@ -219,9 +222,10 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             {filteredTasks?.length > 0 && (
                 <Center>
                     <Pagination
+                        color='rgb(78, 95, 228)'
                         total={Math.ceil(filteredTasks?.length / itemsPerPage)}
                         value={currentPage}
-                        onChange={setCurrentPage}
+                        onChange={handlePageChange}
                     />
                 </Center>
             )}
