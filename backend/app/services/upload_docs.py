@@ -591,39 +591,68 @@ class ExcelUploadService:
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
    
-    async def process_multiple_files(self, files: List[UploadFile], columnMappings:Dict, SheetName:str) -> pd.DataFrame:
+    async def process_multiple_files(self, files: List[UploadFile], columnMappings: Dict, SheetName: str) -> pd.DataFrame:
         """
-        Read and process an individual uploaded Excel or CSV file.
+        Read and process multiple uploaded Excel or CSV files.
 
         Args:
-            file (UploadFile): The uploaded file.
-            sheet_names (List[str]): Expected sheet names.
+            files (List[UploadFile]): List of uploaded files to process.
+            columnMappings (Dict): Column mapping configurations.
+            SheetName (str): Name of the sheet to read from Excel files.
 
         Returns:
-            List[Dict[Any, Any]]: Combined processed records from all files
+            pd.DataFrame: Combined processed records from matching files
         """
         logger.info(f"Processing {len(files)} files")
-        logger.info(f"columnMappings: {columnMappings}")
-        
+        logger.info(f"Column Mappings: {columnMappings}")
+        logger.info(f"Looking for sheet name: {SheetName}")
+
+        processed_dataframes = []
+
         for file in files:
-            content = await file.read()
-            file_extension = file.filename.split('.')[-1].lower()  
-            # check ig input file contains the sheet name expected
-            # Determine the sheet name based on the file name
-            logger.info(f"sheet name is : {SheetName} for the file {file.filename}")
-            # Read the specific sheet from the file
-            if file_extension in ['xls', 'xlsx', 'xlsm']:
-                df = self.read_excel_with_multiple_sheetnames(content, file_extension, SheetName)
-                logger.info(f"df: {df}")
-                df.rename(columns=columnMappings, inplace=True)
-                logger.info(f"renamed df: {df}")
-                logger.info(f"column names in sheet {SheetName} are : {df.columns}")
-                #processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
+            try:
+                # Read the file content
+                content = await file.read()
+                file_extension = file.filename.split('.')[-1].lower()
                 
-                return df
-                #processed_data.append(df.to_dict(orient='records'))  # Convert DataFrame to dict
-                
-        return None
+                logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
+
+                # Handle Excel files
+                if file_extension in ['xls', 'xlsx']:
+                    try:
+                        # Attempt to read the specified sheet
+                        df = self.read_excel_with_multiple_sheetnames(content, file_extension, SheetName)
+                        
+                        if df is not None and not df.empty:
+                            # Rename columns based on provided mappings
+                            df.rename(columns=columnMappings, inplace=True)
+                            
+                            logger.info(f"Successfully processed file: {file.filename}")
+                            logger.info(f"DataFrame columns: {df.columns}")
+                            logger.info(f"DataFrame shape: {df.shape}")
+                            
+                            processed_dataframes.append(df)
+                        else:
+                            logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
+                    
+                    except Exception as excel_error:
+                        logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
+            
+            except Exception as file_error:
+                logger.error(f"Error processing file {file.filename}: {str(file_error)}")
+            
+            # Reset file pointer to beginning for potential reuse
+            file.file.seek(0)
+
+        # Combine all processed dataframes
+        if processed_dataframes:
+            combined_df = pd.concat(processed_dataframes, ignore_index=True)
+            logger.info(f"Total records in combined DataFrame: {len(combined_df)}")
+            return combined_df
+        
+        logger.warning(f"No files found with sheet name: {SheetName}")
+        return pd.DataFrame() 
+        
        
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
@@ -645,53 +674,64 @@ class ExcelUploadService:
             columnMappings = yaml.safe_load(file)
         logger.info("config file data fetched sucessfully")
 
+        try:
+            sub_task_parts =  await self.process_multiple_files(files, columnMappings['sub_task_parts_column_mappings'], "PRICING")
+            logger.info(f"sub_task_parts: {sub_task_parts}")
+            sub_task_description =  await self.process_multiple_files(files, columnMappings['sub_task_description_columns_mappings'], "mldpmlsec1")
+            logger.info(f"sub_task_description: {sub_task_description}")
+            task_description =  await self.process_multiple_files(files, columnMappings['task_description_columns_mappings'], "mltaskmlsec1")
+            logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
+            if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
+                raise ValueError("One or more required sheets are missing from the uploaded files.")
+            compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
+            logger.info(f"compare_result: {compare_result}")
 
-        
-        sub_task_description =  await self.process_multiple_files(files, columnMappings['sub_task_description_columns_mappings'], "mldpmlsec1")
-        if not sub_task_description:
-            raise ValueError("Error: 'mldpmlsec1' not found in the uploaded files.")
-        sub_task_parts =  await self.process_multiple_files(files, columnMappings['sub_task_parts_column_mappings'], "PRICING")
-        if not sub_task_parts:
-            raise ValueError("Error: 'PRICING' not found in the uploaded files.")
-        task_description =  await self.process_multiple_files(files, columnMappings['task_description_columns_mappings'], "mltaskmlsec1")
-        if not task_description:
-            raise ValueError("Error: 'mltaskmlsec1' not found in the uploaded files.")
-        logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
-
-        compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
-        logger.info(f"compare_result: {compare_result}")
-
-        return compare_result
+            return compare_result
+        except Exception as e:
+            logger.error(f"Unexpected error in compare_estimates: {str(e)}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
     def read_excel_with_multiple_sheetnames(self, content, file_extension, SheetName):
-        df = pd.read_excel(io.BytesIO(content), sheet_name=SheetName,
-                        engine='openpyxl' if file_extension != 'xls' else 'xlrd')
-        logger.info(f"frpm read_excel_with_multiple_sheetnames df: {df.head()}")
-        logger.info(f"frpm read_excel_with_multiple_sheetnames headers: {df.columns}")
+        """
+        Read a specific sheet from an Excel file.
 
-        return df 
+        Args:
+            content (bytes): File content.
+            file_extension (str): File extension.
+            SheetName (str): Name of the sheet to read.
 
-    
-def convert_hash_to_ack_id(hash_hex: str) -> str:
-    hash_bytes = bytes.fromhex(hash_hex)
-    base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')
-    ack_id = base64_string[:16]  
-    return ack_id
+        Returns:
+            pd.DataFrame: DataFrame containing the sheet data.
+        """
+        try:
+            logger.info(f"Reading Excel file with sheet name: {SheetName}")
+            
+            # Choose appropriate engine based on file extension
+            engine = 'openpyxl' if file_extension in ['xlsx'] else 'xlrd'
+            
+            # Read the specific sheet
+            df = pd.read_excel(
+                io.BytesIO(content), 
+                sheet_name=SheetName,
+                engine=engine
+            )
+            
+            logger.info(f"Successfully read sheet {SheetName}")
+            logger.info(f"DataFrame headers: {list(df.columns)}")
+            logger.info(f"DataFrame shape: {df.shape}")
+            
+            return df
+        
+        except ValueError as sheet_error:
+            logger.error(f"Sheet {SheetName} not found: {str(sheet_error)}")
+            return None
+        except Exception as error:
+            logger.error(f"Error reading Excel file: {str(error)}")
+            return None
 
-def generate_sha256_hash_from_json(json_data: dict) -> str:
-    json_string = json.dumps(json_data, sort_keys=True, default=datetime_to_str)    # Create a SHA-256 hash object
-    hash_object = hashlib.sha256()
-    hash_object.update(json_string.encode('utf-8'))
-    hash_hex = hash_object.hexdigest()
-    return convert_hash_to_ack_id(hash_hex)
-
-def datetime_to_str(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise TypeError("Object of type 'datetime' is not JSON serializable")
-def testing(self,task_description, sub_task_parts,sub_task_description,estID):
-    # Fetch predicted data
+    def testing(self,task_description, sub_task_parts,sub_task_description,estID):
         pred_data = list(self.estimate_output.find({"estID": estID}))
+        logger.info("pred_data fetched successfully")
         if not pred_data :  # Check for empty or missing tasks
             return pd.DataFrame()  # Return an empty DataFrame if no valid data
         pred_tasks_data = pd.DataFrame(pred_data[0]["tasks"])
@@ -704,14 +744,21 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
         )
         # Fetch actual package data
-        pkg_tasks_data = task_description[task_description["package_number"] == "package_number"]
+        pred_tasks_data["total_billable_value_usd"] = pred_tasks_data["spare_parts"].apply(
+            lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
+        )
+        # Fetch actual package data
+        pkg_tasks_data = task_description
         pkg_tasks_data = pkg_tasks_data[~pkg_tasks_data["task_number"].str.startswith("AWR")]
+        logger.info("pkg_tasks_data fetched successfully")
         # Filter sub_task_parts for tasks belonging to the specific package_number
-        filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+        filtered_sub_task_parts = sub_task_parts
+        logger.info("filtered_sub_task_parts fetched successfully")
         # Compute actual task part consumption
         task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
             task_part_consumption=("billable_value_usd", "sum")
         )
+        logger.info("task_parts_consumption fetched successfully")
         # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
         pkg_tasks_data = pkg_tasks_data.merge(task_parts_consumption, left_on="task_number", right_on="task_number", how="left")
         # Fill missing values to avoid NaN issues
@@ -721,6 +768,8 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
         pred_tasks_data["task_number"] = pred_tasks_data["sourceTask"].astype(str)
         pred_tasks_data.rename(columns={"avg_mh": "actual_man_hours", "total_billable_value_usd": "task_part_consumption"}, inplace=True)
         pred_findings_data = pd.DataFrame(pred_data[0]["findings"])
+        logger.info("pred_findings_data fetched successfully")
+
         if "details" in pred_findings_data.columns:
             pred_findings_data["avg_mh_findings"] = pred_findings_data["details"].apply(
             lambda x: x[0]["mhs"].get("avg") if isinstance(x, list) and len(x) > 0 else None
@@ -736,58 +785,82 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
                 lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
             )
             pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
-            pkg_findings_data = sub_task_description[sub_task_description["package_number"] == "package_number"]
-            pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number_updated"].str.startswith("AWR")]
-            pkg_findings_data["source_task_discrepancy_number_updated"].dropna(inplace=True)
+            logger.info("pred_findings_data grouped successfully")
+
+            pkg_findings_data = sub_task_description
+            pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number"].str.startswith("AWR")]
+            pkg_findings_data["source_task_discrepancy_number"].dropna(inplace=True)
+            logger.info("pkg_findings_data AWR filtered successfully")
             # Filter sub_task_parts for tasks belonging to the specific package_number
-            filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+            filtered_sub_task_parts = sub_task_parts
+            logger.info("filtered_sub_task_parts fetched successfully")
+            has_nan = filtered_sub_task_parts.isnull().any().any()
+            if has_nan:
+                logger.info("filtered_sub_task_parts contains NaN values.")
+            else:
+                logger.info("No NaN values found in filtered_sub_task_parts.")
+            filtered_sub_task_parts.dropna(inplace=True)
+            logger.info("filtered_sub_task_parts NaN values dropped successfully")
+
             filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
+            logger.info("filtered_sub_task_parts HMV filtered successfully")
+
             filtered_sub_task_parts = filtered_sub_task_parts.merge(
-            pkg_findings_data[["log_item_number", "source_task_discrepancy_number_updated"]],
+            pkg_findings_data[["log_item_number", "source_task_discrepancy_number"]],
             left_on="task_number",
             right_on="log_item_number",
             how="left"
             )
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"].dropna(inplace=True)
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"] = (
-            filtered_sub_task_parts["source_task_discrepancy_number_updated"].astype(str)
+            logger.info("filtered_sub_task_parts merged successfully")
+            filtered_sub_task_parts["source_task_discrepancy_number"].dropna(inplace=True)
+            filtered_sub_task_parts["source_task_discrepancy_number"] = (
+            filtered_sub_task_parts["source_task_discrepancy_number"].astype(str)
             )
-            # Filter out rows where "source_task_discrepancy_number_updated" starts with "AWR"
+            # Filter out rows where "source_task_discrepancy_number" starts with "AWR"
             filtered_sub_task_parts = filtered_sub_task_parts[
-                ~filtered_sub_task_parts["source_task_discrepancy_number_updated"].str.startswith("AWR", na=False)
+                ~filtered_sub_task_parts["source_task_discrepancy_number"].str.startswith("AWR", na=False)
             ]
+            logger.info("filtered_sub_task_parts AWR filtered successfully")
             # Compute actual task part consumption
             findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
                 findings_part_consumption=("billable_value_usd", "sum")
             )
+            logger.info("findings_parts_consumption grouped successfully")
             # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
             pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
+            logger.info("pkg_findings_data merged successfully")
             # Fill missing values to avoid NaN issues
             pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
-            pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number_updated"])[["actual_man_hours", "findings_part_consumption"]].sum()
+            pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number"])[["actual_man_hours", "findings_part_consumption"]].sum()
             pred_findings_data.rename(columns={"avg_mh_findings": "actual_man_hours_findings","taskId":"task_number"}, inplace=True)
             pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
             pkg_findings_data.rename(
                 columns={
                     "actual_man_hours": "actual_man_hours_findings",
-                    "source_task_discrepancy_number_updated": "task_number"
+                    "source_task_discrepancy_number": "task_number"
                 },
                 inplace=True
             )
+            logger.info(f"pkg_finfings_data renamed: {pkg_findings_data.columns}")
+
             pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
             pred_findings_data["task_number"] = pred_findings_data["task_number"].astype(str)
             pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
             pred_tasks_data = pred_tasks_data.merge(pred_findings_data, on="task_number", how="left")
+            logger.info("pkg_tasks_data and pred_tasks_data merged successfully")
             # Compute differences safely
             results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
+            logger.info("results merged successfully")
+
             results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
             results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
             # Merge predicted and actual data
             results["diff_avg_mh_findings"] = results["actual_man_hours_findings_pred"].fillna(0) - results["actual_man_hours_findings_actual"].fillna(0)
             results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
+            
             # Assuming 'results' is a DataFrame
             results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
+                 'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
                 'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
@@ -797,12 +870,14 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
             
             results_df.fillna(0, inplace=True)
+            logger.info("results_df filled NaN values successfully")
+            logger.info(f"results_df columns: {results_df.columns}")
             
             tasks = []  # List to store task dictionaries
             
             for _, row in results_df.iterrows():
                 task = {
-                    "package_number": row["package_number"],
+                
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
@@ -837,6 +912,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
             accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
+            logger.info("accuracy_mh and accuracy_billable calculated successfully")
             
             results = {
                 "tasks": tasks,
@@ -886,7 +962,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             # Assuming 'results' is a DataFrame
             results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
+                'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
                 'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
@@ -901,7 +977,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             for _, row in results_df.iterrows():
                 task = {
-                    "package_number": row["package_number"],
+                    
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
@@ -969,6 +1045,27 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             
             return results
+
+
+
+def convert_hash_to_ack_id(hash_hex: str) -> str:
+    hash_bytes = bytes.fromhex(hash_hex)
+    base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')
+    ack_id = base64_string[:16]  
+    return ack_id
+
+def generate_sha256_hash_from_json(json_data: dict) -> str:
+    json_string = json.dumps(json_data, sort_keys=True, default=datetime_to_str)    # Create a SHA-256 hash object
+    hash_object = hashlib.sha256()
+    hash_object.update(json_string.encode('utf-8'))
+    hash_hex = hash_object.hexdigest()
+    return convert_hash_to_ack_id(hash_hex)
+
+def datetime_to_str(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError("Object of type 'datetime' is not JSON serializable")
+            
 
 
     
