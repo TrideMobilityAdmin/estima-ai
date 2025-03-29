@@ -258,7 +258,7 @@ export default function PartUsage() {
     function calculateTotalFindingQuantity(findings: any) {
         return findings?.reduce((total: any, finding: any) => {
             const findingQuantity = finding?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0);
-            return total + findingQuantity;
+            return Math.round(total + findingQuantity);
         }, 0);
     }
 
@@ -1044,8 +1044,8 @@ border-bottom: none;
                             ) : (
                                 <>
                                     <Center p={50}>
-                                        <Text >
-                                            No Findings Found
+                                        <Text c='dimmed'>
+                                            No data Found
                                         </Text>
                                     </Center>
 

@@ -13,6 +13,7 @@ import AggregatedStatistics from '../components/statsCardCompareEst';
 import StatsCard from '../components/statsCardCompareEst';
 import TaskListCompareScreen from '../components/statsTasksAcordComapre';
 import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
+import CompareUploadDropZoneExcelNew from '../components/compareUploadFilesNew';
 
 export default function CompareEstimateNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -213,6 +214,43 @@ export default function CompareEstimateNew() {
   return (
     <>
       <div style={{ paddingLeft: 70, paddingRight: 70, paddingTop: 20, paddingBottom: 20 }}>
+        {/* <Card ml="200" mr='200'>
+          <Flex direction='column'>
+            <Title order={2} c='#2e2e2e'>Compare Estimates</Title>
+            <Text fz='sm' c='#2e2e2e'>Select Estimate ID & Select Actual Data files</Text>
+          </Flex>
+          <Space h='lg'/>
+          <div style={{marginLeft:'60px',marginRight:"60px"}}>
+          <Select
+                size="xs"
+                // w="18vw"
+                label="Select Estimate ID"
+                searchable
+                placeholder="Select Estimate ID"
+                data={estimates?.map((estimate, index) => ({
+                  value: `${estimate.estID}_${index}`, // Unique value
+                  label: estimate.estID, // Displayed text
+                }))}
+                value={selectedUniqueID} // Bind to unique ID
+                onChange={(value) => {
+                  if (value) {
+                    const [estID] = value.split("_"); // Extract the original estID
+                    setSelectedEstID(estID);
+                    setSelectedUniqueID(value); // Ensure UI updates even if duplicate
+                  } else {
+                    setSelectedEstID(null);
+                    setSelectedUniqueID(null);
+                  }
+                }}
+                allowDeselect
+              />
+              <Space h='sm'/>
+              <CompareUploadDropZoneExcelNew name="Excel File" changeHandler={handleFileChange} color="gray"/>
+          </div>
+
+        </Card> */}
+        
+        <Space h='sm'/>
         <SimpleGrid cols={2}>
           <Card >
             <Group justify='space-between'>

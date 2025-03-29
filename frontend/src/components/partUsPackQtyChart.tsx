@@ -7,7 +7,7 @@ import {
 } from "echarts/components";
 import { LineChart } from "echarts/charts";
 import { CanvasRenderer } from "echarts/renderers";
-import { Card, Title } from "@mantine/core";
+import { Card, Center, Title, Text } from "@mantine/core";
 
 // Register required ECharts components
 echarts.use([
@@ -90,7 +90,15 @@ const MixedChartComponent: React.FC<MixedChartProps> = ({ title, data, dataKey1 
       <Title order={5} c="dimmed" ta="left">
         {title}
       </Title>
-      <div ref={chartRef} style={{ width: "100%", height: "350px" }} />
+      
+
+      {data.length > 0 ? (
+              <div ref={chartRef} style={{ width: "100%", height: "350px" }} />
+            ) : (
+              <Center h="300px">
+                <Text c="dimmed">No data found</Text>
+              </Center>
+            )}
     </Card>
   );
 };

@@ -189,7 +189,7 @@ export default function ExpertInsights() {
           </Button>
         </Group>
 
-        <Card shadow="sm" p="lg">
+        {/* <Card shadow="sm" p="lg">
           <NumberInput
             w="20vw"
             label="Probability"
@@ -200,7 +200,7 @@ export default function ExpertInsights() {
             min={0}
             max={100}
           />
-        </Card>
+        </Card> */}
 
         <Card shadow="sm" p="lg">
           <Group justify="right" mb="md">
