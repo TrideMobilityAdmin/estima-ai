@@ -1104,6 +1104,7 @@ class TaskService:
                                         "description": pkg.get("description", ""),
                                         "date": pkg.get("date", "0001-01-01T00:00:00Z"),
                                         "stockStatus": pkg.get("stockStatus", ""),
+                                        "aircraftModel": pkg.get("aircraftModel", ""),
                                         "quantity": pkg["quantity"]
                                     }
                                     for pkg in task.get("findings", {}).get("packages", [])
