@@ -787,7 +787,10 @@ class TaskService:
                                         ]
                                     }
                                 }
-                            }, {
+                            }, 
+                            {
+                                '$limit': 1
+                            },{
                                 '$project': {
                                     'Description': {
                                         '$ifNull': [
