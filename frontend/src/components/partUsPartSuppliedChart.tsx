@@ -4,7 +4,7 @@ import { TooltipComponent, LegendComponent } from "echarts/components";
 import { PieChart } from "echarts/charts";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
-import { Card, Title } from "@mantine/core";
+import { Card, Title, Center, Text } from "@mantine/core";
 
 // Register ECharts components
 echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout]);
@@ -50,15 +50,14 @@ const DonutChartComponentPartSupplied: React.FC<DonutChartProps> = ({ title, par
     })) || [];
 
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && chartData.length > 0) {
       const myChart = echarts.init(chartRef.current);
       const option = {
         tooltip: { trigger: "item" },
-        // legend: { bottom: "0%", left: "center" },
         legend: {
-            orient: 'vertical',
-            left: 'right',
-          },
+          orient: "vertical",
+          left: "right",
+        },
         series: [
           {
             name: title,
@@ -85,7 +84,13 @@ const DonutChartComponentPartSupplied: React.FC<DonutChartProps> = ({ title, par
       <Title order={5} c="dimmed" ta="left">
         {title}
       </Title>
-      <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      {chartData.length > 0 ? (
+        <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      ) : (
+        <Center h="300px">
+          <Text c="dimmed">No data found</Text>
+        </Center>
+      )}
     </Card>
   );
 };
