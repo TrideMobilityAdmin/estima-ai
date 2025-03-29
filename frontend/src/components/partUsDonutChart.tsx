@@ -4,7 +4,7 @@ import { TooltipComponent, LegendComponent } from "echarts/components";
 import { PieChart } from "echarts/charts";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
-import { Card } from "@mantine/core";
+import { Card, Text, Center } from "@mantine/core";
 
 // Register required ECharts components
 echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout]);
@@ -12,32 +12,36 @@ echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelL
 const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [donutData, setDonutData] = useState<{ name: string; value: number }[]>([]);
+  const [hasData, setHasData] = useState(false);
 
   // Process data for the donut chart
   const processDonutData = (data: any) => {
     const totalTasks = data?.usage?.tasks?.reduce(
       (acc: number, task: any) => acc + task?.packages?.reduce((sum: number, pkg: any) => sum + pkg?.quantity, 0),
       0
-    );
+    ) || 0;
 
     const totalFindings = data?.usage?.findings?.hmvTasks?.reduce(
       (acc: number, finding: any) => acc + finding?.packages?.reduce((sum: number, pkg: any) => sum + pkg?.quantity, 0),
       0
-    );
+    ) || 0;
 
     const total = totalTasks + totalFindings;
-    const tasksPercentage = total > 0 ? (totalTasks / total) * 100 : 0;
-    const findingsPercentage = total > 0 ? (totalFindings / total) * 100 : 0;
-
-    setDonutData([
-      { name: "Tasks", value: tasksPercentage },
-      { name: "Findings", value: findingsPercentage },
-    ]);
+    if (total > 0) {
+      setHasData(true);
+      setDonutData([
+        { name: "Tasks", value: (totalTasks / total) * 100 },
+        { name: "Findings", value: (totalFindings / total) * 100 },
+      ]);
+    } else {
+      setHasData(false);
+      setDonutData([]);
+    }
   };
 
   // Initialize and update the Donut chart
   const initDonutChart = () => {
-    if (chartRef.current) {
+    if (chartRef.current && hasData) {
       const myChart = echarts.init(chartRef.current);
       const option = {
         tooltip: { trigger: "item", formatter: "{b}: {c}%" },
@@ -46,7 +50,7 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
           {
             name: "Distribution Analysis",
             type: "pie",
-            radius: ["40%", "70%"], // Inner and outer radius for the donut effect
+            radius: ["40%", "70%"],
             avoidLabelOverlap: false,
             itemStyle: {
               borderRadius: 5,
@@ -55,16 +59,16 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
             },
             label: {
               show: true,
-              position: "inside", // Show values inside the donut
+              position: "inside",
               fontSize: 12,
               fontWeight: "bold",
-              color: "#050505", // White text for better visibility
-              formatter: "{c}%", // Show name and percentage
+              color: "#050505",
+              formatter: "{c}%",
             },
-            labelLine: { show: false }, // Hide connecting lines
+            labelLine: { show: false },
             data: donutData.map((item) => ({
               name: item.name,
-              value: item.value.toFixed(2), // Ensure percentage formatting
+              value: item.value.toFixed(2),
             })),
           },
         ],
@@ -81,14 +85,20 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
   }, [partUsageData]);
 
   useEffect(() => {
-    if (donutData.length > 0) {
+    if (hasData) {
       initDonutChart();
     }
   }, [donutData]);
 
   return (
     <Card radius="md" h="50vh">
-      <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      {hasData ? (
+        <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      ) : (
+        <Center h="100%">
+          <Text c="dimmed">No Data Found</Text>
+        </Center>
+      )}
     </Card>
   );
 };
