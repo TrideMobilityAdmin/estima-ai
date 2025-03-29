@@ -228,18 +228,20 @@ export const useApi = () => {
   };
 
   // New function to upload a file with Estimate ID
-  const compareUploadFile = async (file: any, selectedEstID: any) => {
-    if (!file || !selectedEstID) {
-        console.error("Missing required parameters:", { file, selectedEstID });
+  const compareUploadFile = async (files: File[], selectedEstID: string) => {
+    if (!files.length || !selectedEstID) {
+        console.error("Missing required parameters:", { files, selectedEstID });
         return null;
     }
 
     // Create FormData
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file, index) => {
+        formData.append("files", file); // Sending multiple files
+    });
 
     try {
-        // Make the API call with the file in FormData and estimateId in URL
+        // Make the API call with the files in FormData and estimateId in URL
         const response = await axiosInstance.post(
             `${getEstimateReport_Url}${selectedEstID}/compare`,
             formData,
@@ -252,24 +254,21 @@ export const useApi = () => {
 
         console.log("✅ Upload successful:", response.data);
 
-        // Checking if `comparisonResults` array exists and has data
-        if (response?.data?.comparisonResults && response.data.comparisonResults.length > 0) {
-            showAppNotification("success", "Comparison Success!", "Estimate Compared Successfully");
+        if (response !== null) {
+            showAppNotification("success", "Success!", "Estimate Comparision Successfull!");
         } else {
-            showAppNotification("error", "No Data!", "No data found, try another file.");
+            showAppNotification("error", "Failed!", "Failed try again");
         }
 
         return response;
     } catch (error: any) {
         console.error("❌ Upload failed:", error);
 
-        // Handle session expiration
         if (error.response?.data?.detail === "Invalid authentication credentials") {
             handleSessionExpired();
         }
 
-        // Show error notification for API failure
-        showAppNotification("error", "Upload Failed!", `${error.response?.data?.message || "Failed to upload file, please try again."}`);
+        showAppNotification("error", "Upload Failed!", `${error.response?.data?.message || "Failed to upload files, please try again."}`);
 
         throw error;
     }
