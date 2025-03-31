@@ -318,25 +318,55 @@ export default function EstimateNew() {
             aircraftAge: "",
             aircraftFlightHours: "",
             aircraftFlightCycles: "",
-            areaOfOperations: '',
+            areaOfOperations: "",
             cappingDetails: {
                 cappingTypeManhrs: "",
                 cappingManhrs: 0,
                 cappingTypeSpareCost: "",
                 cappingSpareCost: 0,
             },
-            taskID: '',
-            taskDescription: '',
-            typeOfCheck: '',
+            taskID: "",
+            taskDescription: "",
+            typeOfCheck: "",
             miscLaborTasks: [],
             additionalTasks: []
         },
-
+    
         validate: {
             operator: (value) => (value.trim() ? null : "Operator is required"),
             aircraftRegNo: (value) => (value.trim() ? null : "Aircraft Registration Number is required"),
-            typeOfCheck: (value) => value.trim() ? null : "Type of Check is required",
-            aircraftModel: (value) => value.trim() ? null : "Aircraft Model is required",
+            typeOfCheck: (value) => (value.trim() ? null : "Type of Check is required"),
+            aircraftModel: (value) => (value.trim() ? null : "Aircraft Model is required"),
+    
+            cappingDetails: {
+                // Man Hours Capping Validation
+                cappingTypeManhrs: (value, values) => {
+                    if (!value && values.cappingDetails.cappingManhrs) {
+                        return "Man Hours Type is required when Man Hours are entered";
+                    }
+                    return null;
+                },
+                cappingManhrs: (value, values) => {
+                    if (!value && values.cappingDetails.cappingTypeManhrs) {
+                        return "Man Hours is required when Type is selected";
+                    }
+                    return null;
+                },
+    
+                // Spare Cost Capping Validation
+                cappingTypeSpareCost: (value, values) => {
+                    if (!value && values.cappingDetails.cappingSpareCost) {
+                        return "Capping Type is required when Cost is entered";
+                    }
+                    return null;
+                },
+                cappingSpareCost: (value, values) => {
+                    if (!value && values.cappingDetails.cappingTypeSpareCost) {
+                        return "Cost is required when Type is selected";
+                    }
+                    return null;
+                },
+            },
         },
     });
 
@@ -370,15 +400,6 @@ export default function EstimateNew() {
             showAppNotification("warning", "Validation Error", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
             return;
         }
-        // Check if type of check is N/A and aircraft reg no is empty
-        // if (form.values.typeOfCheck.trim().toLowerCase() === "n/a" && !form.values.aircraftRegNo.trim()) {
-        //     showAppNotification("warning", "Validation Error", "When Type of Check is N/A, Aircraft Registration Number is mandatory");
-        //     return;
-        // }
-
-        // if (form.values.aircraftRegNo.toLocaleLowerCase() === "n/a" && form.values.operator.toLowerCase() === "n/a") {
-        //     showAppNotification("warning", "Both are N/A", "Reg Num or Operator Any of one is Mandatory");
-        // }
 
         if (!selectedFile) {
             showAppNotification("warning", "Error", "Please Select File");
@@ -407,9 +428,9 @@ export default function EstimateNew() {
             areaOfOperations: form.values.areaOfOperations || "", // Ensure it's not empty
             cappingDetails: {
                 cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-                cappingManhrs: form.values.cappingDetails.cappingManhrs || 0,
+                cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
                 cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-                cappingSpareCost: form.values.cappingDetails.cappingSpareCost || 0,
+                cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
             },
             additionalTasks: defaultAdditionalTasks,
             typeOfCheck: form.values.typeOfCheck || "", // Ensure it's not empty
@@ -430,6 +451,15 @@ export default function EstimateNew() {
                 showAppNotification("success", "Success!", "Estimate report submitted successfully!");
                 // Reset form fields after successful submission
                 form.reset();
+                form.setValues({
+                    typeOfCheck: "",
+                    cappingDetails: {
+                        cappingTypeManhrs: "",
+                        cappingManhrs: 0,
+                        cappingTypeSpareCost: "",
+                        cappingSpareCost: 0,
+                    },
+                });
                 // Reset related state variables
                 setSelectedFile(null); // Reset the selected file
                 setValidatedTasks([]); // Reset validated tasks

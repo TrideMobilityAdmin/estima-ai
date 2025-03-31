@@ -258,6 +258,8 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         const filteredSkills = skillBasedTasks.filter(item =>
             item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
+
+        // console.log("filtered skills >>>",filteredSkills);
     
         return (
             <>
@@ -317,7 +319,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
                                                 <Text fz='xs'>Max</Text>
-                                                <Text fz='lg' fw={600}>{task.manHours.min} Hr</Text>
+                                                <Text fz='lg' fw={600}>{task.manHours.max} Hr</Text>
                                             </Flex>
                                             <IconClockUp color="red" size='20' />
                                         </Group>
@@ -326,7 +328,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
                                                 <Text fz='xs'>Avg</Text>
-                                                <Text fz='lg' fw={600}>{task.manHours.max} Hr</Text>
+                                                <Text fz='lg' fw={600}>{task.manHours.avg} Hr</Text>
                                             </Flex>
                                             <IconClockCode color="orange" size='20' />
                                         </Group>
@@ -409,6 +411,8 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         const filteredSkills = skillBasedFindings.filter(item =>
             item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
+
+        console.log("filtered findins skills >>>>",filteredSkills);
     
         return (
             <>
@@ -467,7 +471,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
                                                 <Text fz='xs'>Max</Text>
-                                                <Text fz='lg' fw={600}>{finding.manHours.min} Hr</Text>
+                                                <Text fz='lg' fw={600}>{finding.manHours.max} Hr</Text>
                                             </Flex>
                                             <IconClockUp color="red" size='20' />
                                         </Group>
@@ -476,7 +480,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
                                                 <Text fz='xs'>Avg</Text>
-                                                <Text fz='lg' fw={600}>{finding.manHours.max} Hr</Text>
+                                                <Text fz='lg' fw={600}>{finding.manHours.avg} Hr</Text>
                                             </Flex>
                                             <IconClockCode color="orange" size='20' />
                                         </Group>

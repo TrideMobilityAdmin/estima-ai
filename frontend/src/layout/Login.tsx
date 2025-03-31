@@ -28,7 +28,7 @@ import {
 } from "../constants/GlobalImports";
 import flightBg  from '../../public/airCraft8.jpg'
 import { Overlay } from "@mantine/core";
-import { entityID, roleID, userID, userName, userToken } from "../components/tokenJotai";
+import { entityID, roleID, userEmail, userID, userName, userToken } from "../components/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
 
@@ -75,6 +75,7 @@ function Login() {
   const [token, setToken] = useAtom(userToken);
   const [userId, setUserID] = useAtom(userID);
   const [name, setName] = useAtom(userName);
+  const [email, setEmail] = useAtom(userEmail);
   // const [roleId, setRoleID] = useAtom(roleID);
   // const [entityId, setEntityID] = useAtom(entityID);
   const login = async (values: LoginInput) => {
@@ -88,7 +89,8 @@ function Login() {
       const { 
         accessToken, 
         userID, 
-        username
+        username,
+        email
         // roleID, 
         // entityID 
       } = response.data;
@@ -99,19 +101,24 @@ function Login() {
         setToken(accessToken);
         setUserID(userID);
         setName(username);
+        setEmail(email);
         // setRoleID(roleID);
         // setEntityID(entityID);
 
         sessionStorage.setItem("token", accessToken);
         sessionStorage.setItem("userID", userID);
         sessionStorage.setItem("username", username);
+        sessionStorage.setItem("email", email);
         // sessionStorage.setItem("roleID", roleID);
         // sessionStorage.setItem("entityID", entityID);
-// Verify that the token is stored
-const storedToken = sessionStorage.getItem("token");
-const storedName = sessionStorage.getItem("username");
-console.log("✅ Token stored in sessionStorage:", storedToken);  
-console.log("user stored in sessionStorage:", storedName);  
+        // Verify that the token is stored
+        const storedToken = sessionStorage.getItem("token");
+        const storedName = sessionStorage.getItem("username");
+        const storedeMAIL = sessionStorage.getItem("email");
+        
+        console.log("✅ Token stored in sessionStorage:", storedToken);  
+        console.log("user stored in sessionStorage:", storedName);  
+        console.log("email stored in sessionStorage:", storedeMAIL);  
         saveAuthData({ token, status: "authenticated" });
 
         showNotification({
