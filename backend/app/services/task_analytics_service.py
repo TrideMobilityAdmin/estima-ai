@@ -787,7 +787,10 @@ class TaskService:
                                         ]
                                     }
                                 }
-                            }, {
+                            }, 
+                            {
+                                '$limit': 1
+                            },{
                                 '$project': {
                                     'Description': {
                                         '$ifNull': [
@@ -1101,6 +1104,7 @@ class TaskService:
                                         "description": pkg.get("description", ""),
                                         "date": pkg.get("date", "0001-01-01T00:00:00Z"),
                                         "stockStatus": pkg.get("stockStatus", ""),
+                                        "aircraftModel": pkg.get("aircraftModel", ""),
                                         "quantity": pkg["quantity"]
                                     }
                                     for pkg in task.get("findings", {}).get("packages", [])
@@ -1725,6 +1729,7 @@ class TaskService:
             estimate_data["aircraftModel"] = capping_result.get("aircraftModel")
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
+            logger.info("estimate_data fetched")
             findings_level_pipeline=[
                     {
                         '$match': {
@@ -1842,7 +1847,12 @@ class TaskService:
                     }
                 ]
             findings_result=list(self.estimates_collection.aggregate(findings_level_pipeline))
-            findings_level=findings_result[0]
+            if not findings_result:
+                findings_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+                                "totalBillableCost": 0, "totalUnbillableCost": 0}
+            else:
+                findings_level = findings_result[0]
+
             SC_NC_pipeline = [
                 {
                     '$match': {
@@ -1907,7 +1917,10 @@ class TaskService:
                 }
             ]
             task_SC_result = list(self.estimates_collection.aggregate(SC_NC_pipeline))
-            task_SC_result = task_SC_result[0]
+            if not task_SC_result:
+                task_SC_result = {"totalBillableMhs": 0, "totalUnbillableMhs": 0}
+            else:
+                task_SC_result = task_SC_result[0]
             task_level_pipeline=[
         {
             '$match': {
@@ -2022,8 +2035,13 @@ class TaskService:
         }
     ]
             task_result=list(self.estimates_collection.aggregate(task_level_pipeline))
-            logger.info(f"task_level fetched{task_result}")
-            task_level=task_result[0]
+            logger.info("task_level fetched")
+            if not task_result:
+                task_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+                            "totalBillableCost": 0, "totalUnbillableCost": 0}
+            else:
+                task_level = task_result[0]
+
             if capping_type == "per_source_card":    
                 return {
                     **estimate_data,
