@@ -1316,13 +1316,183 @@ class TaskService:
         }
     }
             ]
+            skill_wise_tasks=[
+    {
+        '$match': {
+            'task_number': {
+                '$in': source_tasks
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'skill_number': '$skill_number', 
+                'task_number': '$task_number'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }, 
+            'task_description': {
+                '$first': '$description'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.skill_number', 
+            'totalMinHours': {
+                '$min': {
+                    '$min': '$actual_man_hours'
+                }
+            }, 
+            'totalAvgHours': {
+                '$avg': {
+                    '$avg': '$actual_man_hours'
+                }
+            }, 
+            'totalMaxHours': {
+                '$max': {
+                    '$max': '$actual_man_hours'
+                }
+            }, 
+            'tasks': {
+                '$push': {
+                    'taskId': '$_id.task_number', 
+                    'taskDescription': '$task_description', 
+                    'manHours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'skil': '$_id', 
+            'totalMinHours': {
+                '$round': [
+                    '$totalMinHours', 2
+                ]
+            }, 
+            'totalAvgHours': {
+                '$round': [
+                    '$totalAvgHours', 2
+                ]
+            }, 
+            'totalMaxHours': {
+                '$round': [
+                    '$totalMaxHours', 2
+                ]
+            }, 
+            'tasks': 1
+        }
+    }, {
+        '$sort': {
+            'skil': 1
+        }
+    }
+]
+            skill_wise_findings=[
+    {
+        '$match': {
+            'source_task_discrepancy_number': {
+                '$in':source_tasks
+            }
+        }
+    }, {
+        '$group': {
+            '_id': {
+                'skill_number': '$skill_number', 
+                'task_number': '$source_task_discrepancy_number'
+            }, 
+            'actual_man_hours': {
+                '$push': '$actual_man_hours'
+            }, 
+            'task_description': {
+                '$first': '$task_description'
+            }
+        }
+    }, {
+        '$group': {
+            '_id': '$_id.skill_number', 
+            'totalMinHours': {
+                '$min': {
+                    '$min': '$actual_man_hours'
+                }
+            }, 
+            'totalAvgHours': {
+                '$avg': {
+                    '$avg': '$actual_man_hours'
+                }
+            }, 
+            'totalMaxHours': {
+                '$max': {
+                    '$max': '$actual_man_hours'
+                }
+            }, 
+            'findings': {
+                '$push': {
+                    'taskId': '$_id.task_number', 
+                    'taskDescription': '$task_description', 
+                    'manHours': {
+                        'min': {
+                            '$min': '$actual_man_hours'
+                        }, 
+                        'max': {
+                            '$max': '$actual_man_hours'
+                        }, 
+                        'avg': {
+                            '$avg': '$actual_man_hours'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'skil': '$_id', 
+            'totalMinHours': {
+                '$round': [
+                    '$totalMinHours', 2
+                ]
+            }, 
+            'totalAvgHours': {
+                '$round': [
+                    '$totalAvgHours', 2
+                ]
+            }, 
+            'totalMaxHours': {
+                '$round': [
+                    '$totalMaxHours', 2
+                ]
+            }, 
+            'findings': 1
+        }
+    }, {
+        '$sort': {
+            'skil': 1
+        }
+    }
+]
 
             # Execute MongoDB queries
             task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
             sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
+            skill_wise_tasks_result = list(self.taskdescription_collection.aggregate(skill_wise_tasks))
+            skill_wise_findings_result = list(self.sub_task_collection.aggregate(skill_wise_findings))
             
             logger.info(f"Retrieved skill analysis for tasks: len={len(task_skill_results)}")
             logger.info(f"Retrieved skill analysis for sub-tasks: len={len(sub_task_skill_results)}")
+            logger.info(f"Retrieved skill-wise tasks: len={len(skill_wise_tasks_result)}")
+            logger.info(f"Retrieved skill-wise findings: len={len(skill_wise_findings_result)}")
             if not task_skill_results and not sub_task_skill_results:
                 logger.info("No data found for both tasks and sub-tasks")
                 return {
