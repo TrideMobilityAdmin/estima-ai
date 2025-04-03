@@ -41,12 +41,12 @@ const StatsCard: React.FC<any> = ({
 
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Actual</Text>
-      <Text fw={600} fz="md">{actual} h</Text>
+      <Text  fz="md">{actual} h</Text>
       </Group>
       <Space h='xs'/>
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Predicted</Text>
-      <Text fw={600} fz="md">{predicted} h</Text>
+      <Text  fz="md">{predicted} h</Text>
       </Group>
       <Space h='xs'/>
 
@@ -54,7 +54,7 @@ const StatsCard: React.FC<any> = ({
       <Text size="sm" c={color} style={{ cursor: "pointer" }}>
         Difference
       </Text>
-      <Text fw={600} fz="md" c={color}>
+      <Text  fz="md" c={color}>
         {difference} h
       </Text>
       </Group>
@@ -62,7 +62,7 @@ const StatsCard: React.FC<any> = ({
 
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Accuracy</Text>
-      <Text fw={600} fz="md" c="green">
+      <Text  fz="md" c="black">
         {accuracy} %
       </Text>
       </Group>
