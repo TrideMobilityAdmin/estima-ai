@@ -340,7 +340,7 @@ class ExcelUploadService:
                 if version_match:
                     latest_version = int(version_match.group(1))
             new_version = latest_version + 1                             
-            est_id = f"{base_est_id}-V{new_version:02d}"
+            est_id = f"{base_est_id}-V{new_version:02d}".upper()
             logger.info(f"estID is : {est_id}")
             
             data_to_insert = {

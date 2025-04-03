@@ -1666,7 +1666,54 @@ class TaskService:
                 ]
             }
         }
-    }, {
+    },
+    {
+        '$addFields': {
+            'aggregatedTasks': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': '$tasks.spare_parts', 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
+                    }
+                }
+            }, 
+            'aggregatedFindings': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': {
+                            '$map': {
+                                'input': '$findings', 
+                                'as': 'finding', 
+                                'in': {
+                                    '$reduce': {
+                                        'input': '$$finding.details.spare_parts', 
+                                        'initialValue': [], 
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }, 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    },
+      {
         '$project': {
             '_id': 0, 
             'estID': 1, 
@@ -1700,9 +1747,17 @@ class TaskService:
                     }
                 }
             }, 
-            'aggregatedTasks': 1, 
+            'aggregatedTasks': {
+                'spareParts': '$aggregatedTasks.spareParts', 
+                'estimateManhrs': '$aggregatedTasks.mhs', 
+                'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
+            },  
             'findings': '$findings', 
-            'aggregatedFindings': 1, 
+            'aggregatedFindings': {
+                'spareParts': '$aggregatedFindings.spareParts', 
+                'estimateManhrs': '$aggregatedFindings.mhs', 
+                'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
+            },  
             'originalFilename': 1, 
             'userID': {
                 '$toString': '$userID'
