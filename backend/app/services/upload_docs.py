@@ -684,7 +684,7 @@ class ExcelUploadService:
             if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
                 raise ValueError("One or more required sheets are missing from the uploaded files.")
             compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
-            logger.info(f"compare_result: {compare_result}")
+            logger.info("compare_result")
 
             return compare_result
         except Exception as e:
@@ -730,10 +730,18 @@ class ExcelUploadService:
             return None
 
     def testing(self,task_description, sub_task_parts,sub_task_description,estID):
+    # Fetch predicted data
+        # Filter the matching row(s)
+    #matching_rows = aircraft_data[aircraft_data["package_number"] == package_number]
+    
+    # Ensure at least one match exists before accessing values
+
+
         pred_data = list(self.estimate_output.find({"estID": estID}))
         logger.info("pred_data fetched successfully")
         if not pred_data :  # Check for empty or missing tasks
-            return pd.DataFrame()  # Return an empty DataFrame if no valid data
+            print("None EstID Pred Data -->" + estID)
+            return {} # Return an empty DataFrame if no valid data
         pred_tasks_data = pd.DataFrame(pred_data[0]["tasks"])
         # Extract 'avg', 'max', and 'min' from 'mhs' dictionary
         pred_tasks_data["avg_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("avg") if isinstance(x, dict) else None)
@@ -744,16 +752,13 @@ class ExcelUploadService:
             lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
         )
         # Fetch actual package data
-        pred_tasks_data["total_billable_value_usd"] = pred_tasks_data["spare_parts"].apply(
-            lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
-        )
-        # Fetch actual package data
         pkg_tasks_data = task_description
-        pkg_tasks_data = pkg_tasks_data[~pkg_tasks_data["task_number"].str.startswith("AWR")]
+        pkg_tasks_data = pkg_tasks_data[pkg_tasks_data["task_type"]=="MPD"]
         logger.info("pkg_tasks_data fetched successfully")
         # Filter sub_task_parts for tasks belonging to the specific package_number
         filtered_sub_task_parts = sub_task_parts
         logger.info("filtered_sub_task_parts fetched successfully")
+        filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].isin(pkg_tasks_data["task_number"])]
         # Compute actual task part consumption
         task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
             task_part_consumption=("billable_value_usd", "sum")
@@ -765,11 +770,69 @@ class ExcelUploadService:
         pkg_tasks_data.loc[:, "task_part_consumption"] = pkg_tasks_data["task_part_consumption"].fillna(0)
         # Ensure data types match for merging
         pkg_tasks_data["task_number"] = pkg_tasks_data["task_number"].astype(str)
+        pkg_findings_data = sub_task_description
+        pkg_findings_data = pkg_findings_data[
+        pkg_findings_data["source_task_discrepancy_number"].isin(pkg_tasks_data["task_number"])]
+        pkg_findings_data.dropna(subset=["source_task_discrepancy_number"], inplace=True)
+        logger.info("pkg_findings_data fetched successfully")
+
+        no_of_findings=len(pkg_findings_data["log_item_number"].unique().tolist())
+        logger.info(f"no_of_findings: {no_of_findings}")
+        # Filter sub_task_parts for tasks belonging to the specific package_number
+        # filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == package_number]
+        logger.info("filtered_sub_task_parts fetched successfully")
+        filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
+        filtered_sub_task_parts = filtered_sub_task_parts.merge(
+        pkg_findings_data[["log_item_number", "source_task_discrepancy_number"]],
+        left_on="task_number",
+        right_on="log_item_number",
+        how="left"
+        )
+        logger.info("filtered_sub_task_parts merged successfully")
+
+        filtered_sub_task_parts.dropna(subset=["source_task_discrepancy_number"], inplace=True)
+        filtered_sub_task_parts["source_task_discrepancy_number"] = (
+        filtered_sub_task_parts["source_task_discrepancy_number"].astype(str)
+        )
+        logger.info("source_task_discrepancy_number converted to string successfully")
+        # Filter out rows where "source_task_discrepancy_number_updated" starts with "AWR"
+        filtered_sub_task_parts = filtered_sub_task_parts[
+            filtered_sub_task_parts["source_task_discrepancy_number"].isin(pkg_tasks_data["task_number"])
+        ]
+        logger.info("filtered_sub_task_parts filtered successfully")
+        # Compute actual task part consumption
+        findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
+            findings_part_consumption=("billable_value_usd", "sum")
+        )
+        logger.info("findings_parts_consumption fetched successfully")
+        # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
+        pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
+        # Fill missing values to avoid NaN issues
+        pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
+        pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number"])[["actual_man_hours", "findings_part_consumption"]].sum()
+        pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
+        pkg_findings_data.rename(
+            columns={
+                "actual_man_hours": "actual_man_hours_findings",
+                "source_task_discrepancy_number": "task_number"
+            },
+            inplace=True
+        )
+        logger.info(f'columns of pkg_findings_data: {pkg_findings_data.columns}')
+
+        pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
+        pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
+        pkg_tasks_data["no_of_findings"]=no_of_findings
+        logger.info("pkg_tasks_data merged successfully")
+        #print(pkg_tasks_data.columns)
+        
+
+        
         pred_tasks_data["task_number"] = pred_tasks_data["sourceTask"].astype(str)
         pred_tasks_data.rename(columns={"avg_mh": "actual_man_hours", "total_billable_value_usd": "task_part_consumption"}, inplace=True)
         pred_findings_data = pd.DataFrame(pred_data[0]["findings"])
         logger.info("pred_findings_data fetched successfully")
-
+        
         if "details" in pred_findings_data.columns:
             pred_findings_data["avg_mh_findings"] = pred_findings_data["details"].apply(
             lambda x: x[0]["mhs"].get("avg") if isinstance(x, list) and len(x) > 0 else None
@@ -784,90 +847,40 @@ class ExcelUploadService:
             pred_findings_data["findings_part_consumption"] = pred_findings_data["details"].apply(
                 lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
             )
+            logger.info("pred_findings_data details fetched successfully")
             pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
-            logger.info("pred_findings_data grouped successfully")
-
-            pkg_findings_data = sub_task_description
-            pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number"].str.startswith("AWR")]
-            pkg_findings_data["source_task_discrepancy_number"].dropna(inplace=True)
-            logger.info("pkg_findings_data AWR filtered successfully")
-            # Filter sub_task_parts for tasks belonging to the specific package_number
-            filtered_sub_task_parts = sub_task_parts
-            logger.info("filtered_sub_task_parts fetched successfully")
-            has_nan = filtered_sub_task_parts.isnull().any().any()
-            if has_nan:
-                logger.info("filtered_sub_task_parts contains NaN values.")
-            else:
-                logger.info("No NaN values found in filtered_sub_task_parts.")
-            filtered_sub_task_parts.dropna(inplace=True)
-            logger.info("filtered_sub_task_parts NaN values dropped successfully")
-
-            filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
-            logger.info("filtered_sub_task_parts HMV filtered successfully")
-
-            filtered_sub_task_parts = filtered_sub_task_parts.merge(
-            pkg_findings_data[["log_item_number", "source_task_discrepancy_number"]],
-            left_on="task_number",
-            right_on="log_item_number",
-            how="left"
-            )
-            logger.info("filtered_sub_task_parts merged successfully")
-            filtered_sub_task_parts["source_task_discrepancy_number"].dropna(inplace=True)
-            filtered_sub_task_parts["source_task_discrepancy_number"] = (
-            filtered_sub_task_parts["source_task_discrepancy_number"].astype(str)
-            )
-            # Filter out rows where "source_task_discrepancy_number" starts with "AWR"
-            filtered_sub_task_parts = filtered_sub_task_parts[
-                ~filtered_sub_task_parts["source_task_discrepancy_number"].str.startswith("AWR", na=False)
-            ]
-            logger.info("filtered_sub_task_parts AWR filtered successfully")
-            # Compute actual task part consumption
-            findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
-                findings_part_consumption=("billable_value_usd", "sum")
-            )
-            logger.info("findings_parts_consumption grouped successfully")
-            # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
-            pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
-            logger.info("pkg_findings_data merged successfully")
-            # Fill missing values to avoid NaN issues
-            pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
-            pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number"])[["actual_man_hours", "findings_part_consumption"]].sum()
             pred_findings_data.rename(columns={"avg_mh_findings": "actual_man_hours_findings","taskId":"task_number"}, inplace=True)
             pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
-            pkg_findings_data.rename(
-                columns={
-                    "actual_man_hours": "actual_man_hours_findings",
-                    "source_task_discrepancy_number": "task_number"
-                },
-                inplace=True
-            )
-            logger.info(f"pkg_finfings_data renamed: {pkg_findings_data.columns}")
-
             pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
             pred_findings_data["task_number"] = pred_findings_data["task_number"].astype(str)
-            pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
+            #pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
             pred_tasks_data = pred_tasks_data.merge(pred_findings_data, on="task_number", how="left")
-            logger.info("pkg_tasks_data and pred_tasks_data merged successfully")
             # Compute differences safely
-            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
-            logger.info("results merged successfully")
-
+            pkg_tasks_data = pkg_tasks_data.drop_duplicates(subset=["task_number"])  
+            logger.info("pkg_tasks_data dropped duplicates successfully")
+            #print(pkg_tasks_data.columns)
+            pred_tasks_data = pred_tasks_data.drop_duplicates(subset=["task_number"])  # Just in case, remove duplicates here too
+            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="right")
+            #print(results.columns)
             results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
             results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
+
             # Merge predicted and actual data
             results["diff_avg_mh_findings"] = results["actual_man_hours_findings_pred"].fillna(0) - results["actual_man_hours_findings_actual"].fillna(0)
             results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
-            
+            logger.info("results merged successfully")
+            logger.info(f"results columns: {results.columns}")
             # Assuming 'results' is a DataFrame
             results_df = results[[
-                 'task_number', 'actual_man_hours_actual',
+                # 'package_number', 
+                'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
                 'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
                 'findings_part_consumption_pred', 'diff_avg_mh',
                 'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
                 'diff_total_billable_value_usd_findings'
-            ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
+            ]].copy()
             
             results_df.fillna(0, inplace=True)
             logger.info("results_df filled NaN values successfully")
@@ -877,7 +890,7 @@ class ExcelUploadService:
             
             for _, row in results_df.iterrows():
                 task = {
-                
+                    # "package_number": row["package_number"],
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
@@ -891,13 +904,13 @@ class ExcelUploadService:
                     "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
                     "diff_avg_mh_findings": row["diff_avg_mh_findings"],
                     "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": 100 - (
-                        abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
+                    "accuracy": ((
+                        row["actual_man_hours_pred"] + row["actual_man_hours_findings_pred"] +
                         row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
                     ) / (
                         row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
                         row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) * 100 if (
+                    ) -1)* 100 if (
                         row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
                         row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
                     ) > 0 else 0  # Avoid division by zero
@@ -909,11 +922,12 @@ class ExcelUploadService:
             pred_mh_total = results_df["actual_man_hours_pred"].sum()
             actual_billable_total = results_df["task_part_consumption_actual"].sum()
             pred_billable_total = results_df["task_part_consumption_pred"].sum()
+            logger.info("actual_mh_total and pred_mh_total and actual_billable_total and pred_billable_total calculated successfully")
             
-            accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
-            accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
+            accuracy_mh = (pred_mh_total  / actual_mh_total)  if actual_mh_total > 0 else 0
+            accuracy_billable = (pred_billable_total  / actual_billable_total) if actual_billable_total > 0 else 0
             logger.info("accuracy_mh and accuracy_billable calculated successfully")
-            
+
             results = {
                 "tasks": tasks,
                 "aggregatedTasklevel": {
@@ -931,19 +945,20 @@ class ExcelUploadService:
                     "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
                     "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
                     "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
-                    "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
-                                    / results_df["actual_man_hours_findings_actual"].sum()) * 100
-                                    if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
-                                                                / results_df["findings_part_consumption_actual"].sum()) * 100
+                    "diff_avg_mh": results_df["diff_avg_mh_findings"].abs().sum(),
+                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].abs().sum(),
+                    "accuracy_mh": ((results_df["actual_man_hours_findings_pred"].sum()) /
+                                            results_df["actual_man_hours_findings_actual"].sum())
+                                            if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
+                    "accuracy_total_billable_value_usd_findings": ((results_df["findings_part_consumption_pred"].sum()) /
+                                                                results_df["findings_part_consumption_actual"].sum()) 
                                                                 if results_df["findings_part_consumption_actual"].sum() > 0 else 0
                 }
             }
+            
 
-            
-            
+        
+        
             
             return results
             
@@ -962,6 +977,7 @@ class ExcelUploadService:
             
             # Assuming 'results' is a DataFrame
             results_df = results[[
+                # 'package_number', 
                 'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
@@ -977,7 +993,7 @@ class ExcelUploadService:
             
             for _, row in results_df.iterrows():
                 task = {
-                    
+                    # "package_number": row["package_number"],
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
@@ -991,13 +1007,13 @@ class ExcelUploadService:
                     "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
                     "diff_avg_mh_findings": row["diff_avg_mh_findings"],
                     "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": 100 - (
-                        abs(row["actual_man_hours_pred"]) + abs(row["actual_man_hours_findings_pred"]) +
+                    "accuracy": ( (
+                        row["actual_man_hours_pred"] + row["actual_man_hours_findings_pred"] +
                         row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
                     ) / (
                         row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
                         row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) * 100 if (
+                    ))  if (
                         row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
                         row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
                     ) > 0 else 0  # Avoid division by zero
@@ -1010,9 +1026,10 @@ class ExcelUploadService:
             actual_billable_total = results_df["task_part_consumption_actual"].sum()
             pred_billable_total = results_df["task_part_consumption_pred"].sum()
             
-            accuracy_mh = (1 - abs(pred_mh_total - actual_mh_total) / actual_mh_total) * 100 if actual_mh_total > 0 else 0
-            accuracy_billable = (1 - abs(pred_billable_total - actual_billable_total) / actual_billable_total) * 100 if actual_billable_total > 0 else 0
-            
+            accuracy_mh = (pred_mh_total  / actual_mh_total)  if actual_mh_total > 0 else 0
+            accuracy_billable = (pred_billable_total  / actual_billable_total) if actual_billable_total > 0 else 0
+            logger.info("accuracy_mh and accuracy_billable calculated successfully")
+
             results = {
                 "tasks": tasks,
                 "aggregatedTasklevel": {
@@ -1030,20 +1047,17 @@ class ExcelUploadService:
                     "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
                     "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
                     "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].sum(),
-                    "accuracy_mh": (1 - abs(results_df["actual_man_hours_findings_pred"].sum() - results_df["actual_man_hours_findings_actual"].sum())
-                                    / results_df["actual_man_hours_findings_actual"].sum()) * 100
-                                    if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": (1 - abs(results_df["findings_part_consumption_pred"].sum() - results_df["findings_part_consumption_actual"].sum())
-                                                                / results_df["findings_part_consumption_actual"].sum()) * 100
+                    "diff_avg_mh": results_df["diff_avg_mh_findings"].abs().sum(),
+                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].abs().sum(),
+                    "accuracy_mh": ((results_df["actual_man_hours_findings_pred"].sum()) /
+                                            results_df["actual_man_hours_findings_actual"].sum())
+                                            if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
+                    "accuracy_total_billable_value_usd_findings": ((results_df["findings_part_consumption_pred"].sum()) /
+                                                                results_df["findings_part_consumption_actual"].sum()) 
                                                                 if results_df["findings_part_consumption_actual"].sum() > 0 else 0
                 }
             }
-
-            
-            
-            
+        
             return results
 
 
