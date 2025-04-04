@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput, Center } from "@mantine/core";
+import { Card, Group, SimpleGrid, Text, ScrollArea, Progress, Box, Flex, Space, Accordion, TextInput, Center, Pagination } from "@mantine/core";
 import { IconAlertTriangle, IconClock, IconClockCode, IconClockDown, IconClockUp, IconCube } from "@tabler/icons-react";
 import SkillsDonutChart from "../components/skillsDonut"; // Assuming this is your chart component
 
@@ -88,16 +88,40 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             task.taskId.toLowerCase().includes(taskSearch.toLowerCase())
         );
 
+        const [currentPage, setCurrentPage] = useState(1);
+        const itemsPerPage = 6;
+
+        const totalPages = Math.ceil(filteredTasks?.length / itemsPerPage);
+        const paginatedTasks = filteredTasks?.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage
+        );
+
         return (
             <>
-                <TextInput
+            <Card withBorder h="85vh" shadow="sm" p="md" radius="md">
+                {/* Top Section: Heading & Search Input */}
+            <Box mb="md">
+              <Text fw={600} size="lg" mb="sm">
+                Tasks
+              </Text>
+              <TextInput
                     placeholder="Search Tasks by Task ID"
                     mb="sm"
                     value={taskSearch}
-                    onChange={(event) => setTaskSearch(event.currentTarget.value)}
+                    onChange={(event) => {
+                        setTaskSearch(event.currentTarget.value);
+                        setCurrentPage(1); // Reset pagination on search
+                    }}
                 />
-                <Accordion variant="separated" value={opened} onChange={setOpened}>
-                    {filteredTasks?.map((task : any) => (
+            </Box>
+
+            {/* Middle Section: Scrollable Accordion List */}
+            <ScrollArea h="65vh" scrollbarSize={0}>
+                {
+                    paginatedTasks?.length > 0 ? (
+                        <Accordion variant="separated" value={opened} onChange={setOpened}>
+                             {paginatedTasks?.map((task : any) => (
                         <Accordion.Item key={task.taskId} value={task.taskId}>
                             <Accordion.Control  onClick={() => handleAccordionChange(task.taskId)}>
                                 <Group>
@@ -117,7 +141,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                                         Min {skill?.manHours.min} Hr
                                                     </Text>
                                                     <Text fz="xs" c="yellow" fw={700}>
-                                                        Avg {skill?.manHours.avg} Hr
+                                                        Est {skill?.manHours.avg} Hr
                                                     </Text>
                                                     <Text fz="xs" c="red" fw={700}>
                                                         Max {skill?.manHours.max} Hr
@@ -135,7 +159,29 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                             </Accordion.Panel>
                         </Accordion.Item>
                     ))}
-                </Accordion>
+                        </Accordion>
+                    ) : (
+                        <Center>
+                            <Text>No Data Found </Text>
+                        </Center>
+                    )
+                }
+            </ScrollArea>
+
+             {/* Bottom Section: Pagination */}
+             {totalPages > 0 && (
+                <Center>
+                    <Pagination
+                        color="#4E66DE"
+                        total={totalPages}
+                        value={currentPage}
+                        onChange={setCurrentPage}
+                        size="sm"
+                    />
+                </Center>
+                    
+                )}
+            </Card>
             </>
         );
     };
@@ -146,16 +192,34 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             finding.taskId.toLowerCase().includes(findingSearch.toLowerCase())
         );
 
+        const [activePage, setActivePage] = useState(1);
+        const itemsPerPage = 6;
+        const totalPages = Math.ceil(filteredFindings?.length / itemsPerPage);
+        const paginatedFindings = filteredFindings?.slice(
+            (activePage - 1) * itemsPerPage,
+            activePage * itemsPerPage
+        );
+
         return (
             <>
-                <TextInput
-                    placeholder="Search Findings by Task ID"
-                    mb="sm"
-                    value={findingSearch}
-                    onChange={(event) => setFindingSearch(event.currentTarget.value)}
-                />
-                <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
-                    {filteredFindings?.map((finding : any) => (
+             <Card withBorder h="85vh" shadow="sm">
+                {/* Top Section: Search Input */}
+                <Box >
+                    <Text fw={600} size="lg" mb="sm">Findings</Text>
+                    <TextInput
+                        placeholder="Search Findings by Task ID"
+                        value={findingSearch}
+                        onChange={(event) => setFindingSearch(event.currentTarget.value)}
+                        mb="sm"
+                    />
+                </Box>
+
+                {/* Middle Section: Scrollable Findings List */}
+                <ScrollArea h="65vh" scrollbarSize={0} scrollHideDelay={0}>
+                    {
+                        paginatedFindings?.length > 0 ? (
+                            <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
+                    {paginatedFindings?.map((finding : any) => (
                         <Accordion.Item key={finding?.taskId} value={finding?.taskId}>
                             <Accordion.Control onClick={() => handleAccordionChangeFindings(finding?.taskId)}>
                                 <Group>
@@ -175,7 +239,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                                         Min {skill?.manHours?.min} Hr
                                                     </Text>
                                                     <Text fz="xs" c="yellow" fw={700}>
-                                                        Avg {skill?.manHours?.avg} Hr
+                                                        Est {skill?.manHours?.avg} Hr
                                                     </Text>
                                                     <Text fz="xs" c="red" fw={700}>
                                                         Max {skill?.manHours?.max} Hr
@@ -194,18 +258,36 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                         </Accordion.Item>
                     ))}
                 </Accordion>
+                        ) : (
+                            <Center>
+                                <Text>
+                                    No Data Found
+                                </Text>
+                            </Center>
+                        )
+                    }
+                </ScrollArea>
+
+                 {/* Bottom Section: Pagination */}
+                 {totalPages > 0 && (
+                    <Center >
+                        <Pagination 
+                            color="#4E66DE"
+                            total={totalPages}
+                            value={activePage}
+                            onChange={setActivePage}
+                            size="sm"
+                        />
+                    </Center>
+                )}
+             </Card>
             </>
         );
     };
 
     const SkillTaskAccordion = ({ data } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
-        const [opened, setOpened] = useState<string | null>(null);
-    
-        const handleAccordionChange = (value: string | null) => {
-            setOpened(value);
-        };
-    
+
         const skillBasedTasks = useMemo(() => {
             // Create a map to group tasks by skill
             const skillMap = new Map();
@@ -260,17 +342,38 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         );
 
         // console.log("filtered skills >>>",filteredSkills);
+        const [activePage, setActivePage] = useState(1);
+        const itemsPerPage = 6;
+
+        // Pagination logic
+        const totalPages = Math.ceil(filteredSkills?.length / itemsPerPage);
+        const paginatedSkills = filteredSkills?.slice(
+           (activePage - 1) * itemsPerPage,
+            activePage * itemsPerPage
+        );
     
         return (
             <>
-                <TextInput
-                    placeholder="Search by Skill Name"
-                    mb="sm"
-                    value={skillSearch}
-                    onChange={(event) => setSkillSearch(event.currentTarget.value)}
-                />
-                <Accordion variant="separated" value={opened} onChange={setOpened}>
-                    {filteredSkills.map((skillGroup) => (
+            <Card withBorder h="85vh" shadow="sm" p="md" radius="md">
+                 {/* Top Section: Heading & Search Input */}
+            <Box mb="md">
+              <Text fw={600} size="lg" mb="sm">
+                Skill - Tasks
+              </Text>
+              <TextInput
+                placeholder="Search by Skill Name"
+                mb="sm"
+                value={skillSearch}
+                onChange={(event) => setSkillSearch(event.currentTarget.value)}
+              />
+            </Box>
+
+            {/* Middle Section: Scrollable Accordion List */}
+            <ScrollArea h="65vh" scrollbarSize={6}>
+                {
+                    paginatedSkills?.length > 0 ? (
+                        <Accordion variant="separated" value={opened} onChange={setOpened}>
+                    {paginatedSkills?.map((skillGroup) => (
                         <Accordion.Item key={skillGroup.skill} value={skillGroup.skill}>
                             <Accordion.Control onClick={() => handleAccordionChange(skillGroup.skill)}>
                                 <Group>
@@ -284,7 +387,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         </Group>
                                         <Group justify="space-between">
                                             <Text size="sm" c="dimmed">Min: {skillGroup.totalMinHours.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Avg: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Est: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
                                             <Text size="sm" c="dimmed">Max: {skillGroup.totalMaxHours.toFixed(2)} Hr</Text>
                                         </Group>
                                     </div>
@@ -327,7 +430,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                     <Card bg='#f3f7da' shadow="0" radius='md' p='xs'>
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
-                                                <Text fz='xs'>Avg</Text>
+                                                <Text fz='xs'>Est</Text>
                                                 <Text fz='lg' fw={600}>{task.manHours.avg} Hr</Text>
                                             </Flex>
                                             <IconClockCode color="orange" size='20' />
@@ -348,17 +451,28 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                         </Accordion.Item>
                     ))}
                 </Accordion>
+                    ) : (
+                        <Center><Text>No Data Found</Text></Center>
+                    )
+                }
+            </ScrollArea>
+
+            {/* Bottom Section: Pagination */}
+            {totalPages > 0 && (
+              <Center>
+                <Pagination color="#4E66DE" value={activePage} onChange={setActivePage} total={totalPages} size="sm" />
+              </Center>
+            )}
+            
+            </Card>
+                
+                
             </>
         );
     };
 
     const SkillFindingAccordion = ({ data } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
-        const [findingsOpened, setFindingsOpened] = useState<string | null>(null);
-    
-        const handleAccordionChangeFindings = (value : any) => {
-            setFindingsOpened(value);
-        };
     
         const skillBasedFindings = useMemo(() => {
             // Create a map to group findings by skill
@@ -413,17 +527,31 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         );
 
         console.log("filtered findins skills >>>>",filteredSkills);
-    
+        
+        const [currentPage, setCurrentPage] = useState(1);
+        const itemsPerPage = 5;
+        const totalPages = Math.ceil(filteredSkills?.length / itemsPerPage);
+        const paginatedData = filteredSkills?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
         return (
             <>
-                <TextInput
-                    placeholder="Search by Skill Name"
-                    mb="sm"
-                    value={skillSearch}
-                    onChange={(event) => setSkillSearch(event.currentTarget.value)}
-                />
-                <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
-                    {filteredSkills.map((skillGroup) => (
+            <Card withBorder h="85vh" shadow="sm" p="md">
+                {/* Top Section: Heading & Search */}
+                <Box mb="sm">
+                    <Text fw={600} size="lg" mb="sm">Skill - Findings</Text>
+                    <TextInput
+                        placeholder="Search by Skill Name"
+                        value={skillSearch}
+                        onChange={(event) => setSkillSearch(event.currentTarget.value)}
+                    />
+                </Box>
+
+                 {/* Middle Section: Scrollable Accordion */}
+                 <ScrollArea h="65vh" scrollbarSize={6} scrollHideDelay={0}>
+                    {
+                        paginatedData?.length > 0 ? (
+                            <Accordion variant="separated" value={findingsOpened} onChange={setFindingsOpened}>
+                    {paginatedData?.map((skillGroup) => (
                         <Accordion.Item key={skillGroup.skill} value={skillGroup.skill}>
                             <Accordion.Control onClick={() => handleAccordionChangeFindings(skillGroup.skill)}>
                                 <Group>
@@ -435,7 +563,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                         </Group>
                                         <Group justify="space-between">
                                             <Text size="sm" c="dimmed">Min: {skillGroup.totalMinHours.toFixed(2)} Hr</Text>
-                                            <Text size="sm" c="dimmed">Avg: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
+                                            <Text size="sm" c="dimmed">Est: {skillGroup.totalAvgHours.toFixed(2)} Hr</Text>
                                             <Text size="sm" c="dimmed">Max: {skillGroup.totalMaxHours.toFixed(2)} Hr</Text>
                                         </Group>
                                     </div>
@@ -479,7 +607,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                                     <Card bg='#f3f7da' shadow="0" radius='md' p='xs'>
                                         <Group justify="space-between" align="start">
                                             <Flex direction='column'>
-                                                <Text fz='xs'>Avg</Text>
+                                                <Text fz='xs'>Est</Text>
                                                 <Text fz='lg' fw={600}>{finding.manHours.avg} Hr</Text>
                                             </Flex>
                                             <IconClockCode color="orange" size='20' />
@@ -495,6 +623,25 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                         </Accordion.Item>
                     ))}
                 </Accordion>
+                        ) : (
+                            <Center>
+                                <Text>
+                                    No Data Found
+                                </Text>
+                            </Center>
+                        )
+                    }
+                 </ScrollArea>
+
+                 {/* Bottom Section: Pagination */}
+                {totalPages > 0 && (
+                    <Center>
+                        <Pagination color="#4E66DE" size="sm" value={currentPage} onChange={setCurrentPage} total={totalPages} />
+                    </Center>
+                )}
+            </Card>
+               
+                
             </>
         );
     };
@@ -515,7 +662,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                 <Card withBorder radius='md' bg='#d2fad4'>
                     <Group gap='lg' justify="space-between">
                         <Flex direction='column'>
-                            <Text fw={400} fz='sm'>Tasks Avg Time</Text>
+                            <Text fw={400} fz='sm'>Tasks Est Hrs</Text>
                             <Text fw={600} fz='h2'>{totalAvgTimeTasks || 0} Hr</Text>
                         </Flex>
                         <IconClock color="green" size='39' />
@@ -534,7 +681,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                 <Card withBorder radius='md' bg='#FFEDE2'>
                     <Group gap='lg' justify="space-between">
                         <Flex direction='column'>
-                            <Text fw={400} fz='sm'>Findings Avg Time</Text>
+                            <Text fw={400} fz='sm'>Findings Est Hrs</Text>
                             <Text fw={600} fz='h2'>{totalAvgTimeFindings || 0} Hr</Text>
                         </Flex>
                         <IconClock color="orange" size='39' />
@@ -543,71 +690,14 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             </SimpleGrid>
             <Space h='sm' />
             <SimpleGrid cols={2}>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">Skill - Tasks</Text>
-                        <SkillTaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
-                </Card>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">Skill - Findings</Text>
-                        <SkillFindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
-                </Card>
+                <SkillTaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
+                <SkillFindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
             </SimpleGrid>
             
             <Space h='sm' />
             <SimpleGrid cols={2}>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">MPD</Text>
-                        <TaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
-                    
-                </Card>
-                <Card withBorder h={skillAnalysisData !== null ? '85vh' : '40vh'} shadow="sm">
-                    <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                        <Text fw={600} size="lg" mb="sm">Findings</Text>
-                        <FindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
-                        {
-                        skillAnalysisData === null ? (
-                            <Center>
-                            <Text>No Data Found </Text>
-                            </Center>
-                        ) : (
-                            <></>
-                        )
-                    }
-                    </ScrollArea>
-                </Card>
+                <TaskAccordion data={skillAnalysisData?.skillAnalysis?.tasks} />
+                <FindingAccordion data={skillAnalysisData?.skillAnalysis?.findings} />
             </SimpleGrid>
             
             
