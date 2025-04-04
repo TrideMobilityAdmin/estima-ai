@@ -769,11 +769,20 @@ class TaskService:
                         '_id': '$task_number', 
                         'doc': {
                             '$first': '$$ROOT'
+                        }, 
+                        'totalQty': {
+                            '$sum': '$used_quantity'
                         }
                     }
                 }, {
                     '$replaceRoot': {
-                        'newRoot': '$doc'
+                        'newRoot': {
+                            '$mergeObjects': [
+                                '$doc', {
+                                    'used_quantity': '$totalQty'
+                                }
+                            ]
+                        }
                     }
                 }, {
                     '$lookup': {
