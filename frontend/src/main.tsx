@@ -5,17 +5,24 @@ import React from 'react'
 import { Provider } from "jotai";
 import { BrowserRouter } from "react-router-dom";
 
-const TOKEN_KEY = "token";
+export const TOKEN_KEY = "token";
+
 // Token management functions
-export const saveAuthData = ({ token }: { token: string; status?: string }) => {
+export const saveAuthData = ({ token, userID, username, email } : any) => {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem("userID", userID);
+    sessionStorage.setItem("username", username);
+    sessionStorage.setItem("email", email);
   }
 };
 
 export const clearAuthState = () => {
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem("userID");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("email");
   }
 };
 
@@ -25,6 +32,7 @@ export const getToken = () => {
   }
   return null;
 };
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider>

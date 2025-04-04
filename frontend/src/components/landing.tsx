@@ -28,8 +28,8 @@ import bgCompareEstimate from "../../public/airCraft8.jpg";
 import bgPartUsage from "../../public/airCraftPartsUsage.webp";
 import bgSkillRequirement from "../../public/airCraftSkill.webp";
 import bgConfiguration from "../../public/airCraft8.jpg";
-import { userName } from "../components/tokenJotai";
-import { userEmail } from "../components/tokenJotai";
+import { userName } from "../api/tokenJotai";
+import { userEmail } from "../api/tokenJotai";
 import { useAtom } from "../constants/GlobalImports";
 const Landing: React.FC = () => {
   const navigate = useNavigate();
