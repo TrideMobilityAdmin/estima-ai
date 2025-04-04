@@ -763,6 +763,27 @@ class TaskService:
                             ]
                         }
                     }
+                }, 
+                {
+                    '$group': {
+                        '_id': '$task_number', 
+                        'doc': {
+                            '$first': '$$ROOT'
+                        }, 
+                        'totalQty': {
+                            '$sum': '$used_quantity'
+                        }
+                    }
+                }, {
+                    '$replaceRoot': {
+                        'newRoot': {
+                            '$mergeObjects': [
+                                '$doc', {
+                                    'used_quantity': '$totalQty'
+                                }
+                            ]
+                        }
+                    }
                 }, {
                     '$lookup': {
                         'from': 'task_description', 
@@ -2465,7 +2486,7 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$requested_part_number', 
-                'partDescription': '$part_description'
+                # 'partDescription': '$part_description'
             }, 
             'totalTasksQty': {
                 '$sum': '$requested_quantity'
@@ -2549,13 +2570,13 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
             }, 
             'totalFindingsQty': {
                 '$sum': '$used_quantity'
@@ -2654,16 +2675,15 @@ class TaskService:
         }
     }, {
         '$group': {
-            '_id': {
-                'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
-            }, 
+            '_id': '$issued_part_number', 
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
+             
             'totalTasksQty': {
                 '$sum': '$used_quantity'
             }, 
@@ -2674,8 +2694,8 @@ class TaskService:
     }, {
         '$project': {
             '_id': 0, 
-            'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            'partId': '$_id', 
+            'partDescription': 1, 
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$task_numbers'
