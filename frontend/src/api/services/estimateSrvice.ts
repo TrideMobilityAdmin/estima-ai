@@ -24,12 +24,12 @@ export const useApi = () => {
 
   // Function to handle session expiration and navigate to login
   const handleSessionExpired = () => {
-    showNotification({
-      title: "Session Expired!",
-      message: "Your session has expired. Please log in again.",
-      color: "red",
-      style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-    });
+    // showNotification({
+    //   title: "Session Expired!",
+    //   message: "Your session has expired. Please log in again.",
+    //   color: "red",
+    //   style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+    // });
     showAppNotification("error", "Session Expired!", "Your session has expired. Please log in again.");
 
     // Clear authentication tokens (modify as needed)

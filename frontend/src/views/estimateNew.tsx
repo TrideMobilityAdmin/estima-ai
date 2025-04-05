@@ -53,7 +53,7 @@ import { showAppNotification } from "../components/showNotificationGlobally";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
 import { useMemo, useRef } from "react";
-import { userName } from "../components/tokenJotai";
+import { userName } from "../api/tokenJotai";
 import excelTemplateFile from '../assets/RFQ_Excel_Template.xlsx';
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
