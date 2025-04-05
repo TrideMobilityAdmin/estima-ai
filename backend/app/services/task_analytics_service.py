@@ -519,7 +519,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+     {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -605,7 +612,7 @@ class TaskService:
                                     {
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
-                                        'quantity': '$requested_quantity', 
+                                        'quantity': '$ceilUsedQuantity', 
                                         'stockStatus': '$requested_stock_status', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
@@ -704,7 +711,14 @@ class TaskService:
                 ]
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$facet': {
             'hmvTasks': [
                 {
@@ -771,7 +785,7 @@ class TaskService:
                             '$first': '$$ROOT'
                         }, 
                         'totalQty': {
-                            '$sum': '$used_quantity'
+                            '$sum': '$ceilUsedQuantity'
                         }
                     }
                 }, {
@@ -779,7 +793,7 @@ class TaskService:
                         'newRoot': {
                             '$mergeObjects': [
                                 '$doc', {
-                                    'used_quantity': '$totalQty'
+                                    'ceilUsedQuantity': '$totalQty'
                                 }
                             ]
                         }
@@ -926,7 +940,7 @@ class TaskService:
                                 'description': '$task_description', 
                                 'date': '$task_desc1.actual_start_date', 
                                 'stockStatus': '$stock_status', 
-                                'quantity': '$used_quantity', 
+                                'quantity': '$ceilUsedQuantity', 
                                 'aircraftModel': '$aircraft_info.aircraft_model'
                             }
                         }
@@ -1000,7 +1014,7 @@ class TaskService:
                                         ]
                                     }, 
                                     'stockStatus': '$$hmvTask.stock_status', 
-                                    'quantity': '$$hmvTask.used_quantity', 
+                                    'quantity': '$$hmvTask.ceilUsedQuantity', 
                                     'aircraftModel': '$$hmvTask.aircraft_info.aircraft_model'
                                 }
                             ]
@@ -2425,7 +2439,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+      {
+        '$addFields': {
+            'ceilRequestedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2489,7 +2510,7 @@ class TaskService:
                 # 'partDescription': '$part_description'
             }, 
             'totalTasksQty': {
-                '$sum': '$requested_quantity'
+                '$sum': '$ceilRequestedQuantity'
             }, 
             'taskNumbers': {
                 '$push': '$task_number'
@@ -2526,7 +2547,15 @@ class TaskService:
         '$match': {
             'isHMV': 'HMV'
         }
-    }, {
+    },
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },
+      {
         '$lookup': {
             'from': 'sub_task_description', 
             'localField': 'task_number', 
@@ -2579,7 +2608,7 @@ class TaskService:
                 # }
             }, 
             'totalFindingsQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_info.log_item_number'
@@ -2618,7 +2647,14 @@ class TaskService:
                 '$ne': 'HMV'
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2685,7 +2721,7 @@ class TaskService:
                 # }
              
             'totalTasksQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_number'
