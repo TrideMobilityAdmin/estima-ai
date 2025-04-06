@@ -1,19 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Card, List, Table, Text, Flex, Title, SimpleGrid, Group, Select, Space, Button, Container, Stack, Tooltip, ActionIcon, ThemeIcon } from '@mantine/core';
-import { AgGridReact } from 'ag-grid-react';
-import DropZoneExcel from '../components/fileDropZone';
-import { IconAlertTriangle, IconArrowMoveRight, IconClock, IconClockCheck, IconCube, IconCurrencyDollar, IconError404, IconSettingsSearch, IconSettingsStar, IconUsers } from '@tabler/icons-react';
-import ReactApexChart from 'react-apexcharts';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button } from '@mantine/core';
+import { IconAlertTriangle, IconClock, IconCurrencyDollar} from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
-import UploadDropZoneExcel from '../components/uploadExcelFile';
-import { showNotification } from '@mantine/notifications';
-import { showAppNotification } from '../components/showNotificationGlobally';
-import compareData from '../assets/compareData.json';
-import AggregatedStatistics from '../components/statsCardCompareEst';
 import StatsCard from '../components/statsCardCompareEst';
 import TaskListCompareScreen from '../components/compareTasksAccordionList';
 import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
-import CompareUploadDropZoneExcelNew from '../components/compareUploadFilesNew';
+import FindingsListCompareScreen from '../components/compareFindingsAccordionList';
 
 export default function CompareEstimateNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -83,42 +75,6 @@ export default function CompareEstimateNew() {
   return (
     <>
       <div style={{ paddingLeft: 70, paddingRight: 70, paddingTop: 20, paddingBottom: 20 }}>
-        {/* <Card ml="200" mr='200'>
-          <Flex direction='column'>
-            <Title order={2} c='#2e2e2e'>Compare Estimates</Title>
-            <Text fz='sm' c='#2e2e2e'>Select Estimate ID & Select Actual Data files</Text>
-          </Flex>
-          <Space h='lg'/>
-          <div style={{marginLeft:'60px',marginRight:"60px"}}>
-          <Select
-                size="xs"
-                // w="18vw"
-                label="Select Estimate ID"
-                searchable
-                placeholder="Select Estimate ID"
-                data={estimates?.map((estimate, index) => ({
-                  value: `${estimate.estID}_${index}`, // Unique value
-                  label: estimate.estID, // Displayed text
-                }))}
-                value={selectedUniqueID} // Bind to unique ID
-                onChange={(value) => {
-                  if (value) {
-                    const [estID] = value.split("_"); // Extract the original estID
-                    setSelectedEstID(estID);
-                    setSelectedUniqueID(value); // Ensure UI updates even if duplicate
-                  } else {
-                    setSelectedEstID(null);
-                    setSelectedUniqueID(null);
-                  }
-                }}
-                allowDeselect
-              />
-              <Space h='sm'/>
-              <CompareUploadDropZoneExcelNew name="Excel File" changeHandler={handleFileChange} color="gray"/>
-          </div>
-
-        </Card> */}
-
         <Space h='sm' />
         <SimpleGrid cols={2}>
           <Card >
@@ -185,6 +141,7 @@ export default function CompareEstimateNew() {
             predicted={Math.round(compareEstimatedData?.aggregatedTasklevel?.avg_mh_pred) || 0}
             difference={Math.round(compareEstimatedData?.aggregatedTasklevel?.diff_avg_mh) || 0}
             accuracy={Math.round(compareEstimatedData?.aggregatedTasklevel?.accuracy_mh) || 0}
+            not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_mh) || 0}
             color="#6d8aed"
           />
 
@@ -195,6 +152,7 @@ export default function CompareEstimateNew() {
             predicted={compareEstimatedData?.aggregatedTasklevel?.total_billable_value_usd_tasks_pred?.toFixed(2) || 0}
             difference={compareEstimatedData?.aggregatedTasklevel?.diff_total_billable_value_usd_tasks?.toFixed(2) || 0}
             accuracy={compareEstimatedData?.aggregatedTasklevel?.accuracy_total_billable_value_usd_tasks?.toFixed(2) || 0}
+            not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_total_billable_value_usd_tasks) || 0}
             color="#70cc60"
           />
 
@@ -205,6 +163,7 @@ export default function CompareEstimateNew() {
             predicted={Math.round(compareEstimatedData?.aggregatedFindingslevel?.avg_mh_findings_pred) || 0}
             difference={Math.round(compareEstimatedData?.aggregatedFindingslevel?.diff_avg_mh) || 0}
             accuracy={Math.round(compareEstimatedData?.aggregatedFindingslevel?.accuracy_mh) || 0}
+            not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_mh) || 0}
             color="#9e64d9"
           />
 
@@ -215,14 +174,56 @@ export default function CompareEstimateNew() {
             predicted={compareEstimatedData?.aggregatedFindingslevel?.total_billable_value_usd_findings_pred?.toFixed(2) || 0}
             difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
             accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
+            not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
             color="orange"
           />
         </SimpleGrid>
         <Space h='sm' />
+        <SimpleGrid cols={2} spacing="md">
         <TaskListCompareScreen tasks={compareEstimatedData?.tasks} />
-        <Space h='sm' />
+        <FindingsListCompareScreen findings={compareEstimatedData?.tasks} />
+        </SimpleGrid>
 
+        
+        <Space h='sm' />
       </div>
     </>
   )
 }
+
+
+{/* <Card ml="200" mr='200'>
+          <Flex direction='column'>
+            <Title order={2} c='#2e2e2e'>Compare Estimates</Title>
+            <Text fz='sm' c='#2e2e2e'>Select Estimate ID & Select Actual Data files</Text>
+          </Flex>
+          <Space h='lg'/>
+          <div style={{marginLeft:'60px',marginRight:"60px"}}>
+          <Select
+                size="xs"
+                // w="18vw"
+                label="Select Estimate ID"
+                searchable
+                placeholder="Select Estimate ID"
+                data={estimates?.map((estimate, index) => ({
+                  value: `${estimate.estID}_${index}`, // Unique value
+                  label: estimate.estID, // Displayed text
+                }))}
+                value={selectedUniqueID} // Bind to unique ID
+                onChange={(value) => {
+                  if (value) {
+                    const [estID] = value.split("_"); // Extract the original estID
+                    setSelectedEstID(estID);
+                    setSelectedUniqueID(value); // Ensure UI updates even if duplicate
+                  } else {
+                    setSelectedEstID(null);
+                    setSelectedUniqueID(null);
+                  }
+                }}
+                allowDeselect
+              />
+              <Space h='sm'/>
+              <CompareUploadDropZoneExcelNew name="Excel File" changeHandler={handleFileChange} color="gray"/>
+          </div>
+
+        </Card> */}

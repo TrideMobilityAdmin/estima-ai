@@ -1,74 +1,148 @@
 {
-    "tasks": [
-        {
-            "package_number": "HMV24/000070/0524",
-            "task_number": "BRIDGING CHECK",
+    "tasks" : {
+        "eligible" : [
+            {
+                "package_number": "HMV24/000070/0524",
+                "task_number": "BRIDGING CHECK",
+    
+                "actual_man_hours_actual": 2.0,
+                "actual_man_hours_pred": 3.8,
+                "diff_avg_mh": 1.8,
+                "accuracy_avg_mh": 1.8,
+    
+                "task_part_consumption_actual": 193.1377102335,
+                "task_part_consumption_pred": 237.1611448388,
+                "diff_total_billable_value_usd_tasks": 44.0234346053,
+                "accuracy_total_billable_value_usd_tasks": 44.0234346053,
 
-            "actual_man_hours_actual": 2.0,
-            "actual_man_hours_pred": 3.8,
-            "diff_avg_mh": 1.8,
-            "accuracy_avg_mh": 1.8,
+                "spare_parts" : [
+                    { "partId": "12345", "desc": "Part A", "actual_qty": 2, "pred_qty": 4},
+                    { "partId": "67890", "desc": "Part B", "actual_qty": 1, "pred_qty": 2},
+                    { "partId": "54321", "desc": "Part C", "actual_qty": 3, "pred_qty": 6},
+                    { "partId": "09876", "desc": "Part D", "actual_qty": 4, "pred_qty": 3}
+                ]
+            },
+            {
+                "package_number": "HMV24/000070/0524",
+                "task_number": "BRIDGING CHECK",
+    
+                "actual_man_hours_actual": 2.0,
+                "actual_man_hours_pred": 3.8,
+                "diff_avg_mh": 1.8,
+                "accuracy_avg_mh": 1.8,
+    
+                "task_part_consumption_actual": 193.1377102335,
+                "task_part_consumption_pred": 237.1611448388,
+                "diff_total_billable_value_usd_tasks": 44.0234346053,
+                "accuracy_total_billable_value_usd_tasks": 44.0234346053,
 
-            "task_part_consumption_actual": 193.1377102335,
-            "task_part_consumption_pred": 237.1611448388,
-            "diff_total_billable_value_usd_tasks": 44.0234346053,
-            "accuracy_total_billable_value_usd_tasks": 44.0234346053,
+                "spare_parts" : [
+                    { "partId": "12345", "desc": "Part A", "actual_qty": 2, "pred_qty": 4},
+                    { "partId": "67890", "desc": "Part B", "actual_qty": 1, "pred_qty": 2},
+                    { "partId": "54321", "desc": "Part C", "actual_qty": 3, "pred_qty": 6},
+                    { "partId": "09876", "desc": "Part D", "actual_qty": 4, "pred_qty": 3}
+                ]
+            }
+        ],
+        "not_eligible" : [
+            {
+                "task_number" : "BRIDGING CHECK",
+                "package_number" : "HMV24/000070/0524",
+                "man_task_man_hourshours" : 5,
+                "task_part_consumption" : 5
+            },
+            {
+                "task_number" : "BRIDGING CHECK",
+                "package_number" : "HMV24/000070/0524",
+                "task_man_hours" : 5,
+                "task_part_consumption" : 5
+            }
+        ]
+    },
+    "findings":{
+        "eligible" :  [
+            {
+                "package_number": "HMV24/000070/0524",
+                "task_number": "BRIDGING CHECK",
+    
+                "actual_man_hours_findings_actual": 0,
+                "actual_man_hours_findings_pred": 1.0,
+                "diff_avg_mh_findings": 1.0,
+                "accuracy_avg_mh_findings": 1.0,
+    
+                "findings_part_consumption_actual": 0,
+                "findings_part_consumption_pred": 30.05,
+                "diff_total_billable_value_usd_findings": 30.05,
+                "accuracy_total_billable_value_usd_findings" : 60,
 
-            "actual_man_hours_findings_actual": 0,
-            "actual_man_hours_findings_pred": 1.0,
-            "diff_avg_mh_findings": 1.0,
-            "accuracy_avg_mh_findings": 1.0,
+                "spare_parts" : [
+                    { "partId": "12345", "desc": "Part A", "actual_qty": 2, "pred_qty": 4},
+                    { "partId": "67890", "desc": "Part B", "actual_qty": 1, "pred_qty": 2},
+                    { "partId": "54321", "desc": "Part C", "actual_qty": 3, "pred_qty": 6},
+                    { "partId": "09876", "desc": "Part D", "actual_qty": 4, "pred_qty": 3}
+                ]
+            },
+            {
+                "package_number": "HMV24/000070/0524",
+                "task_number": "BRIDGING CHECK",
+    
+                "actual_man_hours_findings_actual": 0,
+                "actual_man_hours_findings_pred": 1.0,
+                "diff_avg_mh_findings": 1.0,
+                "accuracy_avg_mh_findings": 1.0,
+    
+                "findings_part_consumption_actual": 0,
+                "findings_part_consumption_pred": 30.05,
+                "diff_total_billable_value_usd_findings": 30.05,
+                "accuracy_total_billable_value_usd_findings" : 60,
 
-            "findings_part_consumption_actual": 0,
-            "findings_part_consumption_pred": 30.05,
-            "diff_total_billable_value_usd_findings": 30.05,
-            "accuracy_total_billable_value_usd_findings" : 60
-        },
-        {
-            "package_number": "HMV24/000070/0524",
-            "task_number": "BRIDGING CHECK",
-
-            "actual_man_hours_actual": 2.0,
-            "actual_man_hours_pred": 3.8,
-            "diff_avg_mh": 1.8,
-            "accuracy_avg_mh": 1.8,
-
-            "task_part_consumption_actual": 193.1377102335,
-            "task_part_consumption_pred": 237.1611448388,
-            "diff_total_billable_value_usd_tasks": 44.0234346053,
-            "accuracy_total_billable_value_usd_tasks": 44.0234346053,
-
-            "actual_man_hours_findings_actual": 0,
-            "actual_man_hours_findings_pred": 1.0,
-            "diff_avg_mh_findings": 1.0,
-            "accuracy_avg_mh_findings": 1.0,
-
-            "findings_part_consumption_actual": 0,
-            "findings_part_consumption_pred": 30.05,
-            "diff_total_billable_value_usd_findings": 30.05,
-            "accuracy_total_billable_value_usd_findings" : 60
-        }
-    ],
+                "spare_parts" : [
+                    { "partId": "12345", "desc": "Part A", "actual_qty": 2, "pred_qty": 4},
+                    { "partId": "67890", "desc": "Part B", "actual_qty": 1, "pred_qty": 2},
+                    { "partId": "54321", "desc": "Part C", "actual_qty": 3, "pred_qty": 6},
+                    { "partId": "09876", "desc": "Part D", "actual_qty": 4, "pred_qty": 3}
+                ]
+            }
+        ],
+        "not -eligible" : [
+            {
+                "task_number" : "BRIDGING CHECK",
+                "package_number" : "HMV24/000070/0524",
+                "task_man_hours" : 5,
+                "task_part_consumption" : 5
+            },
+            {
+                "task_number" : "BRIDGING CHECK",
+                "package_number" : "HMV24/000070/0524",
+                "task_man_hours" : 5,
+                "task_part_consumption" : 5
+            }
+        ]
+    },
     "aggregatedTasklevel": {
         "avg_mh_actual":60,
         "avg_mh_pred":60,
         "diff_avg_mh": 60,
         "accuracy_mh" : 60,
+        "not_eligible_mh": 60,
 
         "total_billable_value_usd_tasks_actual" : 60,
         "total_billable_value_usd_tasks_Pred" : 60,
         "diff_total_billable_value_usd_tasks": 60,
-        "accuracy_total_billable_value_usd_tasks" : 60
+        "accuracy_total_billable_value_usd_tasks" : 60,
+        "not_eligible_total_billable_value_usd_tasks": 60
     },
     "aggregatedFindingslevel": {
         "avg_mh_findings_actual":60,
         "avg_mh_findings_pred":60,
         "diff_avg_mh": 60,
         "accuracy_mh" : 60,
+        "not_eligible_mh": 60,
 
         "total_billable_value_usd_findings_actual" : 60,
         "total_billable_value_usd_findings_Pred" : 60,
         "diff_total_billable_value_usd_findings": 60,
-        "accuracy_total_billable_value_usd_findings" : 60
+        "accuracy_total_billable_value_usd_findings" : 60,
+        "not_eligible_total_billable_value_usd_findings": 60
     }
 }
