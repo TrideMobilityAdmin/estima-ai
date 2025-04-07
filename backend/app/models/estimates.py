@@ -67,7 +67,8 @@ class EstimateRequest(BaseModel):
      aircraftFlightCycles: int
      areaOfOperations: str
      cappingDetails:Optional[Capping]=None
-     typeOfCheck: str
+     typeOfCheck: List[str]
+     typeOfCheckID:str
      operator: str 
      aircraftRegNo:str
      aircraftModel:str  
