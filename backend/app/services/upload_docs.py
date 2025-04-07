@@ -321,9 +321,12 @@ class ExcelUploadService:
         
             formatted_date = current_time.strftime("%d%m%Y")
             # remove spaces
-            type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+            type_of_check_no_spaces = estimate_request.typeOfCheckID.replace(" ", "")
             logger.info(f"type of check is : {type_of_check_no_spaces}")
-            base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+
+            operator_no_spaces=estimate_request.operator.replace(" ","")
+            logger.info(f"operator without spaces:{operator_no_spaces}")
+            base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{operator_no_spaces}-{formatted_date}".upper()
             logger.info(f"base_est_id: {base_est_id}")
             latest_version = 0
             version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
@@ -334,13 +337,18 @@ class ExcelUploadService:
                 "estID": {"$regex": version_regex_pattern}
             })
             latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
-        
+            logger.info("Latest document found sucessfully")
+
             if latest_doc:
                 version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
                 if version_match:
                     latest_version = int(version_match.group(1))
+                    logger.info(f"Latest version found: {latest_version}")
+            else:
+                logger.info("No existing estimates found, starting with version 0.")
+
             new_version = latest_version + 1                             
-            est_id = f"{base_est_id}-V{new_version:02d}".upper()
+            est_id = f"{base_est_id}-V{new_version:02d}"
             logger.info(f"estID is : {est_id}")
             
             data_to_insert = {
@@ -351,6 +359,7 @@ class ExcelUploadService:
                 "probability": estimate_request.probability,
                 "operator": estimate_request.operator,
                 "typeOfCheck": estimate_request.typeOfCheck,
+                "typeOfCheckID": estimate_request.typeOfCheckID,
                 "aircraftAge": estimate_request.aircraftAge,
                 "aircraftRegNo":estimate_request.aircraftRegNo,
                 "aircraftModel": estimate_request.aircraftModel,
@@ -359,9 +368,7 @@ class ExcelUploadService:
                 "areaOfOperations": estimate_request.areaOfOperations,
                 "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
                 "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-                "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
-
-                
+                "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]          
                 
             }
             
