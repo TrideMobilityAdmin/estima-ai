@@ -422,6 +422,8 @@ export default function EstimateNew() {
             return parseFloat(floatVal.toFixed(2)); // Keeps up to 2 decimals (e.g., 5 → 5.00, 5.1234 → 5.12)
         };
 
+        const floatAircraftAge = parseFloatWithDecimal(form.values.aircraftAge);
+
         // Ensure at least one empty additional task if none are added
         const defaultAdditionalTasks = additionalTasks.length > 0 ? additionalTasks : [{ taskID: "", taskDescription: "" }];
 
@@ -437,7 +439,7 @@ export default function EstimateNew() {
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
             aircraftModel: form.values.aircraftModel || "",
-            aircraftAge: parseFloatWithDecimal(form.values.aircraftAge) || 0.00,
+            aircraftAge: form.values.aircraftAge || 0.00,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
             areaOfOperations: form.values.areaOfOperations || "", // Ensure it's not empty
@@ -2218,7 +2220,7 @@ export default function EstimateNew() {
                                     showFields?.length > 0 ? (
                                         <>
                                             <Text size="md" m='sm' fw={500}>
-                                                Optional Parameters
+                                                Additional Parameters
                                             </Text>
                                             {/* <Space h='sm'/> */}
                                         </>
