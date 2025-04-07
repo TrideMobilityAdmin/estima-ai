@@ -328,7 +328,8 @@ export default function EstimateNew() {
             },
             taskID: "",
             taskDescription: "",
-            typeOfCheck: "",
+            typeOfCheck: [], // Changed from string to array for MultiSelect
+            typeOfCheckID: "", // Added new field for typeOfCheckID
             miscLaborTasks: [],
             additionalTasks: []
         },
@@ -336,7 +337,9 @@ export default function EstimateNew() {
         validate: {
             operator: (value) => (value.trim() ? null : "Operator is required"),
             aircraftRegNo: (value) => (value.trim() ? null : "Aircraft Registration Number is required"),
-            typeOfCheck: (value) => (value.trim() ? null : "Type of Check is required"),
+            aircraftAge: (value) => (value.trim() ? null : "Aircraft Age is required"),
+            typeOfCheck: (value) => (value.length > 0 ? null : "Type of Check is required"), // Modified for array validation
+            typeOfCheckID: (value) => (value.trim() ? null : "Type of Check ID is required"), // Added validation
             aircraftModel: (value) => (value.trim() ? null : "Aircraft Model is required"),
     
             cappingDetails: {
@@ -378,7 +381,10 @@ export default function EstimateNew() {
 
         if (validationErrors.hasErrors) {
             if (validationErrors.errors.typeOfCheck) {
-                showAppNotification("warning", "Validation Error", "Please select a Type of Check");
+                showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
+            }
+            if (validationErrors.errors.typeOfCheckID) {
+                showAppNotification("warning", "Validation Error", "Type of Check ID is required");
             }
             if (validationErrors.errors.operator) {
                 showAppNotification("warning", "Validation Error", "Operator is required");
@@ -397,7 +403,7 @@ export default function EstimateNew() {
         }
 
         // Check if aircraft reg no is N/A and type of check is empty
-        if (form.values.aircraftRegNo.trim().toLowerCase() === "n/a" && !form.values.typeOfCheck.trim()) {
+        if (form.values.aircraftRegNo.trim().toLowerCase() === "n/a" && form.values.typeOfCheck.length === 0) {
             showAppNotification("warning", "Validation Error", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
             return;
         }
@@ -407,6 +413,14 @@ export default function EstimateNew() {
             return;
         }
         const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
+        
+        
+        // Utility to ensure float with decimal (e.g., 5 → 5.0, 5.25 → 5.25)
+        const parseFloatWithDecimal = (value: string | number): number => {
+            const floatVal = parseFloat(value as string);
+            if (isNaN(floatVal)) return 0.0;
+            return parseFloat(floatVal.toFixed(2)); // Keeps up to 2 decimals (e.g., 5 → 5.00, 5.1234 → 5.12)
+        };
 
         // Ensure at least one empty additional task if none are added
         const defaultAdditionalTasks = additionalTasks.length > 0 ? additionalTasks : [{ taskID: "", taskDescription: "" }];
@@ -423,7 +437,7 @@ export default function EstimateNew() {
             operator: form.values.operator || "",
             aircraftRegNo: form.values.aircraftRegNo || "",
             aircraftModel: form.values.aircraftModel || "",
-            aircraftAge: Number(form.values.aircraftAge) || 0,
+            aircraftAge: parseFloatWithDecimal(form.values.aircraftAge) || 0.00,
             aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
             aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
             areaOfOperations: form.values.areaOfOperations || "", // Ensure it's not empty
@@ -434,7 +448,8 @@ export default function EstimateNew() {
                 cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
             },
             additionalTasks: defaultAdditionalTasks,
-            typeOfCheck: form.values.typeOfCheck || "", // Ensure it's not empty
+            typeOfCheck: form.values.typeOfCheck || [], // Updated to handle array
+            typeOfCheckID: form.values.typeOfCheckID || "", // Added new field
             miscLaborTasks: defaultMiscLaborTasks
         };
 
@@ -453,7 +468,8 @@ export default function EstimateNew() {
                 // Reset form fields after successful submission
                 form.reset();
                 form.setValues({
-                    typeOfCheck: "",
+                    typeOfCheck: [], // Reset as empty array
+                    typeOfCheckID: "", // Reset typeOfCheckID
                     cappingDetails: {
                         cappingTypeManhrs: "",
                         cappingManhrs: 0,
@@ -478,7 +494,6 @@ export default function EstimateNew() {
         } finally {
             setLoading(false);
         }
-
     };
 
     console.log("rfq sub >>> ", rfqSubmissionResponse);
@@ -760,7 +775,7 @@ export default function EstimateNew() {
     };
     const fields = [
         { label: "Select Probability", name: "probability", component: <NumberInput size="xs" min={0} max={100} step={1} {...form.getInputProps("probability")} /> },
-        { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
+        // { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
         // { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
         // { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
         // { label: "Check Type", name: "typeOfCheck", component: <Select size="xs" data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']} {...form.getInputProps("typeOfCheck")} /> },
@@ -2138,7 +2153,7 @@ export default function EstimateNew() {
                                         //   precision={2}
                                         {...form.getInputProps("probability")}
                                     /> */}
-                                    <Select
+                                    {/* <Select
                                         size="xs"
                                         // width='12vw' 
                                         searchable
@@ -2148,6 +2163,31 @@ export default function EstimateNew() {
                                         // value={task.typeOfCheck}
                                         // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
                                         {...form.getInputProps("typeOfCheck")}
+                                    /> */}
+                                    <MultiSelect
+                                        size="xs"
+                                        searchable
+                                        label='Check Type'
+                                        placeholder="Check Type"
+                                        data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
+                                        {...form.getInputProps("typeOfCheck")}
+                                    />
+                                    <TextInput
+                                        size="xs"
+                                        leftSection={<MdPin />}
+                                        placeholder="Ex: 5.5"
+                                        label="Aircraft Age"
+                                        type="number"
+                                        step="0.01"
+                                        {...form.getInputProps("aircraftAge")}
+                                    />
+                                    <TextInput
+                                        // ref={aircraftRegNoRef}
+                                        size="xs"
+                                        leftSection={<IconPlaneTilt size='20' />}
+                                        placeholder="Ex: A320"
+                                        label="Aircraft Model"
+                                        {...form.getInputProps("aircraftModel")}
                                     />
                                     <TextInput
                                         size="xs"
@@ -2165,13 +2205,12 @@ export default function EstimateNew() {
                                         {...form.getInputProps("aircraftRegNo")}
                                     />
                                     <TextInput
-                                        // ref={aircraftRegNoRef}
                                         size="xs"
-                                        leftSection={<IconPlaneTilt size='20' />}
-                                        placeholder="Ex: A320"
-                                        label="Aircraft Model"
-                                        {...form.getInputProps("aircraftModel")}
+                                        label="Check Type Description (for ID)"
+                                        placeholder="Enter Check Type ID"
+                                        {...form.getInputProps("typeOfCheckID")}
                                     />
+                                    
 
                                 </SimpleGrid>
                                 <Space h='xs' />
