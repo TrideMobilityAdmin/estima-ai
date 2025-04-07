@@ -65,6 +65,7 @@ export const useApi = () => {
       cappingDetails: data.cappingDetails,
       additionalTasks: data.additionalTasks,
       typeOfCheck: data.typeOfCheck, 
+      typeOfCheckID : data.typeOfCheckID,
       miscLaborTasks: data.miscLaborTasks
     };
 
