@@ -19,6 +19,7 @@ const StatsCard: React.FC<any> = ({
   difference,
   accuracy,
   color,
+  not_eligible
 }) => {
   return (
     <Card
@@ -65,6 +66,11 @@ const StatsCard: React.FC<any> = ({
       <Text  fz="md" c="black">
         {accuracy} %
       </Text>
+      </Group>
+      <Space h='xs'/>
+      <Group justify="space-between">
+      <Text size="sm" c='#69696b'>Not Eligible</Text>
+      <Text  fz="md">{not_eligible} h</Text>
       </Group>
     </Card>
   );

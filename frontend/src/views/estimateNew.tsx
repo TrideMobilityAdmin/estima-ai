@@ -3939,12 +3939,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         // Check if using spareParts or spare_parts field based on data structure
         const parts = selectedFindingDetail.spare_parts || [];
 
-        return parts.map(part => ({
+        return parts.map((part) => ({
             partId: part.partId,
             desc: part.desc,
             qty: part.qty || 1, // Default to 1 if not specified
             unit: part.unit,
-            price: part.price || 0 // Default to 0 if not specified
+            price: part.price || 0, // Default to 0 if not specified
+            prob: part.prob || 0
         }));
     }, [selectedFindingDetail]);
 
@@ -3960,6 +3961,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                             sourceTask: finding.taskId,
                             description: detail.description,
                             cluster_id: detail.cluster,
+                            probability : detail.prob,
                             mhsMin: detail.mhs.min,
                             mhsMax: detail.mhs.max,
                             mhsAvg: detail.mhs.avg,
@@ -3968,7 +3970,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                             partDesc: part.desc,
                             unit: part.unit,
                             qty: part.qty,
-                            price: part.price
+                            price: part.price,
+                            prob: part.prob
                         });
                     });
                 } else {
@@ -3976,6 +3979,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                         sourceTask: finding.taskId,
                         description: detail.description,
                         cluster_id: detail.cluster,
+                        probability : detail.prob,
                         mhsMin: detail.mhs.min,
                         mhsMax: detail.mhs.max,
                         mhsAvg: detail.mhs.avg,
@@ -3984,7 +3988,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                         partDesc: '-',
                         unit: '-',
                         qty: 0,
-                        price: 0
+                        price: 0,
+                        prob : 0
                     });
                 }
             });
@@ -3998,6 +4003,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
         { headerName: 'Source Task', field: 'sourceTask', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 200, pinned: 'left' },
         { headerName: 'Description', field: 'description', filter: true, floatingFilter: true, resizable: true, width: 400 },
         { headerName: 'Cluster ID', field: 'cluster_id', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 280 },
+        { headerName: 'Probability', field: 'probability', filter: true, sortable: true, floatingFilter: true, resizable: true, width: 150 },
         {
             headerName: 'Man Hours',
             field: 'mhsMin',
@@ -4056,6 +4062,22 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                 )
             }
         },
+        {
+        headerName: 'Part Probability (%)',
+        field: 'prob',
+        filter: true,
+        sortable: true,
+        floatingFilter: true,
+        resizable: true,
+        width: 200,
+        cellRenderer: (val: any) => {
+            return (
+                <Text>
+                    {val?.data?.prob?.toFixed(2) || "0"}
+                </Text>
+            )
+        }
+    },
     ];
 
     const downloadCSV = () => {
@@ -4069,6 +4091,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             "Source Task",
             "Description",
             "Cluster ID",
+            "Probability",
             "MHS Min",
             "MHS Max",
             "MHS Avg",
@@ -4077,7 +4100,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             "Part Description",
             "Quantity",
             "Unit",
-            "Price"
+            "Price",
+            "Part Probability",
         ];
 
         // Function to escape CSV fields
@@ -4096,6 +4120,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             escapeCSVField(task.sourceTask),
             escapeCSVField(task.description),
             escapeCSVField(task.cluster_id),
+            escapeCSVField(task.probability),
             escapeCSVField(task.mhsMin),
             escapeCSVField(task.mhsMax),
             escapeCSVField(task.mhsAvg),
@@ -4105,6 +4130,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
             escapeCSVField(task.qty),
             escapeCSVField(task.unit),
             escapeCSVField(task.price),
+            escapeCSVField(task.prob),
         ]);
 
         // Convert array to CSV format
@@ -4567,6 +4593,22 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({ findings }) =
                                                         <>
                                                             <Text>
                                                                 {val?.data?.price?.toFixed(2) || 0}
+                                                            </Text>
+                                                        </>
+                                                    )
+                                                }
+                                            },
+                                            {
+                                                field: "prob",
+                                                headerName: "Prob(%)",
+                                                sortable: true,
+                                                resizable: true,
+                                                flex: 1,
+                                                cellRenderer: (val: any) => {
+                                                    return (
+                                                        <>
+                                                            <Text>
+                                                                {(val?.data?.prob ? val.data.prob  : 0)}
                                                             </Text>
                                                         </>
                                                     )
