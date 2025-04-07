@@ -62,7 +62,7 @@ class Capping(BaseModel):
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
-     aircraftAge: int 
+     aircraftAge: float 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
      areaOfOperations: str
