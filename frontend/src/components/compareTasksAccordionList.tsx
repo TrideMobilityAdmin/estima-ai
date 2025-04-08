@@ -42,7 +42,7 @@ interface Task {
     accuracy_total_billable_value_usd_findings: number;
 }
 
-const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
+const TaskListCompareScreen: React.FC<{ tasksEligible: any[], tasksNotEligible: any[] }> = ({ tasksEligible, tasksNotEligible  }) => {
     const [taskSearch, setTaskSearch] = useState("");
     const [openedAccordion, setOpenedAccordion] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -51,9 +51,9 @@ const TaskListCompareScreen: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
     const filteredTasks = useMemo(() => {
         const search = taskSearch?.trim()?.toLowerCase();
-        if (!search) return tasks;
-        return tasks?.filter(task => task?.task_number?.toLowerCase()?.includes(search));
-    }, [tasks, taskSearch]);
+        if (!search) return tasksEligible;
+        return tasksEligible?.filter(task => task?.task_number?.toLowerCase()?.includes(search));
+    }, [tasksEligible, taskSearch]);
 
     useEffect(() => {
         setCurrentPage(1);

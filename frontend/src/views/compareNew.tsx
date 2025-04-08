@@ -7,7 +7,7 @@ import TaskListCompareScreen from '../components/compareTasksAccordionList';
 import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
 import FindingsListCompareScreen from '../components/compareFindingsAccordionList';
 
-export default function CompareEstimateNew() {
+export default function CompareNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
 
   const [estimates, setEstimates] = useState<any[]>([]);
@@ -180,8 +180,8 @@ export default function CompareEstimateNew() {
         </SimpleGrid>
         <Space h='sm' />
         <SimpleGrid cols={2} spacing="md">
-        <TaskListCompareScreen tasks={compareEstimatedData?.tasks} />
-        <FindingsListCompareScreen findings={compareEstimatedData?.tasks} />
+        <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
+        <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings.eligible} findingsNotEligible={compareEstimatedData?.findings.not_eligible} />
         </SimpleGrid>
 
         

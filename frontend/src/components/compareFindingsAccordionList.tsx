@@ -35,7 +35,7 @@ interface Finding {
     accuracy: number;
 }
 
-const FindingsListCompareScreen: React.FC<{ findings: any[] }> = ({ findings }) => {
+const FindingsListCompareScreen: React.FC<{ findingsEligible: any[], findingsNotEligible:[] }> = ({ findingsEligible,findingsNotEligible }) => {
     const [findingSearch, setFindingSearch] = useState("");
     const [openedAccordion, setOpenedAccordion] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -44,9 +44,9 @@ const FindingsListCompareScreen: React.FC<{ findings: any[] }> = ({ findings }) 
 
     const filteredFindings = useMemo(() => {
         const search = findingSearch?.trim()?.toLowerCase();
-        if (!search) return findings;
-        return findings?.filter(finding => finding?.task_number?.toLowerCase()?.includes(search));
-    }, [findings, findingSearch]);
+        if (!search) return findingsEligible;
+        return findingsEligible?.filter(finding => finding?.task_number?.toLowerCase()?.includes(search));
+    }, [findingsEligible, findingSearch]);
 
     useEffect(() => {
         setCurrentPage(1);
