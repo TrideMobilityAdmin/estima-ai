@@ -160,7 +160,9 @@ class ExcelUploadService:
             "original_filename": file.filename,
             "createdAt": current_time,
             "updatedAt": current_time,
-            "status": "Initiated"
+            "status": "Initiated",
+            "statusMPD":"Initiated",
+            "statusFindings":"Initiated"
         })
             logger.info("Processed record")
 
@@ -380,6 +382,8 @@ class ExcelUploadService:
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",
+                "statusMPD":"Initiated",
+                "statusFindings":"Initiated",
                 "estID": est_id,
                 "msg": "File and estimated data inserted successfully",
                 "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),

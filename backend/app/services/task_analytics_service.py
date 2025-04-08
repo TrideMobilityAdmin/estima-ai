@@ -2,6 +2,7 @@ from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursMode
 from statistics import mean
 from fastapi import HTTPException,Depends,status
 from typing import List , Dict,Optional,Any
+import math
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
@@ -1426,6 +1427,7 @@ class TaskService:
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
         configurations = self.configurations_collection.find_one()
+        configurations=replace_nan_inf(configurations)
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
 
         capping_pipeline=[
@@ -1440,7 +1442,16 @@ class TaskService:
                     'aircraftAge': 1, 
                     'aircraftModel': 1, 
                     'aircraftRegNo': 1, 
-                    'typeOfCheck': 1, 
+                    'typeOfCheckID': {
+                '$ifNull': [
+                    '$typeOfCheckID', ''
+                ]
+            }, 
+            'typeOfCheck': {
+                '$ifNull': [
+                    '$typeOfCheck', []
+                ]
+            }, 
                     'mh_type': '$cappingDetails.cappingTypeManhrs', 
                     'mhs': '$cappingDetails.cappingManhrs', 
                     'cost_type': '$cappingDetails.cappingTypeSpareCost', 
@@ -1449,7 +1460,7 @@ class TaskService:
             }
         ]
         result = list(self.estimate_file_upload.aggregate(capping_pipeline))
-        capping_result = result[0]
+        capping_result = replace_nan_inf(result[0] if result else {})
         logger.info(f"capping_result fetched: {capping_result}")
 
         SCMH = 0
@@ -1812,12 +1823,13 @@ class TaskService:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
-            estimate_data = result[0]
+            estimate_data = replace_nan_inf(result[0] if result else {})
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
             estimate_data["aircraftAge"] = capping_result.get("aircraftAge")
             estimate_data["aircraftModel"] = capping_result.get("aircraftModel")
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
+            estimate_data["typeOfCheckID"] = capping_result.get("typeOfCheckID")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
             logger.info("estimate_data fetched")
             findings_level_pipeline=[
@@ -1936,7 +1948,7 @@ class TaskService:
                         }
                     }
                 ]
-            findings_result=list(self.estimates_collection.aggregate(findings_level_pipeline))
+            findings_result=replace_nan_inf(list(self.estimates_collection.aggregate(findings_level_pipeline)))
             if not findings_result:
                 findings_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
                                 "totalBillableCost": 0, "totalUnbillableCost": 0}
@@ -2006,7 +2018,7 @@ class TaskService:
                     }
                 }
             ]
-            task_SC_result = list(self.estimates_collection.aggregate(SC_NC_pipeline))
+            task_SC_result = replace_nan_inf(list(self.estimates_collection.aggregate(SC_NC_pipeline)))
             if not task_SC_result:
                 task_SC_result = {"totalBillableMhs": 0, "totalUnbillableMhs": 0}
             else:
@@ -2124,14 +2136,14 @@ class TaskService:
             }
         }
     ]
-            task_result=list(self.estimates_collection.aggregate(task_level_pipeline))
+            task_result=replace_nan_inf(list(self.estimates_collection.aggregate(task_level_pipeline)))
             logger.info("task_level fetched")
             if not task_result:
                 task_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
                             "totalBillableCost": 0, "totalUnbillableCost": 0}
             else:
                 task_level = task_result[0]
-
+            logger.info(f"capping_type fetched:{capping_type}")
             if capping_type == "per_source_card":    
                 return {
                     **estimate_data,
@@ -2142,6 +2154,7 @@ class TaskService:
                         'unbillable_cost': task_level.get('totalUnbillableCost', 0)
                     }
                 }
+            
             
             elif capping_type == "per_IRC":
                 return {
@@ -2753,4 +2766,12 @@ class TaskService:
     }
         logger.info(f"Combined results: {combined_results}")
         return combined_results
-        
+def replace_nan_inf(obj):
+            """Helper function to recursively replace NaN and inf values with None"""
+            if isinstance(obj, dict):
+                return {k: replace_nan_inf(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_nan_inf(x) for x in obj]
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            return obj
