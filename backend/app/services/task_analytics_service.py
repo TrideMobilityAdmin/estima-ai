@@ -1526,161 +1526,164 @@ class TaskService:
         '$match': {
             'estID': estimate_id
         }
-    }, {
-        '$addFields': {
-            'estimate_manhrs': {
-                'min': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.min', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.min', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'max': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.max', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.max', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'avg': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.avg', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.avg', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'est': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.est', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.est', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-    }, {
-        '$addFields': {
+    }, 
+    # {
+    #     '$addFields': {
+    #         'estimate_manhrs': {
+    #             'min': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.min', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.min', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'max': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.max', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.max', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'avg': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.avg', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.avg', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'est': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.est', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.est', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }
+    #         }
+    #     }
+    # }, 
+    
+    # {
+    #     '$addFields': {
             # 'tatTime': {
             #     '$divide': [
             #         {
@@ -1698,21 +1701,21 @@ class TaskService:
             #         }, man_hours_threshold
             #     ]
             # }, 
-            'estimatedSpareCost': {
-                '$add': [
-                    {
-                        '$ifNull': [
-                            '$aggregatedTasks.totalPartsCost', 0
-                        ]
-                    }, {
-                        '$ifNull': [
-                            '$aggregatedFindings.totalPartsCost', 0
-                        ]
-                    }
-                ]
-            }
-        }
-    },
+    #         'estimatedSpareCost': {
+    #             '$add': [
+    #                 {
+    #                     '$ifNull': [
+    #                         '$aggregatedTasks.totalPartsCost', 0
+    #                     ]
+    #                 }, {
+    #                     '$ifNull': [
+    #                         '$aggregatedFindings.totalPartsCost', 0
+    #                     ]
+    #                 }
+    #             ]
+    #         }
+    #     }
+    # },
     {
         '$addFields': {
             'aggregatedTasks': {
@@ -1727,7 +1730,7 @@ class TaskService:
                         }
                     }
                 }
-            }, 
+            },
             'aggregatedFindings': {
                 'spareParts': {
                     '$reduce': {
@@ -1766,8 +1769,8 @@ class TaskService:
             'description': 1, 
             'overallEstimateReport': {
                 # 'estimatedTatTime': '$tatTime', 
-                'estimatedSpareCost': '$estimatedSpareCost', 
-                'estimateManhrs': '$estimate_manhrs', 
+                'estimatedSpareCost': '$totalConsumption.totalPartsCost', 
+                'estimateManhrs': '$totalConsumption.mhs', 
                 'spareParts': {
                     '$filter': {
                         'input': '$totalConsumption.totalParts', 
