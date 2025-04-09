@@ -1,0 +1,902 @@
+[
+    {
+      "id": 1,
+      "operatorName": "American Airlines",
+      "iataCode": "AA",
+      "country": "United States",
+      "fleetModels": [
+        "A319", "A320", "A321", "B737 Max", "B777-200ER", "B777-300ER", "B787-8", "B787-9", "E190"
+      ]
+    },
+    {
+      "id": 2,
+      "operatorName": "Delta Air Lines",
+      "iataCode": "DL",
+      "country": "United States",
+      "fleetModels": [
+        "A220-100", "A220-300", "A319", "A320", "A321", "A330-200", "A330-300", "A330-900neo", "A350-900", "B737-800", "B737-900ER", "B757-200", "B757-300", "B767-300ER", "B767-400ER"
+      ]
+    },
+    {
+      "id": 3,
+      "operatorName": "United Airlines",
+      "iataCode": "UA",
+      "country": "United States",
+      "fleetModels": [
+        "A319", "A320", "B737-700", "B737-800", "B737-900ER", "B737 Max 8", "B737 Max 9", "B757-200", "B757-300", "B767-300ER", "B767-400ER", "B777-200ER", "B777-300ER", "B787-8", "B787-9", "B787-10", "E175"
+      ]
+    },
+    {
+      "id": 4,
+      "operatorName": "Lufthansa",
+      "iataCode": "LH",
+      "country": "Germany",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "A321neo", "A330-300", "A340-300", "A340-600", "A350-900", "A380-800", "B747-8"
+      ]
+    },
+    {
+      "id": 5,
+      "operatorName": "Air France",
+      "iataCode": "AF",
+      "country": "France",
+      "fleetModels": [
+        "A220-300", "A318", "A319", "A320", "A321", "A330-200", "A350-900", "B777-200ER", "B777-300ER", "B787-9"
+      ]
+    },
+    {
+      "id": 6,
+      "operatorName": "British Airways",
+      "iataCode": "BA",
+      "country": "United Kingdom",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "A321neo", "A350-1000", "A380-800", "B777-200ER", "B777-300ER", "B787-8", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 7,
+      "operatorName": "Emirates",
+      "iataCode": "EK",
+      "country": "United Arab Emirates",
+      "fleetModels": [
+        "A380-800", "B777-200LR", "B777-300ER", "B777-8", "B777-9", "B787-9"
+      ]
+    },
+    {
+      "id": 8,
+      "operatorName": "Qatar Airways",
+      "iataCode": "QR",
+      "country": "Qatar",
+      "fleetModels": [
+        "A320", "A321", "A330-200", "A330-300", "A350-900", "A350-1000", "A380-800", "B777-200LR", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 9,
+      "operatorName": "Singapore Airlines",
+      "iataCode": "SQ",
+      "country": "Singapore",
+      "fleetModels": [
+        "A320", "A321neo", "A330-300", "A350-900", "A350-900ULR", "A380-800", "B737 Max 8", "B777-300ER", "B787-10"
+      ]
+    },
+    {
+      "id": 10,
+      "operatorName": "Air Canada",
+      "iataCode": "AC",
+      "country": "Canada",
+      "fleetModels": [
+        "A220-300", "A319", "A320", "A321", "A330-300", "B737 Max 8", "B777-200LR", "B777-300ER", "B787-8", "B787-9", "E175"
+      ]
+    },
+    {
+      "id": 11,
+      "operatorName": "Qantas",
+      "iataCode": "QF",
+      "country": "Australia",
+      "fleetModels": [
+        "A330-200", "A330-300", "A380-800", "B737-800", "B787-9", "A320"
+      ]
+    },
+    {
+      "id": 12,
+      "operatorName": "Cathay Pacific",
+      "iataCode": "CX",
+      "country": "Hong Kong",
+      "fleetModels": [
+        "A321neo", "A330-300", "A350-900", "A350-1000", "B777-300ER"
+      ]
+    },
+    {
+      "id": 13,
+      "operatorName": "All Nippon Airways",
+      "iataCode": "NH",
+      "country": "Japan",
+      "fleetModels": [
+        "A320", "A321", "A321neo", "A380-800", "B737-800", "B767-300ER", "B777-200ER", "B777-300ER", "B787-8", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 14,
+      "operatorName": "Japan Airlines",
+      "iataCode": "JL",
+      "country": "Japan",
+      "fleetModels": [
+        "A350-900", "B737-800", "B767-300ER", "B777-200ER", "B777-300ER", "B787-8", "B787-9", "E170", "E190"
+      ]
+    },
+    {
+      "id": 15,
+      "operatorName": "KLM Royal Dutch Airlines",
+      "iataCode": "KL",
+      "country": "Netherlands",
+      "fleetModels": [
+        "B737-700", "B737-800", "B737-900", "B777-200ER", "B777-300ER", "B787-9", "B787-10", "E175", "E190"
+      ]
+    },
+    {
+      "id": 16,
+      "operatorName": "Turkish Airlines",
+      "iataCode": "TK",
+      "country": "Turkey",
+      "fleetModels": [
+        "A319", "A320", "A321", "A321neo", "A330-200", "A330-300", "A350-900", "B737-800", "B737-900ER", "B737 Max 8", "B737 Max 9", "B777-300ER", "B787-9"
+      ]
+    },
+    {
+      "id": 17,
+      "operatorName": "Air China",
+      "iataCode": "CA",
+      "country": "China",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-200", "A330-300", "A350-900", "B737-700", "B737-800", "B747-8", "B777-300ER", "B787-9"
+      ]
+    },
+    {
+      "id": 18,
+      "operatorName": "China Southern Airlines",
+      "iataCode": "CZ",
+      "country": "China",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-200", "A330-300", "A350-900", "A380-800", "B737-700", "B737-800", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 19,
+      "operatorName": "China Eastern Airlines",
+      "iataCode": "MU",
+      "country": "China",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-200", "A330-300", "A350-900", "B737-700", "B737-800", "B777-300ER", "B787-9"
+      ]
+    },
+    {
+      "id": 20,
+      "operatorName": "Etihad Airways",
+      "iataCode": "EY",
+      "country": "United Arab Emirates",
+      "fleetModels": [
+        "A320", "A321", "B777-300ER", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 21,
+      "operatorName": "Ryanair",
+      "iataCode": "FR",
+      "country": "Ireland",
+      "fleetModels": [
+        "B737-800", "B737 Max 8"
+      ]
+    },
+    {
+      "id": 22,
+      "operatorName": "easyJet",
+      "iataCode": "U2",
+      "country": "United Kingdom",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321neo"
+      ]
+    },
+    {
+      "id": 23,
+      "operatorName": "Southwest Airlines",
+      "iataCode": "WN",
+      "country": "United States",
+      "fleetModels": [
+        "B737-700", "B737-800", "B737 Max 8"
+      ]
+    },
+    {
+      "id": 24,
+      "operatorName": "Korean Air",
+      "iataCode": "KE",
+      "country": "South Korea",
+      "fleetModels": [
+        "A220-300", "A330-200", "A330-300", "A380-800", "B737-800", "B737-900", "B747-8", "B777-200ER", "B777-300ER", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 25,
+      "operatorName": "Asiana Airlines",
+      "iataCode": "OZ",
+      "country": "South Korea",
+      "fleetModels": [
+        "A320", "A321", "A330-300", "A350-900", "A380-800", "B747-400", "B767-300", "B777-200ER", "B777-300ER"
+      ]
+    },
+    {
+      "id": 26,
+      "operatorName": "LATAM Airlines",
+      "iataCode": "LA",
+      "country": "Chile",
+      "fleetModels": [
+        "A319", "A320", "A321", "A350-900", "B767-300ER", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 27,
+      "operatorName": "Avianca",
+      "iataCode": "AV",
+      "country": "Colombia",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "A321neo", "A330-200", "B787-8"
+      ]
+    },
+    {
+      "id": 28,
+      "operatorName": "Ethiopian Airlines",
+      "iataCode": "ET",
+      "country": "Ethiopia",
+      "fleetModels": [
+        "A350-900", "B737-700", "B737-800", "B767-300ER", "B777-200LR", "B777-300ER", "B787-8", "B787-9", "Q400"
+      ]
+    },
+    {
+      "id": 29,
+      "operatorName": "South African Airways",
+      "iataCode": "SA",
+      "country": "South Africa",
+      "fleetModels": [
+        "A319", "A320", "A330-300", "A340-300", "A340-600"
+      ]
+    },
+    {
+      "id": 30,
+      "operatorName": "Thai Airways",
+      "iataCode": "TG",
+      "country": "Thailand",
+      "fleetModels": [
+        "A320", "A330-300", "A350-900", "A380-800", "B747-400", "B777-200ER", "B777-300", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 31,
+      "operatorName": "Air New Zealand",
+      "iataCode": "NZ",
+      "country": "New Zealand",
+      "fleetModels": [
+        "A320", "A320neo", "A321neo", "B777-200ER", "B777-300ER", "B787-9", "Q300", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 32,
+      "operatorName": "EVA Air",
+      "iataCode": "BR",
+      "country": "Taiwan",
+      "fleetModels": [
+        "A321", "A330-200", "A330-300", "B777-300ER", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 33,
+      "operatorName": "Aeroflot",
+      "iataCode": "SU",
+      "country": "Russia",
+      "fleetModels": [
+        "A320", "A321", "A330-300", "A350-900", "B737-800", "B777-300ER", "SSJ-100"
+      ]
+    },
+    {
+      "id": 34,
+      "operatorName": "Air India",
+      "iataCode": "AI",
+      "country": "India",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "B747-400", "B777-200LR", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 35,
+      "operatorName": "IndiGo",
+      "iataCode": "6E",
+      "country": "India",
+      "fleetModels": [
+        "A320", "A320neo", "A321neo", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 36,
+      "operatorName": "Garuda Indonesia",
+      "iataCode": "GA",
+      "country": "Indonesia",
+      "fleetModels": [
+        "A330-200", "A330-300", "A330-900neo", "B737-800", "B777-300ER", "CRJ-1000"
+      ]
+    },
+    {
+      "id": 37,
+      "operatorName": "Scandinavian Airlines",
+      "iataCode": "SK",
+      "country": "Sweden",
+      "fleetModels": [
+        "A320", "A320neo", "A321", "A330-300", "A340-300", "A350-900", "CRJ-900"
+      ]
+    },
+    {
+      "id": 38,
+      "operatorName": "TAP Air Portugal",
+      "iataCode": "TP",
+      "country": "Portugal",
+      "fleetModels": [
+        "A319", "A320", "A321", "A321LR", "A330-200", "A330-900neo", "ATR 72-600", "E190", "E195"
+      ]
+    },
+    {
+      "id": 39,
+      "operatorName": "Finnair",
+      "iataCode": "AY",
+      "country": "Finland",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-300", "A350-900", "ATR 72-500", "E190"
+      ]
+    },
+    {
+      "id": 40,
+      "operatorName": "Aeromexico",
+      "iataCode": "AM",
+      "country": "Mexico",
+      "fleetModels": [
+        "B737-700", "B737-800", "B737 Max 8", "B737 Max 9", "B787-8", "B787-9", "E190"
+      ]
+    },
+    {
+      "id": 41,
+      "operatorName": "Virgin Atlantic",
+      "iataCode": "VS",
+      "country": "United Kingdom",
+      "fleetModels": [
+        "A330-300", "A330-900neo", "A350-1000", "B787-9"
+      ]
+    },
+    {
+      "id": 42,
+      "operatorName": "Virgin Australia",
+      "iataCode": "VA",
+      "country": "Australia",
+      "fleetModels": [
+        "B737-700", "B737-800", "B777-300ER", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 43,
+      "operatorName": "Iberia",
+      "iataCode": "IB",
+      "country": "Spain",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "A330-200", "A330-300", "A350-900"
+      ]
+    },
+    {
+      "id": 44,
+      "operatorName": "Air India Express",
+      "iataCode": "IX",
+      "country": "India",
+      "fleetModels": [
+        "B737-800"
+      ]
+    },
+    {
+      "id": 45,
+      "operatorName": "SpiceJet",
+      "iataCode": "SG",
+      "country": "India",
+      "fleetModels": [
+        "B737-700", "B737-800", "B737 Max 8", "Dash 8 Q400"
+      ]
+    },
+    {
+      "id": 46,
+      "operatorName": "Vistara",
+      "iataCode": "UK",
+      "country": "India",
+      "fleetModels": [
+        "A320", "A320neo", "A321neo", "B787-9"
+      ]
+    },
+    {
+      "id": 47,
+      "operatorName": "AirAsia",
+      "iataCode": "AK",
+      "country": "Malaysia",
+      "fleetModels": [
+        "A320", "A320neo", "A321neo"
+      ]
+    },
+    {
+      "id": 48,
+      "operatorName": "Malaysia Airlines",
+      "iataCode": "MH",
+      "country": "Malaysia",
+      "fleetModels": [
+        "A330-200", "A330-300", "A350-900", "B737-800", "A380-800"
+      ]
+    },
+    {
+      "id": 49,
+      "operatorName": "Lion Air",
+      "iataCode": "JT",
+      "country": "Indonesia",
+      "fleetModels": [
+        "A330-300", "A330-900neo", "B737-800", "B737-900ER", "B737 Max 8", "B747-400"
+      ]
+    },
+    {
+      "id": 50,
+      "operatorName": "Philippine Airlines",
+      "iataCode": "PR",
+      "country": "Philippines",
+      "fleetModels": [
+        "A320", "A321neo", "A330-300", "A350-900", "B777-300ER"
+      ]
+    },
+    {
+      "id": 51,
+      "operatorName": "Cebu Pacific",
+      "iataCode": "5J",
+      "country": "Philippines",
+      "fleetModels": [
+        "A320", "A321neo", "A330-300", "A330-900neo", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 52,
+      "operatorName": "Vietnam Airlines",
+      "iataCode": "VN",
+      "country": "Vietnam",
+      "fleetModels": [
+        "A321", "A321neo", "A350-900", "B787-9", "B787-10"
+      ]
+    },
+    {
+      "id": 53,
+      "operatorName": "VietJet Air",
+      "iataCode": "VJ",
+      "country": "Vietnam",
+      "fleetModels": [
+        "A320", "A321"
+      ]
+    },
+    {
+      "id": 54,
+      "operatorName": "Aegean Airlines",
+      "iataCode": "A3",
+      "country": "Greece",
+      "fleetModels": [
+        "A319", "A320", "A320neo", "A321", "A321neo"
+      ]
+    },
+    {
+      "id": 55,
+      "operatorName": "Aer Lingus",
+      "iataCode": "EI",
+      "country": "Ireland",
+      "fleetModels": [
+        "A320", "A321", "A321LR", "A330-300"
+      ]
+    },
+    {
+      "id": 56,
+      "operatorName": "Aerolineas Argentinas",
+      "iataCode": "AR",
+      "country": "Argentina",
+      "fleetModels": [
+        "A330-200", "B737-700", "B737-800", "B737 Max 8"
+      ]
+    },
+    {
+      "id": 57,
+      "operatorName": "Aeromexico Connect",
+      "iataCode": "5D",
+      "country": "Mexico",
+      "fleetModels": [
+        "E170", "E190"
+      ]
+    },
+    {
+      "id": 58,
+      "operatorName": "Air Algerie",
+      "iataCode": "AH",
+      "country": "Algeria",
+      "fleetModels": [
+        "A330-200", "B737-600", "B737-800", "ATR 72-500"
+      ]
+    },
+    {
+      "id": 59,
+      "operatorName": "Air Arabia",
+      "iataCode": "G9",
+      "country": "United Arab Emirates",
+      "fleetModels": [
+        "A320", "A321", "A321LR"
+      ]
+    },
+    {
+      "id": 60,
+      "operatorName": "Air Astana",
+      "iataCode": "KC",
+      "country": "Kazakhstan",
+      "fleetModels": [
+        "A320", "A321", "A321LR", "A321neo", "B757-200", "B767-300ER", "E190-E2"
+      ]
+    },
+    {
+      "id": 61,
+      "operatorName": "Air Baltic",
+      "iataCode": "BT",
+      "country": "Latvia",
+      "fleetModels": [
+        "A220-300"
+      ]
+    },
+    {
+      "id": 62,
+      "operatorName": "Air Caledonie",
+      "iataCode": "TY",
+      "country": "New Caledonia",
+      "fleetModels": [
+        "A320neo", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 63,
+      "operatorName": "Air Caraibes",
+      "iataCode": "TX",
+      "country": "France",
+      "fleetModels": [
+        "A330-300", "A350-900", "A350-1000", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 64,
+      "operatorName": "Air Corsica",
+      "iataCode": "XK",
+      "country": "France",
+      "fleetModels": [
+        "A320", "ATR 72-500"
+      ]
+    },
+    {
+      "id": 65,
+      "operatorName": "Air Dolomiti",
+      "iataCode": "EN",
+      "country": "Italy",
+      "fleetModels": [
+        "E195"
+      ]
+    },
+    {
+      "id": 66,
+      "operatorName": "Air Europa",
+      "iataCode": "UX",
+      "country": "Spain",
+      "fleetModels": [
+        "B737-800", "B787-8", "B787-9", "E195"
+      ]
+    },
+    {
+      "id": 67,
+      "operatorName": "Air Macau",
+      "iataCode": "NX",
+      "country": "Macau",
+      "fleetModels": [
+        "A320", "A321"
+      ]
+    },
+    {
+      "id": 68,
+      "operatorName": "Air Malta",
+      "iataCode": "KM",
+      "country": "Malta",
+      "fleetModels": [
+        "A320", "A320neo"
+      ]
+    },
+    {
+      "id": 69,
+      "operatorName": "Air Mauritius",
+      "iataCode": "MK",
+      "country": "Mauritius",
+      "fleetModels": [
+        "A330-900neo", "A350-900", "ATR 72-500"
+      ]
+    },
+    {
+      "id": 70,
+      "operatorName": "Air Namibia",
+      "iataCode": "SW",
+      "country": "Namibia",
+      "fleetModels": [
+        "A319", "A330-200", "E135"
+      ]
+    },
+    {
+      "id": 71,
+      "operatorName": "Air North",
+      "iataCode": "4N",
+      "country": "Canada",
+      "fleetModels": [
+        "B737-400", "B737-500", "ATR 42-300"
+      ]
+    },
+    {
+      "id": 72,
+      "operatorName": "Air Nostrum",
+      "iataCode": "YW",
+      "country": "Spain",
+      "fleetModels": [
+        "ATR 72-600", "CRJ-1000", "CRJ-200"
+      ]
+    },
+    {
+      "id": 73,
+      "operatorName": "Air Serbia",
+      "iataCode": "JU",
+      "country": "Serbia",
+      "fleetModels": [
+        "A319", "A320", "A330-200", "ATR 72-500"
+      ]
+    },
+    {
+      "id": 74,
+      "operatorName": "Air Seychelles",
+      "iataCode": "HM",
+      "country": "Seychelles",
+      "fleetModels": [
+        "A320neo", "A330-200"
+      ]
+    },
+    {
+      "id": 75,
+      "operatorName": "Air Tahiti",
+      "iataCode": "VT",
+      "country": "French Polynesia",
+      "fleetModels": [
+        "ATR 42-600", "ATR 72-600", "B787-9"
+      ]
+    },
+    {
+      "id": 76,
+      "operatorName": "Air Tahiti Nui",
+      "iataCode": "TN",
+      "country": "French Polynesia",
+      "fleetModels": [
+        "B787-9"
+      ]
+    },
+    {
+      "id": 77,
+      "operatorName": "Air Transat",
+      "iataCode": "TS",
+      "country": "Canada",
+      "fleetModels": [
+        "A321", "A321LR", "A321neo", "A330-200", "A330-300"
+      ]
+    },
+    {
+      "id": 78,
+      "operatorName": "Air Vanuatu",
+      "iataCode": "NF",
+      "country": "Vanuatu",
+      "fleetModels": [
+        "ATR 72-600", "B737-800"
+      ]
+    },
+    {
+      "id": 79,
+      "operatorName": "Alaska Airlines",
+      "iataCode": "AS",
+      "country": "United States",
+      "fleetModels": [
+        "A320", "A321neo", "B737-700", "B737-800", "B737-900", "B737 Max 9", "E175"
+      ]
+    },
+    {
+      "id": 80,
+      "operatorName": "Alitalia",
+      "iataCode": "AZ",
+      "country": "Italy",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-200", "B777-200ER", "B777-300ER"
+      ]
+    },
+    {
+      "id": 81,
+      "operatorName": "Allegiant Air",
+      "iataCode": "G4",
+      "country": "United States",
+      "fleetModels": [
+        "A319", "A320"
+      ]
+    },
+    {
+      "id": 82,
+      "operatorName": "American Eagle",
+      "iataCode": "MQ",
+      "country": "United States",
+      "fleetModels": [
+        "CRJ-700", "CRJ-900", "E140", "E145", "E170", "E175"
+      ]
+    },
+    {
+      "id": 83,
+      "operatorName": "ANA Wings",
+      "iataCode": "EH",
+      "country": "Japan",
+      "fleetModels": [
+        "B737-700", "B737-800", "DHC-8-400"
+      ]
+    },
+    {
+      "id": 84,
+      "operatorName": "Arkia",
+      "iataCode": "IZ",
+      "country": "Israel",
+      "fleetModels": [
+        "A321LR", "E195"
+      ]
+    },
+    {
+      "id": 85,
+      "operatorName": "Austrian Airlines",
+      "iataCode": "OS",
+      "country": "Austria",
+      "fleetModels": [
+        "A320", "A321", "B767-300ER", "B777-200ER", "E195"
+      ]
+    },
+    {
+      "id": 86,
+      "operatorName": "Azul Brazilian Airlines",
+      "iataCode": "AD",
+      "country": "Brazil",
+      "fleetModels": [
+        "A320neo", "A321neo", "A330-200", "A330-900neo", "ATR 72-600", "E190", "E195", "E195-E2"
+      ]
+    },
+    {
+      "id": 87,
+      "operatorName": "Bangkok Airways",
+      "iataCode": "PG",
+      "country": "Thailand",
+      "fleetModels": [
+        "A319", "A320", "A321", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 88,
+      "operatorName": "Binter Canarias",
+      "iataCode": "NT",
+      "country": "Spain",
+      "fleetModels": [
+        "ATR 72-600"
+      ]
+    },
+    {
+      "id": 89,
+      "operatorName": "Blue Air",
+      "iataCode": "0B",
+      "country": "Romania",
+      "fleetModels": [
+        "B737-400", "B737-500", "B737-800"
+      ]
+    },
+    {
+      "id": 90,
+      "operatorName": "Blue Islands",
+      "iataCode": "SI",
+      "country": "United Kingdom",
+      "fleetModels": [
+        "ATR 42-500", "ATR 72-500"
+      ]
+    },
+    {
+      "id": 91,
+      "operatorName": "Boeing",
+      "iataCode": "BOE",
+      "country": "United States",
+      "fleetModels": [
+        "B737-800", "B747-8", "B777-200LR", "B777-300ER", "B787-8", "B787-9"
+      ]
+    },
+    {
+      "id": 92,
+      "operatorName": "Boliviana de Aviacion",
+      "iataCode": "OB",
+      "country": "Bolivia",
+      "fleetModels": [
+        "A320neo", "B737-300", "B737-800", "B767-300ER"
+      ]
+    },
+    {
+      "id": 93,
+      "operatorName": "British Airways CityFlyer",
+      "iataCode": "CJ",
+      "country": "United Kingdom",
+      "fleetModels": [
+        "E190"
+      ]
+    },
+    {
+      "id": 94,
+      "operatorName": "Brussels Airlines",
+      "iataCode": "SN",
+      "country": "Belgium",
+      "fleetModels": [
+        "A319", "A320", "A321", "A330-200", "A330-300"
+      ]
+    },
+    {
+      "id": 95,
+      "operatorName": "Cargolux",
+      "iataCode": "",
+      "country": "",
+      "fleetModels": [
+        ""
+      ]
+    },
+    {
+      "id": 96,
+      "operatorName": "Caribbean Airlines",
+      "iataCode": "BW",
+      "country": "Trinidad and Tobago",
+      "fleetModels": [
+        "B737-800", "ATR 72-600"
+      ]
+    },
+    {
+      "id": 97,
+      "operatorName": "Cathay Dragon",
+      "iataCode": "KA",
+      "country": "Hong Kong",
+      "fleetModels": [
+        "A320", "A321", "A330-300"
+      ]
+    },
+    {
+      "id": 98,
+      "operatorName": "China Airlines",
+      "iataCode": "CI",
+      "country": "Taiwan",
+      "fleetModels": [
+        "A350-900", "B737-800", "B747-400", "B777-300ER", "E190"
+      ]
+    },
+    {
+      "id": 99,
+      "operatorName": "China United Airlines",
+      "iataCode": "",
+      "country": "",
+      "fleetModels": [
+        ""
+      ]
+    },
+    {
+      "id": 100,
+      "operatorName": "Copa Airlines",
+      "iataCode": "",
+      "country": "",
+      "fleetModels": [
+        ""
+      ]
+    }
+]
