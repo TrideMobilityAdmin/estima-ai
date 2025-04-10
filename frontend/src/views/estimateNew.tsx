@@ -3479,14 +3479,32 @@ border-bottom: none;
                                         <Space h='xl' /> */}
 
                 {/* <FindingsWiseSection tasks={jsonData?.tasks} findings={jsonData.findings} /> */}
-                <FindingsWiseSection
+
+                {
+                  tabValue === "overall" || tabValue === "finding" ? (
+                    <FindingsWiseSection
+                      tasks={estimateReportData?.tasks}
+                      findings={estimateReportData?.findings}
+                    />
+                  ) : (
+                    <></>
+                  )
+                }
+                {
+                  tabValue === "overall" || tabValue === "mpd" ? (
+                    <PreloadWiseSection tasks={estimateReportData?.tasks} />
+                  ) : (
+                    <></>
+                  )
+                }
+                {/* <FindingsWiseSection
                   tasks={estimateReportData?.tasks}
                   findings={estimateReportData?.findings}
-                />
+                /> */}
 
                 <Space h="md" />
                 {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
-                <PreloadWiseSection tasks={estimateReportData?.tasks} />
+                 {/* <PreloadWiseSection tasks={estimateReportData?.tasks} /> */}
               </>
             ) : (
               <></>
@@ -4888,10 +4906,6 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
   // UPDATED: Function to handle task selection and auto-select highest probability cluster
   const handleTaskSelection = (taskId: string) => {
     setSelectedTaskId(taskId);
-
-    // We do not need to manually set the first cluster here as the useEffect will handle it
-    // The useEffect watching selectedTaskId and getClustersForTask will automatically
-    // select the highest probability cluster when the task changes
   };
 
   return (
@@ -5020,7 +5034,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                       <Accordion.Item key={groupKey} value={groupKey} w="100%">
                         <Accordion.Control>
                           <Text fw={600} truncate>
-                            ATA {groupKey}
+                          {
+                                groupKey === "ZL" ? "ZONAL TASK" : "ATA " + groupKey
+                              }
+                            {/* ATA {groupKey} */}
                           </Text>
                         </Accordion.Control>
                         <Accordion.Panel>
@@ -5408,30 +5425,6 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     task.sourceTask.toLowerCase().includes(taskSearch.toLowerCase())
   );
 
-  // Select the first task by default
-  // useEffect(() => {
-  //     if (tasks?.length > 0) {
-  //         setSelectedTask(tasks[0]);
-  //     }
-  // }, [tasks]);
-
-  // Group tasks by the first two digits before the first hyphen
-  // const groupedTasks = useMemo(() => {
-  //     if (!tasks) return {};
-
-  //     return tasks.reduce((groups, task) => {
-  //         // Extract the first group (first two digits before the first hyphen)
-  //         const taskId = task.sourceTask;
-  //         const groupKey = taskId.split('-')[0];
-
-  //         if (!groups[groupKey]) {
-  //             groups[groupKey] = [];
-  //         }
-
-  //         groups[groupKey].push(task);
-  //         return groups;
-  //     }, {});
-  // }, [tasks]);.
   const groupedTasks = useMemo(() => {
     if (!tasks) return {};
 
@@ -5500,6 +5493,8 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
   //   }, [tasks]);
 
   // Filter tasks based on search
+
+  
   const filteredGroups = useMemo(() => {
     if (!taskSearch.trim()) return groupedTasks;
 
@@ -5517,6 +5512,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
     return filtered;
   }, [groupedTasks, taskSearch]);
+  
   // Get all group keys for default opened accordions
   const defaultOpenValues = useMemo(() => {
     return Object.keys(filteredGroups);
@@ -5993,7 +5989,10 @@ border-bottom: none;
                         >
                           <Accordion.Control>
                             <Text fw={600} truncate>
-                              ATA {groupKey}
+                              {
+                                groupKey === "ZL" ? "ZONAL TASK" : "ATA " + groupKey
+                              }
+                              {/* ATA {groupKey} */}
                             </Text>
                           </Accordion.Control>
                           <Accordion.Panel>
@@ -6256,7 +6255,7 @@ border-bottom: none;
                               cellRenderer: (val: any) => {
                                 return (
                                   <Text>
-                                    {val?.data?.price?.toFixed(4) || 0}
+                                    {val?.data?.price?.toFixed(2) || 0}
                                   </Text>
                                 );
                               },
@@ -6277,727 +6276,3 @@ border-bottom: none;
     </>
   );
 };
-
-// RFQ PARAMETRS OLD
-{
-  /* 
-    <Card withBorder h="60vh" radius="md">
-     
-      <Group justify="space-between" onClick={() => setExpanded(!expanded)} style={{ cursor: "pointer" }}>
-      <Text size="md" mb='sm' fw={500} >
-        RFQ Parameters
-      </Text>
-      <Group>
-        {
-            expanded ? <IconChevronUp color="gray"/> : <IconChevronDown color="gray"/>
-        }
-      </Group>
-      </Group>
-      
-
-     
-      {expanded && (
-        <ScrollArea scrollbarSize={0} style={{ maxHeight: "50vh", overflowX: 'hidden' }}>
-          <SimpleGrid cols={1} spacing="xs">
-            {fields.map((field) => (
-              <Grid key={field.name} align="center">
-                <Grid.Col span={8}>
-                  <Text>{field.label}</Text>
-                </Grid.Col>
-                <Grid.Col span={4}>
-                  <Checkbox
-                    checked={selectedFields.includes(field.name)}
-                    onChange={() => toggleFieldSelection(field.name)}
-                  />
-                </Grid.Col>
-              </Grid>
-            ))}
-          </SimpleGrid>
-          <Group justify="center">
-          <Button variant="light" mt="sm" onClick={() => {
-    setShowFields([...selectedFields]);
-    setExpanded(false); // Collapse the accordion after showing inputs
-}}>
-            Show Inputs
-          </Button>
-          </Group>
-          
-        </ScrollArea>
-      )}
-
-      
-      <ScrollArea style={{ flex: 1, overflow: "auto", marginTop: "10px" }} offsetScrollbars scrollHideDelay={1}>
-        <SimpleGrid cols={1} spacing="xs">
-          <SimpleGrid cols={2}>
-            {fields
-              .filter((field) => showFields.includes(field.name))
-              .map((field) => (
-                <div key={field.name}>
-                  <Text size="xs" fw={500}>
-                    {field.label}
-                  </Text>
-                  {field.component}
-                </div>
-              ))}
-          </SimpleGrid>
-        </SimpleGrid>
-      </ScrollArea>
-    </Card> */
-}
-{
-  /* Left Section: Tasks List */
-}
-{
-  /* <Grid.Col span={3}>
-                            <Card h="100%" w="100%" p="md" bg="none">
-                                <Group>
-                                    <Text size="md" fw={500} mb="xs" c='dimmed'>
-                                        Total Source Tasks
-                                    </Text>
-                                    <Text size="md" fw={500} mb="xs">
-                                        {tasks?.length}
-                                    </Text>
-                                </Group>
-
-                                <TextInput
-                                    placeholder="Search tasks..."
-                                    value={taskSearch}
-                                    onChange={(e) => setTaskSearch(e.target.value)}
-                                    mb="md"
-                                />
-
-                                <Card
-                                    bg="none"
-                                    p={0}
-                                    h="calc(80vh - 150px)"
-                                    style={{
-                                        overflowY: 'auto',
-                                        scrollbarWidth: 'thin',
-                                    }}
-                                >
-                                    <div style={{ height: '100%', overflowY: 'auto', scrollbarWidth: 'thin', }}>
-                                        {filteredTasks?.map((task, taskIndex) => (
-                                            <Badge
-                                                fullWidth
-                                                key={taskIndex}
-                                                variant={selectedTask?.sourceTask === task.sourceTask ? 'filled' : "light"}
-                                                color="#4C7B8B"
-                                                size="lg"
-                                                mb='md'
-                                                h={35}
-                                                radius="md"
-                                                onClick={() => setSelectedTask(task)}
-                                            >
-                                                <Text fw={500}>{task?.sourceTask}</Text>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </Card>
-                            </Card>
-                        </Grid.Col> */
-}
-{
-  /* <Group>
-                        
-<Tooltip label="Download Historical Tasks"  withArrow position="top">
-<CsvDownloadButton
-    data={validatedTasks?.filter((ele) => ele?.status === true)?.map((el) => {
-        return {
-            // ...el,
-            tasks: el?.taskid || 0,
-            status: el?.status
-        };
-    })}
-    headers={[
-        "Tasks",
-        "Status"
-    ]}
-    filename={`Estimate_${selectedEstimateId}.csv`}
-    delimiter=","
-    style={{
-        //pass other props, like styles
-        // boxShadow: "inset 0px 1px 0px 0px #e184f3",
-        height: "2em",
-        background:
-            "linear-gradient(to bottom, #0093E9 5%, #80D0C7 100%)",
-        // backgroundColor: "#c123de",
-        borderRadius: "6px",
-        border: "1px solid #0093E9",
-        display: "inline-block",
-        cursor: "pointer",
-        color: "#ffffff",
-        fontSize: "15px",
-        fontWeight: "bold",
-        padding: "6px 24px",
-        textDecoration: "none",
-        // textShadow: "0px 1px 0px #9b14b3",
-    }}
->
-    Available Tasks - {" "}{validatedTasks?.filter((ele) => ele?.status === true)?.length}
-</CsvDownloadButton>
-</Tooltip>
-
-<Tooltip label="Download New Tasks"  withArrow position="top">
-<CsvDownloadButton
-    data={validatedTasks?.filter((ele) => ele?.status === false)?.map((el) => {
-        return {
-            // ...el,
-            tasks: el?.taskid || 0,
-            status: el?.status
-        };
-    })}
-    headers={[
-        "Tasks",
-        "Status"
-    ]}
-    filename={`Estimate_${selectedEstimateId}.csv`}
-    delimiter=","
-    style={{
-        //pass other props, like styles
-        // boxShadow: "inset 0px 1px 0px 0px #e184f3",
-        height: "2em",
-        background:
-            "linear-gradient(to bottom, #FBAB7E 5%, #F7CE68 100%)",
-        // backgroundColor: "#FBAB7E",
-        borderRadius: "6px",
-        border: "1px solid  #FBAB7E",
-        display: "inline-block",
-        cursor: "pointer",
-        color: "#ffffff",
-        fontSize: "15px",
-        fontWeight: "bold",
-        padding: "6px 24px",
-        textDecoration: "none",
-        // textShadow: "0px 1px 0px #9b14b3",
-    }}
->
-    NotAvaiable Tasks - {" "}{validatedTasks?.filter((ele) => ele?.status === false)?.length}
-</CsvDownloadButton>
-</Tooltip>
-</Group> */
-}
-
-// const createdEstimates = [
-//     {
-//         estId: "Est - 01",
-//         date: "",
-//         aircraft: "Indigo",
-//         totalManHrs: "44",
-//         totalCost: "4000",
-//         status: "In Progress",
-//     },
-//     {
-//         estId: "Est - 02",
-//         date: "",
-//         aircraft: "AirIndia",
-//         totalManHrs: "44",
-//         totalCost: "4000",
-//         status: "In Progress",
-//     },
-//     {
-//         estId: "Est - 03",
-//         date: "",
-//         aircraft: "Indigo",
-//         totalManHrs: "44",
-//         totalCost: "4000",
-//         status: "Completed",
-//     }
-// ];
-
-// const parts = [
-//     {
-//         partName: "Nut",
-//         partDesc: "POO1",
-//         qty: "6",
-//         unit: "",
-//         price: "20"
-//     },
-//     {
-//         partName: "Foam Tape",
-//         partDesc: "POO2",
-//         qty: "2",
-//         unit: "",
-//         price: "80"
-//     },
-//     {
-//         partName: "Blind Rivet",
-//         partDesc: "POO3",
-//         qty: "1",
-//         unit: "",
-//         price: "40"
-//     },
-//     {
-//         partName: "Selant",
-//         partDesc: "POO4",
-//         qty: "4",
-//         unit: "",
-//         price: "20"
-//     },
-//     {
-//         partName: "Nut",
-//         partDesc: "POO1",
-//         qty: "6",
-//         unit: "",
-//         price: "20"
-//     },
-//     {
-//         partName: "Foam Tape",
-//         partDesc: "POO2",
-//         qty: "2",
-//         unit: "",
-//         price: "80"
-//     },
-//     {
-//         partName: "Blind Rivet",
-//         partDesc: "POO3",
-//         qty: "1",
-//         unit: "",
-//         price: "40"
-//     },
-//     {
-//         partName: "Selant",
-//         partDesc: "POO4",
-//         qty: "4",
-//         unit: "",
-//         price: "20"
-//     }
-// ];
-
-// const jsonData = {
-//     tasks: [
-//         {
-//             sourceTask: "255000-16-1",
-//             desciption: "CARGO COMPARTMENTS\n\nDETAILED INSPECTION OF DIVIDER NETS, DOOR NETS AND\nNET ATTACHMENT POINTS\n\nNOTE:\nTHE NUMBER OF AFFECTED ZONES MAY VARY ACCORDING TO",
-//             mhs: { max: 2, min: 2, avg: 2, est: 1.38 },
-//             spareParts: [
-//                 {
-//                     partId: "Nut",
-//                     desc: "POO1",
-//                     qty: "6",
-//                     unit: "",
-//                     price: "20"
-//                 },
-//                 {
-//                     partId: "Foam Tape",
-//                     desc: "POO2",
-//                     qty: "2",
-//                     unit: "",
-//                     price: "80"
-//                 },
-//                 {
-//                     partId: "Blind Rivet",
-//                     desc: "POO3",
-//                     qty: "1",
-//                     unit: "",
-//                     price: "40"
-//                 },
-//                 {
-//                     partId: "Selant",
-//                     desc: "POO4",
-//                     qty: "4",
-//                     unit: "",
-//                     price: "20"
-//                 },
-//                 {
-//                     partId: "Nut",
-//                     desc: "POO1",
-//                     qty: "6",
-//                     unit: "",
-//                     price: "20"
-//                 },
-//                 {
-//                     partId: "Foam Tape",
-//                     desc: "POO2",
-//                     qty: "2",
-//                     unit: "",
-//                     price: "80"
-//                 },
-//                 {
-//                     partId: "Blind Rivet",
-//                     desc: "POO3",
-//                     qty: "1",
-//                     unit: "",
-//                     price: "40"
-//                 },
-//                 {
-//                     partId: "Selant",
-//                     desc: "POO4",
-//                     qty: "4",
-//                     unit: "",
-//                     price: "20"
-//                 }
-//             ],
-//         },
-//         {
-//             sourceTask: "256241-05-1",
-//             desciption: "DOOR ESCAPE SLIDE\n\nCLEAN DOOR GIRT BAR FITTING STOP LEVERS\n\nNOTE:\nTASK IS NOT APPLICABLE FOR DEACTIVATED PASSENGER/CREW\nDOORS.",
-//             mhs: { max: 2, min: 2, avg: 2, est: 0.92 },
-//             spareParts: [
-//                 { partId: "LOTOXANE", desc: "NON AQUEOUS CLEANER-GENERAL", qty: 0.1, unit: "LTR", price: 0 },
-//             ],
-//         },
-//         {
-//             sourceTask: "200435-01-1 (LH)",
-//             desciption: "FAN COMPARTMENT\n\nDETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY\nGEAR BOX (EWIS)",
-//             mhs: { max: 4, min: 4, avg: 4, est: 0.73 },
-//             spareParts: [],
-//         },
-//     ],
-//     findings: [
-//         {
-//             taskId: "200435-01-1 (LH)",
-//             details: [
-//                 {
-//                     logItem: "HMV23/000211/0324/24",
-//                     probability: '66',
-//                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-//                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
-//                     spareParts: [
-//                         {
-//                             partId: "Nut",
-//                             desc: "POO1",
-//                             qty: "6",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Foam Tape",
-//                             desc: "POO2",
-//                             qty: "2",
-//                             unit: "",
-//                             price: "80"
-//                         },
-//                         {
-//                             partId: "Blind Rivet",
-//                             desc: "POO3",
-//                             qty: "1",
-//                             unit: "",
-//                             price: "40"
-//                         },
-//                         {
-//                             partId: "Selant",
-//                             desc: "POO4",
-//                             qty: "4",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Nut",
-//                             desc: "POO1",
-//                             qty: "6",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Foam Tape",
-//                             desc: "POO2",
-//                             qty: "2",
-//                             unit: "",
-//                             price: "80"
-//                         },
-//                         {
-//                             partId: "Blind Rivet",
-//                             desc: "POO3",
-//                             qty: "1",
-//                             unit: "",
-//                             price: "40"
-//                         },
-//                         {
-//                             partId: "Selant",
-//                             desc: "POO4",
-//                             qty: "4",
-//                             unit: "",
-//                             price: "20"
-//                         }
-//                     ],
-//                 },
-//                 {
-//                     logItem: "HMV23/000211/25",
-//                     probability: '44',
-//                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-//                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
-//                     spareParts: [],
-//                 },
-//                 {
-//                     logItem: "HMV23/000211/6",
-//                     probability: '46',
-//                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-//                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
-//                     spareParts: [
-//                         {
-//                             partId: "Nut",
-//                             desc: "POO1",
-//                             qty: "6",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Foam Tape",
-//                             desc: "POO2",
-//                             qty: "2",
-//                             unit: "",
-//                             price: "80"
-//                         },
-//                         {
-//                             partId: "Blind Rivet",
-//                             desc: "POO3",
-//                             qty: "1",
-//                             unit: "",
-//                             price: "40"
-//                         },
-//                         {
-//                             partId: "Selant",
-//                             desc: "POO4",
-//                             qty: "4",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Nut",
-//                             desc: "POO1",
-//                             qty: "6",
-//                             unit: "",
-//                             price: "20"
-//                         },
-//                         {
-//                             partId: "Foam Tape",
-//                             desc: "POO2",
-//                             qty: "2",
-//                             unit: "",
-//                             price: "80"
-//                         },
-//                         {
-//                             partId: "Blind Rivet",
-//                             desc: "POO3",
-//                             qty: "1",
-//                             unit: "",
-//                             price: "40"
-//                         },
-//                         {
-//                             partId: "Selant",
-//                             desc: "POO4",
-//                             qty: "4",
-//                             unit: "",
-//                             price: "20"
-//                         }
-//                     ],
-//                 },
-//                 {
-//                     logItem: "HMV23/000211/26",
-//                     probability: '64',
-//                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-//                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
-//                     spareParts: [],
-//                 },
-//             ],
-//         },
-//         {
-//             taskId: "255000-16-1",
-//             details: [
-//                 {
-//                     logItem: "HMV23/000211/0324/24",
-//                     probability: '66',
-//                     desciption: "WHILE CARRYING OUT MPD # 200435-01-1 (LH) ,FAN COMPARTMENT DETAILED INSPECTION OF EWIS IN THE FAN AND ACCESSORY GEAR BOX (EWIS ) FOUND CLAMP QTY # 2 CUSHION DAMAGED.",
-//                     mhs: { max: 2, min: 2, avg: 2, est: 4 },
-//                     spareParts: [],
-//                 }
-//             ],
-//         },
-//     ],
-// };
-
-{
-  /* <SimpleGrid cols={3} spacing='xs'>
-<Flex
-    justify="flex-start"
-    align="flex-start"
-    direction="column"
->
-    <Card withBorder w='100%' p={5}>
-        <Group p={0} gap='sm'>
-            <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                <MdOutlineTimeline style={{ width: '70%', height: '70%' }} />
-            </ThemeIcon>
-
-            <Flex direction='column'>
-                <Text size="md" fw={500} fz='h6' c='gray'>
-                    Total TAT Time
-                </Text>
-                <Text size="md" fw={600} fz='h3' >
-                    44
-                </Text>
-            </Flex>
-        </Group>
-    </Card>
-    <Space h='sm' />
-    <Card withBorder w='100%'>
-        <Flex gap="lg" direction="column">
-            <Title order={6} c='gray'>Est Man Hrs.</Title>
-            <Grid justify="flex-start" align="center">
-                <Grid.Col span={3}>
-                    <Text fz='sm'>Min</Text>
-                </Grid.Col>
-                <Grid.Col span={9}>
-                    <Group justify="flex-end" fz='xs' fw='600' c="green">{40} Hrs</Group>
-                    <Progress color="green" value={40} />
-                </Grid.Col>
-            </Grid>
-
-            <Grid justify="flex-start" align="center">
-                <Grid.Col span={3}>
-                    <Text fz='sm'>Estimated</Text>
-                </Grid.Col>
-                <Grid.Col span={9}>
-                    <Group justify="flex-end" fz='xs' fw='600' c="yellow">{66} Hrs</Group>
-                    <Progress color="yellow" value={66} />
-                </Grid.Col>
-            </Grid>
-
-            <Grid justify="flex-start" align="center">
-                <Grid.Col span={3}>
-                    <Text fz='sm'>Max</Text>
-                </Grid.Col>
-                <Grid.Col span={9}>
-                    <Group justify="flex-end" fz='xs' fw='600' c="red">{46} Hrs</Group>
-                    <Progress color="red" value={46} />
-                </Grid.Col>
-            </Grid>
-
-            <Grid justify="flex-start" align="center">
-                <Grid.Col span={3}>
-                    <Text fz='sm'>Capping</Text>
-                </Grid.Col>
-                <Grid.Col span={9}>
-                    <Group justify="flex-end" fz='xs' fw='600' c="indigo">{46} Hrs</Group>
-                    <Progress color="indigo" value={46} />
-                </Grid.Col>
-            </Grid>
-        </Flex>
-    </Card>
-    <Space h='sm' />
-    <Card withBorder w='100%' p={5}>
-        <Group p={0} gap='sm'>
-            <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                <MdOutlineMiscellaneousServices style={{ width: '70%', height: '70%' }} />
-            </ThemeIcon>
-            <Flex direction='column'>
-                <Text size="md" fw={500} fz='h6' c='gray'>
-                    Capping Unbilled Costing ($)
-                </Text>
-                <Text size="md" fw={600} fz='h3' >
-                    44
-                </Text>
-            </Flex>
-        </Group>
-    </Card>
-</Flex>
-
-<Card withBorder>
-    <Text size="md" fw={500} fz="h6" c="gray">
-        Estimated Parts
-    </Text>
-
-    
-    <div style={{ position: 'relative', height: '40vh', overflow: 'hidden' }}>
-        <Table
-            stickyHeader
-            striped
-            highlightOnHover
-            style={{
-                // position: 'relative',
-                overflow: 'auto',
-                height: '100%',
-            }}
-        >
-  
-            <Table.Thead
-                style={{
-                    position: 'sticky',
-                    top: 0,
-                    backgroundColor: 'white',
-                    zIndex: 1,
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-                }}
-            >
-                <Table.Tr>
-                    <Table.Th>Part Desc</Table.Th>
-                    <Table.Th>Part Name</Table.Th>
-                    <Table.Th>Qty</Table.Th>
-                    <Table.Th>Price($)</Table.Th>
-                </Table.Tr>
-            </Table.Thead>
-
-
-            <Table.Tbody style={{ overflow: 'auto', height: "50vh" }}>
-                {parts.length > 0 ? (
-                    parts.map((row, index) => (
-                        <Table.Tr key={index}>
-                            <Table.Td>{row.partDesc}</Table.Td>
-                            <Table.Td>{row.partName}</Table.Td>
-                            <Table.Td>{row.qty}</Table.Td>
-                            <Table.Td>{row.price}</Table.Td>
-                        </Table.Tr>
-                    ))
-                ) : (
-                    <Table.Tr>
-                        <Table.Td colSpan={4} style={{ textAlign: 'center' }}>
-                            No data available
-                        </Table.Td>
-                    </Table.Tr>
-                )}
-            </Table.Tbody>
-        </Table>
-    </div>
-</Card>
-
-<Flex
-    justify="flex-start"
-    align="flex-start"
-    direction="column"
->
-    <Card withBorder w='100%' p={5}>
-        <Group p={0} gap='sm'>
-            <ThemeIcon variant="light" radius="md" size="60" color="indigo">
-                <MdOutlineMiscellaneousServices style={{ width: '70%', height: '70%' }} />
-            </ThemeIcon>
-            <Flex direction='column'>
-                <Text size="md" fw={500} fz='h6' c='gray'>
-                    Estimated Spares Cost ($)
-                </Text>
-                <Text size="md" fw={600} fz='h3' >
-                    44
-                </Text>
-            </Flex>
-        </Group>
-    </Card>
-    <Space h='sm' />
-    <Card w='100%' withBorder radius={10}>
-        <Flex gap="lg" direction="column">
-            <Title order={5}>Spare Cost ($)</Title>
-            <AreaChart
-                h={250}
-                data={[
-                    {
-                        date: "Min",
-                        Cost: 100,
-                    },
-                    {
-                        date: "Estimated",
-                        Cost: 800,
-                    },
-                    {
-                        date: "Max",
-                        Cost: 1000,
-                    },
-                ]}
-                dataKey="date"
-                series={[{ name: "Cost", color: "indigo.6" }]}
-                curveType="natural"
-                connectNulls
-            />
-        </Flex>
-    </Card>
-</Flex>
-
-</SimpleGrid> */
-}

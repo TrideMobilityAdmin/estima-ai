@@ -19,7 +19,8 @@ const StatsCard: React.FC<any> = ({
   difference,
   accuracy,
   color,
-  not_eligible
+  not_eligible,
+  unit
 }) => {
   return (
     <Card
@@ -42,16 +43,16 @@ const StatsCard: React.FC<any> = ({
 
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Actual</Text>
-      <Text  fz="md">{actual} h</Text>
+      <Text  fz="md">{actual} {unit}</Text>
       </Group>
       <Space h='xs'/>
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Predicted</Text>
-      <Text  fz="md">{predicted} h</Text>
+      <Text  fz="md">{predicted} {unit}</Text>
       </Group>
       <Space h='xs'/>
 
-      <Group justify="space-between">
+      {/* <Group justify="space-between">
       <Text size="sm" c={color} style={{ cursor: "pointer" }}>
         Difference
       </Text>
@@ -67,10 +68,10 @@ const StatsCard: React.FC<any> = ({
         {accuracy} %
       </Text>
       </Group>
-      <Space h='xs'/>
+      <Space h='xs'/> */}
       <Group justify="space-between">
       <Text size="sm" c='#69696b'>Not Eligible</Text>
-      <Text  fz="md">{not_eligible} h</Text>
+      <Text  fz="md">{not_eligible} {unit}</Text>
       </Group>
     </Card>
   );

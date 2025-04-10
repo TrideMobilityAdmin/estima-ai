@@ -137,51 +137,55 @@ export default function CompareNew() {
           <StatsCard
             title="Tasks - MH"
             icon={IconClock}
-            actual={Math.round(compareEstimatedData?.aggregatedTasklevel?.avg_mh_actual) || 0}
-            predicted={Math.round(compareEstimatedData?.aggregatedTasklevel?.avg_mh_pred) || 0}
-            difference={Math.round(compareEstimatedData?.aggregatedTasklevel?.diff_avg_mh) || 0}
-            accuracy={Math.round(compareEstimatedData?.aggregatedTasklevel?.accuracy_mh) || 0}
+            actual={Math.round(compareEstimatedData?.tasks?.summary_tasks?.total_actual_manhours) || 0}
+            predicted={Math.round(compareEstimatedData?.tasks?.summary_tasks?.total_predict_manhours) || 0}
+            // difference={Math.round(compareEstimatedData?.aggregatedTasklevel?.diff_avg_mh) || 0}
+            // accuracy={Math.round(compareEstimatedData?.aggregatedTasklevel?.accuracy_mh) || 0}
             not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_mh) || 0}
             color="#6d8aed"
+            unit="h"
           />
 
           <StatsCard
             title="Tasks - Spares"
             icon={IconCurrencyDollar}
-            actual={compareEstimatedData?.aggregatedTasklevel?.total_billable_value_usd_tasks_actual?.toFixed(2) || 0}
-            predicted={compareEstimatedData?.aggregatedTasklevel?.total_billable_value_usd_tasks_pred?.toFixed(2) || 0}
-            difference={compareEstimatedData?.aggregatedTasklevel?.diff_total_billable_value_usd_tasks?.toFixed(2) || 0}
-            accuracy={compareEstimatedData?.aggregatedTasklevel?.accuracy_total_billable_value_usd_tasks?.toFixed(2) || 0}
+            actual={compareEstimatedData?.tasks?.summary_tasks?.total_actual_spares_cost?.toFixed(2) || 0}
+            predicted={compareEstimatedData?.tasks?.summary_tasks?.total_predict_spares_cost?.toFixed(2) || 0}
+            // difference={compareEstimatedData?.aggregatedTasklevel?.diff_total_billable_value_usd_tasks?.toFixed(2) || 0}
+            // accuracy={compareEstimatedData?.aggregatedTasklevel?.accuracy_total_billable_value_usd_tasks?.toFixed(2) || 0}
             not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_total_billable_value_usd_tasks) || 0}
             color="#70cc60"
+            unit="$"
           />
 
           <StatsCard
             title="Findings - MH"
             icon={IconAlertTriangle}
-            actual={Math.round(compareEstimatedData?.aggregatedFindingslevel?.avg_mh_findings_actual) || 0}
-            predicted={Math.round(compareEstimatedData?.aggregatedFindingslevel?.avg_mh_findings_pred) || 0}
-            difference={Math.round(compareEstimatedData?.aggregatedFindingslevel?.diff_avg_mh) || 0}
-            accuracy={Math.round(compareEstimatedData?.aggregatedFindingslevel?.accuracy_mh) || 0}
+            actual={Math.round(compareEstimatedData?.findings?.summary_findings?.total_actual_manhours) || 0}
+            predicted={Math.round(compareEstimatedData?.findings?.summary_findings?.total_predict_manhours) || 0}
+            // difference={Math.round(compareEstimatedData?.findings?.summary_findings?.total_actual_manhours) || 0}
+            // accuracy={Math.round(compareEstimatedData?.aggregatedFindingslevel?.accuracy_mh) || 0}
             not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_mh) || 0}
             color="#9e64d9"
+            unit="h"
           />
 
           <StatsCard
             title="Findings - Spares"
             icon={IconCurrencyDollar}
-            actual={compareEstimatedData?.aggregatedFindingslevel?.total_billable_value_usd_findings_actual?.toFixed(2) || 0}
-            predicted={compareEstimatedData?.aggregatedFindingslevel?.total_billable_value_usd_findings_pred?.toFixed(2) || 0}
-            difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
-            accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
+            actual={compareEstimatedData?.findings?.summary_findings?.total_actual_spares_cost?.toFixed(2) || 0}
+            predicted={compareEstimatedData?.findings?.summary_findings?.total_predict_spares_cost?.toFixed(2) || 0}
+            // difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
+            // accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
             not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
             color="orange"
+            unit="$"
           />
         </SimpleGrid>
         <Space h='sm' />
-        <SimpleGrid cols={2} spacing="md">
-        <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
-        <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings.eligible} findingsNotEligible={compareEstimatedData?.findings.not_eligible} />
+        <SimpleGrid cols={1} spacing="md">
+        <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible_tasks} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
+        <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings?.eligible_tasks} findingsNotEligible={compareEstimatedData?.findings?.not_eligible} />
         </SimpleGrid>
 
         
@@ -190,40 +194,3 @@ export default function CompareNew() {
     </>
   )
 }
-
-
-{/* <Card ml="200" mr='200'>
-          <Flex direction='column'>
-            <Title order={2} c='#2e2e2e'>Compare Estimates</Title>
-            <Text fz='sm' c='#2e2e2e'>Select Estimate ID & Select Actual Data files</Text>
-          </Flex>
-          <Space h='lg'/>
-          <div style={{marginLeft:'60px',marginRight:"60px"}}>
-          <Select
-                size="xs"
-                // w="18vw"
-                label="Select Estimate ID"
-                searchable
-                placeholder="Select Estimate ID"
-                data={estimates?.map((estimate, index) => ({
-                  value: `${estimate.estID}_${index}`, // Unique value
-                  label: estimate.estID, // Displayed text
-                }))}
-                value={selectedUniqueID} // Bind to unique ID
-                onChange={(value) => {
-                  if (value) {
-                    const [estID] = value.split("_"); // Extract the original estID
-                    setSelectedEstID(estID);
-                    setSelectedUniqueID(value); // Ensure UI updates even if duplicate
-                  } else {
-                    setSelectedEstID(null);
-                    setSelectedUniqueID(null);
-                  }
-                }}
-                allowDeselect
-              />
-              <Space h='sm'/>
-              <CompareUploadDropZoneExcelNew name="Excel File" changeHandler={handleFileChange} color="gray"/>
-          </div>
-
-        </Card> */}
