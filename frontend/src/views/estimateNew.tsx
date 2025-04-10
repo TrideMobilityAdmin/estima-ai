@@ -96,6 +96,7 @@ import {
   IconShadow,
   IconSquareCheck,
   IconStatusChange,
+  IconTimeDuration0,
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
@@ -3658,7 +3659,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
 
             {/* Estimated Man Hours */}
-            <Card withBorder radius="md" p="md" mb="md" bg="gray.0">
+            <Card withBorder radius="md" p="md" mb="sm" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
                 Estimated Man Hours
               </Text>
@@ -3691,7 +3692,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                             {typeof value === "number"
                               ? value.toFixed(0)
                               : value}{" "}
-                            Hrs
+                            hr
                           </Text>
                         </Group>
                         <Progress
@@ -3708,7 +3709,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     );
                   })}
 
-                <Box>
+                {/* <Box>
                   <Group justify="space-between" mb={5}>
                     <Text fz="xs" fw={500}>
                       Unbillable Man hours
@@ -3723,29 +3724,45 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     size="md"
                     radius="sm"
                   />
-                </Box>
+                </Box> */}
               </Flex>
             </Card>
 
             {/* Unbillable Cost */}
-            <Card withBorder radius="md" p="xs" mb="md" bg="blue.0">
+            <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
+            
               <Group gap="md">
-                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                <ThemeIcon variant="light" radius="md" size={30} color="blue.6">
                   <IconSettingsDollar size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
-                  <Text size="sm" fw={500} c="dimmed">
+                  <Text size="xs" fw={500} c="dimmed">
                     Unbillable Material Cost
                   </Text>
-                  <Text size="xl" fw={700} c="blue.6">
+                  <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost || 0}
                   </Text>
                 </Flex>
               </Group>
+              <Space h="xs" />
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={30} color="green.6">
+                  <IconClockHour4 size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="xs" fw={500} c="dimmed">
+                    Unbillable Man Hours
+                  </Text>
+                  <Text size="lg" fw={600} c={"green.6"}>
+                  {capppingMhs?.toFixed(0)} hr
+                  </Text>
+                </Flex>
+              </Group>
+              
             </Card>
 
             {/* Estimated Spares Cost */}
-            <Card withBorder radius="md" p="xs" bg="blue.0">
+            <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <MdOutlineMiscellaneousServices size={24} />
@@ -4874,10 +4891,14 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
 
   const downloadCSV = () => {
     if (!flattenedData || flattenedData.length === 0) {
-      console.warn("No data available for CSV export");
+      showNotification({
+        title: "Export Failed",
+        message: "No data available for export",
+        color: "red",
+      });
       return;
     }
-
+  
     // Define CSV Headers (Column Titles)
     const csvHeaders = [
       "Source Task",
@@ -4895,7 +4916,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       "Price",
       "Part Probability",
     ];
-
+  
     // Function to escape CSV fields
     const escapeCSVField = (field: any) => {
       if (field === null || field === undefined) return "-"; // Handle null or undefined
@@ -4910,8 +4931,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       }
       return stringField;
     };
-
-    // Map Flattened Data to CSV Format
+  
+    // Map ALL Flattened Data to CSV Format (not just visible rows)
     const csvData = flattenedData.map((task: any) => [
       escapeCSVField(task.sourceTask),
       escapeCSVField(task.description),
@@ -4928,7 +4949,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       escapeCSVField(task.price),
       escapeCSVField(task.prob),
     ]);
-
+  
     // Convert array to CSV format
     const csvContent =
       "data:text/csv;charset=utf-8," +
@@ -4938,7 +4959,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       ]
         .map((row) => row.join(","))
         .join("\n");
-
+  
     // Create a download link and trigger click
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -4947,6 +4968,72 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
+    showNotification({
+      title: "Export Successful",
+      message: `Exported ${flattenedData.length} records to CSV`,
+      color: "green",
+    });
+  };
+  
+  // Add a new function for Excel export
+  const downloadExcel = () => {
+    if (!flattenedData || flattenedData.length === 0) {
+      showNotification({
+        title: "Export Failed",
+        message: "No data available for export",
+        color: "red",
+      });
+      return;
+    }
+  
+    try {
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      
+      // Prepare data for Excel format
+      const excelData = flattenedData.map((task: any) => ({
+        "Source Task": task.sourceTask || "-",
+        "Description": task.description || "-",
+        "Cluster ID": task.cluster_id || "-",
+        "Probability": task.probability || 0,
+        "MHS Min": task.mhsMin || 0,
+        "MHS Max": task.mhsMax || 0,
+        "MHS Avg": task.mhsAvg || 0,
+        "MHS Est": task.mhsEst || 0,
+        "Part Number": task.partId || "-",
+        "Part Description": task.partDesc || "-",
+        "Quantity": task.qty || 0,
+        "Unit": task.unit || "-",
+        "Price": task.price || 0,
+        "Part Probability": task.prob || 0,
+      }));
+      
+      // Convert to worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Findings");
+      
+      // Write and download
+      XLSX.writeFile(wb, "Findings.xlsx");
+      
+      showNotification({
+        title: "Export Successful",
+        message: `Exported ${flattenedData.length} records to Excel`,
+        color: "green",
+      });
+    } catch (error) {
+      console.error("Excel export failed:", error);
+      showNotification({
+        title: "Export Failed",
+        message: "Failed to export to Excel. Falling back to CSV.",
+        color: "orange",
+      });
+      
+      // Fallback to CSV if Excel export fails
+      downloadCSV();
+    }
   };
 
   // UPDATED: Function to handle task selection and auto-select highest probability cluster
@@ -4975,10 +5062,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             >
               <Title order={4} c="white">
                 Findings
-              </Title>
+              </Title>  
               <Space w={50} />
-              <Button color="green" size="xs" onClick={downloadCSV} ml="60vw">
-                Download CSV
+              <Button color="green" size="xs" onClick={downloadExcel} ml="60vw">
+                Download Excel
               </Button>
             </div>
           </>
@@ -5918,8 +6005,8 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
               <Text c="white">Total Source Tasks - {tasks?.length}</Text>
               {/* <Space w={600}/> */}
               {/* Button aligned to the end */}
-              <Button color="green" size="xs" onClick={downloadCSV} ml="50vw">
-                Download CSV
+              <Button color="green" size="xs" onClick={downloadExcel} ml="50vw">
+                Download Excel
               </Button>
             </div>
           </>
