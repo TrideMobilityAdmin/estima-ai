@@ -1,0 +1,602 @@
+[
+    {
+      "id": 1,
+      "operatorName": "American Airlines",
+      "iataCode": "AA",
+      "country": "United States"
+    },
+    {
+      "id": 2,
+      "operatorName": "Delta Air Lines",
+      "iataCode": "DL",
+      "country": "United States"
+    },
+    {
+      "id": 3,
+      "operatorName": "United Airlines",
+      "iataCode": "UA",
+      "country": "United States"
+    },
+    {
+      "id": 4,
+      "operatorName": "Lufthansa",
+      "iataCode": "LH",
+      "country": "Germany"
+    },
+    {
+      "id": 5,
+      "operatorName": "British Airways",
+      "iataCode": "BA",
+      "country": "United Kingdom"
+    },
+    {
+      "id": 6,
+      "operatorName": "Air France",
+      "iataCode": "AF",
+      "country": "France"
+    },
+    {
+      "id": 7,
+      "operatorName": "Emirates",
+      "iataCode": "EK",
+      "country": "United Arab Emirates"
+    },
+    {
+      "id": 8,
+      "operatorName": "Qatar Airways",
+      "iataCode": "QR",
+      "country": "Qatar"
+    },
+    {
+      "id": 9,
+      "operatorName": "Singapore Airlines",
+      "iataCode": "SQ",
+      "country": "Singapore"
+    },
+    {
+      "id": 10,
+      "operatorName": "Cathay Pacific",
+      "iataCode": "CX",
+      "country": "Hong Kong SAR"
+    },
+    {
+      "id": 11,
+      "operatorName": "Air Canada",
+      "iataCode": "AC",
+      "country": "Canada"
+    },
+    {
+      "id": 12,
+      "operatorName": "Qantas",
+      "iataCode": "QF",
+      "country": "Australia"
+    },
+    {
+      "id": 13,
+      "operatorName": "KLM Royal Dutch Airlines",
+      "iataCode": "KL",
+      "country": "Netherlands"
+    },
+    {
+      "id": 14,
+      "operatorName": "Turkish Airlines",
+      "iataCode": "TK",
+      "country": "Turkey"
+    },
+    {
+      "id": 15,
+      "operatorName": "All Nippon Airways",
+      "iataCode": "NH",
+      "country": "Japan"
+    },
+    {
+      "id": 16,
+      "operatorName": "Japan Airlines",
+      "iataCode": "JL",
+      "country": "Japan"
+    },
+    {
+      "id": 17,
+      "operatorName": "China Southern Airlines",
+      "iataCode": "CZ",
+      "country": "China"
+    },
+    {
+      "id": 18,
+      "operatorName": "China Eastern Airlines",
+      "iataCode": "MU",
+      "country": "China"
+    },
+    {
+      "id": 19,
+      "operatorName": "Air China",
+      "iataCode": "CA",
+      "country": "China"
+    },
+    {
+      "id": 20,
+      "operatorName": "Korean Air",
+      "iataCode": "KE",
+      "country": "South Korea"
+    },
+    {
+      "id": 21,
+      "operatorName": "Asiana Airlines",
+      "iataCode": "OZ",
+      "country": "South Korea"
+    },
+    {
+      "id": 22,
+      "operatorName": "Thai Airways",
+      "iataCode": "TG",
+      "country": "Thailand"
+    },
+    {
+      "id": 23,
+      "operatorName": "Swiss International Air Lines",
+      "iataCode": "LX",
+      "country": "Switzerland"
+    },
+    {
+      "id": 24,
+      "operatorName": "EVA Air",
+      "iataCode": "BR",
+      "country": "Taiwan"
+    },
+    {
+      "id": 25,
+      "operatorName": "Etihad Airways",
+      "iataCode": "EY",
+      "country": "United Arab Emirates"
+    },
+    {
+      "id": 26,
+      "operatorName": "ANA Wings",
+      "iataCode": "EH",
+      "country": "Japan"
+    },
+    {
+      "id": 27,
+      "operatorName": "Garuda Indonesia",
+      "iataCode": "GA",
+      "country": "Indonesia"
+    },
+    {
+      "id": 28,
+      "operatorName": "Malaysia Airlines",
+      "iataCode": "MH",
+      "country": "Malaysia"
+    },
+    {
+      "id": 29,
+      "operatorName": "Virgin Atlantic",
+      "iataCode": "VS",
+      "country": "United Kingdom"
+    },
+    {
+      "id": 30,
+      "operatorName": "Iberia",
+      "iataCode": "IB",
+      "country": "Spain"
+    },
+    {
+      "id": 31,
+      "operatorName": "Finnair",
+      "iataCode": "AY",
+      "country": "Finland"
+    },
+    {
+      "id": 32,
+      "operatorName": "Aeroflot",
+      "iataCode": "SU",
+      "country": "Russia"
+    },
+    {
+      "id": 33,
+      "operatorName": "SAS Scandinavian Airlines",
+      "iataCode": "SK",
+      "country": "Sweden"
+    },
+    {
+      "id": 34,
+      "operatorName": "TAP Air Portugal",
+      "iataCode": "TP",
+      "country": "Portugal"
+    },
+    {
+      "id": 35,
+      "operatorName": "Air New Zealand",
+      "iataCode": "NZ",
+      "country": "New Zealand"
+    },
+    {
+      "id": 36,
+      "operatorName": "Air India",
+      "iataCode": "AI",
+      "country": "India"
+    },
+    {
+      "id": 37,
+      "operatorName": "IndiGo",
+      "iataCode": "6E",
+      "country": "India"
+    },
+    {
+      "id": 38,
+      "operatorName": "SpiceJet",
+      "iataCode": "SG",
+      "country": "India"
+    },
+    {
+      "id": 39,
+      "operatorName": "Vistara",
+      "iataCode": "UK",
+      "country": "India"
+    },
+    {
+      "id": 40,
+      "operatorName": "Austrian Airlines",
+      "iataCode": "OS",
+      "country": "Austria"
+    },
+    {
+      "id": 41,
+      "operatorName": "Brussels Airlines",
+      "iataCode": "SN",
+      "country": "Belgium"
+    },
+    {
+      "id": 42,
+      "operatorName": "LOT Polish Airlines",
+      "iataCode": "LO",
+      "country": "Poland"
+    },
+    {
+      "id": 43,
+      "operatorName": "Aegean Airlines",
+      "iataCode": "A3",
+      "country": "Greece"
+    },
+    {
+      "id": 44,
+      "operatorName": "LATAM Airlines",
+      "iataCode": "LA",
+      "country": "Chile"
+    },
+    {
+      "id": 45,
+      "operatorName": "Avianca",
+      "iataCode": "AV",
+      "country": "Colombia"
+    },
+    {
+      "id": 46,
+      "operatorName": "Aeroméxico",
+      "iataCode": "AM",
+      "country": "Mexico"
+    },
+    {
+      "id": 47,
+      "operatorName": "South African Airways",
+      "iataCode": "SA",
+      "country": "South Africa"
+    },
+    {
+      "id": 48,
+      "operatorName": "Ethiopian Airlines",
+      "iataCode": "ET",
+      "country": "Ethiopia"
+    },
+    {
+      "id": 49,
+      "operatorName": "Kenya Airways",
+      "iataCode": "KQ",
+      "country": "Kenya"
+    },
+    {
+      "id": 50,
+      "operatorName": "EgyptAir",
+      "iataCode": "MS",
+      "country": "Egypt"
+    },
+    {
+      "id": 51,
+      "operatorName": "Royal Air Maroc",
+      "iataCode": "AT",
+      "country": "Morocco"
+    },
+    {
+      "id": 52,
+      "operatorName": "Saudia",
+      "iataCode": "SV",
+      "country": "Saudi Arabia"
+    },
+    {
+      "id": 53,
+      "operatorName": "Royal Jordanian",
+      "iataCode": "RJ",
+      "country": "Jordan"
+    },
+    {
+      "id": 54,
+      "operatorName": "Gulf Air",
+      "iataCode": "GF",
+      "country": "Bahrain"
+    },
+    {
+      "id": 55,
+      "operatorName": "Oman Air",
+      "iataCode": "WY",
+      "country": "Oman"
+    },
+    {
+      "id": 56,
+      "operatorName": "Vietnam Airlines",
+      "iataCode": "VN",
+      "country": "Vietnam"
+    },
+    {
+      "id": 57,
+      "operatorName": "Philippine Airlines",
+      "iataCode": "PR",
+      "country": "Philippines"
+    },
+    {
+      "id": 58,
+      "operatorName": "Cebu Pacific",
+      "iataCode": "5J",
+      "country": "Philippines"
+    },
+    {
+      "id": 59,
+      "operatorName": "Lion Air",
+      "iataCode": "JT",
+      "country": "Indonesia"
+    },
+    {
+      "id": 60,
+      "operatorName": "AirAsia",
+      "iataCode": "AK",
+      "country": "Malaysia"
+    },
+    {
+      "id": 61,
+      "operatorName": "Jetstar Airways",
+      "iataCode": "JQ",
+      "country": "Australia"
+    },
+    {
+      "id": 62,
+      "operatorName": "Virgin Australia",
+      "iataCode": "VA",
+      "country": "Australia"
+    },
+    {
+      "id": 63,
+      "operatorName": "Southwest Airlines",
+      "iataCode": "WN",
+      "country": "United States"
+    },
+    {
+      "id": 64,
+      "operatorName": "JetBlue Airways",
+      "iataCode": "B6",
+      "country": "United States"
+    },
+    {
+      "id": 65,
+      "operatorName": "Alaska Airlines",
+      "iataCode": "AS",
+      "country": "United States"
+    },
+    {
+      "id": 66,
+      "operatorName": "Spirit Airlines",
+      "iataCode": "NK",
+      "country": "United States"
+    },
+    {
+      "id": 67,
+      "operatorName": "Frontier Airlines",
+      "iataCode": "F9",
+      "country": "United States"
+    },
+    {
+      "id": 68,
+      "operatorName": "Hawaiian Airlines",
+      "iataCode": "HA",
+      "country": "United States"
+    },
+    {
+      "id": 69,
+      "operatorName": "WestJet",
+      "iataCode": "WS",
+      "country": "Canada"
+    },
+    {
+      "id": 70,
+      "operatorName": "Air Transat",
+      "iataCode": "TS",
+      "country": "Canada"
+    },
+    {
+      "id": 71,
+      "operatorName": "Ryanair",
+      "iataCode": "FR",
+      "country": "Ireland"
+    },
+    {
+      "id": 72,
+      "operatorName": "easyJet",
+      "iataCode": "U2",
+      "country": "United Kingdom"
+    },
+    {
+      "id": 73,
+      "operatorName": "Vueling Airlines",
+      "iataCode": "VY",
+      "country": "Spain"
+    },
+    {
+      "id": 74,
+      "operatorName": "Wizz Air",
+      "iataCode": "W6",
+      "country": "Hungary"
+    },
+    {
+      "id": 75,
+      "operatorName": "Norwegian Air Shuttle",
+      "iataCode": "DY",
+      "country": "Norway"
+    },
+    {
+      "id": 76,
+      "operatorName": "Aer Lingus",
+      "iataCode": "EI",
+      "country": "Ireland"
+    },
+    {
+      "id": 77,
+      "operatorName": "Eurowings",
+      "iataCode": "EW",
+      "country": "Germany"
+    },
+    {
+      "id": 78,
+      "operatorName": "Pegasus Airlines",
+      "iataCode": "PC",
+      "country": "Turkey"
+    },
+    {
+      "id": 79,
+      "operatorName": "AZUL Brazilian Airlines",
+      "iataCode": "AD",
+      "country": "Brazil"
+    },
+    {
+      "id": 80,
+      "operatorName": "GOL Airlines",
+      "iataCode": "G3",
+      "country": "Brazil"
+    },
+    {
+      "id": 81,
+      "operatorName": "Volaris",
+      "iataCode": "Y4",
+      "country": "Mexico"
+    },
+    {
+      "id": 82,
+      "operatorName": "Interjet",
+      "iataCode": "4O",
+      "country": "Mexico"
+    },
+    {
+      "id": 83,
+      "operatorName": "Copa Airlines",
+      "iataCode": "CM",
+      "country": "Panama"
+    },
+    {
+      "id": 84,
+      "operatorName": "Caribbean Airlines",
+      "iataCode": "BW",
+      "country": "Trinidad and Tobago"
+    },
+    {
+      "id": 85,
+      "operatorName": "AirBaltic",
+      "iataCode": "BT",
+      "country": "Latvia"
+    },
+    {
+      "id": 86,
+      "operatorName": "Air Astana",
+      "iataCode": "KC",
+      "country": "Kazakhstan"
+    },
+    {
+      "id": 87,
+      "operatorName": "Air Mauritius",
+      "iataCode": "MK",
+      "country": "Mauritius"
+    },
+    {
+      "id": 88,
+      "operatorName": "Fiji Airways",
+      "iataCode": "FJ",
+      "country": "Fiji"
+    },
+    {
+      "id": 89,
+      "operatorName": "Air Tahiti Nui",
+      "iataCode": "TN",
+      "country": "French Polynesia"
+    },
+    {
+      "id": 90,
+      "operatorName": "Royal Brunei Airlines",
+      "iataCode": "BI",
+      "country": "Brunei"
+    },
+    {
+      "id": 91,
+      "operatorName": "Air Seychelles",
+      "iataCode": "HM",
+      "country": "Seychelles"
+    },
+    {
+      "id": 92,
+      "operatorName": "Aerolineas Argentinas",
+      "iataCode": "AR",
+      "country": "Argentina"
+    },
+    {
+      "id": 93,
+      "operatorName": "Malta Air",
+      "iataCode": "AL",
+      "country": "Malta"
+    },
+    {
+      "id": 94,
+      "operatorName": "Croatia Airlines",
+      "iataCode": "OU",
+      "country": "Croatia"
+    },
+    {
+      "id": 95,
+      "operatorName": "TAP Express",
+      "iataCode": "NI",
+      "country": "Portugal"
+    },
+    {
+      "id": 96,
+      "operatorName": "Air Europa",
+      "iataCode": "UX",
+      "country": "Spain"
+    },
+    {
+      "id": 97,
+      "operatorName": "Luxair",
+      "iataCode": "LG",
+      "country": "Luxembourg"
+    },
+    {
+      "id": 98,
+      "operatorName": "Iran Air",
+      "iataCode": "IR",
+      "country": "Iran"
+    },
+    {
+      "id": 99,
+      "operatorName": "Iraqi Airways",
+      "iataCode": "IA",
+      "country": "Iraq"
+    },
+    {
+      "id": 100,
+      "operatorName": "Kuwait Airways",
+      "iataCode": "KU",
+      "country": "Kuwait"
+    }
+  ]

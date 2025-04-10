@@ -120,6 +120,7 @@ import excelTemplateFile from "../assets/RFQ_Excel_Template.xlsx";
 import { saveAs } from "file-saver";
 import ExcelJS from "exceljs";
 import aircraftMOdelsData from "../assets/aircraftModels.json";
+import aircraftOperators from "../assets/aircraftOperators.json";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -359,8 +360,7 @@ export default function EstimateNew() {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `Estimate_${selectedEstimateId}_${
-        status ? "Available" : "NotAvailable"
+      `Estimate_${selectedEstimateId}_${status ? "Available" : "NotAvailable"
       }.csv`
     );
     document.body.appendChild(link);
@@ -379,38 +379,38 @@ export default function EstimateNew() {
       excelData =
         filteredTasks.length > 0
           ? filteredTasks.map((task) => ({
-              "TASK NUMBER": task?.taskid || "",
-              //   "ESTIMATE ID": selectedEstimateId,
-              STATUS: "Available",
-            }))
+            "TASK NUMBER": task?.taskid || "",
+            //   "ESTIMATE ID": selectedEstimateId,
+            STATUS: "Available",
+          }))
           : [
-              {
-                "TASK NUMBER": "",
-                // "ESTIMATE ID": "",
-                STATUS: "",
-              },
-            ];
+            {
+              "TASK NUMBER": "",
+              // "ESTIMATE ID": "",
+              STATUS: "",
+            },
+          ];
     } else {
       // Status === false: Include MAN HOURS and DESCRIPTION as empty
       excelData =
         filteredTasks.length > 0
           ? filteredTasks.map((task) => ({
-              "TASK NUMBER": task?.taskid || "",
-              DESCRIPTION: "",
-              "MAN HOURS": "",
-              STATUS: "Not Available",
-              //   "ESTIMATE ID": selectedEstimateId,
-            }))
+            "TASK NUMBER": task?.taskid || "",
+            DESCRIPTION: "",
+            "MAN HOURS": "",
+            STATUS: "Not Available",
+            //   "ESTIMATE ID": selectedEstimateId,
+          }))
           : [
-              {
-                "TASK NUMBER": "",
-                DESCRIPTION: "",
+            {
+              "TASK NUMBER": "",
+              DESCRIPTION: "",
 
-                "MAN HOURS": "",
-                STATUS: "",
-                // "ESTIMATE ID": "",
-              },
-            ];
+              "MAN HOURS": "",
+              STATUS: "",
+              // "ESTIMATE ID": "",
+            },
+          ];
     }
 
     // Create Excel sheet and download
@@ -420,8 +420,7 @@ export default function EstimateNew() {
 
     XLSX.writeFile(
       wb,
-      `Estimate_${selectedEstimateId}_${
-        status ? "Available" : "NotAvailable"
+      `Estimate_${selectedEstimateId}_${status ? "Available" : "NotAvailable"
       }.xlsx`
     );
   };
@@ -454,7 +453,7 @@ export default function EstimateNew() {
   // }
 
   // Form initialization
-  const form = useForm({
+  const form = useForm<any>({
     initialValues: {
       tasks: [],
       probability: 10,
@@ -478,6 +477,7 @@ export default function EstimateNew() {
       miscLaborTasks: [],
       additionalTasks: [],
     },
+    validateInputOnChange: true,
 
     validate: {
       operator: (value) => (value.trim() ? null : "Operator is required"),
@@ -615,14 +615,14 @@ export default function EstimateNew() {
       selectedExpertInsightTasks.length > 0
         ? selectedExpertInsightTasks
         : [
-            {
-              taskID: "",
-              taskDescription: "",
-              manHours: 0,
-              skill: "",
-              spareParts: [{ partID: "", quantity: 0 }],
-            },
-          ];
+          {
+            taskID: "",
+            taskDescription: "",
+            manHours: 0,
+            skill: "",
+            spareParts: [{ partID: "", quantity: 0 }],
+          },
+        ];
 
     const requestData = {
       tasks: validTasks || [],
@@ -666,15 +666,29 @@ export default function EstimateNew() {
         // Reset form fields after successful submission
         form.reset();
         form.setValues({
-          typeOfCheck: [], // Reset as empty array
-          typeOfCheckID: "", // Reset typeOfCheckID
+          tasks: [],
+          probability: 10,
+          operator: "",
+          aircraftRegNo: "",
+          aircraftModel: "",
+          aircraftAge: "",
+          aircraftFlightHours: "",
+          aircraftFlightCycles: "",
+          areaOfOperations: "",
           cappingDetails: {
             cappingTypeManhrs: "",
             cappingManhrs: 0,
             cappingTypeSpareCost: "",
             cappingSpareCost: 0,
           },
+          taskID: "",
+          taskDescription: "",
+          typeOfCheck: [],
+          typeOfCheckID: "",
+          miscLaborTasks: [],
+          additionalTasks: [],
         });
+
         // Reset related state variables
         setSelectedFile(null); // Reset the selected file
         setValidatedTasks([]); // Reset validated tasks
@@ -1890,7 +1904,7 @@ export default function EstimateNew() {
                       (validatedTasks?.filter((ele) => ele.status === true)
                         ?.length /
                         validatedTasks?.length) *
-                        100 || 0
+                      100 || 0
                     )}{" "}
                     %
                   </Badge>
@@ -1917,7 +1931,7 @@ export default function EstimateNew() {
                       (validatedTasks?.filter((ele) => ele.status === false)
                         ?.length /
                         validatedTasks?.length) *
-                        100 || 0
+                      100 || 0
                     )}{" "}
                     %
                   </Badge>
@@ -2512,8 +2526,14 @@ export default function EstimateNew() {
                       "12Y CHECK",
                       "6Y CHECK",
                     ]}
-                    {...form.getInputProps("typeOfCheck")}
+                    value={form.values.typeOfCheck}
+                    onChange={(value) => {
+                      form.setFieldValue("typeOfCheck", value);
+                      form.validateField("typeOfCheck");
+                    }}
+                    error={form.errors.typeOfCheck}
                   />
+
                   <TextInput
                     size="xs"
                     leftSection={<MdPin />}
@@ -2522,7 +2542,67 @@ export default function EstimateNew() {
                     type="number"
                     step="0.01"
                     {...form.getInputProps("aircraftAge")}
+                    error={form.errors.aircraftAge}
                   />
+
+                  <Select
+                    size="xs"
+                    searchable
+                    clearable
+                    leftSection={<IconPlaneTilt size={20} />}
+                    placeholder="Indigo, AirIndia"
+                    label="Operator"
+                    data={aircraftOperators.map((el) => ({
+                      label: el.operatorName,
+                      value: el.operatorName,
+                    }))}
+                    value={form.values.operator}
+                    onChange={(value) => {
+                      form.setFieldValue("operator", value || "");
+                      form.validateField("operator");
+                    }}
+                    error={form.errors.operator}
+                  />
+
+                  <Select
+                    size="xs"
+                    searchable
+                    clearable
+                    leftSection={<IconPlaneTilt size={20} />}
+                    placeholder="Select Aircraft Model"
+                    label="Aircraft Model"
+                    data={aircraftMOdelsData.map((el) => ({
+                      label: el.model,
+                      value: el.model,
+                    }))}
+                    value={form.values.aircraftModel}
+                    onChange={(value) => {
+                      form.setFieldValue("aircraftModel", value || "");
+                      form.validateField("aircraftModel");
+                    }}
+                    error={form.errors.aircraftModel}
+                  />
+
+                  <TextInput
+                    ref={aircraftRegNoRef}
+                    size="xs"
+                    leftSection={<IconPlaneTilt size="20" />}
+                    placeholder="Ex: N-64AB, SP-LR"
+                    label="Aircraft Reg No"
+                    {...form.getInputProps("aircraftRegNo")}
+                    error={form.errors.aircraftRegNo}
+                  />
+
+                  <TextInput
+                    size="xs"
+                    label="Check Type Description (for ID)"
+                    placeholder="Enter Check Type ID"
+                    {...form.getInputProps("typeOfCheckID")}
+                    error={form.errors.typeOfCheckID}
+                  />
+
+                  
+
                   {/* <TextInput
                                         // ref={aircraftRegNoRef}
                                         size="xs"
@@ -2532,41 +2612,13 @@ export default function EstimateNew() {
                                         {...form.getInputProps("aircraftModel")}
                                     />
                                     */}
-
-                  <Select
-                    size="xs"
-                    searchable
-                    leftSection={<IconPlaneTilt size={20} />}
-                    placeholder="Select Aircraft Model"
-                    label="Aircraft Model"
-                    data={aircraftMOdelsData.map((el) => ({
-                      label: el.model,
-                      value: el.model,
-                    }))}
-                    {...form.getInputProps("aircraftModel")}
-                  />
-
-                  <TextInput
+                  {/* <TextInput
                     size="xs"
                     leftSection={<IconPlaneTilt size="20" />}
                     placeholder="Indigo, AirIndia"
                     label="Operator"
                     {...form.getInputProps("operator")}
-                  />
-                  <TextInput
-                    ref={aircraftRegNoRef}
-                    size="xs"
-                    leftSection={<IconPlaneTilt size="20" />}
-                    placeholder="Ex:N-64AB, SP-LR"
-                    label="Aircraft Reg No"
-                    {...form.getInputProps("aircraftRegNo")}
-                  />
-                  <TextInput
-                    size="xs"
-                    label="Check Type Description (for ID)"
-                    placeholder="Enter Check Type ID"
-                    {...form.getInputProps("typeOfCheckID")}
-                  />
+                  /> */}
                 </SimpleGrid>
                 <Space h="xs" />
                 {showFields?.length > 0 ? (
@@ -3207,8 +3259,8 @@ border-bottom: none;
                         {tabValue === "overall"
                           ? "Estimate Report"
                           : tabValue === "finding"
-                          ? "Findings Report"
-                          : "MPD Report"}
+                            ? "Findings Report"
+                            : "MPD Report"}
                         {/* Overall Estimate Report */}
                       </Title>
                     </Group>
@@ -3228,7 +3280,7 @@ border-bottom: none;
                           // leftSection={<MdPictureAsPdf size={14} />}
                           rightSection={<MdOutlineFileDownload size={14} />}
                           onClick={downloadCSVReport}
-                          // loading={downloading}
+                        // loading={downloading}
                         >
                           {downloading ? "Downloading..." : "CSV"}
                         </Button>
@@ -3246,7 +3298,7 @@ border-bottom: none;
                           // leftSection={<MdPictureAsPdf size={14} />}
                           rightSection={<MdOutlineFileDownload size={14} />}
                           onClick={downloadExcelReport}
-                          // loading={downloading}
+                        // loading={downloading}
                         >
                           {downloading ? "Downloading..." : "Excel"}
                         </Button>
@@ -3555,10 +3607,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       key === "min"
                         ? "teal.6"
                         : key === "max"
-                        ? "blue.6"
-                        : key === "avg"
-                        ? "teal.6"
-                        : "green.6";
+                          ? "blue.6"
+                          : key === "avg"
+                            ? "teal.6"
+                            : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -3852,10 +3904,10 @@ const OverallFindingsReport: React.FC<any> = ({
                       key === "min"
                         ? "teal.6"
                         : key === "max"
-                        ? "blue.6"
-                        : key === "avg"
-                        ? "teal.6"
-                        : "green.6";
+                          ? "blue.6"
+                          : key === "avg"
+                            ? "teal.6"
+                            : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -4137,10 +4189,10 @@ const OverallMPDReport: React.FC<any> = ({
                       key === "min"
                         ? "teal.6"
                         : key === "max"
-                        ? "blue.6"
-                        : key === "avg"
-                        ? "teal.6"
-                        : "green.6";
+                          ? "blue.6"
+                          : key === "avg"
+                            ? "teal.6"
+                            : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -4968,7 +5020,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                       <Accordion.Item key={groupKey} value={groupKey} w="100%">
                         <Accordion.Control>
                           <Text fw={600} truncate>
-                            {groupKey}
+                            ATA {groupKey}
                           </Text>
                         </Accordion.Control>
                         <Accordion.Panel>
@@ -5045,7 +5097,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                         <Tooltip
                           key={clusterIndex}
                           label={clusterItem.cluster}
-                          // label={`${clusterItem.cluster} (Probability: ${clusterItem.prob.toFixed(2)}%)`}
+                        // label={`${clusterItem.cluster} (Probability: ${clusterItem.prob.toFixed(2)}%)`}
                         >
                           <Badge
                             fullWidth
@@ -5196,7 +5248,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                       <Flex direction="column">
                         <Text fz="xs">Estimated</Text>
                         <Text fz="xl" fw={600}>
-                          {selectedFindingDetail?.mhs?.est?.toFixed(0) || 0} Hr
+                          {selectedFindingDetail?.mhs?.avg?.toFixed(0) || 0} Hr
                         </Text>
                       </Flex>
                       <IconClockCheck color="indigo" size="25" />
@@ -5878,13 +5930,13 @@ border-bottom: none;
             pagination={true}
             paginationPageSize={10}
             domLayout="autoHeight"
-            // defaultColDef={{
-            //   sortable: true,
-            //   filter: true,
-            //   resizable: true,
-            //   minWidth: 100,
-            //   flex: 1
-            // }}
+          // defaultColDef={{
+          //   sortable: true,
+          //   filter: true,
+          //   resizable: true,
+          //   minWidth: 100,
+          //   flex: 1
+          // }}
           />
         </div>
       </Modal>
@@ -5941,7 +5993,7 @@ border-bottom: none;
                         >
                           <Accordion.Control>
                             <Text fw={600} truncate>
-                              {groupKey}
+                              ATA {groupKey}
                             </Text>
                           </Accordion.Control>
                           <Accordion.Panel>
@@ -5952,7 +6004,7 @@ border-bottom: none;
                                     key={taskIndex}
                                     variant={
                                       selectedTask?.sourceTask ===
-                                      task.sourceTask
+                                        task.sourceTask
                                         ? "filled"
                                         : "light"
                                     }
@@ -6087,7 +6139,7 @@ border-bottom: none;
                             <Flex direction="column">
                               <Text fz="xs">Estimated</Text>
                               <Text fz="xl" fw={600}>
-                                {selectedTask?.mhs?.est?.toFixed(0) || 0} Hr
+                                {selectedTask?.mhs?.avg?.toFixed(0) || 0} Hr
                               </Text>
                             </Flex>
                             <IconClockCheck color="indigo" size="25" />
