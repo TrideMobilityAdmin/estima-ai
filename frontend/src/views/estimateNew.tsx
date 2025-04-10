@@ -202,6 +202,40 @@ export default function EstimateNew() {
   //     }
   //     setLoading(false);
   // };
+
+  const operatorsList = ['GO AIRLINES (INDIA) LTD',
+    'ALPHA STAR AVIATION SERVICES',
+    'EZEN AVIATION PTY LTD',
+    'AERGO CAPITAL',
+    'SPICEJET',
+    'SMARTLYNX AIRLINES LTD',
+    'INDIGO',
+    'AIX Connect Private Limited',
+    'JAZEERA AIRWAYS',
+    'TURBO MEGHA AIRWAYS PVT LTD',
+    'AIRCASTLE SINGAPORE PTE. LTD',
+    'TATA SIA AIRLINES',
+    'GE CAPITAL AVIATION SERVICES',
+    'US BANGLA',
+    'DRUK AIR',
+    'OMAN AIR',
+    'BIG CHARTERS PVT LTD (FLYBIG)',
+    'FLYNAS',
+    'FLYDUBAI',
+    'ISLAND AVIATION SERVICES LTD',
+    'MANTA AIR',
+    'SNV AVIATION PRIVATE LIMITED AKASA AIR',
+    'BEOND SIMDI OPERATIONS PRIVATE LIMITED',
+    'NOVOAIR LTD',
+    'FITS AIR',
+    'CEBU AIR, INC.',
+    'AERO NOMAD AIRLINES LLC',
+    'SRILANKA AIRLINES LTD',
+    'KUWAIT AIRWAYS COMPANY',
+    'SNV AVIATION PRIVATE LIMITED',
+    'QUIKJET CARGO AIRLINES PRIVATE LIMITED',
+    'WIZZ AIR ABU DHABI LLC'];
+
   const fetchEstimatesStatus = async () => {
     setLoading(true);
     const data = await getAllEstimatesStatus();
@@ -2552,10 +2586,11 @@ export default function EstimateNew() {
                     leftSection={<IconPlaneTilt size={20} />}
                     placeholder="Indigo, AirIndia"
                     label="Operator"
-                    data={aircraftOperators.map((el) => ({
-                      label: el.operatorName,
-                      value: el.operatorName,
-                    }))}
+                    data={operatorsList}
+                    // data={aircraftOperators.map((el) => ({
+                    //   label: el.operatorName,
+                    //   value: el.operatorName,
+                    // }))}
                     value={form.values.operator}
                     onChange={(value) => {
                       form.setFieldValue("operator", value || "");
