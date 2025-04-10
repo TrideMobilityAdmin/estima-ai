@@ -236,6 +236,16 @@ export default function EstimateNew() {
     'QUIKJET CARGO AIRLINES PRIVATE LIMITED',
     'WIZZ AIR ABU DHABI LLC'];
 
+    const models = ['A320',
+      'ATR42',
+      'ATR72',
+      'B737 NG',
+      'Q400',
+      'A321',
+      'B737 MAX',
+      'A319',
+      'B737-800(BCF)'];     
+
   const fetchEstimatesStatus = async () => {
     setLoading(true);
     const data = await getAllEstimatesStatus();
@@ -2606,10 +2616,11 @@ export default function EstimateNew() {
                     leftSection={<IconPlaneTilt size={20} />}
                     placeholder="Select Aircraft Model"
                     label="Aircraft Model"
-                    data={aircraftMOdelsData.map((el) => ({
-                      label: el.model,
-                      value: el.model,
-                    }))}
+                    data={models}
+                    // data={aircraftMOdelsData.map((el) => ({
+                    //   label: el.model,
+                    //   value: el.model,
+                    // }))}
                     value={form.values.aircraftModel}
                     onChange={(value) => {
                       form.setFieldValue("aircraftModel", value || "");
