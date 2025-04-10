@@ -771,9 +771,21 @@ class ExcelUploadService:
                 # print(task)
                 # print(actual_task_data)
                 # break
+                actual_spares_list = []
                 if 'billable_value_usd' in actual_parts_data and len(actual_parts_data["billable_value_usd"]) > 0:
-                    actual_spares_cost = actual_parts_data["billable_value_usd"].values[0]
+                    for index, row in actual_parts_data.iterrows():
+                        rowdict = row.to_dict()
+                        spares_dict = {}
+                        spares_dict["partId"] = rowdict["issued_part_number"]
+                        spares_dict["desc"] = rowdict["part_description"]
+                        spares_dict["price"] = rowdict["billable_value_usd"]
+                        spares_dict["qty"] = rowdict["used_quantity"]
+                        spares_dict["unit"]=rowdict["issued_unit_of_measurement"]
+                        actual_spares_cost = actual_spares_cost + rowdict["billable_value_usd"]
+                        actual_spares_list.append(spares_dict)
+                    # actual_spares_cost = actual_parts_data["billable_value_usd"].values[0]
                 mydict["actual_manhours"]  = actual_manhours
+                mydict["actual_spares_list"] = actual_spares_list
                 mydict["actual_spares_cost"] = actual_spares_cost
                 mydict["task_number"] = task
                 # print(predicted_task_data["mhs"])
@@ -809,11 +821,99 @@ class ExcelUploadService:
         summary_tasks_comparision["total_predict_manhours"] = total_predict_manhours
         summary_tasks_comparision["total_actual_manhours"] = total_actual_manhours
         # summary_eligible_tasks = {"summary" : summary_tasks_comparision}
-        eligible_tasks_comparision = {"eligible_tasks": final_mpd_data }
-        output_eligible_tasks_comparision = {"tasks": eligible_tasks_comparision}
-        output_eligible_tasks_comparision["summary"] = summary_tasks_comparision
+        eligible_tasks_comparision = {"eligible_tasks": final_mpd_data, "summary_tasks" :  summary_tasks_comparision}
+        # output_eligible_tasks_comparision = {"tasks": eligible_tasks_comparision}
         logger.info("output_eligible_tasks_comparision successfully fetched")
-        return output_eligible_tasks_comparision
+
+        final_findings_data = self.findings(pred_findings_data_full, sub_task_parts,sub_task_description, eligibile_tasks)
+        logger.info("final_findings_data successfully fetched")
+        finaloutput = {}
+        finaloutput["tasks"] = eligible_tasks_comparision
+        finaloutput["findings"] = final_findings_data
+        return finaloutput
+
+        
+
+    def findings(self,pred_findings_data_full, sub_task_parts,sub_task_description, eligibile_tasks):
+        final_findings_data = []
+        kindex = 0
+        for task in eligibile_tasks:
+            # if task != '200145-01-1':
+            #     continue
+            mydict = {}
+            pred_findings_data = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
+            # print(pred_findings_data)
+            sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number"] == task]
+            actual_findings_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
+            findings_spares_cost = 0
+            findings_spareslist = []
+            actual_spares_list = []
+            actual_manhours = 0
+            for index, row in sub_task_description_data.iterrows():
+                rowdict = row.to_dict()
+                actual_manhours = actual_manhours + rowdict["actual_man_hours"]
+                #print(actual_manhours)
+            mydict["actual_findings_manhours"] = actual_manhours
+            actual_spares_cost = 0
+            for index, row in actual_findings_parts_data.iterrows():
+                rowdict = row.to_dict()
+                spares_dict = {}
+                spares_dict["partId"] = rowdict["issued_part_number"]
+                spares_dict["desc"] = rowdict["part_description"]
+                spares_dict["price"] = rowdict["billable_value_usd"]
+                spares_dict["qty"] = rowdict["used_quantity"]
+                spares_dict["unit"] = rowdict["issued_unit_of_measurement"]
+                actual_spares_cost = actual_spares_cost + row["billable_value_usd"]
+                actual_spares_list.append(spares_dict)
+                
+            mydict["actual_findings_spares_cost"] = actual_spares_cost
+            mydict["actual_findings_spares_list"] = actual_spares_list
+            mydict["task_number"] = task
+            
+            predicted_finding_spares_cost = 0
+            predicted_finding_manhours = 0
+            predicted_finding_sparelist = []
+            # print(pred_findings_data)
+            for index, row in pred_findings_data.iterrows():
+                rowdict = row.to_dict()
+                rowdata = rowdict["details"]
+                # print(rowdict)
+                # if index > 0:
+                #     break
+                for k in rowdata:
+                    manhours = 0
+                    if 'mhs' in k:
+                        manhours = k["mhs"]["avg"]
+                    predicted_finding_manhours = predicted_finding_manhours + manhours
+                    spare_parts = []
+                    if "spare_parts" in k:
+                        spare_parts = k["spare_parts"]
+                    predicted_finding_sparelist = spare_parts
+                    # mydict["predicted_spares_list"] = spare_parts
+                    spsum = 0
+                    for s in spare_parts:
+                        spsum = spsum + s["price"]
+                    predicted_finding_spares_cost = spsum
+                    
+            mydict["predicted_finding_spares_cost"] = predicted_finding_spares_cost
+            mydict["predicted_finding_manhours"] = predicted_finding_manhours
+            mydict["predicted_finding_sparelist"] = predicted_finding_sparelist
+            final_findings_data.append(mydict)
+        df = pd.DataFrame(final_findings_data) 
+        total_actual_findings_spares_cost = df['actual_findings_spares_cost'].sum()
+        total_predicted_finding_spares_cost = df['predicted_finding_spares_cost'].sum()
+        total_predicted_finding_manhours = df['predicted_finding_manhours'].sum()
+        total_actual_findings_manhours = df['actual_findings_manhours'].sum()
+        summary_findings_comparision = {}
+        summary_findings_comparision["total_actual_spares_cost"] = total_actual_findings_spares_cost
+        summary_findings_comparision["total_predict_spares_cost"] = total_predicted_finding_spares_cost
+        summary_findings_comparision["total_predict_manhours"] = total_predicted_finding_manhours
+        summary_findings_comparision["total_actual_manhours"] = total_actual_findings_manhours
+        # summary_eligible_tasks = {"summary_findings" : summary_findings_comparision}
+        eligible_tasks_comparision = {"eligible_tasks": final_findings_data, "summary_findings" :  summary_findings_comparision}
+        
+        return eligible_tasks_comparision
+
 
         
 
