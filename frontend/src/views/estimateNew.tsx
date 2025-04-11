@@ -470,32 +470,6 @@ export default function EstimateNew() {
     );
   };
 
-  // Handle extracted tasks
-  // const handleTasks = (extractedTasks: string[]) => {
-  //     setTasks(extractedTasks);
-  //     console.log("tasks :", extractedTasks);
-  // };
-
-  //  Extracted tasks are passed to validation API
-  // const handleTasks = async (extractedTasks: string[]) => {
-  //     setIsLoading(true);
-  //     setTasks(extractedTasks);
-
-  //     console.log("Extracted Tasks:", extractedTasks);
-  //     const response = await validateTasks(extractedTasks);
-  //     setValidatedTasks(response);
-  //     setIsLoading(false);
-
-  //     const invalidTasks = response?.filter((task) => task?.status === false);
-  //     if (invalidTasks.length > 0) {
-  //         showNotification({
-  //             title: "Tasks Not Available!",
-  //             message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to generate Estimate.`,
-  //             color: "orange",
-  //             style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-  //         });
-  //     }
-  // }
 
   // Form initialization
   const form = useForm<any>({
@@ -1193,10 +1167,16 @@ export default function EstimateNew() {
     if (result) {
       // Create a new remark object similar to what your API would return
       const user = currentUser; // Replace with actual current user name or ID
+
+      const currentDate = new Date();
+      // Adjust for the 5:30 that formatDate will add later
+      currentDate.setHours(currentDate.getHours() - 5);
+      currentDate.setMinutes(currentDate.getMinutes() - 30);
+
       const newRemarkObj = {
         remark: newRemark,
         updatedBy: user,
-        createdAt: new Date(), // Current timestamp
+        createdAt: currentDate.toISOString(), // Current timestamp
       };
       setSelectedEstRemarksData((prevRemarks) => [
         ...prevRemarks,
