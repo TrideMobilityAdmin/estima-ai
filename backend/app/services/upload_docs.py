@@ -883,7 +883,7 @@ class ExcelUploadService:
                 for k in rowdata:
                     manhours = 0
                     if 'mhs' in k:
-                        manhours = k["mhs"]["avg"]
+                        manhours = k["mhs"]["avg"]*(k["prob"]/100)
                     predicted_finding_manhours = predicted_finding_manhours + manhours
                     spare_parts = []
                     if "spare_parts" in k:
@@ -892,7 +892,7 @@ class ExcelUploadService:
                     # mydict["predicted_spares_list"] = spare_parts
                     spsum = 0
                     for s in spare_parts:
-                        spsum = spsum + s["price"]
+                        spsum = spsum + s["price"]*(s["prob"]/100)
                     predicted_finding_spares_cost = spsum
                     
             mydict["predicted_finding_spares_cost"] = predicted_finding_spares_cost
