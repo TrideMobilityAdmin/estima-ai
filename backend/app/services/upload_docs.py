@@ -704,10 +704,10 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
         )
         # Fetch actual package data
-        pkg_tasks_data = task_description[task_description["package_number"] == "package_number"]
+        pkg_tasks_data = task_description
         pkg_tasks_data = pkg_tasks_data[~pkg_tasks_data["task_number"].str.startswith("AWR")]
         # Filter sub_task_parts for tasks belonging to the specific package_number
-        filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+        filtered_sub_task_parts = sub_task_parts
         # Compute actual task part consumption
         task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
             task_part_consumption=("billable_value_usd", "sum")
@@ -736,11 +736,11 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
                 lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
             )
             pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
-            pkg_findings_data = sub_task_description[sub_task_description["package_number"] == "package_number"]
+            pkg_findings_data = sub_task_description
             pkg_findings_data = pkg_findings_data[~pkg_findings_data["source_task_discrepancy_number_updated"].str.startswith("AWR")]
             pkg_findings_data["source_task_discrepancy_number_updated"].dropna(inplace=True)
             # Filter sub_task_parts for tasks belonging to the specific package_number
-            filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == "package_number"]
+            filtered_sub_task_parts = sub_task_parts
             filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
             filtered_sub_task_parts = filtered_sub_task_parts.merge(
             pkg_findings_data[["log_item_number", "source_task_discrepancy_number_updated"]],
@@ -787,7 +787,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
             # Assuming 'results' is a DataFrame
             results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
+                 'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
                 'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
@@ -802,7 +802,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             for _, row in results_df.iterrows():
                 task = {
-                    "package_number": row["package_number"],
+                
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
@@ -886,7 +886,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             # Assuming 'results' is a DataFrame
             results_df = results[[
-                'package_number', 'task_number', 'actual_man_hours_actual',
+                'task_number', 'actual_man_hours_actual',
                 'task_part_consumption_actual', 'actual_man_hours_pred',
                 'task_part_consumption_pred', 'actual_man_hours_findings_actual',
                 'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
@@ -901,7 +901,7 @@ def testing(self,task_description, sub_task_parts,sub_task_description,estID):
             
             for _, row in results_df.iterrows():
                 task = {
-                    "package_number": row["package_number"],
+                    
                     "task_number": row["task_number"],
                     "actual_man_hours_actual": row["actual_man_hours_actual"],
                     "task_part_consumption_actual": row["task_part_consumption_actual"],
