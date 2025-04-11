@@ -28,11 +28,15 @@ import bgCompareEstimate from "../../public/airCraft8.jpg";
 import bgPartUsage from "../../public/airCraftPartsUsage.webp";
 import bgSkillRequirement from "../../public/airCraftSkill.webp";
 import bgConfiguration from "../../public/airCraft8.jpg";
-
+import { userName } from "../api/tokenJotai";
+import { userEmail } from "../api/tokenJotai";
+import { useAtom } from "../constants/GlobalImports";
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [active, setActive] = useState(location.pathname);
+  const [currentUser] = useAtom(userName);
+  const [currentUserEmail] = useAtom(userEmail);
 
   useEffect(() => {
     setActive(location.pathname);
@@ -53,6 +57,10 @@ const Landing: React.FC = () => {
   const activeBg = isLandingPage
     ? aircraftServiceBg
     : backgroundMap[location.pathname] || "#f7f7f7";
+
+    console.log("current user >>>>",currentUser);
+    console.log("current user email >>>>",currentUserEmail);
+    
 
   return (
     <div
@@ -185,22 +193,22 @@ const Landing: React.FC = () => {
               <Flex direction="column" align="center" justify="center">
                 <Avatar src={gmrIcon} variant="light" radius="md" size="lg" />
                 <Text fw="bold" size="md">
-                  GMR EstimaAI
+                 {currentUser || "-"}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  gmr@evrides.live
+                  {currentUserEmail || "-"}
                 </Text>
               </Flex>
             </Card>
             <Menu.Divider />
-            <Menu.Label>Application</Menu.Label>
+            {/* <Menu.Label>Application</Menu.Label>
             <Menu.Item leftSection={<IconSettings size={14} />}>
               Users
             </Menu.Item>
             <Menu.Item leftSection={<IconMessageCircle size={14} />}>
               Messages
             </Menu.Item>
-            <Menu.Divider />
+            <Menu.Divider /> */}
             <Menu.Item
               color="red"
               leftSection={<IconLogout size={14} />}

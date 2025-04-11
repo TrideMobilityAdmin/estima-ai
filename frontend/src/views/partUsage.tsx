@@ -1,4 +1,4 @@
-import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center, ThemeIcon, Tooltip, Divider } from "@mantine/core";
+import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center, ThemeIcon, Tooltip, Divider, Pagination } from "@mantine/core";
 import { showNotification, useEffect, useState } from "../constants/GlobalImports";
 import { DatePickerInput } from "@mantine/dates";
 import { IconAlertTriangle, IconCalendar, IconCheck, IconCube, IconMenuDeep, IconReport, IconSettingsBolt, IconSettingsDown, IconSettingsSearch, IconTool } from "@tabler/icons-react";
@@ -211,12 +211,21 @@ export default function PartUsage() {
         );
     }, [combinedTasks, taskSearch]);
 
+    // Handle pagination
+    const ITEMS_PER_PAGE = 8;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredTasks?.length / ITEMS_PER_PAGE);
+    const displayedTasks = filteredTasks?.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     console.log("Combined tasks:", combinedTasks);
 
     // Search filter for findings
     const filteredFindings = partUsageData?.usage?.findings?.hmvTasks?.filter((finding: any) =>
         finding?.taskId?.toLowerCase().includes(findingSearch?.toLowerCase())
     );
+    const [currentPageFindings, setCurrentPageFindings] = useState(1);
+    const totalPagesFindings = Math.ceil(filteredFindings?.length / ITEMS_PER_PAGE);
+    const displayedFindings = filteredFindings?.slice((currentPageFindings - 1) * ITEMS_PER_PAGE, currentPageFindings * ITEMS_PER_PAGE);
 
 
     // Prepare Data for the tasks wise Bar Graph
@@ -258,7 +267,7 @@ export default function PartUsage() {
     function calculateTotalFindingQuantity(findings: any) {
         return findings?.reduce((total: any, finding: any) => {
             const findingQuantity = finding?.packages?.reduce((sum: any, pkg: any) => sum + pkg?.quantity, 0);
-            return total + findingQuantity;
+            return Math.round(total + findingQuantity);
         }, 0);
     }
 
@@ -307,7 +316,7 @@ export default function PartUsage() {
         </LocalizationProvider> */}
                     <DatePickerInput
                         size="xs"
-                        w='18vw'
+                        w='21vw'
                         type="range"
                         label="Pick dates range"
                         placeholder="Pick dates range"
@@ -475,7 +484,7 @@ border-bottom: none;
                                     cellRenderer: (val: any) => {
                                         return (
                                             <Text>
-                                                {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0)}
+                                                {Math.round(val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0))}
                                             </Text>
                                         )
                                     }
@@ -610,33 +619,41 @@ border-bottom: none;
                 <Space h='sm' />
                 <Grid>
                     <Grid.Col span={8}>
-                        <Card radius='md' h='60vh'>
+                        <Card radius="md" h="60vh">
+                            <Title order={5} c="dimmed">Daily Trend Analysis</Title>
 
-                            <Title order={5} c='dimmed'>
-                                Daily Trend Analysis
-                            </Title>
-                            <AreaChart
-                                h={250}
-                                data={chartData}
-                                withLegend
-                                dataKey="date"
-                                xAxisLabel="Date"
-                                yAxisLabel="Count"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                series={[
-                                    { name: 'tasks', color: 'rgba(17, 166, 0, 1)' },
-                                    { name: 'findings', color: 'rgba(0, 149, 255, 1)' },
-                                ]}
-                                connectNulls
-                                curveType="natural"
-                            />
-
+                            {chartData?.length > 0 ? (
+                                <div style={{ overflowX: "auto", width: "100%", height: '50vh' }}>
+                                    <div style={{ width: `${chartData.length * 80}px`, minWidth: "600px" }}>
+                                        <AreaChart
+                                            h={260}
+                                            data={chartData}
+                                            withLegend
+                                            dataKey="date"
+                                            xAxisLabel="Date"
+                                            yAxisLabel="Count"
+                                            xAxisProps={{
+                                                interval: 0, // Ensures all labels are displayed
+                                                angle: -45, // Rotates labels for better visibility
+                                                textAnchor: "end",
+                                            }}
+                                            series={[
+                                                { name: "tasks", color: "rgba(17, 166, 0, 1)" },
+                                                { name: "findings", color: "rgba(0, 149, 255, 1)" },
+                                            ]}
+                                            connectNulls
+                                            curveType="natural"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <Center>
+                                    <Text c="dimmed" pt={150}>No Data Found</Text>
+                                </Center>
+                            )}
                         </Card>
                     </Grid.Col>
+
                     <Grid.Col span={4}>
                         <Card radius='md' h='60vh'>
                             <Title order={5} c='dimmed'>
@@ -882,111 +899,134 @@ border-bottom: none;
                 </SimpleGrid> */}
                 <Space h='md' />
                 <SimpleGrid cols={2}>
-                    <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
-                        <Title order={5}>
-                            MPD
-                        </Title>
-
+                    <Card radius="md" h={partUsageData?.usage ? "90vh" : "40vh"} style={{ overflowY: "auto" }}>
+                        {/* 🔹 Section 1: Title & Search Input */}
+                        <Title order={5}>MPD</Title>
                         <TextInput
                             placeholder="Search Tasks..."
                             value={taskSearch}
                             onChange={(e) => setTaskSearch(e.currentTarget.value)}
                             mb="md"
                         />
-                        {
-                            filteredTasks?.length > 0 ? (
-                                <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                                    <Accordion
-                                        variant="separated"
-                                        radius="md"
-                                        multiple
-                                        value={openItems}
-                                        onChange={handleAccordionChange}
-                                    >
-                                        {filteredTasks?.map((task: any, index: number) => {
-                                            const itemValue = `${task?.taskId} - ${index}`;
-                                            return (
-                                                <Accordion.Item key={itemValue} value={itemValue}>
-                                                    <Accordion.Control>
-                                                        <Group>
-                                                            <IconCube color="#4E66DE" />
-                                                            {task?.taskId || "-"}
-                                                        </Group>
-                                                    </Accordion.Control>
-                                                    <Accordion.Panel>
-                                                        <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
-                                                            <Text fz='xs'>
-                                                                <Text span c="gray" inherit>Description : </Text>
-                                                                {task?.taskDescription || "-"}
+
+                        {/* 🔹 Section 2: Scrollable Accordion List */}
+                        {filteredTasks.length > 0 ? (
+                            <ScrollArea h="70vh" scrollbarSize={0} scrollHideDelay={0}>
+                                <Accordion
+                                    variant="separated"
+                                    radius="md"
+                                    multiple
+                                    value={openItems}
+                                    onChange={setOpenItems}
+                                >
+                                    {displayedTasks?.map((task: any, index: any) => {
+                                        const itemValue = `${task?.taskId} - ${index}`;
+                                        return (
+                                            <Accordion.Item key={itemValue} value={itemValue}>
+                                                <Accordion.Control>
+                                                    <Group>
+                                                        <IconCube color="#4E66DE" />
+                                                        {task?.taskId || "-"}
+                                                    </Group>
+                                                </Accordion.Control>
+                                                <Accordion.Panel>
+                                                    <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
+                                                        <Text fz="xs">
+                                                            <Text span c="gray" inherit>
+                                                                Description:{" "}
                                                             </Text>
+                                                            {task?.taskDescription || "-"}
+                                                        </Text>
 
-                                                            {task?.packages?.map((pkg: any) => (
-                                                                <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
-                                                                    <Group justify="space-between" align="flex-start">
-                                                                        <Flex direction='column'>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Package ID :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
-                                                                            </Group>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Aircraft Model :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.aircraftModel || "-"}</Text>
-                                                                            </Group>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Date :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
-                                                                            </Group>
-                                                                        </Flex>
+                                                        {task?.packages?.map((pkg: any) => (
+                                                            <Card key={pkg?.packageId} p="sm" radius="md" mt="xs" bg="#ebeced">
+                                                                <Group justify="space-between" align="flex-start">
+                                                                    <Flex direction="column">
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Package ID:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.packageId || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Aircraft Model:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.aircraftModel || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Date:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.date || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                    </Flex>
 
-                                                                        <Flex direction='column' align='end' gap='xs'>
-                                                                            <Badge fullWidth color="blue">Qty: {pkg?.quantity || "-"}</Badge>
-                                                                            <Badge fullWidth color="yellow"> {pkg?.stockStatus || "-"}</Badge>
-                                                                        </Flex>
-                                                                    </Group>
-                                                                </Card>
-                                                            ))}
-                                                        </ScrollArea>
-                                                    </Accordion.Panel>
-                                                </Accordion.Item>
-                                            );
-                                        })}
-                                    </Accordion>
-                                </ScrollArea>
-                            ) : (
-                                <>
-                                    <Center p={50}>
-                                        <Text >
-                                            No Tasks Found
-                                        </Text>
-                                    </Center>
+                                                                    <Flex direction="column" align="end" gap="xs">
+                                                                        <Badge fullWidth color="blue">
+                                                                            Qty: {pkg?.quantity || "-"}
+                                                                        </Badge>
+                                                                        <Badge fullWidth color="yellow">{pkg?.stockStatus || "-"}</Badge>
+                                                                    </Flex>
+                                                                </Group>
+                                                            </Card>
+                                                        ))}
+                                                    </ScrollArea>
+                                                </Accordion.Panel>
+                                            </Accordion.Item>
+                                        );
+                                    })}
+                                </Accordion>
+                            </ScrollArea>
+                        ) : (
+                            <Center h="60vh">
+                                <Text>No Tasks Found</Text>
+                            </Center>
+                        )}
 
-                                </>
-                            )
-                        }
-
+                        {/* 🔹 Section 3: Pagination */}
+                        {totalPages > 1 && (
+                            <Center mt="md">
+                                <Pagination
+                                    color="#4E66DE"
+                                    total={totalPages}
+                                    value={currentPage}
+                                    onChange={setCurrentPage}
+                                    size="sm"
+                                />
+                            </Center>
+                        )}
                     </Card>
                     <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
+                        {/* 🔹 Section 1: Title & Search Input */}
                         <Title order={5}>
                             Findings
                         </Title>
-
                         <TextInput
                             placeholder="Search Findings..."
                             value={findingSearch}
                             onChange={(e) => setFindingSearch(e.currentTarget.value)}
                             mb="md"
                         />
+
+                         {/* 🔹 Section 2: Scrollable Accordion List */}
                         {
                             filteredFindings?.length > 0 ? (
-                                <ScrollArea h={'85vh'} scrollbarSize={0} scrollHideDelay={0}>
-                                    <Accordion variant="separated" radius="md">
-                                        {filteredFindings?.map((finding: any, index: number) => (
+                                <ScrollArea h={'70vh'} scrollbarSize={0} scrollHideDelay={0}>
+                                    <Accordion 
+                                    variant="separated" 
+                                    radius="md"
+                                    multiple
+                                    value={openItems}
+                                    onChange={setOpenItems}
+                                    >
+                                        {displayedFindings?.map((finding: any, index: number) => (
                                             <Accordion.Item key={`${finding?.taskId} - ${index}`} value={`${finding?.taskId} - ${index}`}>
                                                 <Accordion.Control>
                                                     <Group>
@@ -1044,8 +1084,8 @@ border-bottom: none;
                             ) : (
                                 <>
                                     <Center p={50}>
-                                        <Text >
-                                            No Findings Found
+                                        <Text c='dimmed'>
+                                            No data Found
                                         </Text>
                                     </Center>
 
@@ -1053,6 +1093,18 @@ border-bottom: none;
                             )
                         }
 
+                        {/* 🔹 Section 3: Pagination */}
+                        {totalPagesFindings > 1 && (
+                            <Center mt="md">
+                                <Pagination
+                                    color="#4E66DE"
+                                    total={totalPagesFindings}
+                                    value={currentPageFindings}
+                                    onChange={setCurrentPageFindings}
+                                    size="sm"
+                                />
+                            </Center>
+                        )}
                     </Card>
                 </SimpleGrid>
             </div>

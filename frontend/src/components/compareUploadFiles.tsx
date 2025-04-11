@@ -1,5 +1,6 @@
 import { ActionIcon, Flex, Paper, Text, ScrollArea } from "@mantine/core";
 import { Dropzone } from "@mantine/dropzone";
+import { showNotification } from "@mantine/notifications";
 import { useState } from "react";
 import { MdClose, MdFilePresent, MdUploadFile } from "react-icons/md";
 
@@ -11,12 +12,44 @@ interface UploadDropZoneExcelProps {
 
 const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZoneExcelProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [validSheetNames, setValidSheetNames] = useState<string[]>([]);
 
-  const handleDrop = (newFiles: File[]) => {
-    console.log("Dropped files:", newFiles);
-    const updatedFiles = [...selectedFiles, ...newFiles];
-    setSelectedFiles(updatedFiles);
-    changeHandler(updatedFiles);
+  const handleDrop = async (newFiles: File[]) => {
+    const validFiles: File[] = [];
+    const invalidFiles: File[] = [];
+
+    newFiles.forEach((file) => {
+      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+        validFiles.push(file);
+      } else {
+        invalidFiles.push(file);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      showNotification({
+        title: "Invalid File Format",
+        message: "Only .xlsx and .xls files are supported. .xlsm files are not allowed.",
+        color: "red",
+      });
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+      changeHandler([...selectedFiles, ...validFiles]);
+      await extractSheetNames(validFiles);
+    }
+  };
+
+  const extractSheetNames = async (files: File[]) => {
+    const sheetNames: string[] = [];
+    for (const file of files) {
+      const data = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(data, { type: "array" });
+      sheetNames.push(...workbook.SheetNames);
+    }
+    setValidSheetNames(sheetNames);
   };
 
   const removeFile = (fileToRemove: File) => {
@@ -27,16 +60,8 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
 
   return (
     <div style={{ width: "500px", margin: "auto" }}> {/* Fixed width container */}
-      {/* File Drop Zone with fixed width */}
       <Dropzone
-        accept={[
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          ".xlsm",
-          ".xls",
-          ".xlsx",
-          ".csv"
-        ]}
+        accept={["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]}
         styles={{
           root: {
             borderColor: color || "#ced4da",
@@ -47,7 +72,7 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
             textAlign: "center",
             padding: "2em",
             cursor: "pointer",
-            width: "100%", // Ensure it stays within the container
+            width: "100%",
           },
         }}
         onDrop={handleDrop}
@@ -63,31 +88,12 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
 
       {/* Scrollable Selected Files */}
       {selectedFiles.length > 0 && (
-        <ScrollArea
-          scrollbarSize={6}
-          type="always"
-          offsetScrollbars
-          style={{ width: "100%", marginTop: "10px", overflowX: "auto" }}
-        >
+        <ScrollArea scrollbarSize={6} type="always" offsetScrollbars style={{ width: "100%", marginTop: "10px", overflowX: "auto" }}>
           <Flex gap="sm" style={{ whiteSpace: "nowrap" }}>
             {selectedFiles.map((file, index) => (
-              <Paper
-                key={index}
-                withBorder
-                shadow="xs"
-                radius="md"
-                p="sm"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5em",
-                  minWidth: "200px", // Ensures each item has space
-                }}
-              >
+              <Paper key={index} withBorder shadow="xs" radius="md" p="sm" style={{ display: "flex", alignItems: "center", gap: "0.5em", minWidth: "200px" }}>
                 <MdFilePresent size={24} color="#1a73e8" />
-                <Text size="sm" style={{ overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
-                  {file.name}
-                </Text>
+                <Text size="sm" style={{ overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{file.name}</Text>
                 <ActionIcon onClick={() => removeFile(file)} color="red" variant="transparent">
                   <MdClose size={16} />
                 </ActionIcon>
@@ -96,6 +102,18 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
           </Flex>
         </ScrollArea>
       )}
+
+      {/* Valid Sheet Names Display */}
+      {/* {validSheetNames.length > 0 && (
+        <div style={{ marginTop: "10px" }}>
+          <Text fw={500}>Valid Sheet Names:</Text>
+          <ul>
+            {validSheetNames.map((sheet, index) => (
+              <li key={index}>{sheet}</li>
+            ))}
+          </ul>
+        </div>
+      )} */}
     </div>
   );
 };

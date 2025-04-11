@@ -1,0 +1,602 @@
+[
+  {
+    "id": 1,
+    "model": "A319"
+  },
+  {
+    "id": 2,
+    "model": "A320"
+  },
+  {
+    "id": 3,
+    "model": "A321"
+  },
+  {
+    "id": 4,
+    "model": "A220-100"
+  },
+  {
+    "id": 5,
+    "model": "A220-300"
+  },
+  {
+    "id": 6,
+    "model": "A300"
+  },
+  {
+    "id": 7,
+    "model": "A310"
+  },
+  {
+    "id": 8,
+    "model": "A318"
+  },
+  {
+    "id": 9,
+    "model": "A320neo"
+  },
+  {
+    "id": 10,
+    "model": "A321neo"
+  },
+  {
+    "id": 11,
+    "model": "A321XLR"
+  },
+  {
+    "id": 12,
+    "model": "A330-200"
+  },
+  {
+    "id": 13,
+    "model": "A330-300"
+  },
+  {
+    "id": 14,
+    "model": "A330-800neo"
+  },
+  {
+    "id": 15,
+    "model": "A330-900neo"
+  },
+  {
+    "id": 16,
+    "model": "A340-200"
+  },
+  {
+    "id": 17,
+    "model": "A340-300"
+  },
+  {
+    "id": 18,
+    "model": "A340-500"
+  },
+  {
+    "id": 19,
+    "model": "A340-600"
+  },
+  {
+    "id": 20,
+    "model": "A350-900"
+  },
+  {
+    "id": 21,
+    "model": "A350-1000"
+  },
+  {
+    "id": 22,
+    "model": "A380-800"
+  },
+  {
+    "id": 23,
+    "model": "B737-600"
+  },
+  {
+    "id": 24,
+    "model": "B737-700"
+  },
+  {
+    "id": 25,
+    "model": "B737-800"
+  },
+  {
+    "id": 26,
+    "model": "B737-900"
+  },
+  {
+    "id": 27,
+    "model": "B737 MAX 7"
+  },
+  {
+    "id": 28,
+    "model": "B737 MAX 8"
+  },
+  {
+    "id": 29,
+    "model": "B737 MAX 9"
+  },
+  {
+    "id": 30,
+    "model": "B737 MAX 10"
+  },
+  {
+    "id": 31,
+    "model": "B747-400"
+  },
+  {
+    "id": 32,
+    "model": "B747-8"
+  },
+  {
+    "id": 33,
+    "model": "B757-200"
+  },
+  {
+    "id": 34,
+    "model": "B757-300"
+  },
+  {
+    "id": 35,
+    "model": "B767-200"
+  },
+  {
+    "id": 36,
+    "model": "B767-300"
+  },
+  {
+    "id": 37,
+    "model": "B767-400"
+  },
+  {
+    "id": 38,
+    "model": "B777-200"
+  },
+  {
+    "id": 39,
+    "model": "B777-200LR"
+  },
+  {
+    "id": 40,
+    "model": "B777-300"
+  },
+  {
+    "id": 41,
+    "model": "B777-300ER"
+  },
+  {
+    "id": 42,
+    "model": "B777X"
+  },
+  {
+    "id": 43,
+    "model": "B787-8"
+  },
+  {
+    "id": 44,
+    "model": "B787-9"
+  },
+  {
+    "id": 45,
+    "model": "B787-10"
+  },
+  {
+    "id": 46,
+    "model": "Embraer E170"
+  },
+  {
+    "id": 47,
+    "model": "Embraer E175"
+  },
+  {
+    "id": 48,
+    "model": "Embraer E190"
+  },
+  {
+    "id": 49,
+    "model": "Embraer E195"
+  },
+  {
+    "id": 50,
+    "model": "Embraer E175-E2"
+  },
+  {
+    "id": 51,
+    "model": "Embraer E190-E2"
+  },
+  {
+    "id": 52,
+    "model": "Embraer E195-E2"
+  },
+  {
+    "id": 53,
+    "model": "Embraer ERJ-135"
+  },
+  {
+    "id": 54,
+    "model": "Embraer ERJ-140"
+  },
+  {
+    "id": 55,
+    "model": "Embraer ERJ-145"
+  },
+  {
+    "id": 56,
+    "model": "Bombardier CRJ-100"
+  },
+  {
+    "id": 57,
+    "model": "Bombardier CRJ-200"
+  },
+  {
+    "id": 58,
+    "model": "Bombardier CRJ-700"
+  },
+  {
+    "id": 59,
+    "model": "Bombardier CRJ-900"
+  },
+  {
+    "id": 60,
+    "model": "Bombardier CRJ-1000"
+  },
+  {
+    "id": 61,
+    "model": "Bombardier Q100"
+  },
+  {
+    "id": 62,
+    "model": "Bombardier Q200"
+  },
+  {
+    "id": 63,
+    "model": "Bombardier Q300"
+  },
+  {
+    "id": 64,
+    "model": "Bombardier Q400"
+  },
+  {
+    "id": 65,
+    "model": "ATR 42-300"
+  },
+  {
+    "id": 66,
+    "model": "ATR 42-500"
+  },
+  {
+    "id": 67,
+    "model": "ATR 42-600"
+  },
+  {
+    "id": 68,
+    "model": "ATR 72-200"
+  },
+  {
+    "id": 69,
+    "model": "ATR 72-500"
+  },
+  {
+    "id": 70,
+    "model": "ATR 72-600"
+  },
+  {
+    "id": 71,
+    "model": "Sukhoi Superjet 100"
+  },
+  {
+    "id": 72,
+    "model": "COMAC C919"
+  },
+  {
+    "id": 73,
+    "model": "COMAC ARJ21"
+  },
+  {
+    "id": 74,
+    "model": "Mitsubishi SpaceJet M90"
+  },
+  {
+    "id": 75,
+    "model": "BAe 146"
+  },
+  {
+    "id": 76,
+    "model": "Avro RJ70"
+  },
+  {
+    "id": 77,
+    "model": "Avro RJ85"
+  },
+  {
+    "id": 78,
+    "model": "Avro RJ100"
+  },
+  {
+    "id": 79,
+    "model": "Fokker 50"
+  },
+  {
+    "id": 80,
+    "model": "Fokker 70"
+  },
+  {
+    "id": 81,
+    "model": "Fokker 100"
+  },
+  {
+    "id": 82,
+    "model": "Saab 340"
+  },
+  {
+    "id": 83,
+    "model": "Saab 2000"
+  },
+  {
+    "id": 84,
+    "model": "Dornier 328"
+  },
+  {
+    "id": 85,
+    "model": "Dornier 328JET"
+  },
+  {
+    "id": 86,
+    "model": "Bombardier Challenger 850"
+  },
+  {
+    "id": 87,
+    "model": "Cessna Citation X"
+  },
+  {
+    "id": 88,
+    "model": "Cessna Citation Latitude"
+  },
+  {
+    "id": 89,
+    "model": "Cessna Citation Longitude"
+  },
+  {
+    "id": 90,
+    "model": "Gulfstream G550"
+  },
+  {
+    "id": 91,
+    "model": "Gulfstream G650"
+  },
+  {
+    "id": 92,
+    "model": "Gulfstream G700"
+  },
+  {
+    "id": 93,
+    "model": "Bombardier Global 5000"
+  },
+  {
+    "id": 94,
+    "model": "Bombardier Global 6000"
+  },
+  {
+    "id": 95,
+    "model": "Bombardier Global 7500"
+  },
+  {
+    "id": 96,
+    "model": "Dassault Falcon 7X"
+  },
+  {
+    "id": 97,
+    "model": "Dassault Falcon 8X"
+  },
+  {
+    "id": 98,
+    "model": "Dassault Falcon 900"
+  },
+  {
+    "id": 99,
+    "model": "Dassault Falcon 2000"
+  },
+  {
+    "id": 100,
+    "model": "Pilatus PC-12"
+  },
+  {
+    "id": 101,
+    "model": "Pilatus PC-24"
+  },
+  {
+    "id": 102,
+    "model": "Beechcraft King Air 90"
+  },
+  {
+    "id": 103,
+    "model": "Beechcraft King Air 200"
+  },
+  {
+    "id": 104,
+    "model": "Beechcraft King Air 350"
+  },
+  {
+    "id": 105,
+    "model": "Cessna Caravan"
+  },
+  {
+    "id": 106,
+    "model": "DHC-6 Twin Otter"
+  },
+  {
+    "id": 107,
+    "model": "Let L-410"
+  },
+  {
+    "id": 108,
+    "model": "Britten-Norman Islander"
+  },
+  {
+    "id": 109,
+    "model": "Douglas DC-3"
+  },
+  {
+    "id": 110,
+    "model": "Douglas DC-9"
+  },
+  {
+    "id": 111,
+    "model": "McDonnell Douglas MD-80"
+  },
+  {
+    "id": 112,
+    "model": "McDonnell Douglas MD-90"
+  },
+  {
+    "id": 113,
+    "model": "McDonnell Douglas MD-11"
+  },
+  {
+    "id": 114,
+    "model": "McDonnell Douglas DC-10"
+  },
+  {
+    "id": 115,
+    "model": "Ilyushin Il-76"
+  },
+  {
+    "id": 116,
+    "model": "Ilyushin Il-96"
+  },
+  {
+    "id": 117,
+    "model": "Tupolev Tu-154"
+  },
+  {
+    "id": 118,
+    "model": "Tupolev Tu-204"
+  },
+  {
+    "id": 119,
+    "model": "Tupolev Tu-214"
+  },
+  {
+    "id": 120,
+    "model": "Antonov An-24"
+  },
+  {
+    "id": 121,
+    "model": "Antonov An-26"
+  },
+  {
+    "id": 122,
+    "model": "Antonov An-72"
+  },
+  {
+    "id": 123,
+    "model": "Antonov An-124"
+  },
+  {
+    "id": 124,
+    "model": "Antonov An-225"
+  },
+  {
+    "id": 125,
+    "model": "Yakovlev Yak-40"
+  },
+  {
+    "id": 126,
+    "model": "Yakovlev Yak-42"
+  },
+  {
+    "id": 127,
+    "model": "CASA C-212"
+  },
+  {
+    "id": 128,
+    "model": "CASA CN-235"
+  },
+  {
+    "id": 129,
+    "model": "CASA C-295"
+  },
+  {
+    "id": 130,
+    "model": "Lockheed L-100 Hercules"
+  },
+  {
+    "id": 131,
+    "model": "Sikorsky S-92"
+  },
+  {
+    "id": 132,
+    "model": "AgustaWestland AW139"
+  },
+  {
+    "id": 133,
+    "model": "AgustaWestland AW189"
+  },
+  {
+    "id": 134,
+    "model": "Bell 429"
+  },
+  {
+    "id": 135,
+    "model": "Airbus H125"
+  },
+  {
+    "id": 136,
+    "model": "Airbus H130"
+  },
+  {
+    "id": 137,
+    "model": "Airbus H135"
+  },
+  {
+    "id": 138,
+    "model": "Airbus H145"
+  },
+  {
+    "id": 139,
+    "model": "Airbus H160"
+  },
+  {
+    "id": 140,
+    "model": "Airbus H175"
+  },
+  {
+    "id": 141,
+    "model": "Airbus H225"
+  },
+  {
+    "id": 142,
+    "model": "Robinson R22"
+  },
+  {
+    "id": 143,
+    "model": "Robinson R44"
+  },
+  {
+    "id": 144,
+    "model": "Robinson R66"
+  },
+  {
+    "id": 145,
+    "model": "Boeing P-8 Poseidon"
+  },
+  {
+    "id": 146,
+    "model": "Boeing C-17 Globemaster III"
+  },
+  {
+    "id": 147,
+    "model": "Lockheed C-130 Hercules"
+  },
+  {
+    "id": 148,
+    "model": "Lockheed C-130J Super Hercules"
+  },
+  {
+    "id": 149,
+    "model": "Xian MA60"
+  },
+  {
+    "id": 150,
+    "model": "Xian MA600"
+  }
+]

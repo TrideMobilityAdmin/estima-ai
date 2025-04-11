@@ -2,6 +2,7 @@ from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursMode
 from statistics import mean
 from fastapi import HTTPException,Depends,status
 from typing import List , Dict,Optional,Any
+import math
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
@@ -519,7 +520,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+     {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -605,7 +613,7 @@ class TaskService:
                                     {
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
-                                        'quantity': '$requested_quantity', 
+                                        'quantity': '$ceilUsedQuantity', 
                                         'stockStatus': '$requested_stock_status', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
@@ -704,7 +712,14 @@ class TaskService:
                 ]
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$facet': {
             'hmvTasks': [
                 {
@@ -763,6 +778,27 @@ class TaskService:
                             ]
                         }
                     }
+                }, 
+                {
+                    '$group': {
+                        '_id': '$task_number', 
+                        'doc': {
+                            '$first': '$$ROOT'
+                        }, 
+                        'totalQty': {
+                            '$sum': '$ceilUsedQuantity'
+                        }
+                    }
+                }, {
+                    '$replaceRoot': {
+                        'newRoot': {
+                            '$mergeObjects': [
+                                '$doc', {
+                                    'ceilUsedQuantity': '$totalQty'
+                                }
+                            ]
+                        }
+                    }
                 }, {
                     '$lookup': {
                         'from': 'task_description', 
@@ -787,7 +823,10 @@ class TaskService:
                                         ]
                                     }
                                 }
-                            }, {
+                            }, 
+                            {
+                                '$limit': 1
+                            },{
                                 '$project': {
                                     'Description': {
                                         '$ifNull': [
@@ -902,7 +941,7 @@ class TaskService:
                                 'description': '$task_description', 
                                 'date': '$task_desc1.actual_start_date', 
                                 'stockStatus': '$stock_status', 
-                                'quantity': '$used_quantity', 
+                                'quantity': '$ceilUsedQuantity', 
                                 'aircraftModel': '$aircraft_info.aircraft_model'
                             }
                         }
@@ -976,7 +1015,7 @@ class TaskService:
                                         ]
                                     }, 
                                     'stockStatus': '$$hmvTask.stock_status', 
-                                    'quantity': '$$hmvTask.used_quantity', 
+                                    'quantity': '$$hmvTask.ceilUsedQuantity', 
                                     'aircraftModel': '$$hmvTask.aircraft_info.aircraft_model'
                                 }
                             ]
@@ -1101,6 +1140,7 @@ class TaskService:
                                         "description": pkg.get("description", ""),
                                         "date": pkg.get("date", "0001-01-01T00:00:00Z"),
                                         "stockStatus": pkg.get("stockStatus", ""),
+                                        "aircraftModel": pkg.get("aircraftModel", ""),
                                         "quantity": pkg["quantity"]
                                     }
                                     for pkg in task.get("findings", {}).get("packages", [])
@@ -1387,6 +1427,7 @@ class TaskService:
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
         configurations = self.configurations_collection.find_one()
+        configurations=replace_nan_inf(configurations)
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
 
         capping_pipeline=[
@@ -1401,7 +1442,16 @@ class TaskService:
                     'aircraftAge': 1, 
                     'aircraftModel': 1, 
                     'aircraftRegNo': 1, 
-                    'typeOfCheck': 1, 
+                    'typeOfCheckID': {
+                '$ifNull': [
+                    '$typeOfCheckID', ''
+                ]
+            }, 
+            'typeOfCheck': {
+                '$ifNull': [
+                    '$typeOfCheck', []
+                ]
+            }, 
                     'mh_type': '$cappingDetails.cappingTypeManhrs', 
                     'mhs': '$cappingDetails.cappingManhrs', 
                     'cost_type': '$cappingDetails.cappingTypeSpareCost', 
@@ -1410,7 +1460,7 @@ class TaskService:
             }
         ]
         result = list(self.estimate_file_upload.aggregate(capping_pipeline))
-        capping_result = result[0]
+        capping_result = replace_nan_inf(result[0] if result else {})
         logger.info(f"capping_result fetched: {capping_result}")
 
         SCMH = 0
@@ -1476,161 +1526,164 @@ class TaskService:
         '$match': {
             'estID': estimate_id
         }
-    }, {
-        '$addFields': {
-            'estimate_manhrs': {
-                'min': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.min', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.min', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'max': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.max', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.max', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'avg': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.avg', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.avg', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'est': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.est', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.est', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-    }, {
-        '$addFields': {
+    }, 
+    # {
+    #     '$addFields': {
+    #         'estimate_manhrs': {
+    #             'min': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.min', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.min', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'max': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.max', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.max', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'avg': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.avg', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.avg', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }, 
+    #             'est': {
+    #                 '$sum': [
+    #                     {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$tasks', 
+    #                                 'as': 'task', 
+    #                                 'in': {
+    #                                     '$ifNull': [
+    #                                         '$$task.mhs.est', 0
+    #                                     ]
+    #                                 }
+    #                             }
+    #                         }
+    #                     }, {
+    #                         '$sum': {
+    #                             '$map': {
+    #                                 'input': '$findings', 
+    #                                 'as': 'finding', 
+    #                                 'in': {
+    #                                     '$sum': {
+    #                                         '$map': {
+    #                                             'input': '$$finding.details', 
+    #                                             'as': 'detail', 
+    #                                             'in': {
+    #                                                 '$ifNull': [
+    #                                                     '$$detail.mhs.est', 0
+    #                                                 ]
+    #                                             }
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 ]
+    #             }
+    #         }
+    #     }
+    # }, 
+    
+    # {
+    #     '$addFields': {
             # 'tatTime': {
             #     '$divide': [
             #         {
@@ -1648,29 +1701,76 @@ class TaskService:
             #         }, man_hours_threshold
             #     ]
             # }, 
-            'estimatedSpareCost': {
-                '$add': [
-                    {
-                        '$ifNull': [
-                            '$aggregatedTasks.totalPartsCost', 0
-                        ]
-                    }, {
-                        '$ifNull': [
-                            '$aggregatedFindings.totalPartsCost', 0
-                        ]
+    #         'estimatedSpareCost': {
+    #             '$add': [
+    #                 {
+    #                     '$ifNull': [
+    #                         '$aggregatedTasks.totalPartsCost', 0
+    #                     ]
+    #                 }, {
+    #                     '$ifNull': [
+    #                         '$aggregatedFindings.totalPartsCost', 0
+    #                     ]
+    #                 }
+    #             ]
+    #         }
+    #     }
+    # },
+    {
+        '$addFields': {
+            'aggregatedTasks': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': '$tasks.spare_parts', 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
                     }
-                ]
+                }
+            },
+            'aggregatedFindings': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': {
+                            '$map': {
+                                'input': '$findings', 
+                                'as': 'finding', 
+                                'in': {
+                                    '$reduce': {
+                                        'input': '$$finding.details.spare_parts', 
+                                        'initialValue': [], 
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }, 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
+                    }
+                }
             }
         }
-    }, {
+    },
+      {
         '$project': {
             '_id': 0, 
             'estID': 1, 
             'description': 1, 
             'overallEstimateReport': {
                 # 'estimatedTatTime': '$tatTime', 
-                'estimatedSpareCost': '$estimatedSpareCost', 
-                'estimateManhrs': '$estimate_manhrs', 
+                'estimatedSpareCost': '$totalConsumption.totalPartsCost', 
+                'estimateManhrs': '$totalConsumption.mhs', 
                 'spareParts': {
                     '$filter': {
                         'input': '$totalConsumption.totalParts', 
@@ -1696,9 +1796,17 @@ class TaskService:
                     }
                 }
             }, 
-            'aggregatedTasks': 1, 
+            'aggregatedTasks': {
+                'spareParts': '$aggregatedTasks.spareParts', 
+                'estimateManhrs': '$aggregatedTasks.mhs', 
+                'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
+            },  
             'findings': '$findings', 
-            'aggregatedFindings': 1, 
+            'aggregatedFindings': {
+                'spareParts': '$aggregatedFindings.spareParts', 
+                'estimateManhrs': '$aggregatedFindings.mhs', 
+                'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
+            },  
             'originalFilename': 1, 
             'userID': {
                 '$toString': '$userID'
@@ -1718,13 +1826,15 @@ class TaskService:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
-            estimate_data = result[0]
+            estimate_data = replace_nan_inf(result[0] if result else {})
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
             estimate_data["aircraftAge"] = capping_result.get("aircraftAge")
             estimate_data["aircraftModel"] = capping_result.get("aircraftModel")
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
+            estimate_data["typeOfCheckID"] = capping_result.get("typeOfCheckID")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
+            logger.info("estimate_data fetched")
             findings_level_pipeline=[
                     {
                         '$match': {
@@ -1841,8 +1951,13 @@ class TaskService:
                         }
                     }
                 ]
-            findings_result=list(self.estimates_collection.aggregate(findings_level_pipeline))
-            findings_level=findings_result[0]
+            findings_result=replace_nan_inf(list(self.estimates_collection.aggregate(findings_level_pipeline)))
+            if not findings_result:
+                findings_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+                                "totalBillableCost": 0, "totalUnbillableCost": 0}
+            else:
+                findings_level = findings_result[0]
+
             SC_NC_pipeline = [
                 {
                     '$match': {
@@ -1906,8 +2021,11 @@ class TaskService:
                     }
                 }
             ]
-            task_SC_result = list(self.estimates_collection.aggregate(SC_NC_pipeline))
-            task_SC_result = task_SC_result[0]
+            task_SC_result = replace_nan_inf(list(self.estimates_collection.aggregate(SC_NC_pipeline)))
+            if not task_SC_result:
+                task_SC_result = {"totalBillableMhs": 0, "totalUnbillableMhs": 0}
+            else:
+                task_SC_result = task_SC_result[0]
             task_level_pipeline=[
         {
             '$match': {
@@ -2021,9 +2139,14 @@ class TaskService:
             }
         }
     ]
-            task_result=list(self.estimates_collection.aggregate(task_level_pipeline))
-            logger.info(f"task_level fetched{task_result}")
-            task_level=task_result[0]
+            task_result=replace_nan_inf(list(self.estimates_collection.aggregate(task_level_pipeline)))
+            logger.info("task_level fetched")
+            if not task_result:
+                task_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+                            "totalBillableCost": 0, "totalUnbillableCost": 0}
+            else:
+                task_level = task_result[0]
+            logger.info(f"capping_type fetched:{capping_type}")
             if capping_type == "per_source_card":    
                 return {
                     **estimate_data,
@@ -2034,6 +2157,7 @@ class TaskService:
                         'unbillable_cost': task_level.get('totalUnbillableCost', 0)
                     }
                 }
+            
             
             elif capping_type == "per_IRC":
                 return {
@@ -2331,7 +2455,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+      {
+        '$addFields': {
+            'ceilRequestedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2392,10 +2523,10 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$requested_part_number', 
-                'partDescription': '$part_description'
+                # 'partDescription': '$part_description'
             }, 
             'totalTasksQty': {
-                '$sum': '$requested_quantity'
+                '$sum': '$ceilRequestedQuantity'
             }, 
             'taskNumbers': {
                 '$push': '$task_number'
@@ -2432,7 +2563,15 @@ class TaskService:
         '$match': {
             'isHMV': 'HMV'
         }
-    }, {
+    },
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },
+      {
         '$lookup': {
             'from': 'sub_task_description', 
             'localField': 'task_number', 
@@ -2476,16 +2615,16 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
             }, 
             'totalFindingsQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_info.log_item_number'
@@ -2524,7 +2663,14 @@ class TaskService:
                 '$ne': 'HMV'
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2581,18 +2727,17 @@ class TaskService:
         }
     }, {
         '$group': {
-            '_id': {
-                'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
-            }, 
+            '_id': '$issued_part_number', 
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
+             
             'totalTasksQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_number'
@@ -2601,8 +2746,8 @@ class TaskService:
     }, {
         '$project': {
             '_id': 0, 
-            'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            'partId': '$_id', 
+            'partDescription': 1, 
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$task_numbers'
@@ -2624,4 +2769,12 @@ class TaskService:
     }
         logger.info(f"Combined results: {combined_results}")
         return combined_results
-        
+def replace_nan_inf(obj):
+            """Helper function to recursively replace NaN and inf values with None"""
+            if isinstance(obj, dict):
+                return {k: replace_nan_inf(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_nan_inf(x) for x in obj]
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            return obj

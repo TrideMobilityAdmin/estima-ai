@@ -1,13 +1,20 @@
 import React, { useEffect, useRef } from "react";
 import * as echarts from "echarts/core";
-import { TooltipComponent, LegendComponent } from "echarts/components";
+import { TooltipComponent, LegendComponent, LegendScrollComponent } from "echarts/components";
 import { PieChart } from "echarts/charts";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
-import { Card, Title } from "@mantine/core";
-
+import { Card, Title, Center, Text } from "@mantine/core";
+import airlines from '../assets/airlineColors.json';
 // Register ECharts components
-echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout]);
+echarts.use([
+  TooltipComponent,
+  LegendComponent,
+  LegendScrollComponent,
+  PieChart,
+  CanvasRenderer,
+  LabelLayout
+]);
 
 interface DonutChartProps {
   title: string;
@@ -16,76 +23,155 @@ interface DonutChartProps {
 }
 
 // Airline color mapping function
-const getAirlineColor = (statusCode: string) => {
-  const airlines = [
-    { name: "FLY DUBAI", primaryColor: "#006496" },
-    { name: "FLYNAS", primaryColor: "#00B7AC" },
-    { name: "Indigo EOL", primaryColor: "#001B94" },
-    { name: "SpiceJet", primaryColor: "#ed1b23" },
-    { name: "OMAN AIR", primaryColor: "#006B65" },
-    { name: "INDIGO", primaryColor: "#001B94" },
-    { name: "US BANGLA", primaryColor: "#012169" },
-    { name: "OWNED", primaryColor: "#05154f" },
-  ];
+const getAirlineColor = (statusCode: string): string => {
+  // Convert status code to lowercase for case-insensitive comparison
+  const statusLower = statusCode.toLowerCase();
 
-  const airline = airlines.find((airline) => airline.name.toLowerCase() === statusCode.toLowerCase());
-  return airline ? airline.primaryColor : "rgba(196, 147, 0, 1)";
+  // First try exact match (original behavior)
+  const exactMatch = airlines.find(airline => airline.name.toLowerCase() === statusLower);
+  if (exactMatch) {
+    return exactMatch.primaryColor;
+  }
+
+  // Then try partial matches (new behavior)
+  // Check if status code contains airline name
+  const containsAirlineName = airlines.find(airline =>
+    statusLower.includes(airline.name.toLowerCase())
+  );
+  if (containsAirlineName) {
+    return containsAirlineName.primaryColor;
+  }
+
+  // Check if airline name contains status code
+  const airlineNameContainsStatus = airlines.find(airline =>
+    airline.name.toLowerCase().includes(statusLower)
+  );
+  if (airlineNameContainsStatus) {
+    return airlineNameContainsStatus.primaryColor;
+  }
+
+  // If still no match found, try to match key words
+  const keyWords = statusLower.split(/[\s-]+/); // Split by spaces or hyphens
+  for (const word of keyWords) {
+    if (word.length < 3) continue; // Skip very short words
+
+    const keywordMatch = airlines.find(airline =>
+      airline.name.toLowerCase().includes(word)
+    );
+    if (keywordMatch) {
+      return keywordMatch.primaryColor;
+    }
+  }
+
+  // Default color if no match found
+  return "rgba(196, 147, 0, 1)";
 };
 
-const DonutChartComponentPartSupplied: React.FC<DonutChartProps> = ({ title, partUsageData, type }) => {
+const DonutChartComponentPartSupplied: React.FC<DonutChartProps> = ({
+  title,
+  partUsageData,
+  type
+}) => {
   const chartRef = useRef<HTMLDivElement | null>(null);
 
   // Determine which dataset to use (MPD or Findings)
-  const stockStatuses =
-    type === "MPD"
-      ? partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses
-      : partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses;
+  const stockStatuses = type === "MPD"
+    ? partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses
+    : partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses;
 
   // Process data
-  const chartData =
-    stockStatuses?.map((status: any) => ({
-      name: status.statusCode,
-      value: status.count,
-      itemStyle: { color: getAirlineColor(status.statusCode) }, // Assign color dynamically
-    })) || [];
+  const chartData = stockStatuses?.map((status: any) => ({
+    name: status.statusCode,
+    value: status.count,
+    itemStyle: {
+      color: getAirlineColor(status.statusCode) // Assign color dynamically
+    }
+  })) || [];
 
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && chartData.length > 0) {
       const myChart = echarts.init(chartRef.current);
+
+      // Handle window resize
+      const handleResize = () => {
+        myChart.resize();
+      };
+      window.addEventListener('resize', handleResize);
+
       const option = {
-        tooltip: { trigger: "item" },
-        // legend: { bottom: "0%", left: "center" },
+        tooltip: {
+          trigger: "item",
+          formatter: "{a} <br/>{b}: {c} ({d}%)"
+        },
         legend: {
-            orient: 'vertical',
-            left: 'right',
+          type: 'scroll',          // Enable scrolling for legend
+          orient: 'vertical',      // Vertical orientation
+          right: 10,               // Position on right
+          top: 20,                 // Top position
+          bottom: 10,              // Bottom position to ensure proper height calculation
+          formatter: '{name}',     // Format legend names
+          textStyle: {
+            fontSize: 12,          // Smaller text for legends
+            overflow: 'breakAll'   // Break text to avoid overflow
           },
+          pageTextStyle: {         // Style for paging text
+            color: '#333'
+          }
+        },
         series: [
           {
             name: title,
             type: "pie",
             radius: ["40%", "70%"], // Donut shape
-            avoidLabelOverlap: false,
+            center: ['40%', '50%'], // Move chart slightly to the left
+            avoidLabelOverlap: true,
             itemStyle: {
               borderRadius: 5,
               borderColor: "#fff",
-              borderWidth: 2,
+              borderWidth: 2
             },
-            label: { show: true, formatter: "{c}" },
-            labelLine: { show: true },
-            data: chartData,
-          },
-        ],
+            label: {
+              show: true,
+              position: 'inside',
+              formatter: "{c}"
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: '14',
+                fontWeight: 'bold'
+              }
+            },
+            labelLine: {
+              show: true
+            },
+            data: chartData
+          }
+        ]
       };
+
       myChart.setOption(option);
+
+      // Clean up
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        myChart.dispose();
+      };
     }
-  }, [chartData]);
+  }, [chartData, title]);
 
   return (
     <Card radius="md" h="60vh">
       <Title order={5} c="dimmed" ta="left">
         {title}
       </Title>
-      <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      {chartData.length > 0 ? (
+        <div ref={chartRef} style={{ width: "100%", height: "300px" }} />
+      ) : (
+        <Center h="300px">
+          <Text c="dimmed">No data found</Text>
+        </Center>
+      )}
     </Card>
   );
 };

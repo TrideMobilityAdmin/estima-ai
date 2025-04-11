@@ -103,14 +103,14 @@ export default function Basic() {
           </Card>
         {/* </Menu.Item> */}
         <Menu.Divider />
-        <Menu.Label>Application</Menu.Label>
+        {/* <Menu.Label>Application</Menu.Label>
         <Menu.Item leftSection={<IconSettings size={14} />}>
           Users
         </Menu.Item>
         <Menu.Item leftSection={<IconMessageCircle size={14} />}>
           Messages
         </Menu.Item>
-        <Menu.Divider />
+        <Menu.Divider /> */}
         <Menu.Item
           color="red"
           leftSection={<IconLogout size={14} />}

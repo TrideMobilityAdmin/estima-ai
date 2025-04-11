@@ -19,6 +19,9 @@ import { useApi } from '../api/services/estimateSrvice';
 interface SparePart {
   partID: string;
   quantity: number;
+  description : any;
+  unit : any;
+  price : any;
 }
 
 interface TaskRow {
@@ -52,7 +55,7 @@ export default function ExpertInsights() {
   });
   const [partsModalOpen, setPartsModalOpen] = useState(false);
   const [selectedTaskParts, setSelectedTaskParts] = useState<any[]>([]);
-  const [newPart, setNewPart] = useState<any>({ partID: '', quantity: 0 });
+  const [newPart, setNewPart] = useState<any>({ partID: '', quantity: 0, description:"", unit: "", price: "" });
   const [currentTaskID, setCurrentTaskID] = useState<number | null>(null);
 
   useEffect(() => {
@@ -126,7 +129,10 @@ export default function ExpertInsights() {
           manHours: Number(task.manHours),
           spareParts: task.spareParts.map(part => ({
             partID: part.partID,
-            quantity: Number(part.quantity)
+            quantity: Number(part.quantity),
+            description: part.description,
+            unit: part.unit,
+            price: part.price
           }))
         }))
       };
@@ -146,13 +152,13 @@ export default function ExpertInsights() {
     setSelectedTaskParts([...task.spareParts]);
     setCurrentTaskID(index);
     setPartsModalOpen(true);
-    setNewPart({ partID: '', quantity: 0 });
+    setNewPart({ partID: '', quantity: 0, description:"", unit: "", price: "" });
   };
 
   const handleAddPart = () => {
     if (newPart.partID.trim() && newPart.quantity > 0) {
       setSelectedTaskParts(prevParts => [...prevParts, { ...newPart }]);
-      setNewPart({ partID: '', quantity: 0 });
+      setNewPart({ partID: '', quantity: 0, description:"", unit: "", price: "" });
     }
   };
 
@@ -189,7 +195,7 @@ export default function ExpertInsights() {
           </Button>
         </Group>
 
-        <Card shadow="sm" p="lg">
+        {/* <Card shadow="sm" p="lg">
           <NumberInput
             w="20vw"
             label="Probability"
@@ -200,7 +206,7 @@ export default function ExpertInsights() {
             min={0}
             max={100}
           />
-        </Card>
+        </Card> */}
 
         <Card shadow="sm" p="lg">
           <Group justify="right" mb="md">
@@ -302,6 +308,7 @@ export default function ExpertInsights() {
           opened={partsModalOpen}
           onClose={() => setPartsModalOpen(false)}
           title="Spare Parts"
+          size={800}
         >
           <Stack gap="md">
             <Group justify="right">
@@ -319,7 +326,10 @@ export default function ExpertInsights() {
               <thead>
                 <tr>
                   <th>Part ID</th>
+                  <th>Description</th>
                   <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Price</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -337,6 +347,16 @@ export default function ExpertInsights() {
                       />
                     </td>
                     <td>
+                      <TextInput
+                        value={part.description}
+                        onChange={(e) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].description = e.target.value;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                      />
+                    </td>
+                    <td>
                       <NumberInput
                         value={part.quantity}
                         onChange={(value) => {
@@ -345,6 +365,26 @@ export default function ExpertInsights() {
                           setSelectedTaskParts(updatedParts);
                         }}
                         min={0}
+                      />
+                    </td>
+                    <td>
+                      <TextInput
+                        value={part.unit}
+                        onChange={(e) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].unit = e.target.value;
+                          setSelectedTaskParts(updatedParts);
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <TextInput
+                        value={part.price}
+                        onChange={(e) => {
+                          const updatedParts = [...selectedTaskParts];
+                          updatedParts[index].price = e.target.value;
+                          setSelectedTaskParts(updatedParts);
+                        }}
                       />
                     </td>
                     <td>
@@ -369,6 +409,15 @@ export default function ExpertInsights() {
                     />
                   </td>
                   <td>
+                    <TextInput
+                      placeholder="Description"
+                      value={newPart.description}
+                      onChange={(e) =>
+                        setNewPart({ ...newPart, description: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
                     <NumberInput
                       placeholder="Quantity"
                       value={newPart.quantity}
@@ -376,6 +425,24 @@ export default function ExpertInsights() {
                         setNewPart({ ...newPart, quantity: value || 0 })
                       }
                       min={0}
+                    />
+                  </td>
+                  <td>
+                    <TextInput
+                      placeholder="Unit"
+                      value={newPart.unit}
+                      onChange={(e) =>
+                        setNewPart({ ...newPart, unit: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <TextInput
+                      placeholder="Price"
+                      value={newPart.price}
+                      onChange={(e) =>
+                        setNewPart({ ...newPart, price: e.target.value })
+                      }
                     />
                   </td>
                   <td></td>
