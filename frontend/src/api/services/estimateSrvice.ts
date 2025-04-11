@@ -382,7 +382,7 @@ export const useApi = () => {
       
       showNotification({
         title: "Success!",
-        message: "Successfully updated probability wise data",
+        message: "Successfully updated data",
         color: "green",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
@@ -401,7 +401,7 @@ export const useApi = () => {
       } else {
         showNotification({
           title: "Failed!",
-          message: "Failed to update probability wise data, please try again...",
+          message: "Failed to update data, please try again...",
           color: "orange",
           style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
         });
