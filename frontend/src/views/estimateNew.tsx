@@ -3369,10 +3369,16 @@ border-bottom: none;
                           ?.estimatedSpareCost || 0
                       }
                       capppingMhs={
-                        estimateReportData?.capping?.unbillable_mhs || 0
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
+                      }
+                      capppingMhsType={
+                        estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
                       cappingUnbilledCost={
-                        estimateReportData?.capping?.unbillable_cost || 0
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingUnbilledCostType={
+                        estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
                         estimateReportData?.overallEstimateReport?.spareParts ||
@@ -3634,7 +3640,9 @@ interface TATDashboardProps {
     capping: number;
   };
   capppingMhs: any;
-  cappingUnbilledCost: number;
+  capppingMhsType: any;
+  cappingUnbilledCost: any;
+  cappingUnbilledCostType: any;
   parts: Part[];
   estimatedSparesCost: number;
   spareCostData: ChartData[];
@@ -3645,6 +3653,8 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhs,
+  capppingMhsType,
+  cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
   spareCostData,
@@ -3740,11 +3750,14 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   <Text size="sm" fw={500} c="dimmed">
                     Unbillable Material Cost
                   </Text>
-                  {/* <Text size="xs" c="black">
-                    Per line item
-                  </Text> */}
+                  <Text size="xs" c="black">
+                    {(cappingUnbilledCostType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char : any) => char.toUpperCase()
+                    )}
+                  </Text>
                   <Text size="lg" fw={600} c="blue.6">
-                    ${cappingUnbilledCost || 0}
+                    ${cappingUnbilledCost?.toFixed(2) || 0}
                   </Text>
                   
                 </Flex>
@@ -3758,11 +3771,14 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   <Text size="sm" fw={500} c="dimmed">
                     Unbillable Man Hours
                   </Text>
-                  {/* <Text size="xs" c="black">
-                    Per line item
-                  </Text> */}
+                  <Text size="xs" c="black">
+                    {(capppingMhsType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char : any) => char.toUpperCase()
+                    )}
+                  </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                  {capppingMhs?.toFixed(0)} hr
+                  {Math.round(capppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
@@ -5436,20 +5452,25 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 </Text>
 
                 <SimpleGrid cols={8}>
-                  {selectedFindingDetail?.skill?.map(
-                    (skl: any, index: number) => (
-                      <Badge
-                        key={index}
-                        fullWidth
-                        color="cyan"
-                        size="lg"
-                        radius="md"
-                      >
-                        {skl}
+                  {Array.isArray(selectedFindingDetail?.skill) && selectedFindingDetail.skill.length > 0
+                    ? selectedFindingDetail.skill.map((skl: any, index: number) => (
+                        <Badge
+                          key={index}
+                          fullWidth
+                          color="cyan"
+                          size="lg"
+                          radius="md"
+                        >
+                          {skl?.toString().trim() ? skl : "Unknown Skill"}
+                        </Badge>
+                      ))
+                    : (
+                      <Badge fullWidth color="gray" size="lg" radius="md">
+                        Unknown Skill
                       </Badge>
-                    )
-                  )}
+                    )}
                 </SimpleGrid>
+
 
                 <Space h="md" />
 
@@ -6308,14 +6329,25 @@ border-bottom: none;
                       </Text>
 
                       <SimpleGrid cols={8}>
-                        {selectedTask?.skill?.map((skl: any) => (
-                          <>
-                            <Badge fullWidth color="cyan" size="lg" radius="md">
-                              {skl}
+                        {Array.isArray(selectedTask?.skill) && selectedTask?.skill.length > 0
+                          ? selectedTask?.skill.map((skl: any, index: number) => (
+                              <Badge
+                                key={index}
+                                fullWidth
+                                color="cyan"
+                                size="lg"
+                                radius="md"
+                              >
+                                {skl?.toString().trim() ? skl : "Unknown Skill"}
+                              </Badge>
+                            ))
+                          : (
+                            <Badge fullWidth color="gray" size="lg" radius="md">
+                              Unknown Skill
                             </Badge>
-                          </>
-                        ))}
+                          )}
                       </SimpleGrid>
+
 
                       <Space h="md" />
                       <Text size="md" mb="xs" fw={500} c="dimmed">
