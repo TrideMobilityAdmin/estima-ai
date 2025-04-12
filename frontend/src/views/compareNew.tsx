@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button } from '@mantine/core';
-import { IconAlertTriangle, IconClock, IconCurrencyDollar} from '@tabler/icons-react';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon } from '@mantine/core';
+import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconSettingsDollar} from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
 import StatsCard from '../components/statsCardCompareEst';
 import TaskListCompareScreen from '../components/compareTasksAccordionList';
 import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
 import FindingsListCompareScreen from '../components/compareFindingsAccordionList';
 import { showAppNotification } from '../components/showNotificationGlobally';
+import StatsCardUnbillable from '../components/statsCardCompareUnbillable';
 
 export default function CompareNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -185,6 +186,72 @@ export default function CompareNew() {
             color="orange"
             unit="$"
           />
+        </SimpleGrid>
+        <Space h='xs' />
+        <SimpleGrid cols={4} spacing="md">
+        <Card withBorder radius="md" p="5" mb="sm" >
+          <Group gap="md">
+            <ThemeIcon variant="light" radius="md" size={50} color="#6d8aed">
+              <IconClock size={24} />
+            </ThemeIcon>
+            <Flex direction="column">
+              <Text size="sm" fw={500} c="dimmed">
+                Unbillable MH - Actual
+              </Text>
+              <Text size="lg" fw={600} c="#6d8aed">
+                44 hr
+              </Text>
+            </Flex>
+          </Group>
+          </Card>
+
+          <Card withBorder radius="md" p="5" mb="sm" >
+          <Group gap="md">
+            <ThemeIcon variant="light" radius="md" size={50} color="#70cc60">
+              <IconClock size={24} />
+            </ThemeIcon>
+            <Flex direction="column">
+              <Text size="sm" fw={500} c="dimmed">
+                Unbillable Spares - Actual
+              </Text>
+              <Text size="lg" fw={600} c="#70cc60">
+                44 hr
+              </Text>
+            </Flex>
+          </Group>
+          </Card>
+
+          <Card withBorder radius="md" p="5" mb="sm" >
+          <Group gap="md">
+            <ThemeIcon variant="light" radius="md" size={50} color="#9e64d9">
+              <IconCurrencyDollar size={24} />
+            </ThemeIcon>
+            <Flex direction="column">
+              <Text size="sm" fw={500} c="dimmed">
+                Unbillable MH - Predicted
+              </Text>
+              <Text size="lg" fw={600} c="#9e64d9">
+                44 hr
+              </Text>
+            </Flex>
+          </Group>
+          </Card>
+
+          <Card withBorder radius="md" p="5" mb="sm" >
+          <Group gap="md">
+            <ThemeIcon variant="light" radius="md" size={50} color="orange">
+              <IconCurrencyDollar size={24} />
+            </ThemeIcon>
+            <Flex direction="column">
+              <Text size="sm" fw={500} c="dimmed">
+                Unbillable Spares - Predicted
+              </Text>
+              <Text size="lg" fw={600} c="orange">
+                44 hr
+              </Text>
+            </Flex>
+          </Group>
+          </Card>
         </SimpleGrid>
         <Space h='sm' />
         <SimpleGrid cols={1} spacing="md">

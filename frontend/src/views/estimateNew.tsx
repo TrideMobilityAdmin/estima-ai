@@ -2192,7 +2192,7 @@ export default function EstimateNew() {
 
       <div style={{ padding: 60 }}>
         <Grid grow gutter="xs">
-          <Grid.Col span={4}>
+          <Grid.Col span={{ base: 12, md: 4, lg: 4 }}>
             {/* <Card withBorder
                             // className="glass-card"
                             h='20vh' radius='md'
@@ -2468,7 +2468,7 @@ export default function EstimateNew() {
                         </Card>
                     </Grid.Col> */}
 
-          <Grid.Col span={4}>
+          <Grid.Col span={{ base: 12, md: 4, lg: 4 }}>
             <Card withBorder h="60vh" radius="md">
               {/* <Card bg='#dce1fc'> */}
               <Group
