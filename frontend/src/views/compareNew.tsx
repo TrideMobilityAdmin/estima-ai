@@ -81,7 +81,7 @@ export default function CompareNew() {
     <>
       <div style={{ paddingLeft: 70, paddingRight: 70, paddingTop: 20, paddingBottom: 20 }}>
         <Space h='sm' />
-        <SimpleGrid cols={2}>
+        <SimpleGrid cols={{ base: 1, sm: 1, lg: 2 }}>
           <Card >
             <Group justify='space-between'>
               <Text>
@@ -138,7 +138,7 @@ export default function CompareNew() {
           </Button>
         </Group>
         <Space h='sm' />
-        <SimpleGrid cols={4} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <StatsCard
             title="Tasks - MH"
             icon={IconClock}
@@ -188,7 +188,7 @@ export default function CompareNew() {
           />
         </SimpleGrid>
         <Space h='xs' />
-        <SimpleGrid cols={4} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
         <Card withBorder radius="md" p="5" mb="sm" >
           <Group gap="md">
             <ThemeIcon variant="light" radius="md" size={50} color="#6d8aed">
