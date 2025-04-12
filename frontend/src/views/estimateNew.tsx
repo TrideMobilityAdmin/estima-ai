@@ -237,15 +237,15 @@ export default function EstimateNew() {
     'QUIKJET CARGO AIRLINES PRIVATE LIMITED',
     'WIZZ AIR ABU DHABI LLC'];
 
-    const models = ['A320',
-      'ATR42',
-      'ATR72',
-      'B737 NG',
-      'Q400',
-      'A321',
-      'B737 MAX',
-      'A319',
-      'B737-800(BCF)'];     
+  const models = ['A320',
+    'ATR42',
+    'ATR72',
+    'B737 NG',
+    'Q400',
+    'A321',
+    'B737 MAX',
+    'A319',
+    'B737-800(BCF)'];
 
   const fetchEstimatesStatus = async () => {
     setLoading(true);
@@ -639,7 +639,7 @@ export default function EstimateNew() {
             taskDescription: "",
             manHours: 0,
             skill: "",
-            spareParts: [{ partID: "", description:"", quantity: 0, unit:"", price:0 }],
+            spareParts: [{ partID: "", description: "", quantity: 0, unit: "", price: 0 }],
           },
         ];
 
@@ -1821,43 +1821,43 @@ export default function EstimateNew() {
         )}
 
         <Group p={10}>
-        <AreaChart
-          h={350}
-          data={transformedData || []}
-          dataKey="prob"
-          withLegend
-          withTooltip
-          xAxisLabel="Probability (%)"
-          yAxisLabel="Value"
-          // tooltipProps={{
-          //   content: ({ label, payload }) => (
-          //     <ChartTooltip
-          //       label={"Probability : " + label}
-          //       payload={payload.map(item => ({
-          //         ...item,
-          //         name: customSeriesNames[item.name] || item.name
-          //       }))}
-          //     />
-          //   ),
-          // }}
-          series={[
-            { 
-              name: "totalManhrs", 
-              color: "green.6",
-              label: customSeriesNames.totalManhrs  // Custom display name
-            },
-            { 
-              name: "totalSpareCost", 
-              color: "blue.6",
-              label: customSeriesNames.totalSpareCost  // Custom display name
-            },
-          ]}
-          curveType="linear"
+          <AreaChart
+            h={350}
+            data={transformedData || []}
+            dataKey="prob"
+            withLegend
+            withTooltip
+            xAxisLabel="Probability (%)"
+            yAxisLabel="Value"
+            // tooltipProps={{
+            //   content: ({ label, payload }) => (
+            //     <ChartTooltip
+            //       label={"Probability : " + label}
+            //       payload={payload.map(item => ({
+            //         ...item,
+            //         name: customSeriesNames[item.name] || item.name
+            //       }))}
+            //     />
+            //   ),
+            // }}
+            series={[
+              {
+                name: "totalManhrs",
+                color: "green.6",
+                label: customSeriesNames.totalManhrs  // Custom display name
+              },
+              {
+                name: "totalSpareCost",
+                color: "blue.6",
+                label: customSeriesNames.totalSpareCost  // Custom display name
+              },
+            ]}
+            curveType="linear"
           // legendProps={{
           //   verticalAlign: 'bottom',
           //   formatter: (name) => customSeriesNames[name] || name
           // }}
-        />
+          />
         </Group>
       </Modal>
       {/* Tasks for slected rfq file */}
@@ -2648,7 +2648,7 @@ export default function EstimateNew() {
                     error={form.errors.typeOfCheckID}
                   />
 
-                  
+
 
                   {/* <TextInput
                                         // ref={aircraftRegNoRef}
@@ -3557,7 +3557,7 @@ border-bottom: none;
 
                 <Space h="md" />
                 {/* <PreloadWiseSection tasks={jsonData?.tasks} /> */}
-                 {/* <PreloadWiseSection tasks={estimateReportData?.tasks} /> */}
+                {/* <PreloadWiseSection tasks={estimateReportData?.tasks} /> */}
               </>
             ) : (
               <></>
@@ -3738,10 +3738,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
               </Flex>
             </Card>
 
-            <Space h={10}/>
+            <Space h={10} />
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
-            
+
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
@@ -3753,13 +3753,13 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   <Text size="xs" c="black">
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
-                      .replace(/\b\w/g, (char : any) => char.toUpperCase()
-                    )}
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
                   </Text>
-                  
+
                 </Flex>
               </Group>
               <Space h="sm" />
@@ -3774,15 +3774,15 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   <Text size="xs" c="black">
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
-                      .replace(/\b\w/g, (char : any) => char.toUpperCase()
-                    )}
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                  {Math.round(capppingMhs)} hr
+                    {Math.round(capppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
-              
+
             </Card>
 
             {/* Estimated Spares Cost */}
@@ -3813,7 +3813,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -3868,7 +3868,14 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       sortable: true,
                       resizable: true,
                       filter: true,
-                      floatingFilter: true,
+                      // floatingFilter: true,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.partId || 0}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "desc",
@@ -3878,7 +3885,14 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       sortable: true,
                       resizable: true,
                       filter: true,
-                      floatingFilter: true,
+                      // floatingFilter: true,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.desc || 0}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "qty",
@@ -3901,6 +3915,13 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       headerName: "Units",
                       flex: 0.8,
                       minWidth: 80,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.unit || 0}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "price",
@@ -3908,10 +3929,12 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       flex: 1,
                       minWidth: 90,
                       filter: "agNumberColumnFilter",
-                      valueFormatter: (params) => {
+                      cellRenderer: (params : any) => {
                         if (params.value === null || params.value === undefined)
                           return "";
-                        return `$${parseFloat(params.value).toFixed(2)}`;
+                        return <Text>
+                          {parseFloat(params.value).toFixed(2)}
+                        </Text>
                       },
                     },
                   ]}
@@ -3926,7 +3949,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-          <Card withBorder radius="md" p="5" bg="blue.0">
+            <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <MdOutlineMiscellaneousServices size={24} />
@@ -3941,7 +3964,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </Flex>
               </Group>
             </Card>
-            <Title order={5} m="xs" fw={500} c="dimmed">
+            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
@@ -4021,13 +4044,13 @@ const OverallFindingsReport: React.FC<any> = ({
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
-                    key === "min_mh"
-                      ? "teal.6"
-                      : key === "max_mh"
-                        ? "blue.6"
-                        : key === "avg_mh"
-                          ? "green.6"
-                          : "green.6";
+                      key === "min_mh"
+                        ? "teal.6"
+                        : key === "max_mh"
+                          ? "blue.6"
+                          : key === "avg_mh"
+                            ? "green.6"
+                            : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -4122,7 +4145,7 @@ const OverallFindingsReport: React.FC<any> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -4226,7 +4249,7 @@ const OverallFindingsReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
@@ -4306,13 +4329,13 @@ const OverallMPDReport: React.FC<any> = ({
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
-                    key === "min_mh"
-                      ? "teal.6"
-                      : key === "max_mh"
-                        ? "blue.6"
-                        : key === "avg_mh"
-                          ? "green.6"
-                          : "green.6";
+                      key === "min_mh"
+                        ? "teal.6"
+                        : key === "max_mh"
+                          ? "blue.6"
+                          : key === "avg_mh"
+                            ? "green.6"
+                            : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -4393,7 +4416,7 @@ const OverallMPDReport: React.FC<any> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -4497,7 +4520,7 @@ const OverallMPDReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
@@ -4937,7 +4960,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       });
       return;
     }
-  
+
     // Define CSV Headers (Column Titles)
     const csvHeaders = [
       "Source Task",
@@ -4955,7 +4978,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       "Price",
       "Part Probability",
     ];
-  
+
     // Function to escape CSV fields
     const escapeCSVField = (field: any) => {
       if (field === null || field === undefined) return "-"; // Handle null or undefined
@@ -4970,7 +4993,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       }
       return stringField;
     };
-  
+
     // Map ALL Flattened Data to CSV Format (not just visible rows)
     const csvData = flattenedData.map((task: any) => [
       escapeCSVField(task.sourceTask),
@@ -4988,7 +5011,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       escapeCSVField(task.price),
       escapeCSVField(task.prob),
     ]);
-  
+
     // Convert array to CSV format
     const csvContent =
       "data:text/csv;charset=utf-8," +
@@ -4998,7 +5021,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       ]
         .map((row) => row.join(","))
         .join("\n");
-  
+
     // Create a download link and trigger click
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -5007,14 +5030,14 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     showNotification({
       title: "Export Successful",
       message: `Exported ${flattenedData.length} records to CSV`,
       color: "green",
     });
   };
-  
+
   // Add a new function for Excel export
   const downloadExcel = () => {
     if (!flattenedData || flattenedData.length === 0) {
@@ -5025,11 +5048,11 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       });
       return;
     }
-  
+
     try {
       // Create workbook and worksheet
       const wb = XLSX.utils.book_new();
-      
+
       // Prepare data for Excel format
       const excelData = flattenedData.map((task: any) => ({
         "Source Task": task.sourceTask || "-",
@@ -5047,16 +5070,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Price": task.price || 0,
         "Part Probability": task.prob || 0,
       }));
-      
+
       // Convert to worksheet
       const ws = XLSX.utils.json_to_sheet(excelData);
-      
+
       // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, "Findings");
-      
+
       // Write and download
       XLSX.writeFile(wb, "Findings.xlsx");
-      
+
       showNotification({
         title: "Export Successful",
         message: `Exported ${flattenedData.length} records to Excel`,
@@ -5069,7 +5092,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         message: "Failed to export to Excel. Falling back to CSV.",
         color: "orange",
       });
-      
+
       // Fallback to CSV if Excel export fails
       downloadCSV();
     }
@@ -5101,7 +5124,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             >
               <Title order={4} c="white">
                 Findings
-              </Title>  
+              </Title>
               <Space w={50} />
               <Button color="green" size="xs" onClick={downloadExcel} ml="60vw">
                 Download Excel
@@ -5206,9 +5229,9 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                       <Accordion.Item key={groupKey} value={groupKey} w="100%">
                         <Accordion.Control>
                           <Text fw={600} truncate>
-                          {
-                                groupKey === "ZL" ? "ZONAL TASK" : "ATA " + groupKey
-                              }
+                            {
+                              groupKey === "ZL" ? "ZONAL TASK" : "ATA " + groupKey
+                            }
                             {/* ATA {groupKey} */}
                           </Text>
                         </Accordion.Control>
@@ -5454,16 +5477,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 <SimpleGrid cols={8}>
                   {Array.isArray(selectedFindingDetail?.skill) && selectedFindingDetail.skill.length > 0
                     ? selectedFindingDetail.skill.map((skl: any, index: number) => (
-                        <Badge
-                          key={index}
-                          fullWidth
-                          color="cyan"
-                          size="lg"
-                          radius="md"
-                        >
-                          {skl?.toString().trim() ? skl : "Unknown Skill"}
-                        </Badge>
-                      ))
+                      <Badge
+                        key={index}
+                        fullWidth
+                        color="cyan"
+                        size="lg"
+                        radius="md"
+                      >
+                        {skl?.toString().trim() ? skl : "Unknown Skill"}
+                      </Badge>
+                    ))
                     : (
                       <Badge fullWidth color="gray" size="lg" radius="md">
                         Unknown Skill
@@ -5521,15 +5544,29 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                         floatingFilter: true,
                         resizable: true,
                         flex: 1,
+                        cellRenderer: (val: any) => {
+                          return (
+                            <Text>
+                              {val?.data?.partId || 0}
+                            </Text>
+                          );
+                        },
                       },
                       {
                         field: "desc",
                         headerName: "Description",
                         sortable: true,
                         filter: true,
-                        floatingFilter: true,
+                        // floatingFilter: true,
                         resizable: true,
                         flex: 1,
+                        cellRenderer: (val: any) => {
+                          return (
+                            <Text>
+                              {val?.data?.desc || 0}
+                            </Text>
+                          );
+                        },
                       },
                       {
                         field: "qty",
@@ -5551,6 +5588,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                         sortable: true,
                         resizable: true,
                         flex: 1,
+                        cellRenderer: (val: any) => {
+                          return (
+                            <Text>
+                              {val?.data?.unit || 0}
+                            </Text>
+                          );
+                        },
                       },
                       {
                         field: "price",
@@ -5671,7 +5715,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
   // Filter tasks based on search
 
-  
+
   const filteredGroups = useMemo(() => {
     if (!taskSearch.trim()) return groupedTasks;
 
@@ -5689,7 +5733,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
 
     return filtered;
   }, [groupedTasks, taskSearch]);
-  
+
   // Get all group keys for default opened accordions
   const defaultOpenValues = useMemo(() => {
     return Object.keys(filteredGroups);
@@ -6331,16 +6375,16 @@ border-bottom: none;
                       <SimpleGrid cols={8}>
                         {Array.isArray(selectedTask?.skill) && selectedTask?.skill.length > 0
                           ? selectedTask?.skill.map((skl: any, index: number) => (
-                              <Badge
-                                key={index}
-                                fullWidth
-                                color="cyan"
-                                size="lg"
-                                radius="md"
-                              >
-                                {skl?.toString().trim() ? skl : "Unknown Skill"}
-                              </Badge>
-                            ))
+                            <Badge
+                              key={index}
+                              fullWidth
+                              color="cyan"
+                              size="lg"
+                              radius="md"
+                            >
+                              {skl?.toString().trim() ? skl : "Unknown Skill"}
+                            </Badge>
+                          ))
                           : (
                             <Badge fullWidth color="gray" size="lg" radius="md">
                               Unknown Skill
@@ -6398,6 +6442,13 @@ border-bottom: none;
                               floatingFilter: true,
                               resizable: true,
                               flex: 1,
+                              cellRenderer: (val: any) => {
+                                return (
+                                  <Text>
+                                    {val?.data?.partId || 0}
+                                  </Text>
+                                );
+                              },
                             },
                             {
                               field: "desc",
@@ -6408,6 +6459,13 @@ border-bottom: none;
                               floatingFilter: true,
                               resizable: true,
                               flex: 1,
+                              cellRenderer: (val: any) => {
+                                return (
+                                  <Text>
+                                    {val?.data?.desc || 0}
+                                  </Text>
+                                );
+                              },
                             },
                             {
                               field: "qty",
@@ -6431,6 +6489,13 @@ border-bottom: none;
                               // floatingFilter: true,
                               resizable: true,
                               flex: 1,
+                              cellRenderer: (val: any) => {
+                                return (
+                                  <Text>
+                                    {val?.data?.unit || 0}
+                                  </Text>
+                                );
+                              },
                             },
                             {
                               field: "price",
