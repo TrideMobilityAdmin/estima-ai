@@ -3813,7 +3813,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -3964,7 +3964,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </Flex>
               </Group>
             </Card>
-            <Title order={5} m="xs" fw={500} c="dimmed">
+            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
@@ -4145,7 +4145,7 @@ const OverallFindingsReport: React.FC<any> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -4249,7 +4249,7 @@ const OverallFindingsReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
@@ -4416,7 +4416,7 @@ const OverallMPDReport: React.FC<any> = ({
             h="100%"
             style={{ display: "flex", flexDirection: "column" }}
           >
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Estimated Parts
             </Title>
             <Box style={{ flex: 1, height: "500px" }}>
@@ -4520,7 +4520,7 @@ const OverallMPDReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" fw={500} c="dimmed">
+            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
