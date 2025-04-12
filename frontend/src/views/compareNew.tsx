@@ -43,12 +43,14 @@ export default function CompareNew() {
 
   const handleUpload = async () => {
     if (!selectedFiles.length) {
-      alert("Please select files first!");
+      // alert("Please select files first!");
+      showAppNotification("error", "Failed","Please upload Actual Files.");
       return;
     }
 
     if (!selectedEstID) {
-      alert("Please select an Estimate ID first!");
+      // alert("Please select an Estimate ID first!");
+      showAppNotification("error", "Failed","Please select an Estimate ID.");
       return;
     }
 
