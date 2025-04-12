@@ -1767,6 +1767,7 @@ class TaskService:
             '_id': 0, 
             'estID': 1, 
             'description': 1, 
+            'cappingValues':1,
             'overallEstimateReport': {
                 # 'estimatedTatTime': '$tatTime', 
                 'estimatedSpareCost': '$totalConsumption.totalPartsCost', 
