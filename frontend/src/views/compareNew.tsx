@@ -6,6 +6,7 @@ import StatsCard from '../components/statsCardCompareEst';
 import TaskListCompareScreen from '../components/compareTasksAccordionList';
 import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
 import FindingsListCompareScreen from '../components/compareFindingsAccordionList';
+import { showAppNotification } from '../components/showNotificationGlobally';
 
 export default function CompareNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -64,7 +65,8 @@ export default function CompareNew() {
       }
     } catch (error) {
       console.error("Upload failed:", error);
-      alert("Failed to upload files. Please try again.");
+      // alert("Failed to upload files. Please try again.");
+      showAppNotification("error", "Failed","Failed to upload files. Please try again.");
     } finally {
       setIsLoading(false); // Set loading to false after request completes
     }

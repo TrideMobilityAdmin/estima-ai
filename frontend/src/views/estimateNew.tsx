@@ -470,32 +470,6 @@ export default function EstimateNew() {
     );
   };
 
-  // Handle extracted tasks
-  // const handleTasks = (extractedTasks: string[]) => {
-  //     setTasks(extractedTasks);
-  //     console.log("tasks :", extractedTasks);
-  // };
-
-  //  Extracted tasks are passed to validation API
-  // const handleTasks = async (extractedTasks: string[]) => {
-  //     setIsLoading(true);
-  //     setTasks(extractedTasks);
-
-  //     console.log("Extracted Tasks:", extractedTasks);
-  //     const response = await validateTasks(extractedTasks);
-  //     setValidatedTasks(response);
-  //     setIsLoading(false);
-
-  //     const invalidTasks = response?.filter((task) => task?.status === false);
-  //     if (invalidTasks.length > 0) {
-  //         showNotification({
-  //             title: "Tasks Not Available!",
-  //             message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to generate Estimate.`,
-  //             color: "orange",
-  //             style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-  //         });
-  //     }
-  // }
 
   // Form initialization
   const form = useForm<any>({
@@ -665,7 +639,7 @@ export default function EstimateNew() {
             taskDescription: "",
             manHours: 0,
             skill: "",
-            spareParts: [{ partID: "", quantity: 0 }],
+            spareParts: [{ partID: "", description:"", quantity: 0, unit:"", price:0 }],
           },
         ];
 
@@ -882,6 +856,12 @@ export default function EstimateNew() {
     totalManhrs: Math.round(item?.totalManhrs),
     totalSpareCost: Math.round(item?.totalSpareCost),
   }));
+
+  // Define your custom series names here
+  const customSeriesNames = {
+    totalManhrs: "Total Man Hours", // Custom name for totalManhrs
+    totalSpareCost: "Total Spares Cost" // Custom name for totalSpareCost
+  };
 
   const [downloading, setDownloading] = useState(false);
 
@@ -1187,10 +1167,16 @@ export default function EstimateNew() {
     if (result) {
       // Create a new remark object similar to what your API would return
       const user = currentUser; // Replace with actual current user name or ID
+
+      const currentDate = new Date();
+      // Adjust for the 5:30 that formatDate will add later
+      currentDate.setHours(currentDate.getHours() - 5);
+      currentDate.setMinutes(currentDate.getMinutes() - 30);
+
       const newRemarkObj = {
         remark: newRemark,
         updatedBy: user,
-        createdAt: new Date(), // Current timestamp
+        createdAt: currentDate.toISOString(), // Current timestamp
       };
       setSelectedEstRemarksData((prevRemarks) => [
         ...prevRemarks,
@@ -1835,29 +1821,43 @@ export default function EstimateNew() {
         )}
 
         <Group p={10}>
-          <AreaChart
-            h={350}
-            //   data={probabilityData?.probData || []}
-            data={transformedData || []}
-            dataKey="prob"
-            withLegend
-            withTooltip
-            xAxisLabel="Probability (%)"
-            yAxisLabel="Value"
-            tooltipProps={{
-              content: ({ label, payload }) => (
-                <ChartTooltip
-                  label={"Probability : " + label}
-                  payload={payload}
-                />
-              ),
-            }}
-            series={[
-              { name: "totalManhrs", color: "green.6" },
-              { name: "totalSpareCost", color: "blue.6" },
-            ]}
-            curveType="linear"
-          />
+        <AreaChart
+          h={350}
+          data={transformedData || []}
+          dataKey="prob"
+          withLegend
+          withTooltip
+          xAxisLabel="Probability (%)"
+          yAxisLabel="Value"
+          // tooltipProps={{
+          //   content: ({ label, payload }) => (
+          //     <ChartTooltip
+          //       label={"Probability : " + label}
+          //       payload={payload.map(item => ({
+          //         ...item,
+          //         name: customSeriesNames[item.name] || item.name
+          //       }))}
+          //     />
+          //   ),
+          // }}
+          series={[
+            { 
+              name: "totalManhrs", 
+              color: "green.6",
+              label: customSeriesNames.totalManhrs  // Custom display name
+            },
+            { 
+              name: "totalSpareCost", 
+              color: "blue.6",
+              label: customSeriesNames.totalSpareCost  // Custom display name
+            },
+          ]}
+          curveType="linear"
+          // legendProps={{
+          //   verticalAlign: 'bottom',
+          //   formatter: (name) => customSeriesNames[name] || name
+          // }}
+        />
         </Group>
       </Modal>
       {/* Tasks for slected rfq file */}
@@ -3669,12 +3669,12 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
-                      key === "min"
+                      key === "min_mh"
                         ? "teal.6"
-                        : key === "max"
+                        : key === "max_mh"
                           ? "blue.6"
-                          : key === "avg"
-                            ? "teal.6"
+                          : key === "avg_mh"
+                            ? "green.6"
                             : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
@@ -3728,31 +3728,39 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
               </Flex>
             </Card>
 
+            <Space h={10}/>
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
             
               <Group gap="md">
-                <ThemeIcon variant="light" radius="md" size={30} color="blue.6">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
-                  <Text size="xs" fw={500} c="dimmed">
+                  <Text size="sm" fw={500} c="dimmed">
                     Unbillable Material Cost
                   </Text>
+                  {/* <Text size="xs" c="black">
+                    Per line item
+                  </Text> */}
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost || 0}
                   </Text>
+                  
                 </Flex>
               </Group>
-              <Space h="xs" />
+              <Space h="sm" />
               <Group gap="md">
-                <ThemeIcon variant="light" radius="md" size={30} color="green.6">
+                <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
-                  <Text size="xs" fw={500} c="dimmed">
+                  <Text size="sm" fw={500} c="dimmed">
                     Unbillable Man Hours
                   </Text>
+                  {/* <Text size="xs" c="black">
+                    Per line item
+                  </Text> */}
                   <Text size="lg" fw={600} c={"green.6"}>
                   {capppingMhs?.toFixed(0)} hr
                   </Text>
@@ -3762,7 +3770,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             </Card>
 
             {/* Estimated Spares Cost */}
-            <Card withBorder radius="md" p="5" bg="blue.0">
+            {/* <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <MdOutlineMiscellaneousServices size={24} />
@@ -3776,7 +3784,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   </Text>
                 </Flex>
               </Group>
-            </Card>
+            </Card> */}
           </Card>
         </Grid.Col>
 
@@ -3902,16 +3910,31 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" fw={500} c="dimmed">
+          <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <MdOutlineMiscellaneousServices size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Estimated Spares Cost
+                  </Text>
+                  <Text size="xl" fw={700} c="blue.6">
+                    ${estimatedSparesCost?.toFixed(2) || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            <Title order={5} m="xs" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
-            <Card withBorder radius="md" p="md" bg="blue.0">
+            <Card withBorder radius="md" p="xs" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={350}
+                h={280}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -3982,13 +4005,13 @@ const OverallFindingsReport: React.FC<any> = ({
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
-                      key === "min"
-                        ? "teal.6"
-                        : key === "max"
-                          ? "blue.6"
-                          : key === "avg"
-                            ? "teal.6"
-                            : "green.6";
+                    key === "min_mh"
+                      ? "teal.6"
+                      : key === "max_mh"
+                        ? "blue.6"
+                        : key === "avg_mh"
+                          ? "green.6"
+                          : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")
@@ -4267,13 +4290,13 @@ const OverallMPDReport: React.FC<any> = ({
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
-                      key === "min"
-                        ? "teal.6"
-                        : key === "max"
-                          ? "blue.6"
-                          : key === "avg"
-                            ? "teal.6"
-                            : "green.6";
+                    key === "min_mh"
+                      ? "teal.6"
+                      : key === "max_mh"
+                        ? "blue.6"
+                        : key === "avg_mh"
+                          ? "green.6"
+                          : "green.6";
 
                     // Format the label, replace "avg" with "Estimated"
                     const label = key.includes("avg")

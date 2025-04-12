@@ -44,6 +44,9 @@ class Estimate(BaseModel):
 class SparePart(BaseModel):
     partID:str
     quantity:float
+    description:str
+    unit:str
+    price:float
 class MiscLaborTask(BaseModel):
     taskID: str
     taskDescription: str
