@@ -4845,7 +4845,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       unit: part.unit,
       price: part.price || 0, // Default to 0 if not specified
       prob: part.prob || 0,
-    }));
+    }))?.sort((a:any,b:any)=>b?.price - a?.price);
   }, [selectedFindingDetail]);
 
   // Flatten the data structure when findings change
@@ -6504,7 +6504,7 @@ border-bottom: none;
                           pagination
                           paginationPageSize={6}
                           domLayout="autoHeight" // Ensures height adjusts dynamically
-                          rowData={selectedTask?.spare_parts || []}
+                          rowData={selectedTask?.spare_parts?.sort((a:any,b:any)=>b?.price - a?.price) || []}
                           columnDefs={[
                             {
                               field: "partId",
