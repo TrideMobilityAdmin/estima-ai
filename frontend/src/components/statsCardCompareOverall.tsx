@@ -1,4 +1,4 @@
-import { Card, Text, Group, Divider, Space } from "@mantine/core";
+import { Card, Text, Group, Divider, Space, Flex } from "@mantine/core";
 // import { LucideIcon, Clock, DollarSign, Search, LineChart } from "lucide-react";
 
 // interface StatsCardProps {
@@ -41,7 +41,18 @@ const StatsCardOverall: React.FC<any> = ({
 
       <Divider variant="dashed" mt={10} mb={10}/>
 
-      <Group justify="space-between">
+      <Group justify="center" align="center" gap='150'>
+        <Flex direction='column' align='center' justify='center'>
+            <Text size="sm" c='#69696b'>Actual</Text>
+            <Text  fz="lg" fw={500}>{actual} {unit}</Text>
+        </Flex>
+        <Flex direction='column' align='center' justify='center'>
+            <Text size="sm" c='#69696b'>Predicted</Text>
+            <Text  fz="lg" fw={500}>{predicted} {unit}</Text>
+        </Flex>
+      </Group>
+
+      {/* <Group justify="space-between">
       <Text size="sm" c='#69696b'>Actual</Text>
       <Text  fz="md">{actual} {unit}</Text>
       </Group>
@@ -50,7 +61,7 @@ const StatsCardOverall: React.FC<any> = ({
       <Text size="sm" c='#69696b'>Predicted</Text>
       <Text  fz="md">{predicted} {unit}</Text>
       </Group>
-      <Space h='xs'/>
+      <Space h='xs'/> */}
     </Card>
   );
 };

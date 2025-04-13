@@ -139,7 +139,7 @@ export default function CompareNew() {
           </Button>
         </Group>
         <Space h='sm' />
-        {/* <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing="md">
         <StatsCardOverall
             title="Overall - MH"
             icon={IconClock}
@@ -157,25 +157,25 @@ export default function CompareNew() {
             color="#6d8aed"
             unit="h"
           />
-          <StatsCard
+          <StatsCardOverall
             title="Overall - Spares"
             icon={IconCurrencyDollar}
             actual={
-              (compareEstimatedData?.findings?.summary_findings?.total_actual_spares_cost?.toFixed(2) || 0)
-              + (compareEstimatedData?.tasks?.summary_tasks?.total_actual_spares_cost?.toFixed(2) || 0)
+             ( (compareEstimatedData?.findings?.summary_findings?.total_actual_spares_cost || 0)
+              + (compareEstimatedData?.tasks?.summary_tasks?.total_actual_spares_cost || 0))?.toFixed(2)
             }
             predicted={
-             ( compareEstimatedData?.findings?.summary_findings?.total_predict_spares_cost?.toFixed(2) || 0)
-              + (compareEstimatedData?.tasks?.summary_tasks?.total_predict_spares_cost?.toFixed(2) || 0)
+             (( compareEstimatedData?.findings?.summary_findings?.total_predict_spares_cost || 0)
+              + (compareEstimatedData?.tasks?.summary_tasks?.total_predict_spares_cost || 0))?.toFixed(2)
             }
             // difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
             // accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
             // not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
-            color="orange"
+            color="#9e64d9"
             unit="$"
           />
         </SimpleGrid>
-        <Space h='sm' /> */}
+        <Space h='sm' />
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <StatsCard
             title="Tasks - MH"
@@ -228,9 +228,12 @@ export default function CompareNew() {
         <Space h='xs' />
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <Card withBorder radius="md" p="5" mb="sm" >
-            <Text size="sm" fw={500} c="dimmed" m={5}>
+          <Text fw={600} fz="md" c='#69696b' p={5}>
+          Unbillable MH - Actual
+        </Text>
+            {/* <Text size="sm" fw={500} c="#69696b" m={5}>
               Unbillable MH - Actual
-            </Text>
+            </Text> */}
             <Divider variant="dashed" mt={5} mb={10} />
             <Group gap="md">
 
@@ -258,13 +261,42 @@ export default function CompareNew() {
           </Card>
 
           <Card withBorder radius="md" p="5" mb="sm" >
-            <Text size="sm" fw={500} c="dimmed" m={5}>
-              Unbillable Spares - Actual
+          <Text fw={600} fz="md" c='#69696b' p={5}>
+              Unbillable MH - Predicted
             </Text>
             <Divider variant="dashed" mt={5} mb={10} />
             <Group gap="md">
               <ThemeIcon variant="light" radius="md" size={50} color="#70cc60">
                 <IconClock size={24} />
+              </ThemeIcon>
+              <Flex direction="column">
+
+                <Text size="xs" >
+                  {
+                    (compareEstimatedData?.cappingDetails?.predicted_capping?.cappingTypeManhrs || "Capping Type")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )
+                  } (
+                  {
+                    compareEstimatedData?.cappingDetails?.predicted_capping?.cappingManhrs || 0
+                  } mh)
+                </Text>
+                <Text size="lg" fw={600} c="#70cc60">
+                  {Math.round(compareEstimatedData?.cappingDetails?.predicted_capping?.unbillableManhrs) || 0} hr
+                </Text>
+              </Flex>
+            </Group>
+          </Card>
+
+          <Card withBorder radius="md" p="5" mb="sm" >
+          <Text fw={600} fz="md" c='#69696b' p={5}>
+              Unbillable Spares - Actual
+            </Text>
+            <Divider variant="dashed" mt={5} mb={10} />
+            <Group gap="md">
+              <ThemeIcon variant="light" radius="md" size={50} color="#9e64d9">
+                <IconCurrencyDollar size={24} />
               </ThemeIcon>
               <Flex direction="column">
 
@@ -280,44 +312,17 @@ export default function CompareNew() {
                   } $
                   )
                 </Text>
-                <Text size="lg" fw={600} c="#70cc60">
+                <Text size="lg" fw={600} c="#9e64d9">
                   {compareEstimatedData?.cappingDetails?.actual_capping?.unbillableSpareCost?.toFixed(2) || 0} $
                 </Text>
               </Flex>
             </Group>
           </Card>
 
-          <Card withBorder radius="md" p="5" mb="sm" >
-            <Text size="sm" fw={500} c="dimmed" m={5}>
-              Unbillable MH - Predicted
-            </Text>
-            <Divider variant="dashed" mt={5} mb={10} />
-            <Group gap="md">
-              <ThemeIcon variant="light" radius="md" size={50} color="#9e64d9">
-                <IconCurrencyDollar size={24} />
-              </ThemeIcon>
-              <Flex direction="column">
-
-                <Text size="xs" >
-                  {
-                    (compareEstimatedData?.cappingDetails?.predicted_capping?.cappingTypeManhrs || "Capping Type")
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )
-                  } (
-                  {
-                    compareEstimatedData?.cappingDetails?.predicted_capping?.cappingManhrs || 0
-                  } mh)
-                </Text>
-                <Text size="lg" fw={600} c="#9e64d9">
-                  {Math.round(compareEstimatedData?.cappingDetails?.predicted_capping?.unbillableManhrs) || 0} hr
-                </Text>
-              </Flex>
-            </Group>
-          </Card>
+          
 
           <Card withBorder radius="md" p="5" mb="sm" >
-            <Text size="sm" fw={500} c="dimmed" m={5}>
+          <Text fw={600} fz="md" c='#69696b' p={5}>
               Unbillable Spares - Predicted
             </Text>
             <Divider variant="dashed" mt={5} mb={10} />

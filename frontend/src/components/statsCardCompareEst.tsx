@@ -27,10 +27,10 @@ const StatsCard: React.FC<any> = ({
       shadow="sm"
     //   padding="lg"
       radius="md"
-      style={{
-        borderTop: `4px solid ${color}`,
-        borderRadius: "10px",
-      }}
+      // style={{
+      //   borderTop: `4px solid ${color}`,
+      //   borderRadius: "10px",
+      // }}
     >
       <Group justify="space-between">
         <Text fw={600} fz="md" c='#69696b'>
