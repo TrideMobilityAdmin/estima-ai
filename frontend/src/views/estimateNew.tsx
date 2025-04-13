@@ -3192,7 +3192,7 @@ border-bottom: none;
                                                         <IconDownload />
                                                     </ActionIcon>
                                                 </Tooltip> */}
-                        <Tooltip label="Probability Details">
+                        {/* <Tooltip label="Probability Details">
                           <ActionIcon
                             size={20}
                             color="rgba(156, 104, 0, 1)"
@@ -3209,7 +3209,7 @@ border-bottom: none;
                           >
                             <IconChartArcs3 />
                           </ActionIcon>
-                        </Tooltip>
+                        </Tooltip> */}
                         <Tooltip label="Remarks!">
                           {/* <Indicator 
                                                 label={val?.data?.remarks?.length || 0} 
@@ -3381,7 +3381,7 @@ border-bottom: none;
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.overallEstimateReport?.spareParts ||
+                        estimateReportData?.overallEstimateReport?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) ||
                         []
                       }
                       spareCostData={[
@@ -3425,13 +3425,19 @@ border-bottom: none;
                           ?.estimatedSpareCost || 0
                       }
                       capppingMhs={
-                        estimateReportData?.capping?.unbillable_mhs || 0
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
+                      }
+                      capppingMhsType={
+                        estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
                       cappingUnbilledCost={
-                        estimateReportData?.capping?.unbillable_cost || 0
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingUnbilledCostType={
+                        estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.aggregatedFindings?.spareParts || []
+                        estimateReportData?.aggregatedFindings?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) || []
                       }
                       spareCostData={[
                         {
@@ -3474,13 +3480,19 @@ border-bottom: none;
                           ?.estimatedSpareCost || 0
                       }
                       capppingMhs={
-                        estimateReportData?.capping?.unbillable_mhs || 0
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
+                      }
+                      capppingMhsType={
+                        estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
                       cappingUnbilledCost={
-                        estimateReportData?.capping?.unbillable_cost || 0
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingUnbilledCostType={
+                        estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.aggregatedTasks?.spareParts || []
+                        estimateReportData?.aggregatedTasks?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) || []
                       }
                       spareCostData={[
                         {
@@ -3741,14 +3753,16 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
             <Space h={10} />
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
-
+              {/* <Text size="sm" fw={500} c="dimmed">
+                  Unbillable
+              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                    Unbillable Material Cost
+                  Unbillable Material Cost
                   </Text>
                   <Text size="xs" c="black">
                     {(cappingUnbilledCostType || "")
@@ -3769,7 +3783,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                    Unbillable Man Hours
+                  Unbillable Man Hours
                   </Text>
                   <Text size="xs" c="black">
                     {(capppingMhsType || "")
@@ -3868,14 +3882,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       sortable: true,
                       resizable: true,
                       filter: true,
-                      // floatingFilter: true,
-                      cellRenderer: (val: any) => {
-                        return (
-                          <Text>
-                            {val?.data?.partId || 0}
-                          </Text>
-                        );
-                      },
+                      floatingFilter: true,
                     },
                     {
                       field: "desc",
@@ -3885,14 +3892,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       sortable: true,
                       resizable: true,
                       filter: true,
-                      // floatingFilter: true,
-                      cellRenderer: (val: any) => {
-                        return (
-                          <Text>
-                            {val?.data?.desc || 0}
-                          </Text>
-                        );
-                      },
+                      floatingFilter: true,
                     },
                     {
                       field: "qty",
@@ -3949,6 +3949,9 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
+          <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
+              Spare Cost Analysis
+            </Title>
             <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
@@ -3964,9 +3967,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </Flex>
               </Group>
             </Card>
-            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
-              Spare Cost Analysis
-            </Title>
+            <Space h='5'/>
 
             <Card withBorder radius="md" p="xs" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
@@ -4020,6 +4021,9 @@ const OverallFindingsReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
+  capppingMhs,
+  capppingMhsType,
+  cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
   spareCostData,
@@ -4101,38 +4105,54 @@ const OverallFindingsReport: React.FC<any> = ({
             </Card>
 
             {/* Unbillable Cost */}
-            {/* <Card withBorder radius="md" p="xs" mb="md" bg="blue.0">
-                            <Group gap="md">
-                                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
-                                    <IconSettingsDollar size={24} />
-                                </ThemeIcon>
-                                <Flex direction="column">
-                                    <Text size="sm" fw={500} c="dimmed">
-                                        Unbillable Cost
-                                    </Text>
-                                    <Text size="xl" fw={700} c="blue.6">
-                                        ${cappingUnbilledCost || 0}
-                                    </Text>
-                                </Flex>
-                            </Group>
-                        </Card> */}
-
-            {/* Estimated Spares Cost */}
-            <Card withBorder radius="md" p="xs" bg="blue.0">
+            <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
+              {/* <Text size="sm" fw={500} c="dimmed">
+                  Unbillable
+              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
-                  <MdOutlineMiscellaneousServices size={24} />
+                  <IconSettingsDollar size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                    Estimated Spares Cost
+                  Unbillable Material Cost
                   </Text>
-                  <Text size="xl" fw={700} c="blue.6">
-                    ${estimatedSparesCost?.toFixed(2) || 0}
+                  <Text size="xs" c="black">
+                    {(cappingUnbilledCostType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
+                  </Text>
+                  <Text size="lg" fw={600} c="blue.6">
+                    ${cappingUnbilledCost?.toFixed(2) || 0}
+                  </Text>
+
+                </Flex>
+              </Group>
+              <Space h="sm" />
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="green.6">
+                  <IconClockHour4 size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                  Unbillable Man Hours
+                  </Text>
+                  <Text size="xs" c="black">
+                    {(capppingMhsType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
+                  </Text>
+                  <Text size="lg" fw={600} c={"green.6"}>
+                    {Math.round(capppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
+
             </Card>
+
+            
           </Card>
         </Grid.Col>
 
@@ -4249,16 +4269,32 @@ const OverallFindingsReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
+            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
-
+            {/* Estimated Spares Cost */}
+            <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <MdOutlineMiscellaneousServices size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Estimated Spares Cost
+                  </Text>
+                  <Text size="xl" fw={700} c="blue.6">
+                    ${estimatedSparesCost?.toFixed(2) || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            <Space h='5'/>
             <Card withBorder radius="md" p="md" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={350}
+                h={280}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -4305,6 +4341,9 @@ const OverallMPDReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
+  capppingMhs,
+  capppingMhsType,
+  cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
   spareCostData,
@@ -4372,38 +4411,54 @@ const OverallMPDReport: React.FC<any> = ({
             </Card>
 
             {/* Unbillable Cost */}
-            {/* <Card withBorder radius="md" p="xs" mb="md" bg="blue.0">
-                            <Group gap="md">
-                                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
-                                    <IconSettingsDollar size={24} />
-                                </ThemeIcon>
-                                <Flex direction="column">
-                                    <Text size="sm" fw={500} c="dimmed">
-                                        Unbillable Cost
-                                    </Text>
-                                    <Text size="xl" fw={700} c="blue.6">
-                                        ${cappingUnbilledCost || 0}
-                                    </Text>
-                                </Flex>
-                            </Group>
-                        </Card> */}
-
-            {/* Estimated Spares Cost */}
-            <Card withBorder radius="md" p="xs" bg="blue.0">
+            <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
+              {/* <Text size="sm" fw={500} c="dimmed">
+                  Unbillable
+              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
-                  <MdOutlineMiscellaneousServices size={24} />
+                  <IconSettingsDollar size={24} />
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                    Estimated Spares Cost
+                  Unbillable Material Cost
                   </Text>
-                  <Text size="xl" fw={700} c="blue.6">
-                    ${estimatedSparesCost?.toFixed(2) || 0}
+                  <Text size="xs" c="black">
+                    {(cappingUnbilledCostType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
+                  </Text>
+                  <Text size="lg" fw={600} c="blue.6">
+                    ${cappingUnbilledCost?.toFixed(2) || 0}
+                  </Text>
+
+                </Flex>
+              </Group>
+              <Space h="sm" />
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="green.6">
+                  <IconClockHour4 size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                  Unbillable Man Hours
+                  </Text>
+                  <Text size="xs" c="black">
+                    {(capppingMhsType || "")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )}
+                  </Text>
+                  <Text size="lg" fw={600} c={"green.6"}>
+                    {Math.round(capppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
+
             </Card>
+
+
           </Card>
         </Grid.Col>
 
@@ -4520,16 +4575,33 @@ const OverallMPDReport: React.FC<any> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-            <Title order={5} mb="md" size="sm" fw={500} c="dimmed">
+            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
 
+                        {/* Estimated Spares Cost */}
+                        <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <MdOutlineMiscellaneousServices size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Estimated Spares Cost
+                  </Text>
+                  <Text size="xl" fw={700} c="blue.6">
+                    ${estimatedSparesCost?.toFixed(2) || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            <Space h='5'/>
             <Card withBorder radius="md" p="md" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={350}
+                h={280}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },

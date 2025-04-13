@@ -11,7 +11,7 @@ import { Card, Text, Group, Divider, Space } from "@mantine/core";
 //   color: string;
 // }
 
-const StatsCard: React.FC<any> = ({
+const StatsCardOverall: React.FC<any> = ({
   title,
   icon: Icon,
   actual,
@@ -51,30 +51,8 @@ const StatsCard: React.FC<any> = ({
       <Text  fz="md">{predicted} {unit}</Text>
       </Group>
       <Space h='xs'/>
-
-      {/* <Group justify="space-between">
-      <Text size="sm" c={color} style={{ cursor: "pointer" }}>
-        Difference
-      </Text>
-      <Text  fz="md" c={color}>
-        {difference} h
-      </Text>
-      </Group>
-      <Space h='xs'/>
-
-      <Group justify="space-between">
-      <Text size="sm" c='#69696b'>Accuracy</Text>
-      <Text  fz="md" c="black">
-        {accuracy} %
-      </Text>
-      </Group>
-      <Space h='xs'/> */}
-      {/* <Group justify="space-between">
-      <Text size="sm" c='#69696b'>Not Eligible</Text>
-      <Text  fz="md">{not_eligible} {unit}</Text>
-      </Group> */}
     </Card>
   );
 };
 
-export default StatsCard;
+export default StatsCardOverall;

@@ -8,6 +8,7 @@ import CompareUploadDropZoneExcel from '../components/compareUploadFiles';
 import FindingsListCompareScreen from '../components/compareFindingsAccordionList';
 import { showAppNotification } from '../components/showNotificationGlobally';
 import StatsCardUnbillable from '../components/statsCardCompareUnbillable';
+import StatsCardOverall from '../components/statsCardCompareOverall';
 
 export default function CompareNew() {
   const { getAllEstimates, compareUploadFile } = useApi();
@@ -138,6 +139,43 @@ export default function CompareNew() {
           </Button>
         </Group>
         <Space h='sm' />
+        {/* <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing="md">
+        <StatsCardOverall
+            title="Overall - MH"
+            icon={IconClock}
+            actual={
+              (Math.round(compareEstimatedData?.tasks?.summary_tasks?.total_actual_manhours) || 0) 
+              + (Math.round(compareEstimatedData?.findings?.summary_findings?.total_actual_manhours) || 0)
+            }
+            predicted={
+              (Math.round(compareEstimatedData?.tasks?.summary_tasks?.total_predict_manhours) || 0)
+              + (Math.round(compareEstimatedData?.findings?.summary_findings?.total_predict_manhours) || 0)
+            }
+            // difference={Math.round(compareEstimatedData?.aggregatedTasklevel?.diff_avg_mh) || 0}
+            // accuracy={Math.round(compareEstimatedData?.aggregatedTasklevel?.accuracy_mh) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_mh) || 0}
+            color="#6d8aed"
+            unit="h"
+          />
+          <StatsCard
+            title="Overall - Spares"
+            icon={IconCurrencyDollar}
+            actual={
+              (compareEstimatedData?.findings?.summary_findings?.total_actual_spares_cost?.toFixed(2) || 0)
+              + (compareEstimatedData?.tasks?.summary_tasks?.total_actual_spares_cost?.toFixed(2) || 0)
+            }
+            predicted={
+             ( compareEstimatedData?.findings?.summary_findings?.total_predict_spares_cost?.toFixed(2) || 0)
+              + (compareEstimatedData?.tasks?.summary_tasks?.total_predict_spares_cost?.toFixed(2) || 0)
+            }
+            // difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
+            // accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
+            color="orange"
+            unit="$"
+          />
+        </SimpleGrid>
+        <Space h='sm' /> */}
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <StatsCard
             title="Tasks - MH"
@@ -146,7 +184,7 @@ export default function CompareNew() {
             predicted={Math.round(compareEstimatedData?.tasks?.summary_tasks?.total_predict_manhours) || 0}
             // difference={Math.round(compareEstimatedData?.aggregatedTasklevel?.diff_avg_mh) || 0}
             // accuracy={Math.round(compareEstimatedData?.aggregatedTasklevel?.accuracy_mh) || 0}
-            not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_mh) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_mh) || 0}
             color="#6d8aed"
             unit="h"
           />
@@ -158,7 +196,7 @@ export default function CompareNew() {
             predicted={compareEstimatedData?.tasks?.summary_tasks?.total_predict_spares_cost?.toFixed(2) || 0}
             // difference={compareEstimatedData?.aggregatedTasklevel?.diff_total_billable_value_usd_tasks?.toFixed(2) || 0}
             // accuracy={compareEstimatedData?.aggregatedTasklevel?.accuracy_total_billable_value_usd_tasks?.toFixed(2) || 0}
-            not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_total_billable_value_usd_tasks) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedTasklevel?.not_eligible_total_billable_value_usd_tasks) || 0}
             color="#70cc60"
             unit="$"
           />
@@ -170,7 +208,7 @@ export default function CompareNew() {
             predicted={Math.round(compareEstimatedData?.findings?.summary_findings?.total_predict_manhours) || 0}
             // difference={Math.round(compareEstimatedData?.findings?.summary_findings?.total_actual_manhours) || 0}
             // accuracy={Math.round(compareEstimatedData?.aggregatedFindingslevel?.accuracy_mh) || 0}
-            not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_mh) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_mh) || 0}
             color="#9e64d9"
             unit="h"
           />
@@ -182,7 +220,7 @@ export default function CompareNew() {
             predicted={compareEstimatedData?.findings?.summary_findings?.total_predict_spares_cost?.toFixed(2) || 0}
             // difference={compareEstimatedData?.aggregatedFindingslevel?.diff_total_billable_value_usd_findings?.toFixed(2) || 0}
             // accuracy={compareEstimatedData?.aggregatedFindingslevel?.accuracy_total_billable_value_usd_findings?.toFixed(2) || 0}
-            not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
+            // not_eligible={Math.round(compareEstimatedData?.aggregatedFindingslevel?.not_eligible_total_billable_value_usd_findings) || 0}
             color="orange"
             unit="$"
           />
@@ -309,10 +347,10 @@ export default function CompareNew() {
           </Card>
         </SimpleGrid>
         <Space h='sm' />
-        <SimpleGrid cols={1} spacing="md">
+        {/* <SimpleGrid cols={1} spacing="md">
           <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible_tasks} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
           <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings?.eligible_tasks} findingsNotEligible={compareEstimatedData?.findings?.not_eligible} />
-        </SimpleGrid>
+        </SimpleGrid> */}
 
 
         <Space h='sm' />
