@@ -750,28 +750,33 @@ class ExcelUploadService:
             print("None EstID Pred Data -->" + estID)
             return {}
         
-        # Process tasks data
-        pred_tasks_data_full = pd.DataFrame(pred_data[0]["tasks"])
-        pred_findings_data_full = pd.DataFrame(pred_data[0]["findings"])
+        # Process tasks and findings
+        pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
+        pred_findings_data_full = pd.DataFrame(pred_data[0].get("findings", []))
         
-        # Properly handle capping values
-        if "capping_values" in pred_data[0]:
-            capping_values = pred_data[0]["capping_values"]
-        else:
-            capping_values = {
-            'cappingTypeManhrs': "No capping",
-                'cappingManhrs':0.0,
-                'billableManhrs': 0.0,
-                'unbillableManhrs': 0.0,
-                'cappingTypeSpareCost': "No capping",
-                'cappingSpareCost':0.0,
-                'billableSpareCost': 0.0,
-                'unbillableSpareCost': 0.0
-            }
-        # Get capping details if available
-        cappingDetails = pred_data[0].get("cappingDetails", "capping details not found")
-        capping_values["cappingManhrs"]= cappingDetails["cappingManhrs"]
-        capping_values["cappingSpareCost"]= cappingDetails["cappingSpareCost"]
+        # Get capping details safely
+        cappingDetails = pred_data[0].get("cappingDetails", {})
+        if not isinstance(cappingDetails, dict):
+            cappingDetails = {}
+        
+        # Initialize capping_values safely
+        capping_values = pred_data[0].get("capping_values", {})
+        if not isinstance(capping_values, dict):
+            capping_values = {}
+        
+        # Populate with safe default values and overwrite if details exist
+        capping_values = {
+            'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", capping_values.get("cappingTypeManhrs", "No capping")),
+            'cappingManhrs': cappingDetails.get("cappingManhrs", capping_values.get("cappingManhrs", 0.0)),
+            'billableManhrs': capping_values.get("billableManhrs", 0.0),
+            'unbillableManhrs': capping_values.get("unbillableManhrs", 0.0),
+            'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", capping_values.get("cappingTypeSpareCost", "No capping")),
+            'cappingSpareCost': cappingDetails.get("cappingSpareCost", capping_values.get("cappingSpareCost", 0.0)),
+            'billableSpareCost': capping_values.get("billableSpareCost", 0.0),
+            'unbillableSpareCost': capping_values.get("unbillableSpareCost", 0.0)
+        }
+        
+        # Final assignment
         pred_capping_values = capping_values
 
 
@@ -996,27 +1001,29 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     print(f"cappingDetails: {cappingDetails}")
     print(f"Number of eligible tasks: {len(eligibile_tasks)}")
     
-    if cappingDetails == "capping details not found":
+    
+    # Ensure cappingDetails is a dictionary
+    if not isinstance(cappingDetails, dict) or not cappingDetails:
         print("No capping details found, returning default values")
         return {
             'cappingTypeManhrs': "No capping",
-            'cappingManhrs':0.0,
+            'cappingManhrs': 0.0,
             'billableManhrs': 0.0,
             'unbillableManhrs': 0.0,
             'cappingTypeSpareCost': "No capping",
-            'cappingSpareCost':0.0,
+            'cappingSpareCost': 0.0,
             'billableSpareCost': 0.0,
             'unbillableSpareCost': 0.0
         }
-
-
+    
+    # Populate capping values from cappingDetails
     capping_values = {
         'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", "No capping"),
-        'cappingManhrs':cappingDetails["cappingManhrs"],
+        'cappingManhrs': cappingDetails.get("cappingManhrs", 0.0),
         'billableManhrs': 0.0,
         'unbillableManhrs': 0.0,
         'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", "No capping"),
-        'cappingSpareCost':cappingDetails["cappingSpareCost"],
+        'cappingSpareCost': cappingDetails.get("cappingSpareCost", 0.0),
         'billableSpareCost': 0.0,
         'unbillableSpareCost': 0.0
     }
