@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon } from '@mantine/core';
-import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconSettingsDollar} from '@tabler/icons-react';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider } from '@mantine/core';
+import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconSettingsDollar } from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
 import StatsCard from '../components/statsCardCompareEst';
 import TaskListCompareScreen from '../components/compareTasksAccordionList';
@@ -45,13 +45,13 @@ export default function CompareNew() {
   const handleUpload = async () => {
     if (!selectedFiles.length) {
       // alert("Please select files first!");
-      showAppNotification("error", "Failed","Please upload Actual Files.");
+      showAppNotification("error", "Failed", "Please upload Actual Files.");
       return;
     }
 
     if (!selectedEstID) {
       // alert("Please select an Estimate ID first!");
-      showAppNotification("error", "Failed","Please select an Estimate ID.");
+      showAppNotification("error", "Failed", "Please select an Estimate ID.");
       return;
     }
 
@@ -69,7 +69,7 @@ export default function CompareNew() {
     } catch (error) {
       console.error("Upload failed:", error);
       // alert("Failed to upload files. Please try again.");
-      showAppNotification("error", "Failed","Failed to upload files. Please try again.");
+      showAppNotification("error", "Failed", "Failed to upload files. Please try again.");
     } finally {
       setIsLoading(false); // Set loading to false after request completes
     }
@@ -189,77 +189,132 @@ export default function CompareNew() {
         </SimpleGrid>
         <Space h='xs' />
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
-        <Card withBorder radius="md" p="5" mb="sm" >
-          <Group gap="md">
-            <ThemeIcon variant="light" radius="md" size={50} color="#6d8aed">
-              <IconClock size={24} />
-            </ThemeIcon>
-            <Flex direction="column">
-              <Text size="sm" fw={500} c="dimmed">
-                Unbillable MH - Actual
-              </Text>
-              <Text size="lg" fw={600} c="#6d8aed">
-                44 hr
-              </Text>
-            </Flex>
-          </Group>
+          <Card withBorder radius="md" p="5" mb="sm" >
+            <Text size="sm" fw={500} c="dimmed" m={5}>
+              Unbillable MH - Actual
+            </Text>
+            <Divider variant="dashed" mt={5} mb={10} />
+            <Group gap="md">
+
+              <ThemeIcon variant="light" radius="md" size={50} color="#6d8aed">
+                <IconClock size={24} />
+              </ThemeIcon>
+              <Flex direction="column">
+
+                <Text size="xs" >
+                  {
+                    (compareEstimatedData?.cappingDetails?.actual_capping?.cappingTypeManhrs || "Capping Type")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )
+                  } (
+                  {
+                    compareEstimatedData?.cappingDetails?.actual_capping?.cappingManhrs || 0
+                  } mh)
+                </Text>
+                <Text size="lg" fw={600} c="#6d8aed">
+                  {Math.round(compareEstimatedData?.cappingDetails?.actual_capping?.unbillableManhrs) || 0} hr
+                </Text>
+              </Flex>
+            </Group>
           </Card>
 
           <Card withBorder radius="md" p="5" mb="sm" >
-          <Group gap="md">
-            <ThemeIcon variant="light" radius="md" size={50} color="#70cc60">
-              <IconClock size={24} />
-            </ThemeIcon>
-            <Flex direction="column">
-              <Text size="sm" fw={500} c="dimmed">
-                Unbillable Spares - Actual
-              </Text>
-              <Text size="lg" fw={600} c="#70cc60">
-                44 hr
-              </Text>
-            </Flex>
-          </Group>
+            <Text size="sm" fw={500} c="dimmed" m={5}>
+              Unbillable Spares - Actual
+            </Text>
+            <Divider variant="dashed" mt={5} mb={10} />
+            <Group gap="md">
+              <ThemeIcon variant="light" radius="md" size={50} color="#70cc60">
+                <IconClock size={24} />
+              </ThemeIcon>
+              <Flex direction="column">
+
+                <Text size="xs" >
+                  {
+                    (compareEstimatedData?.cappingDetails?.actual_capping?.cappingTypeSpareCost || "Capping Type")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )
+                  } (
+                  {
+                    compareEstimatedData?.cappingDetails?.actual_capping?.cappingSpareCost || 0
+                  } $
+                  )
+                </Text>
+                <Text size="lg" fw={600} c="#70cc60">
+                  {compareEstimatedData?.cappingDetails?.actual_capping?.unbillableSpareCost?.toFixed(2) || 0} $
+                </Text>
+              </Flex>
+            </Group>
           </Card>
 
           <Card withBorder radius="md" p="5" mb="sm" >
-          <Group gap="md">
-            <ThemeIcon variant="light" radius="md" size={50} color="#9e64d9">
-              <IconCurrencyDollar size={24} />
-            </ThemeIcon>
-            <Flex direction="column">
-              <Text size="sm" fw={500} c="dimmed">
-                Unbillable MH - Predicted
-              </Text>
-              <Text size="lg" fw={600} c="#9e64d9">
-                44 hr
-              </Text>
-            </Flex>
-          </Group>
+            <Text size="sm" fw={500} c="dimmed" m={5}>
+              Unbillable MH - Predicted
+            </Text>
+            <Divider variant="dashed" mt={5} mb={10} />
+            <Group gap="md">
+              <ThemeIcon variant="light" radius="md" size={50} color="#9e64d9">
+                <IconCurrencyDollar size={24} />
+              </ThemeIcon>
+              <Flex direction="column">
+
+                <Text size="xs" >
+                  {
+                    (compareEstimatedData?.cappingDetails?.predicted_capping?.cappingTypeManhrs || "Capping Type")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )
+                  } (
+                  {
+                    compareEstimatedData?.cappingDetails?.predicted_capping?.cappingManhrs || 0
+                  } mh)
+                </Text>
+                <Text size="lg" fw={600} c="#9e64d9">
+                  {Math.round(compareEstimatedData?.cappingDetails?.predicted_capping?.unbillableManhrs) || 0} hr
+                </Text>
+              </Flex>
+            </Group>
           </Card>
 
           <Card withBorder radius="md" p="5" mb="sm" >
-          <Group gap="md">
-            <ThemeIcon variant="light" radius="md" size={50} color="orange">
-              <IconCurrencyDollar size={24} />
-            </ThemeIcon>
-            <Flex direction="column">
-              <Text size="sm" fw={500} c="dimmed">
-                Unbillable Spares - Predicted
-              </Text>
-              <Text size="lg" fw={600} c="orange">
-                44 hr
-              </Text>
-            </Flex>
-          </Group>
+            <Text size="sm" fw={500} c="dimmed" m={5}>
+              Unbillable Spares - Predicted
+            </Text>
+            <Divider variant="dashed" mt={5} mb={10} />
+            <Group gap="md">
+              <ThemeIcon variant="light" radius="md" size={50} color="orange">
+                <IconCurrencyDollar size={24} />
+              </ThemeIcon>
+              <Flex direction="column">
+
+                <Text size="xs" >
+                  {
+                    (compareEstimatedData?.cappingDetails?.predicted_capping?.cappingTypeSpareCost || "Capping Type")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char: any) => char.toUpperCase()
+                      )
+                  } (
+                  {
+                    compareEstimatedData?.cappingDetails?.predicted_capping?.cappingSpareCost || 0
+                  } $
+                  )
+                </Text>
+                <Text size="lg" fw={600} c="orange">
+                  {compareEstimatedData?.cappingDetails?.predicted_capping?.unbillableSpareCost?.toFixed(2) || 0} $
+                </Text>
+              </Flex>
+            </Group>
           </Card>
         </SimpleGrid>
         <Space h='sm' />
         <SimpleGrid cols={1} spacing="md">
-        <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible_tasks} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
-        <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings?.eligible_tasks} findingsNotEligible={compareEstimatedData?.findings?.not_eligible} />
+          <TaskListCompareScreen tasksEligible={compareEstimatedData?.tasks?.eligible_tasks} tasksNotEligible={compareEstimatedData?.tasks?.not_eligible} />
+          <FindingsListCompareScreen findingsEligible={compareEstimatedData?.findings?.eligible_tasks} findingsNotEligible={compareEstimatedData?.findings?.not_eligible} />
         </SimpleGrid>
 
-        
+
         <Space h='sm' />
       </div>
     </>
