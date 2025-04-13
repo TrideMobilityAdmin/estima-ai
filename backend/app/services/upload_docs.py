@@ -1,9 +1,11 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
+from fastapi.responses import ORJSONResponse
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
 import os
 import json
+import math
 import yaml
 import re
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
@@ -740,179 +742,620 @@ class ExcelUploadService:
             logger.error(f"Error reading Excel file: {str(error)}")
             return None
 
-    def testing(self,task_description, sub_task_parts,sub_task_description,estID):
-        pred_data = list(self.estimate_output.find({"estID": estID}))
-        logger.info("pred_data fetched successfully")
-       
-        pred_tasks_data_full = pd.DataFrame(pred_data[0]["tasks"])
-        logger.info(f"pred_tasks_data columns: {pred_tasks_data_full.columns}")
-        
-        pred_findings_data_full = pd.DataFrame(pred_data[0]["findings"])
-        logger.info(f"pred_findings_data columns: {pred_findings_data_full.columns}")
+    def testing(self,task_description, sub_task_parts, sub_task_description, estID):
 
-        eligibile_tasks = []
-        for index, task in pred_tasks_data_full.iterrows():
-            eligibile_tasks.append(task["sourceTask"])
-        eligible_task_description= task_description[task_description["task_number"].isin(eligibile_tasks)]
-        non_eligible_task_description= task_description[~task_description["task_number"].isin(eligibile_tasks)]
+        # Fetch predicted data
+        pred_data = list(self.estimate_output.find({"estID": estID}))
+        if not pred_data:
+            print("None EstID Pred Data -->" + estID)
+            return {}
+        
+        # Process tasks and findings
+        pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
+        pred_findings_data_full = pd.DataFrame(pred_data[0].get("findings", []))
+        
+        # Get capping details safely
+        cappingDetails = pred_data[0].get("cappingDetails", {})
+        if not isinstance(cappingDetails, dict):
+            cappingDetails = {}
+        
+        # Initialize capping_values safely
+        capping_values = pred_data[0].get("capping_values", {})
+        if not isinstance(capping_values, dict):
+            capping_values = {}
+        
+        # Populate with safe default values and overwrite if details exist
+        capping_values = {
+            'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", capping_values.get("cappingTypeManhrs", "No capping")),
+            'cappingManhrs': cappingDetails.get("cappingManhrs", capping_values.get("cappingManhrs", 0.0)),
+            'billableManhrs': capping_values.get("billableManhrs", 0.0),
+            'unbillableManhrs': capping_values.get("unbillableManhrs", 0.0),
+            'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", capping_values.get("cappingTypeSpareCost", "No capping")),
+            'cappingSpareCost': cappingDetails.get("cappingSpareCost", capping_values.get("cappingSpareCost", 0.0)),
+            'billableSpareCost': capping_values.get("billableSpareCost", 0.0),
+            'unbillableSpareCost': capping_values.get("unbillableSpareCost", 0.0)
+        }
+        
+        # Final assignment
+        pred_capping_values = capping_values
+
+
+        sub_task_description["source_task_discrepancy_number_updated"] = ""
+
+        # Create task_findings_dict
+        findings = sub_task_description["log_item_number"].tolist()
+        tasks = sub_task_description["source_task_discrepancy_number"].tolist()
+        task_findings_dict = dict(zip(findings, tasks))
+
+        # Resolve task references safely (avoid infinite loops)
+        max_iterations = 10  # Safety limit
+        for finding in findings:
+            iteration = 0
+            current = finding
+            
+            while iteration < max_iterations:
+                if current not in task_findings_dict or task_findings_dict[current] == current:
+                    break  # Stop if there's no further reference or self-referencing
+                next_value = task_findings_dict[current]
+                if next_value == finding:  # Circular reference detected
+                    break
+                current = next_value
+                iteration += 1
+            
+            # Update with the resolved reference
+            task_findings_dict[finding] = current
+
+        # Assign resolved values back to DataFrame
+        sub_task_description["source_task_discrepancy_number_updated"] = sub_task_description["log_item_number"].map(task_findings_dict)
+
+
+
+        
+        # Extract eligible tasks
+        eligibile_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
+        
+        # Calculate actual capping values
+        actual_capping_values = actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts)
+        
+        # Filter task descriptions
+        eligible_task_description = task_description[task_description["task_number"].isin(eligibile_tasks)]
+        
+        # ----- PROCESS TASKS DATA (similar to testing function) -----
         final_mpd_data = []
         for task in eligibile_tasks:
             mydict = {}
             actual_task_data = task_description[task_description["task_number"] == task]
             actual_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
             predicted_task_data = pred_tasks_data_full[pred_tasks_data_full["sourceTask"] == task]
-            pred_findings_data = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
-            sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number"] == task]
-            actual_findings_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
             
             if not actual_task_data.empty:
-                actual_manhours = actual_task_data["actual_man_hours"].values[0]
+                # Process actual man hours
+                actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
+                
+                # Process actual spares
                 actual_spares_cost = 0
-                # print(task)
-                # print(actual_task_data)
-                # break
                 actual_spares_list = []
-                if 'billable_value_usd' in actual_parts_data and len(actual_parts_data["billable_value_usd"]) > 0:
+                
+                if not actual_parts_data.empty and 'billable_value_usd' in actual_parts_data.columns:
                     for index, row in actual_parts_data.iterrows():
                         rowdict = row.to_dict()
                         spares_dict = {}
-                        spares_dict["partId"] = rowdict["issued_part_number"]
-                        spares_dict["desc"] = rowdict["part_description"]
-                        spares_dict["price"] = rowdict["billable_value_usd"]
-                        spares_dict["qty"] = rowdict["used_quantity"]
-                        spares_dict["unit"]=rowdict["issued_unit_of_measurement"]
-                        actual_spares_cost = actual_spares_cost + rowdict["billable_value_usd"]
+                        spares_dict["partId"] = rowdict.get("issued_part_number", "")
+                        spares_dict["price"] = rowdict.get("billable_value_usd", 0)
+                        spares_dict["qty"] = rowdict.get("used_quantity", 0)
+                        spares_dict["unit"] = rowdict.get("issued_unit_of_measurement", "")
+                        actual_spares_cost += rowdict.get("billable_value_usd", 0)
                         actual_spares_list.append(spares_dict)
-                    # actual_spares_cost = actual_parts_data["billable_value_usd"].values[0]
-                mydict["actual_manhours"]  = actual_manhours
+                
+                # Add to dictionary
+                mydict["actual_manhours"] = actual_manhours
                 mydict["actual_spares_list"] = actual_spares_list
                 mydict["actual_spares_cost"] = actual_spares_cost
                 mydict["task_number"] = task
-                # print(predicted_task_data["mhs"])
+                
+                # Process predicted data
                 mydict["predict_manhours"] = 0
                 mydict["predict_spares_cost"] = 0
                 mydict["predicted_spares_list"] = []
+                
                 for index, row in predicted_task_data.iterrows():
                     if "description" in row:
                         mydict["description"] = row["description"]
-                    if "avg" in row["mhs"]:
+                    if "mhs" in row and "avg" in row["mhs"]:
                         mydict["predict_manhours"] = row["mhs"]["avg"]
                     if "spare_parts" in row:
                         spare_parts = row["spare_parts"]
                         mydict["predicted_spares_list"] = spare_parts
                         spsum = 0
                         for s in spare_parts:
-                            spsum = spsum + s["price"]
+                            spsum = spsum + s.get("price", 0)
                         mydict["predict_spares_cost"] = spsum
-                findings_manhours = 0
-                for index, k in sub_task_description_data.iterrows():
-                    one_finding = k["actual_man_hours"]
-                    findings_manhours = findings_manhours + one_finding
-                final_mpd_data.append(mydict)
                 
-        df = pd.DataFrame(final_mpd_data) 
-        total_actual_spares_cost = df['actual_spares_cost'].sum()
-        total_predict_spares_cost = df['predict_spares_cost'].sum()
-        total_predict_manhours = df['predict_manhours'].sum()
-        total_actual_manhours = df['actual_manhours'].sum()
-        summary_tasks_comparision = {}
-        summary_tasks_comparision["total_actual_spares_cost"] = total_actual_spares_cost
-        summary_tasks_comparision["total_predict_spares_cost"] = total_predict_spares_cost
-        summary_tasks_comparision["total_predict_manhours"] = total_predict_manhours
-        summary_tasks_comparision["total_actual_manhours"] = total_actual_manhours
-        # summary_eligible_tasks = {"summary" : summary_tasks_comparision}
-        eligible_tasks_comparision = {"eligible_tasks": final_mpd_data, "summary_tasks" :  summary_tasks_comparision}
-        # output_eligible_tasks_comparision = {"tasks": eligible_tasks_comparision}
-        logger.info("output_eligible_tasks_comparision successfully fetched")
-
-        final_findings_data = self.findings(pred_findings_data_full, sub_task_parts,sub_task_description, eligibile_tasks)
-        logger.info("final_findings_data successfully fetched")
-        finaloutput = {}
-        finaloutput["tasks"] = eligible_tasks_comparision
-        finaloutput["findings"] = final_findings_data
-        return finaloutput
-
+                final_mpd_data.append(mydict)
         
-
-    def findings(self,pred_findings_data_full, sub_task_parts,sub_task_description, eligibile_tasks):
+        # Calculate summary for tasks
+        df_tasks = pd.DataFrame(final_mpd_data)
+        total_actual_spares_cost = df_tasks['actual_spares_cost'].sum() if not df_tasks.empty else 0
+        total_predict_spares_cost = df_tasks['predict_spares_cost'].sum() if not df_tasks.empty else 0
+        total_predict_manhours = df_tasks['predict_manhours'].sum() if not df_tasks.empty else 0
+        total_actual_manhours = df_tasks['actual_manhours'].sum() if not df_tasks.empty else 0
+        
+        summary_tasks_comparision = {
+            "total_actual_spares_cost": total_actual_spares_cost,
+            "total_predict_spares_cost": total_predict_spares_cost,
+            "total_predict_manhours": total_predict_manhours,
+            "total_actual_manhours": total_actual_manhours
+        }
+        
+        eligible_tasks_comparision = {
+            "eligible_tasks": final_mpd_data,
+            "summary_tasks": summary_tasks_comparision
+        }
+        
+        # ----- PROCESS FINDINGS DATA (similar to original findings function but using testing2 logic) -----
         final_findings_data = []
-        kindex = 0
+        
         for task in eligibile_tasks:
-            # if task != '200145-01-1':
-            #     continue
             mydict = {}
-            pred_findings_data = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
-            # print(pred_findings_data)
-            sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number"] == task]
-            actual_findings_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
-            findings_spares_cost = 0
-            findings_spareslist = []
-            actual_spares_list = []
+            pred_findings_task = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
+            sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"] == task]
+            actual_findings_parts_data = sub_task_parts[
+                (sub_task_parts["task_number"].str.startswith("HMV")) & 
+                (sub_task_parts["task_number"].isin(sub_task_description_data["log_item_number"].tolist()))
+            ]
+            
+            # Process actual findings manhours
             actual_manhours = 0
             for index, row in sub_task_description_data.iterrows():
-                rowdict = row.to_dict()
-                actual_manhours = actual_manhours + rowdict["actual_man_hours"]
-                #print(actual_manhours)
+                one_finding = row.get("actual_man_hours", 0)
+                actual_manhours += one_finding
+            
             mydict["actual_findings_manhours"] = actual_manhours
+            
+            # Process actual findings spares
             actual_spares_cost = 0
+            actual_spares_list = []
+            
             for index, row in actual_findings_parts_data.iterrows():
                 rowdict = row.to_dict()
                 spares_dict = {}
-                spares_dict["partId"] = rowdict["issued_part_number"]
-                spares_dict["desc"] = rowdict["part_description"]
-                spares_dict["price"] = rowdict["billable_value_usd"]
-                spares_dict["qty"] = rowdict["used_quantity"]
-                spares_dict["unit"] = rowdict["issued_unit_of_measurement"]
-                actual_spares_cost = actual_spares_cost + row["billable_value_usd"]
+                spares_dict["partId"] = rowdict.get("issued_part_number", "")
+                spares_dict["price"] = rowdict.get("billable_value_usd", 0)
+                spares_dict["qty"] = rowdict.get("used_quantity", 0)
+                spares_dict["unit"] = rowdict.get("issued_unit_of_measurement", "")
+                actual_spares_cost += rowdict.get("billable_value_usd", 0)
                 actual_spares_list.append(spares_dict)
-                
+            
             mydict["actual_findings_spares_cost"] = actual_spares_cost
             mydict["actual_findings_spares_list"] = actual_spares_list
             mydict["task_number"] = task
             
+            # Process predicted findings
             predicted_finding_spares_cost = 0
             predicted_finding_manhours = 0
             predicted_finding_sparelist = []
-            # print(pred_findings_data)
-            for index, row in pred_findings_data.iterrows():
+            
+            for index, row in pred_findings_task.iterrows():
                 rowdict = row.to_dict()
-                rowdata = rowdict["details"]
-                # print(rowdict)
-                # if index > 0:
-                #     break
-                for k in rowdata:
-                    manhours = 0
-                    if 'mhs' in k:
-                        manhours = k["mhs"]["avg"]*(k["prob"]/100)
-                    predicted_finding_manhours = predicted_finding_manhours + manhours
-                    spare_parts = []
-                    if "spare_parts" in k:
-                        spare_parts = k["spare_parts"]
-                    predicted_finding_sparelist = spare_parts
-                    # mydict["predicted_spares_list"] = spare_parts
-                    spsum = 0
-                    for s in spare_parts:
-                        spsum = spsum + s["price"]*(s["prob"]/100)
-                    predicted_finding_spares_cost = spsum
-                    
+                if "details" in rowdict:
+                    rowdata = rowdict["details"]
+                    for k in rowdata:
+                        manhours = 0
+                        if 'mhs' in k:
+                            manhours = k["mhs"].get("avg", 0) * (k.get("prob", 100) / 100)
+                        predicted_finding_manhours += manhours
+                        
+                        spare_parts = []
+                        if "spare_parts" in k:
+                            spare_parts = k["spare_parts"]
+                        predicted_finding_sparelist += spare_parts
+                        
+                        spsum = 0
+                        for s in spare_parts:
+                            spsum += s.get("price", 0) * (s.get("prob", 100) / 100)
+                        predicted_finding_spares_cost += spsum
+            
             mydict["predicted_finding_spares_cost"] = predicted_finding_spares_cost
             mydict["predicted_finding_manhours"] = predicted_finding_manhours
             mydict["predicted_finding_sparelist"] = predicted_finding_sparelist
+            
             final_findings_data.append(mydict)
-        df = pd.DataFrame(final_findings_data) 
-        total_actual_findings_spares_cost = df['actual_findings_spares_cost'].sum()
-        total_predicted_finding_spares_cost = df['predicted_finding_spares_cost'].sum()
-        total_predicted_finding_manhours = df['predicted_finding_manhours'].sum()
-        total_actual_findings_manhours = df['actual_findings_manhours'].sum()
-        summary_findings_comparision = {}
-        summary_findings_comparision["total_actual_spares_cost"] = total_actual_findings_spares_cost
-        summary_findings_comparision["total_predict_spares_cost"] = total_predicted_finding_spares_cost
-        summary_findings_comparision["total_predict_manhours"] = total_predicted_finding_manhours
-        summary_findings_comparision["total_actual_manhours"] = total_actual_findings_manhours
-        # summary_eligible_tasks = {"summary_findings" : summary_findings_comparision}
-        eligible_tasks_comparision = {"eligible_tasks": final_findings_data, "summary_findings" :  summary_findings_comparision}
         
-        return eligible_tasks_comparision
+        # Calculate summary for findings
+        df_findings = pd.DataFrame(final_findings_data)
+        total_actual_findings_spares_cost = df_findings['actual_findings_spares_cost'].sum() if not df_findings.empty else 0
+        total_predicted_finding_spares_cost = df_findings['predicted_finding_spares_cost'].sum() if not df_findings.empty else 0
+        total_predicted_finding_manhours = df_findings['predicted_finding_manhours'].sum() if not df_findings.empty else 0
+        total_actual_findings_manhours = df_findings['actual_findings_manhours'].sum() if not df_findings.empty else 0
+        
+        summary_findings_comparision = {
+            "total_actual_spares_cost": total_actual_findings_spares_cost,
+            "total_predict_spares_cost": total_predicted_finding_spares_cost,
+            "total_predict_manhours": total_predicted_finding_manhours,
+            "total_actual_manhours": total_actual_findings_manhours
+        }
+        
+        eligible_findings_comparision = {
+            "eligible_tasks": final_findings_data,
+            "summary_findings": summary_findings_comparision
+        }
+        
+
+        
+        # Create the final output structure to match testing function
+        finaloutput = {
+            "tasks": eligible_tasks_comparision,
+            "findings": eligible_findings_comparision,
+            # Adding additional aircraft info that was in testing2 but not in testing
+            "cappingDetails": {
+                "actual_capping": actual_capping_values,
+                "predicted_capping": pred_capping_values
+            }
+        }
+        finaloutput= replace_nan_inf(finaloutput)
+        
+        return finaloutput
+    
+def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
+    print("Starting actual_cap_calculation")
+    print(f"cappingDetails: {cappingDetails}")
+    print(f"Number of eligible tasks: {len(eligibile_tasks)}")
+    
+    
+    # Ensure cappingDetails is a dictionary
+    if not isinstance(cappingDetails, dict) or not cappingDetails:
+        print("No capping details found, returning default values")
+        return {
+            'cappingTypeManhrs': "No capping",
+            'cappingManhrs': 0.0,
+            'billableManhrs': 0.0,
+            'unbillableManhrs': 0.0,
+            'cappingTypeSpareCost': "No capping",
+            'cappingSpareCost': 0.0,
+            'billableSpareCost': 0.0,
+            'unbillableSpareCost': 0.0
+        }
+    
+    # Populate capping values from cappingDetails
+    capping_values = {
+        'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", "No capping"),
+        'cappingManhrs': cappingDetails.get("cappingManhrs", 0.0),
+        'billableManhrs': 0.0,
+        'unbillableManhrs': 0.0,
+        'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", "No capping"),
+        'cappingSpareCost': cappingDetails.get("cappingSpareCost", 0.0),
+        'billableSpareCost': 0.0,
+        'unbillableSpareCost': 0.0
+    }
+    
+    print(f"Initial capping_values: {capping_values}")
+    
+    # Filter sub_task_description to only include eligible tasks
+    sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligibile_tasks)]
+    print(f"Filtered sub_task_description shape: {sub_task_description.shape}")
+    
+    # Define create_group function correctly (fixed indentation)
+    def create_group(df):
+        print("Creating groups for tasks")
+        # Create a new column 'group' with default values
+        df['group'] = range(len(df))
+        
+        # Track which rows belong to which group
+        group_mapping = {}
+        
+        # First pass: Identify groups based on source task relationships
+        for idx, row in df.iterrows():
+            if row["source_task_discrepancy_number_updated"] != row["source_task_discrepancy_number"]:
+                # This task is related to another task
+                source_task = row["source_task_discrepancy_number"]
+                
+                # Find the rows where log_item_number matches this source_task
+                # and assign them the same group
+                related_rows = df[df["log_item_number"] == source_task]
+                
+                if not related_rows.empty:
+                    # Use the first related row's group as the group for this row
+                    related_group = related_rows.iloc[0]['group']
+                    df.at[idx, 'group'] = related_group
+                    group_mapping[row['log_item_number']] = related_group
+        
+        # Second pass: Ensure consistency in group assignments
+        for idx, row in df.iterrows():
+            log_item = row['log_item_number']
+            if log_item in group_mapping:
+                df.at[idx, 'group'] = group_mapping[log_item]
+        
+        print(f"Number of unique groups created: {df['group'].nunique()}")
+        return df
+    
+    # Apply the create_group function
+    sub_task_description = create_group(sub_task_description)
+    
+    # Calculate task level man hours
+    print("Calculating task level man hours")
+    task_level_mh = sub_task_description.groupby(
+        ["source_task_discrepancy_number_updated"]
+    ).agg(
+        avg_actual_man_hours=("actual_man_hours", "sum"),
+        max_actual_man_hours=("actual_man_hours", "sum"),
+        min_actual_man_hours=("actual_man_hours", "sum")
+    ).reset_index()
+    
+    print(f"task_level_mh shape: {task_level_mh.shape}")
+    
+    # Calculate group level man hours
+    print("Calculating group level man hours")
+    group_level_mh = sub_task_description.groupby(
+        ["group"]
+    ).agg(
+        avg_actual_man_hours=("actual_man_hours", "sum"),
+        max_actual_man_hours=("actual_man_hours", "sum"),
+        min_actual_man_hours=("actual_man_hours", "sum"),
+        skill_number=("skill_number", lambda x: list(set(x)))
+    ).reset_index()
+    
+    print(f"group_level_mh shape: {group_level_mh.shape}")
+    
+    # Get eligible log items
+    eligible_log_items = sub_task_description["log_item_number"].unique().tolist()
+    print(f"Number of eligible log items: {len(eligible_log_items)}")
+    
+    # Filter sub_task_parts to only include eligible log items
+    filtered_sub_task_parts = sub_task_parts[sub_task_parts['task_number'].isin(eligible_log_items)]
+    print(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
+    
+    # Merge task_level_parts
+    print("Merging task level parts")
+    task_level_parts = pd.merge(
+        filtered_sub_task_parts,
+        sub_task_description[["log_item_number", "source_task_discrepancy_number_updated"]],
+        left_on="task_number",
+        right_on="log_item_number",
+        how="left"
+    ).drop(columns=["log_item_number"])
+    
+    # If the merge resulted in an empty DataFrame, create an empty one with required columns
+    if task_level_parts.empty:
+        print("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
+        task_level_parts = pd.DataFrame(columns=["source_task_discrepancy_number_updated", "issued_part_number", 
+                                                "billable_value_usd", "used_quantity", 
+                                                "part_description", "issued_unit_of_measurement"])
+    
+    # Aggregate task level parts
+    task_level_parts = task_level_parts.groupby(["source_task_discrepancy_number_updated", "issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    print(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
+    
+    # Add 'group' column to filtered_sub_task_parts by merging with sub_task_description
+    print("Adding group column to filtered_sub_task_parts")
+    if 'group' not in filtered_sub_task_parts.columns:
+        filtered_sub_task_parts = pd.merge(
+            filtered_sub_task_parts,
+            sub_task_description[["log_item_number", "group"]],
+            left_on="task_number",
+            right_on="log_item_number",
+            how="left"
+        )
+    
+    # Group parts by group and part number
+    group_level_parts = filtered_sub_task_parts.groupby(["group", "issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    print(f"group_level_parts shape: {group_level_parts.shape}")
+    
+    # Create parts_line_items DataFrame
+    parts_line_items = filtered_sub_task_parts.groupby(["issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    print(f"parts_line_items shape: {parts_line_items.shape}")
+    
+    # Create copies for processing
+    task_level_mh_cap = task_level_mh.copy()
+    task_level_parts_cap = task_level_parts.copy()
+    
+    # Aggregate task level parts for capping
+    task_level_parts_cap_agg = task_level_parts_cap.groupby(["source_task_discrepancy_number_updated"]).agg(
+        billable_value_usd=("billable_value_usd", "sum")
+    ).reset_index()
+    
+    print(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
+    
+    # Copy group level data
+    group_level_mh_cap = group_level_mh.copy()
+    group_level_parts_cap = group_level_parts.copy()
+    
+    # Add source_task_discrepancy_number_updated column to group_level_parts_cap if it doesn't exist
+    if "source_task_discrepancy_number_updated" not in group_level_parts_cap.columns:
+        print("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
+        # This is a placeholder. In real code, you would need to properly join/map this information.
+        group_level_parts_cap["source_task_discrepancy_number_updated"] = "Unknown"
+    
+    # Aggregate group level parts for capping
+    group_level_parts_cap_agg = group_level_parts_cap.groupby(["source_task_discrepancy_number_updated", "group"]).agg(
+        billable_value_usd=("billable_value_usd", "sum")
+    ).reset_index()
+    
+    print(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
+    
+    # Create a copy of parts_line_items for capping
+    parts_line_items_result = parts_line_items.copy()
+    
+    # Get capping values from details
+    mhs_cap_type = cappingDetails.get("cappingTypeManhrs", "No capping")
+    mhs_cap_amt = cappingDetails.get("cappingManhrs", 0)
+    spares_cap_type = cappingDetails.get("cappingTypeSpareCost", "No capping")
+    spares_cap_amt = cappingDetails.get("cappingSpareCost", 0)
+    
+    print(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
+    
+    # Define man-hours capping function
+    def mhs_cap(mhs_cap_type, mhs_cap_amt):
+        print(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
+        if mhs_cap_type == "per_source_card":
+            # Calculate intermediate values (before applying probability)
+            task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: min(x, mhs_cap_amt)
+            )
+            task_level_mh_cap["billable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: max(0, x - mhs_cap_amt)
+            )
+            task_level_mh_cap["mhs_cap_amt"] = mhs_cap_amt
+            
+            # Save intermediate results to CSV
+            #task_level_mh_cap.to_csv("task_level_mh_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            task_level_mh_cap["unbillable_mh"] = task_level_mh_cap["unbillable_mh_raw"] 
+            task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] 
+            
+            # Save final results to CSV
+            #task_level_mh_cap.to_csv("task_level_mh_cap_final.csv", index=False)
+            
+            unbillable_sum = task_level_mh_cap["unbillable_mh"].sum()
+            billable_sum = task_level_mh_cap["billable_mh"].sum()
+            print(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+        
+        elif mhs_cap_type == "per_IRC":
+            # Calculate intermediate values (before applying probability)
+            group_level_mh_cap["unbillable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: min(x, mhs_cap_amt)
+            )
+            group_level_mh_cap["billable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: max(0, x - mhs_cap_amt)
+            )
+            
+            group_level_mh_cap["mhs_cap_amt"] = mhs_cap_amt
+            # Save intermediate results to CSV
+            #group_level_mh_cap.to_csv("group_level_mh_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            group_level_mh_cap["unbillable_mh"] = group_level_mh_cap["unbillable_mh_raw"]
+            group_level_mh_cap["billable_mh"] = group_level_mh_cap["billable_mh_raw"] 
+            
+            # Save final results to CSV
+            #group_level_mh_cap.to_csv("group_level_mh_cap_final.csv", index=False)
+            
+            unbillable_sum = group_level_mh_cap["unbillable_mh"].sum()
+            billable_sum = group_level_mh_cap["billable_mh"].sum()
+            print(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+        
+        else:  # No capping
+            total_sum = task_level_mh_cap["avg_actual_man_hours"].sum() 
+            print(f"No capping for MH: unbillable=0, billable={total_sum}")
+            return 0, total_sum
+    
+    # Define spares capping function
+    def spares_cap(spares_cap_type, spares_cap_amt):
+        print(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
+        if spares_cap_type == "per_source_card":
+            # Use the aggregated DataFrame for calculations
+            task_level_parts_cap = task_level_parts_cap_agg.copy()
+            
+            # Calculate intermediate values (before applying probability)
+            task_level_parts_cap["unbillable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            task_level_parts_cap["billable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            task_level_parts_cap["spares_cap_amt"] = spares_cap_amt
+            
+            # Save intermediate results to CSV
+            #task_level_parts_cap.to_csv("task_level_parts_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            task_level_parts_cap["unbillable_spares"] = task_level_parts_cap["unbillable_spares_raw"] 
+            task_level_parts_cap["billable_spares"] = task_level_parts_cap["billable_spares_raw"]
+            # Save final results to CSV
+            #task_level_parts_cap.to_csv("task_level_parts_cap_final.csv", index=False)
+            
+            unbillable_sum = task_level_parts_cap["unbillable_spares"].sum()
+            billable_sum = task_level_parts_cap["billable_spares"].sum()
+            print(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+            
+        elif spares_cap_type == "per_IRC":
+            # Use the aggregated DataFrame for calculations
+            group_level_parts_cap = group_level_parts_cap_agg.copy()
+            
+            # Calculate intermediate values (before applying probability)
+            group_level_parts_cap["unbillable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            group_level_parts_cap["billable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            
+            group_level_parts_cap["spares_cap_amt"] = spares_cap_amt
+            # Save intermediate results to CSV
+            #group_level_parts_cap.to_csv("group_level_parts_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            group_level_parts_cap["unbillable_spares"] = group_level_parts_cap["unbillable_spares_raw"] 
+            group_level_parts_cap["billable_spares"] = group_level_parts_cap["billable_spares_raw"] 
+            
+            # Save final results to CSV
+            #group_level_parts_cap.to_csv("group_level_parts_cap_final.csv", index=False)
+            
+            unbillable_sum = group_level_parts_cap["unbillable_spares"].sum()
+            billable_sum = group_level_parts_cap["billable_spares"].sum()
+            print(f"Per IRC spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+            
+        elif spares_cap_type == "per_line_item":
+            # Calculate intermediate values (before applying probability)
+            parts_line_items_result["unbillable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            parts_line_items_result["billable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            parts_line_items_result["spares_cap_amt"] = spares_cap_amt
+            # Save intermediate results to CSV
+            #parts_line_items_result.to_csv("line_item_parts_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            parts_line_items_result["unbillable_spares"] = parts_line_items_result["unbillable_spares_raw"] 
+            parts_line_items_result["billable_spares"] = parts_line_items_result["billable_spares_raw"] 
+            
+            # Save final results to CSV
+            #parts_line_items_result.to_csv("line_item_parts_cap_final.csv", index=False)
+            
+            unbillable_sum = parts_line_items_result["unbillable_spares"].sum()
+            billable_sum = parts_line_items_result["billable_spares"].sum()
+            print(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+            
+        else:  # No capping
+            total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0
+            print(f"No capping for spares: unbillable=0, billable={total_sum}")
+            return 0, total_sum
+    
+    # Calculate and set man-hours capping values
+    print("Calculating man-hours capping values")
+    capping_values["unbillableManhrs"], capping_values["billableManhrs"] = mhs_cap(mhs_cap_type, mhs_cap_amt)
+    
+    # Calculate and set spare costs capping values
+    print("Calculating spare costs capping values")
+    capping_values['unbillableSpareCost'], capping_values['billableSpareCost'] = spares_cap(spares_cap_type, spares_cap_amt)
+    
+    print(f"Final capping_values: {capping_values}")
+    return capping_values
 
 
         
@@ -938,5 +1381,13 @@ def datetime_to_str(obj):
     raise TypeError("Object of type 'datetime' is not JSON serializable")
             
 
+def replace_nan_inf(obj):
+            """Helper function to recursively replace NaN and inf values with None"""
+            if isinstance(obj, dict):
+                return {k: replace_nan_inf(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_nan_inf(x) for x in obj]
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            return obj
 
-    

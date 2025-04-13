@@ -498,10 +498,10 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
         # Collecting data
         #aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
         #task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1',data_path)
-        task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
+        #task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
         #sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1',data_path)
-        #sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name,['PRICING',"Sheet1",'sheet1',"Pricing","Price"],data_path)
-        return pd.DataFrame(),pd.DataFrame(), task_parts, pd.DataFrame(),pd.DataFrame()
+        sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name,['PRICING',"Sheet1",'sheet1',"Pricing","Price"],data_path)
+        return pd.DataFrame(),pd.DataFrame(),  pd.DataFrame(),pd.DataFrame(),sub_task_parts,
 
         #return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts
     except Exception as e:

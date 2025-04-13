@@ -20,7 +20,7 @@ def clean_data(data):
         data = data.loc[:, ~data.columns.str.isnumeric()]
 
         # Drop duplicate rows
-        cleaned_data = data.drop_duplicates()
+        #cleaned_data = data.drop_duplicates()
 
 
         # Iterate over columns and clean based on data type
