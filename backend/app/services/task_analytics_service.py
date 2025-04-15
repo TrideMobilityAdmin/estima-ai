@@ -55,7 +55,7 @@ class TaskService:
         """
         Get man hours statistics for a specific source task
         """
-        logger.info(f"Fetching man hours for source task: {source_task}")
+        logger.info("Fetching man hours for source task")
 
         try:
             pipeline = [
