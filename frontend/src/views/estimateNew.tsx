@@ -2705,7 +2705,11 @@ export default function EstimateNew() {
                           size="xs"
                           label="Man Hrs Capping Type"
                           placeholder="Select Capping Type"
-                          data={["per_source_card", "per_IRC"]}
+                          // data={["per_source_card", "per_IRC"]}
+                          data={[
+                            { value: "per_source_card", label: "Per Source Card" },
+                            { value: "per_IRC", label: "Per Defect" },
+                          ]}
                           allowDeselect
                           {...form.getInputProps(
                             "cappingDetails.cappingTypeManhrs"
@@ -2733,7 +2737,12 @@ export default function EstimateNew() {
                           size="xs"
                           label="Spares Capping Type"
                           placeholder="Select Capping Type"
-                          data={["per_source_card", "per_IRC", "per_line_item"]}
+                          // data={["per_source_card", "per_IRC", "per_line_item"]}
+                          data={[
+                            { value: "per_source_card", label: "Per Source Card" },
+                            { value: "per_IRC", label: "Per Defect" },
+                            { value: "per_line_item", label: "Per Line Item" },
+                          ]}
                           allowDeselect
                           {...form.getInputProps(
                             "cappingDetails.cappingTypeSpareCost"

@@ -1,6 +1,7 @@
 import { ActionIcon, Flex, Paper, Text, ScrollArea } from "@mantine/core";
 import { Dropzone } from "@mantine/dropzone";
 import { showNotification } from "@mantine/notifications";
+import { IconFiles } from "@tabler/icons-react";
 import { useState } from "react";
 import { MdClose, MdFilePresent, MdUploadFile } from "react-icons/md";
 
@@ -70,7 +71,7 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
             borderRadius: 10,
             backgroundColor: "#F4F4F4",
             textAlign: "center",
-            padding: "2em",
+            padding: "1em",
             cursor: "pointer",
             width: "100%",
           },
@@ -79,7 +80,7 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
         multiple
       >
         <div>
-          <MdUploadFile size={40} color={color || "#1a73e8"} />
+          <IconFiles size={30} color={color || "#1a73e8"} />
           <Text c="dimmed" size="md">
             Drag and drop your {name} here, or click to select files
           </Text>

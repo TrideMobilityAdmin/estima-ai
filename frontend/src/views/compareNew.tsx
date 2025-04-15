@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider } from '@mantine/core';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider, Grid } from '@mantine/core';
 import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconSettingsDollar } from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
 import StatsCard from '../components/statsCardCompareEst';
@@ -115,10 +115,33 @@ export default function CompareNew() {
 
           </Card>
           <Card >
-            <Flex direction='column'>
-              <Text>
+          <Text>
                 Select Actual Data
               </Text>
+            <Grid>
+              <Grid.Col span={1}>
+              <Text c='gray' size='xs'>
+                  Note:
+                </Text>
+              </Grid.Col>
+              <Grid.Col span={10}>
+                <Text c='gray' size='xs'>
+                Please select the following actual data files :
+                </Text>
+                <Text c='gray' size='xs'>
+                  (Material consumption pricing, Mlttable, Mldpmlsec1,Mltaskmlsec1)
+                </Text>
+              </Grid.Col>
+            </Grid>
+            <Flex direction='column'>
+              
+              {/* <Text c='gray' size='xs'>
+              Note: Please select the following files of Actual Data :
+              </Text>
+              <Text c='gray' size='xs'>
+              (Material consumption pricing, Mlttable, Mldpmlsec1,Mltaskmlsec1)
+              </Text> */}
+              <Space h='md' />
               <CompareUploadDropZoneExcel name="Excel File" changeHandler={handleFileChange} color="green" />
             </Flex>
           </Card>
