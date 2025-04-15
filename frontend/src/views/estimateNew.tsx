@@ -470,7 +470,8 @@ export default function EstimateNew() {
     );
   };
 
-
+  // Reset counter for keys to force re-render
+  const [formKey, setFormKey] = useState(0);
   // Form initialization
   const form = useForm<any>({
     initialValues: {
@@ -479,7 +480,7 @@ export default function EstimateNew() {
       operator: "",
       aircraftRegNo: "",
       aircraftModel: "",
-      aircraftAge: "",
+      aircraftAge: 0,
       aircraftFlightHours: "",
       aircraftFlightCycles: "",
       areaOfOperations: "",
@@ -502,8 +503,8 @@ export default function EstimateNew() {
       operator: (value) => (value.trim() ? null : "Operator is required"),
       aircraftRegNo: (value) =>
         value.trim() ? null : "Aircraft Registration Number is required",
-      aircraftAge: (value) =>
-        value.trim() ? null : "Aircraft Age is required",
+      // aircraftAge: (value) =>
+      //   value.trim() ? null : "Aircraft Age is required",
       typeOfCheck: (value) =>
         value.length > 0 ? null : "Type of Check is required", // Modified for array validation
       typeOfCheckID: (value) =>
@@ -690,7 +691,7 @@ export default function EstimateNew() {
           operator: "",
           aircraftRegNo: "",
           aircraftModel: "",
-          aircraftAge: "",
+          aircraftAge: 0,
           aircraftFlightHours: "",
           aircraftFlightCycles: "",
           areaOfOperations: "",
@@ -713,6 +714,8 @@ export default function EstimateNew() {
         setValidatedTasks([]); // Reset validated tasks
         setAdditionalTasks([]); // Reset additional tasks
         setSelectedExpertInsightTasks([]); // Reset expert insight tasks
+        // Force re-render of selects
+        setFormKey((prev) => prev + 1);
       }
     } catch (error) {
       console.error("API Error:", error);
@@ -2591,6 +2594,7 @@ export default function EstimateNew() {
                   />
 
                   <Select
+                    key={`operator-select-${formKey}`}
                     size="xs"
                     searchable
                     clearable
@@ -2611,6 +2615,7 @@ export default function EstimateNew() {
                   />
 
                   <Select
+                     key={`aircraftModel-select-${formKey}`}
                     size="xs"
                     searchable
                     clearable
@@ -2702,6 +2707,7 @@ export default function EstimateNew() {
                     <Grid>
                       <Grid.Col span={7}>
                         <Select
+                          key={`cappingTypeManhrs-select-${formKey}`}
                           size="xs"
                           label="Man Hrs Capping Type"
                           placeholder="Select Capping Type"
@@ -2734,6 +2740,7 @@ export default function EstimateNew() {
                     <Grid>
                       <Grid.Col span={7}>
                         <Select
+                          key={`cappingTypeSpareCost-select-${formKey}`}
                           size="xs"
                           label="Spares Capping Type"
                           placeholder="Select Capping Type"
