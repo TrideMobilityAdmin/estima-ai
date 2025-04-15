@@ -1373,7 +1373,7 @@ class TaskService:
                     "taskDescription": task.get("taskDescription", ""),
                     "skills": [
                         {
-                            "skill": skill["skill"],
+                            "skill": skill.get("skill",""),
                             "manHours": skill["manhours"]
                         }
                         for skill in task["skills"]
@@ -1387,7 +1387,7 @@ class TaskService:
                     "taskId": sub_task["_id"],
                     "skills": [
                         {
-                            "skill": skill["skill"],
+                            "skill": skill.get("skill",""),
                             "manHours": skill["manhours"]
                         }
                         for skill in sub_task["skills"]
