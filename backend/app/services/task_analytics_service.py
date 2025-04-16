@@ -51,6 +51,8 @@ class TaskService:
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.capping_data_collection=self.mongo_client.get_collection("capping_data")
         self.estimate_file_upload=self.mongo_client.get_collection("estimate_file_upload")
+        self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
+        self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -136,15 +138,19 @@ class TaskService:
         try:
             task_ids = estimate_request.tasks
 
-            # Query MongoDB to check which tasks exist
-            existing_tasks_list = self.taskdescription_collection.find(
-                {"task_number": {"$in": task_ids}}, {"_id": 0, "task_number": 1}
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
+    
+            lrhTasks=updateLhRhTasks(LhRhTasks,task_ids)
+  
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1}
             )
             existing_tasks_list = list(existing_tasks_list)  
             existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
             validated_tasks = [
                 ValidTasks(taskid=task, status=(task in existing_tasks))
-                for task in task_ids
+                for task in lrhTasks
             ]
             return validated_tasks
 
@@ -155,354 +161,8 @@ class TaskService:
                 detail=f"Error validating tasks: {str(e)}"
             )
     
-    async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
-        """
-        Create a new estimate based on the provided tasks and parameters.
-        """
-        logger.info("Creating new estimate")
-        try:
-            current_time = datetime.now(timezone.utc)
-
-            processed_tasks = []
-            total_task_mhs=0
-            total_parts_cost = 0
-
-            findings_list=[]
-            aggregated_findings_by_task=[]
-            toatal_findings_mhs=0
-            toatal_findings_parts_cost=0
-
-            for task_id in estimate_request.tasks:
-                task_mhs = await self.get_man_hours(task_id)
-                total_task_mhs+=task_mhs.mhs.avg
-
-                spare_parts = await self.get_spare_parts(task_id)
-                task_parts_cost = sum(part.price * part.qty for part in spare_parts)
-                total_parts_cost += task_parts_cost
-
-                task_details = TaskDetailsWithParts(
-                    sourceTask=task_mhs.sourceTask,
-                    desciption=task_mhs.desciption,
-                    mhs=task_mhs.mhs,
-                    spareParts=spare_parts
-                )
-                processed_tasks.append(task_details)
-
-            aggregated_tasks=AggregatedTasks(
-                totalMhs=float(total_task_mhs),
-                totalPartsCost=float(total_parts_cost)
-            )
-
-            # findings level implementation
-            findings_man_hours = await self.get_man_hours_findings(task_id)
-            findings_spare_parts = await self.get_spare_parts_findings(task_id)
-
-            findings_details = []
-            task_findings_mhs = 0
-            task_findings_parts_cost = 0
-
-            spare_parts_by_log_item = {}
-            for spare_part in findings_spare_parts:
-                if spare_part.logItem not in spare_parts_by_log_item:
-                    spare_parts_by_log_item[spare_part.logItem] = []
-                spare_parts_by_log_item[spare_part.logItem].append(spare_part)
-
-            for mh in findings_man_hours:
-                log_item_parts = spare_parts_by_log_item.get(mh.logItem, [])
-                parts_cost = sum(part.price * part.qty for part in log_item_parts)
-                task_findings_mhs += mh.mhs.avg
-                task_findings_parts_cost += parts_cost
-
-                details = Details(
-                    logItem=mh.logItem,
-                    desciption=mh.desciption,
-                    mhs=mh.mhs,
-                    spareParts=log_item_parts
-                )
-                findings_details.append(details)
-            if findings_details:
-                findings_list.append(FindingsDetailsWithParts(
-                    taskId=task_id,
-                    details=findings_details
-                    
-                ))
-            aggregated_findings_by_task.append(AggregatedFindingsByTask(
-                taskId=task_id,
-                aggregatedMhs=ManHrs(
-                    min=min(d.mhs.min for d in findings_details),
-                    max=max(d.mhs.max for d in findings_details),
-                    avg=sum(d.mhs.avg for d in findings_details) / len(findings_details),
-                    est=sum(d.mhs.est for d in findings_details) / len(findings_details)
-                ),
-                totalPartsCost=task_findings_parts_cost
-            ))
-            toatal_findings_mhs += task_findings_mhs
-            toatal_findings_parts_cost += task_findings_parts_cost
-
-            aggregated_tasks=AggregatedTasks(
-                totalMhs=float(total_task_mhs),
-                totalPartsCost=float(total_parts_cost)
-            )
-            aggregated_findings=AggregatedFindings(
-                totalMhs=float(toatal_findings_mhs),
-                totalPartsCost=float(toatal_findings_parts_cost)
-            )
-
-                     
-            try:
-                estimate_id = await self._generate_estimate_id()
-                description = await self._get_estimate_description(estimate_request.tasks)
-                logger.info(f'description at task level: {description}')
-            except Exception as e: 
-                logger.error(f"Error generating estimate ID or description: {str(e)}")
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Failed to generate estimate ID or description")
-            estimate_doc = {
-                "estID":estimate_id,
-                "description": description,
-                "tasks": [task.model_dump() for task in processed_tasks],
-                "aggregatedTasks": aggregated_tasks.model_dump(),
-                "findings": [finding.model_dump() for finding in findings_list],
-                "aggregatedFindingsByTask": [agg.model_dump() for agg in aggregated_findings_by_task],
-                "aggregatedFindings": aggregated_findings.model_dump(),
-                "userID":current_user["_id"],
-                "createdAt": current_time,
-                "lastUpdated": current_time,
-                "createdBy":current_user["email"],
-                "updatedBy":current_user["_id"],
-                "originalFilename":description
-                
-            }
-
-            result = self.estimates_collection.insert_one(estimate_doc)
-            download_link = f"/estimates/{estimate_id}/download"
-            
-            response = EstimateResponse(
-                estID=estimate_id,
-                description=description,
-                tasks=processed_tasks,
-                aggregatedTasks=aggregated_tasks,
-                findings=findings_list,
-                aggregatedFindingsByTask=aggregated_findings_by_task,
-                aggregatedFindings=aggregated_findings,
-                userID=estimate_doc["userID"],
-                createdAt=current_time,
-                lastUpdated=current_time,
-                createdBy=estimate_doc["createdBy"],
-                updatedBy=estimate_doc["updatedBy"],
-                originalFilename=description,
-                downloadEstimate=download_link
-
-            )
-
-            return response
-
-        except Exception as e:
-            logger.error(f"Error creating estimate: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Error creating estimate: {str(e)}"
-            )
-
-    async def get_spare_parts(self, task_id: str) -> List[SpareParts]:
-        """
-        Helper method to get spare parts for a task
-        """
-        try:
-            logger.info(f"Fetching spare parts for task_id: {task_id}")
-            pipeline = [
-                {"$match": {"Task": task_id}},
-                {
-                    "$group": {
-                         "_id": "$Task",
-                        "spareParts": {
-                            "$push": {
-                                "partId": "$RequestedPart",
-                                "desc": "$PartDescription",
-                                "unit": "$UOM",
-                                "qty": "$RequestedQty",
-                                "price": {"$ifNull": ["$MaterialCost", 0.0]}
-                            }
-                        }
-                    }
-                },
-                {"$project": {"_id": 0,  "spareParts": 1}}
-            ]
-            results = list(self.task_spareparts_collection.aggregate(pipeline))
-            if not results:
-                logger.warning(f"No spare parts found for task_id: {task_id}")
-                return []
-            spare_parts = [
-                SpareParts(**part)
-                for part in results[0]["spareParts"] 
-            ]
-            return spare_parts
-    
-        except Exception as e:
-            logger.error(f"Error fetching spare parts: {str(e)}")
-            return []
-    
-    async def _get_estimate_description(self, tasks: List[str]) -> str:
-        try:
-            logger.info(f"Fetching estimate description for tasks: {tasks}")
-            estimate_doc = self.tasks_collection.find_one(
-                {"Task": {"$all": tasks}},
-                {"original_filename": 1}
-            )
-            if estimate_doc:
-                original_filename = estimate_doc.get("original_filename")
-                logger.info(f"Found estimate description: {original_filename}")
-                return original_filename
-            logger.warning("no matching document found in task_coolection")
-            return "no matching description found"
-            
-        except Exception as e:
-            logger.error(f"Error fetching estimate description: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching estimate description: {str(e)}"
-            )
-    async def _generate_estimate_id(self) -> str:
-        logger.info("Generating estimate ID")
-        try:
-            logger.info("Finding count of estimates")
-            count = self.estimates_collection.count_documents({})  # Await count
-            logger.info(f"Count of estimates: {count}")
-
-            if count == 0:
-                logger.info("No estimates found, starting with EST-001")
-                return "EST-001"
-
-        # Fetch the last inserted estimate
-            last_estimate = self.estimates_collection.find_one(
-                {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
-                projection={"estID": 1}
-            )
-
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
-
-            if not last_estimate or "estID" not in last_estimate:
-                logger.warning("No estID found in the last estimate, defaulting to EST-001")
-                return "EST-001"
-
-            last_id_str = last_estimate["estID"]
-            last_id = int(last_id_str.split("-")[1])
-            new_id = f"EST-{last_id + 1:03d}"
-        
-            logger.info(f"Generated new estimate ID: {new_id}")
-            return new_id
-
-        except Exception as e:
-            logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
-        # findings level spare parts
-    async def get_spare_parts_findings(self, task_id: str) -> List[SpareResponse]:
-        """
-        Helper method to get spare parts for a task
-        """
-        try:
-            logger.info(f"Fetching spare parts for task_id: {task_id}")
-            pipeline = [
-                {"$match": {"SourceTaskDiscrep": task_id}},
-                {'$lookup': {
-                    'from': 'sub_task_parts', 
-                    'localField': 'LogItem', 
-                    'foreignField': 'Task', 
-                    'as': 'spare'
-                    }},
-                {'$unwind': {
-                        'path': '$spare'
-                          }},
-                {
-                    "$group": {
-                         "_id": "$LogItem",
-                        "spareParts": {
-                            "$push": {
-                                "partId": "$spare.IssuedPart",
-                                "desc": "$spare.PartDescription",
-                                "unit": "$spare.IssuedUOM",
-                                "qty": "$spare.UsedQty",
-                                "price": {"$ifNull": ["$spare.TotalBillablePrice", 0.0]}
-                            }
-                        }
-                    }
-                },
-                {"$project": {"logItem": "$_id", "spareParts": 1,"_id": 0,}}
-            ]
-            results = list(self.sub_task_collection.aggregate(pipeline))
-            if not results:
-                logger.warning(f"No spare parts found for task_id: {task_id}")
-                return []
-            spareParts=[]
-            for result in results:
-                log_item=result["logItem"]
-                for spare in result["spareParts"]:
-                    spareParts.append(SpareResponse(
-                         logItem=log_item,**spare))
-
-            
-            
-            return spareParts
-    
-        except Exception as e:
-            logger.error(f"Error fetching spare parts: {str(e)}")
-            return []      
-
-    # mahhrs at findings level
-    async def get_man_hours_findings(self, source_task: str) -> List[FindingsManHoursModel]:
-        """
-        Get man hours statistics for a specific source task
-        """
-        logger.info(f"Fetching man hours for source task: {source_task}")
-
-        try:
-            pipeline = [
-                {"$match": {"SourceTaskDiscrep": source_task}},
-                {
-                    "$group": {
-                        "_id": "$LogItem",
-                        "description": {"$first": "$Description"},
-                        "probability": {"$first": "$prob"}, 
-                        "min": {"$min": "$ActualManHrs"},
-                        "max": {"$max": "$ActualManHrs"},
-                        "avg": {"$avg": "$ActualManHrs"},
-                        "est": {"$avg": "$EstManHrs"}
-                    }
-                }
-            ]
-
-            results = list(self.sub_task_collection.aggregate(pipeline))
-            logger.info(f"Aggregation results: len={len(results)}")
-
-            if not results:
-                logger.warning(f"No data found for source task: {source_task}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No data found for source task: {source_task}"
-                )
-            # task = results[0]
-            task_man_hours = [
-                FindingsManHoursModel(
-                    logItem=task["_id"],
-                    desciption=task["description"],
-                    mhs=ManHrs(
-                        min=task["min"],
-                        max=task["max"],
-                        avg=task["avg"],
-                        est=task["est"]
-            )
-            )
-            for task in results
-            ]
-            return task_man_hours
-
-        except Exception as e:
-            logger.error(f"Error fetching man hours: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching man hours: {str(e)}"
-            )
-    
+  
+ 
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
@@ -2591,3 +2251,30 @@ def replace_nan_inf(obj):
             elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
                 return None
             return obj
+
+
+def updateLhRhTasks(LhRhTasks, task_ids):
+    """
+    Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
+    Parameters:
+    - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+    - MPD_TASKS: DataFrame with 'TASK NUMBER' and 'DESCRIPTION' columns
+    Returns:
+    - Updated DataFrame with LH and RH tasks duplicated if LHRH == 1
+    """
+    
+    lhrh_task_list = [doc["TASK_CLEANED"] for doc in LhRhTasks if doc.get("LHRH") == 1]
+
+    updated_tasks = []
+    for task_id in task_ids:
+        task_str = str(task_id)
+        if task_str in lhrh_task_list:
+            # Add both LH and RH versions for LHRH tasks
+            updated_tasks.append(f"{task_str} (LH)")
+            updated_tasks.append(f"{task_str} (RH)")
+        else:
+            # Keep regular tasks unchanged
+            updated_tasks.append(task_str)
+        logger.info(f"the updated taks:{updated_tasks}")
+    
+    return updated_tasks

@@ -37,25 +37,7 @@ router = APIRouter(prefix="/api/v1", tags=["API's"])
 #     }
 # )
 
-# async def get_task_man_hours(
-#     source_task: str,
-#     current_user: dict = Depends(get_current_user)
-# ) -> List[FindingsManHoursModel]:
-#     """
-#     Get man hours estimation for a specific source task.
-#     """
-#     try:
-#         task_service = TaskService()
-#         result = await task_service.get_man_hours_findings(source_task)
-#         return result
-#     except HTTPException as he:
-#         raise he
-#     except Exception as e:
-#         logger.error(f"Error processing request: {str(e)}")
-#         raise HTTPException(
-#             status_code=500,
-#             detail="Internal server error"
-#         )
+
 @router.get("/estimates/", response_model=List[Estimate])
 async def get_all_estimates(
     current_user: dict = Depends(get_current_user),
@@ -63,16 +45,6 @@ async def get_all_estimates(
 ):
     return await task_service.get_all_estimates()
 
-# @router.get("/spare_parts/{task_id}", response_model=List[SpareResponse])
-# async def get_spare_parts(
-#     task_id: str,
-#     current_user: dict = Depends(get_current_user),
-#     task_service: TaskService = Depends()
-# ):
-#     """
-#     Get spare parts for a specific task.
-#     """
-#     return await task_service.get_spare_parts_findings(task_id)
 
 
 @router.get("/parts/usage")
