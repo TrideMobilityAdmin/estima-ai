@@ -2275,6 +2275,6 @@ def updateLhRhTasks(LhRhTasks, task_ids):
         else:
             # Keep regular tasks unchanged
             updated_tasks.append(task_str)
-        logger.info("the updated taks",updated_tasks)
+        logger.info(f"the updated taks:{updated_tasks}")
     
     return updated_tasks
