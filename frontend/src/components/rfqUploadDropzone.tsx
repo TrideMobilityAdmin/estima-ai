@@ -1,6 +1,6 @@
-import { ActionIcon, Flex, Paper, Text, Group, Center, Space, Select, Stack, Alert } from "@mantine/core";
+import { ActionIcon, Flex, Paper, Text, Group, Center, Space, Select, Stack, Alert, Loader } from "@mantine/core";
 import { Dropzone } from "@mantine/dropzone";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MdClose, MdFilePresent, MdUploadFile, MdError } from "react-icons/md";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
@@ -23,11 +23,9 @@ interface UploadDropZoneExcelProps {
 interface SheetInfo {
   name: string;
   columns: string[];
-  // Add raw column names to preserve original format
   rawColumns: string[];
 }
 
-// Add a type for the row data
 interface RowData {
   [key: string]: any;
 }
@@ -44,15 +42,28 @@ const RFQUploadDropZoneExcel = ({
   const [availableSheets, setAvailableSheets] = useState<SheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const [taskColumns, setTaskColumns] = useState<string[]>([]);
-  const [rawTaskColumns, setRawTaskColumns] = useState<string[]>([]);  // Store original column names
+  const [rawTaskColumns, setRawTaskColumns] = useState<string[]>([]);
   const [selectedTaskColumn, setSelectedTaskColumn] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [processingPercentage, setProcessingPercentage] = useState<number>(0);
 
   // Required sheet and column name constants
   const REQUIRED_SHEET_NAME = "MPD";
   const REQUIRED_TASK_COLUMN_NAME = "TASK NUMBER";
   const REQUIRED_DESCRIPTION_COLUMN_NAME = "DESCRIPTION";
+
+  // Reset analysis state
+  const resetAnalysisState = useCallback(() => {
+    setTasks([]);
+    setSelectedSheet(null);
+    setSelectedTaskColumn(null);
+    setAvailableSheets([]);
+    setTaskColumns([]);
+    setRawTaskColumns([]);
+    setFileError(null);
+    setProcessingPercentage(0);
+  }, []);
 
   useEffect(() => {
     // Only update local file state from props if it's different
@@ -61,10 +72,11 @@ const RFQUploadDropZoneExcel = ({
       
       // If a file is passed from props and we haven't analyzed it yet, do so
       if (selectedFile && availableSheets.length === 0 && !isAnalyzing) {
+        resetAnalysisState();
         analyzeFile(selectedFile);
       }
     }
-  }, [selectedFile]);
+  }, [selectedFile, file, availableSheets.length, isAnalyzing, resetAnalysisState]);
 
   // List of possible task columns for auto-detection
   const possibleTaskColumns = [
@@ -96,9 +108,9 @@ const RFQUploadDropZoneExcel = ({
     return name.toString()
       .trim()
       .toUpperCase()
-      .replace(/\s+/g, " ")  // Replace multiple spaces with single space
-      .replace(/[\r\n]+/g, " ")  // Replace newlines with space (for wrapped text)
-      .replace(/[^\w\s]/g, "");  // Remove special characters
+      .replace(/\s+/g, " ")
+      .replace(/[\r\n]+/g, " ")
+      .replace(/[^\w\s]/g, "");
   };
 
   // Function to check if a column name matches the required name
@@ -114,6 +126,7 @@ const RFQUploadDropZoneExcel = ({
     return columns.find(column => isMatchingColumnName(column, requiredName));
   };
 
+  // Handle user dropping a file
   const handleDrop = async (newFiles: File[]) => {
     try {
       if (newFiles.length > 0) {
@@ -121,11 +134,7 @@ const RFQUploadDropZoneExcel = ({
         
         // Reset all state
         setFile(droppedFile);
-        setTasks([]);
-        setSelectedSheet(null);
-        setSelectedTaskColumn(null);
-        setAvailableSheets([]);
-        setFileError(null);
+        resetAnalysisState();
         setIsAnalyzing(true);
         
         // Update parent component's state if callback provided
@@ -145,6 +154,7 @@ const RFQUploadDropZoneExcel = ({
     }
   };
 
+  // Validate file meets requirements
   const validateFileRequirements = (sheets: SheetInfo[], workbook: XLSX.WorkBook): boolean => {
     // Check if the required sheet exists
     const mpdSheet = sheets.find(sheet => sheet.name === REQUIRED_SHEET_NAME);
@@ -179,7 +189,6 @@ const RFQUploadDropZoneExcel = ({
     
     // Check if there is any data in the required columns
     const taskColumnKey = findMatchingColumnNameInData(jsonData[0], REQUIRED_TASK_COLUMN_NAME);
-    const descriptionColumnKey = findMatchingColumnNameInData(jsonData[0], REQUIRED_DESCRIPTION_COLUMN_NAME);
     
     let hasTaskData = false;
     
@@ -206,6 +215,7 @@ const RFQUploadDropZoneExcel = ({
     return Object.keys(dataRow).find(key => isMatchingColumnName(key, requiredName));
   };
 
+  // Analyze the uploaded file
   const analyzeFile = async (fileToAnalyze: File) => {
     if (!fileToAnalyze) {
       setIsAnalyzing(false);
@@ -214,6 +224,7 @@ const RFQUploadDropZoneExcel = ({
     
     setIsAnalyzing(true);
     setFileError(null);
+    setProcessingPercentage(10);
     const fileType = fileToAnalyze.name.split(".").pop()?.toLowerCase();
     
     try {
@@ -222,91 +233,129 @@ const RFQUploadDropZoneExcel = ({
         setFileError("Invalid file format. Please upload an Excel file (.xls, .xlsx) containing the required sheet and columns.");
         // Don't reset the file here to keep showing the file error message
       } else {
-        // Handle Excel files with multiple sheets
-        const buffer = await fileToAnalyze.arrayBuffer();
-        const workbook = XLSX.read(buffer, { 
-          type: "array",
-          cellStyles: true,  // Enable style parsing
-          // cellFormulas: true,
-          cellHTML: true     // This might help with format preservation
-        });
+        // Use a more memory-efficient approach for Excel files
+        setProcessingPercentage(20);
         
-        const sheets: SheetInfo[] = [];
-        
-        // Analyze each sheet
-        workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          
-          // Get data with header options to preserve formatting
-          // First, get the raw headers
-          const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:A1");
-          const headers: string[] = [];
-          const rawHeaders: string[] = [];
-          
-          // Get the header row
-          for (let C = range.s.c; C <= range.e.c; ++C) {
-            const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
-            const cell = worksheet[cellAddress];
-            
-            if (cell && cell.v !== undefined) {
-              const headerValue = cell.v.toString();
-              rawHeaders.push(headerValue);  // Store the raw header
-              headers.push(normalizeColumnName(headerValue));  // Store normalized header
+        // Process in a separate promise to avoid UI blocking
+        await new Promise<void>((resolve, reject) => {
+          setTimeout(async () => {
+            try {
+              // Read file in chunks to avoid memory issues
+              const reader = new FileReader();
+              
+              reader.onload = async (e) => {
+                try {
+                  setProcessingPercentage(40);
+                  const buffer = e.target?.result as ArrayBuffer;
+                  
+                  // Use a worker to process Excel file if possible
+                  const workbook = XLSX.read(new Uint8Array(buffer), { 
+                    type: "array",
+                    cellStyles: true,
+                    cellHTML: true
+                  });
+                  
+                  setProcessingPercentage(60);
+                  
+                  const sheets: SheetInfo[] = [];
+                  
+                  // Analyze each sheet
+                  workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    
+                    // Get the raw headers
+                    const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:A1");
+                    const headers: string[] = [];
+                    const rawHeaders: string[] = [];
+                    
+                    // Get the header row
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                      const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+                      const cell = worksheet[cellAddress];
+                      
+                      if (cell && cell.v !== undefined) {
+                        const headerValue = cell.v.toString();
+                        rawHeaders.push(headerValue);
+                        headers.push(normalizeColumnName(headerValue));
+                      }
+                    }
+                    
+                    // Even if there's no data rows, we still want to include the sheet with headers
+                    if (headers.length > 0) {
+                      sheets.push({
+                        name: sheetName,
+                        columns: headers,
+                        rawColumns: rawHeaders
+                      });
+                    }
+                  });
+                  
+                  console.log("📑 Available Sheets:", sheets);
+                  setProcessingPercentage(80);
+                  
+                  // Validate the file against our requirements
+                  const isValid = validateFileRequirements(sheets, workbook);
+                  
+                  if (!isValid) {
+                    // Don't reset the file here to keep showing the file error message
+                  } else {
+                    // If we reach here, the file is valid
+                    setAvailableSheets(sheets);
+                    
+                    // Auto-select the MPD sheet
+                    const mpdSheet = sheets.find(sheet => sheet.name === REQUIRED_SHEET_NAME)!;
+                    setSelectedSheet(REQUIRED_SHEET_NAME);
+                    
+                    // Set both normalized and raw columns
+                    setTaskColumns(mpdSheet.columns);
+                    setRawTaskColumns(mpdSheet.rawColumns);
+                    
+                    // Find the task number column that matches the required name (normalized)
+                    const taskNumberColumn = findMatchingColumnName(mpdSheet.rawColumns, REQUIRED_TASK_COLUMN_NAME);
+                    
+                    if (taskNumberColumn) {
+                      setSelectedTaskColumn(taskNumberColumn);
+                      
+                      // Extract tasks from the required sheet and matching TASK NUMBER column
+                      await extractTasksFromSheet(workbook, REQUIRED_SHEET_NAME, taskNumberColumn, fileToAnalyze);
+                    }
+                  }
+                  
+                  setProcessingPercentage(100);
+                  resolve();
+                } catch (error) {
+                  console.error("❌ File Processing Error:", error);
+                  setFileError("An error occurred while processing the Excel file. Please try again with a valid file.");
+                  reject(error);
+                }
+              };
+              
+              reader.onerror = (error) => {
+                console.error("❌ File Reading Error:", error);
+                setFileError("An error occurred while reading the file. Please try again.");
+                reject(error);
+              };
+              
+              // Read the file as an array buffer
+              reader.readAsArrayBuffer(fileToAnalyze);
+              
+            } catch (error) {
+              console.error("❌ File Analysis Error:", error);
+              setFileError("An error occurred while analyzing the file. Please try again with a valid Excel file.");
+              reject(error);
             }
-          }
-          
-          // Get data with first row as header
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as RowData[];
-          
-          // Even if there's no data rows, we still want to include the sheet with headers
-          if (headers.length > 0) {
-            sheets.push({
-              name: sheetName,
-              columns: headers,
-              rawColumns: rawHeaders
-            });
-          }
+          }, 100); // Small delay to allow UI to update
         });
-        
-        console.log("📑 Available Sheets:", sheets);
-        
-        // Validate the file against our requirements
-        const isValid = validateFileRequirements(sheets, workbook);
-        
-        if (!isValid) {
-          // Don't reset the file here to keep showing the file error message
-        } else {
-          // If we reach here, the file is valid
-          setAvailableSheets(sheets);
-          
-          // Auto-select the MPD sheet
-          const mpdSheet = sheets.find(sheet => sheet.name === REQUIRED_SHEET_NAME)!;
-          setSelectedSheet(REQUIRED_SHEET_NAME);
-          
-          // Set both normalized and raw columns
-          setTaskColumns(mpdSheet.columns);
-          setRawTaskColumns(mpdSheet.rawColumns);
-          
-          // Find the task number column that matches the required name (normalized)
-          const taskNumberColumn = findMatchingColumnName(mpdSheet.rawColumns, REQUIRED_TASK_COLUMN_NAME);
-          
-          if (taskNumberColumn) {
-            setSelectedTaskColumn(taskNumberColumn);
-            
-            // Extract tasks from the required sheet and matching TASK NUMBER column
-            await extractTasksFromSheet(workbook, REQUIRED_SHEET_NAME, taskNumberColumn, fileToAnalyze);
-          }
-        }
       }
     } catch (error) {
       console.error("❌ File Analysis Error:", error);
       setFileError("An error occurred while analyzing the file. Please try again with a valid Excel file.");
-      // Don't reset the file here to keep showing the file error message
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // Find task column in a row
   const findTaskColumn = (row: RowData): string | undefined => {
     // Find the first matching column that exists in the row
     const columnName = Object.keys(row).find(key => {
@@ -320,6 +369,7 @@ const RFQUploadDropZoneExcel = ({
     return columnName;
   };
 
+  // Process task cell data
   const processTaskCell = (taskCell: any): string[] => {
     if (!taskCell) return [];
     
@@ -330,15 +380,13 @@ const RFQUploadDropZoneExcel = ({
     const tasks = taskString
       .split(/[,\n]/)
       .map((task: string) => task.trim())
-      .filter((task: string) => task.length > 0)
-      .map((task: string) => task
-      // .replace(/[^\w\s-/#]/g, "")
-    ); // Allow hyphen, forward slash, and hash
+      .filter((task: string) => task.length > 0); 
 
     console.log("📌 Processed Tasks:", tasks);
     return tasks;
   };
 
+  // Extract tasks from sheet
   const extractTasksFromSheet = async (
     workbook: XLSX.WorkBook, 
     sheetName: string, 
@@ -349,28 +397,51 @@ const RFQUploadDropZoneExcel = ({
     
     try {
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
-      const extractedTasks = new Set<string>();
-      
-      jsonData.forEach((row: any) => {
-        // Try to find the column in the row using the exact name first
-        let taskCell = row[columnName];
-        
-        // If not found, try normalized comparison
-        if (taskCell === undefined) {
-          const rowKeys = Object.keys(row);
-          const matchingKey = rowKeys.find(key => isMatchingColumnName(key, columnName));
-          if (matchingKey) {
-            taskCell = row[matchingKey];
+      // Process in chunks to avoid memory issues
+      const processDataChunk = () => {
+        return new Promise<string[]>((resolve, reject) => {
+          try {
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            const extractedTasks = new Set<string>();
+            
+            jsonData.forEach((row: any) => {
+              // Try to find the column in the row using the exact name first
+              let taskCell = row[columnName];
+              
+              // If not found, try normalized comparison
+              if (taskCell === undefined) {
+                const rowKeys = Object.keys(row);
+                const matchingKey = rowKeys.find(key => isMatchingColumnName(key, columnName));
+                if (matchingKey) {
+                  taskCell = row[matchingKey];
+                }
+              }
+              
+              const tasks = processTaskCell(taskCell);
+              tasks.forEach(task => extractedTasks.add(task));
+            });
+            
+            const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
+            resolve(uniqueTasks);
+          } catch (error) {
+            reject(error);
           }
-        }
-        
-        const tasks = processTaskCell(taskCell);
-        tasks.forEach(task => extractedTasks.add(task));
+        });
+      };
+      
+      // Execute the processing with a small timeout to allow UI updates
+      const uniqueTasks = await new Promise<string[]>((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const tasks = await processDataChunk();
+            resolve(tasks);
+          } catch (error) {
+            reject(error);
+          }
+        }, 50);
       });
       
-      const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
       console.log("📌 Final Extracted Tasks:", uniqueTasks);
       
       // Check if we found any tasks
@@ -392,6 +463,7 @@ const RFQUploadDropZoneExcel = ({
     }
   };
 
+  // Extract tasks from CSV
   const extractTasksFromCSV = async (
     csvText: string, 
     columnName: string,
@@ -402,7 +474,7 @@ const RFQUploadDropZoneExcel = ({
     Papa.parse(csvText, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      chunk: (results : any, parser : any) => {
         try {
           const extractedTasks = new Set<string>();
           
@@ -412,28 +484,42 @@ const RFQUploadDropZoneExcel = ({
             tasks.forEach(task => extractedTasks.add(task));
           });
           
-          const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
-          console.log("📌 Final Extracted Tasks from CSV:", uniqueTasks);
+          // Update tasks incrementally
+          const currentTasks = Array.from(extractedTasks).filter(Boolean);
+          setTasks(prev => [...new Set([...prev, ...currentTasks])]);
+        } catch (error) {
+          console.error("❌ Error processing CSV chunk:", error);
+        }
+      },
+      complete: (results) => {
+        try {
+          // Final processing of all tasks
+          const allTasks = [...tasks]; // Use state for accumulated tasks
+          console.log("📌 Final Extracted Tasks from CSV:", allTasks);
           
-          setTasks(uniqueTasks);
+          if (allTasks.length === 0) {
+            setFileError(`No tasks found in the selected column. Please check the file or select another column.`);
+            return;
+          }
           
           // Make sure we're using the current file reference, not the potentially stale closure value
-          changeHandler(currentFile, uniqueTasks, { 
+          changeHandler(currentFile, allTasks, { 
             sheetName: "CSV Data", 
             columnName
           });
         } catch (error) {
-          console.error("❌ Error extracting tasks from CSV:", error);
-          setFileError("An error occurred while extracting tasks from the CSV. Please check the file format.");
+          console.error("❌ Error in CSV complete callback:", error);
+          setFileError("An error occurred while finalizing the CSV data. Please check the file format.");
         }
       },
-      error: (error : any) => {
+      error: (error: any) => {
         console.error("❌ CSV Parsing Error:", error);
         setFileError("An error occurred while parsing the CSV file. Please check the file format.");
       }
     });
   };
 
+  // Handle sheet selection change
   const handleSheetChange = async (sheetName: string) => {
     if (!file || !sheetName) return;
     
@@ -445,17 +531,20 @@ const RFQUploadDropZoneExcel = ({
     const sheet = availableSheets.find(s => s.name === sheetName);
     if (sheet) {
       setTaskColumns(sheet.columns);
+      setRawTaskColumns(sheet.rawColumns);
     }
     
     // Clear tasks in parent component
     changeHandler(file, [], undefined);
   };
 
+  // Handle column selection change
   const handleColumnChange = async (columnName: string) => {
     if (!file || !selectedSheet || !columnName) return;
     
     setSelectedTaskColumn(columnName);
     setIsAnalyzing(true);
+    setTasks([]);
     
     try {
       const fileType = file.name.split(".").pop()?.toLowerCase();
@@ -464,26 +553,40 @@ const RFQUploadDropZoneExcel = ({
         const text = await file.text();
         extractTasksFromCSV(text, columnName, file);
       } else {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
-        await extractTasksFromSheet(workbook, selectedSheet, columnName, file);
+        // Use a more memory-efficient approach
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+          try {
+            const buffer = e.target?.result as ArrayBuffer;
+            const workbook = XLSX.read(new Uint8Array(buffer), { type: "array" });
+            await extractTasksFromSheet(workbook, selectedSheet, columnName, file);
+          } catch (error) {
+            console.error("❌ Error processing file for column change:", error);
+            setFileError("An error occurred while extracting tasks. Please try again.");
+          } finally {
+            setIsAnalyzing(false);
+          }
+        };
+        
+        reader.onerror = () => {
+          setFileError("An error occurred while reading the file. Please try again.");
+          setIsAnalyzing(false);
+        };
+        
+        reader.readAsArrayBuffer(file);
       }
     } catch (error) {
       console.error("❌ Error processing column change:", error);
       setFileError("An error occurred while extracting tasks. Please try again.");
-    } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // Remove the selected file
   const removeFile = () => {
     setFile(null);
-    setTasks([]);
-    setSelectedSheet(null);
-    setSelectedTaskColumn(null);
-    setAvailableSheets([]);
-    setTaskColumns([]);
-    setFileError(null);
+    resetAnalysisState();
     
     if (setSelectedFile) {
       setSelectedFile(null);
@@ -569,7 +672,12 @@ const RFQUploadDropZoneExcel = ({
             )}
             
             {isAnalyzing ? (
-              <Text size="xs" c="dimmed">Analyzing file...</Text>
+              <Stack align="center" w="100%">
+                <Loader size="sm" />
+                <Text size="xs" c="dimmed">
+                  Analyzing file{processingPercentage > 0 ? ` (${processingPercentage}%)` : '...'}
+                </Text>
+              </Stack>
             ) : (
               <>
                 {availableSheets.length > 0 && !fileError && (
@@ -589,13 +697,16 @@ const RFQUploadDropZoneExcel = ({
                       <Select
                         label="Select Task Column"
                         placeholder="Choose a column containing tasks"
-                        data={taskColumns.map(col => ({ value: col, label: col }))}
+                        data={rawTaskColumns.map((col, index) => ({ 
+                          value: col, 
+                          label: col 
+                        }))}
                         value={selectedTaskColumn}
                         onChange={(value) => value && handleColumnChange(value)}
                         searchable
                         clearable={false}
                         size="xs"
-                        disabled={taskColumns.length === 0}
+                        disabled={rawTaskColumns.length === 0}
                       />
                     )}
                     

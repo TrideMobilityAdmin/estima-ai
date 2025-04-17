@@ -173,6 +173,7 @@ export default function EstimateNew() {
   const [estimateReportloading, setEstimateReportLoading] = useState(false); // Add loading state
   const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
   const [validatedSkillsTasks, setValidatedSkillsTasks] = useState<any[]>([]);
+  const [validatedAdditionalTasks, setValidatedAdditionalTasks] = useState<any[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const [isValidating2, setIsValidating2] = useState(false);
   const [probabilityWiseData, setProbabilityWiseData] = useState<any>(null);
@@ -414,8 +415,13 @@ export default function EstimateNew() {
   };
 
   const downloadExcel = (status: boolean) => {
-    const filteredTasks =
-      validatedTasks?.filter((task) => task?.status === status) || [];
+    // Combine both the original validated tasks and additional validated tasks
+    const allValidatedTasks = [...validatedTasks, ...validatedAdditionalTasks];
+    // Filter based on the selected status (available or not available)
+    const filteredTasks = allValidatedTasks.filter((task) => task?.status === status) || [];
+
+    // const filteredTasks =
+    //   validatedTasks?.filter((task) => task?.status === status) || [];
 
     let excelData: Record<string, any>[] = [];
 
@@ -607,22 +613,21 @@ export default function EstimateNew() {
       return;
     }
 
-    if (!selectedFile) {
-      showAppNotification("warning", "Error", "Please Select File");
+    // if (!selectedFile) {
+    //   showAppNotification("warning", "Error", "Please Select File");
+    //   return;
+    // }
+    if (!selectedFile && additionalTasks.length === 0) {
+      showAppNotification(
+        "warning",
+        "Error",
+        "Please select a file or add at least one Additional Task."
+      );
       return;
     }
     const validTasks = validatedTasks
       ?.filter((task) => task?.status === true)
       ?.map((task) => task?.taskid);
-
-    // Utility to ensure float with decimal (e.g., 5 → 5.0, 5.25 → 5.25)
-    const parseFloatWithDecimal = (value: string | number): number => {
-      const floatVal = parseFloat(value as string);
-      if (isNaN(floatVal)) return 0.0;
-      return parseFloat(floatVal.toFixed(2)); // Keeps up to 2 decimals (e.g., 5 → 5.00, 5.1234 → 5.12)
-    };
-
-    const floatAircraftAge = parseFloatWithDecimal(form.values.aircraftAge);
 
     // Ensure at least one empty additional task if none are added
     const defaultAdditionalTasks =
@@ -933,6 +938,7 @@ export default function EstimateNew() {
     ],
   };
 
+
   const handleAddAdditionalTask = () => {
     setAdditionalTasks([
       ...additionalTasks,
@@ -953,6 +959,42 @@ export default function EstimateNew() {
   };
 
   console.log("additional tasks >>>>", additionalTasks);
+
+  // Step 3: Modify the "Show Tasks" button click handler to include additional tasks validation
+  const handleShowTasks = async () => {
+    setSelectedEstimateId(selectedFile?.name);
+    setSelectedFileTasksOpened(true);
+
+    // Check if there are any additional tasks to validate
+    if (additionalTasks.length > 0) {
+      // Extract task IDs from the additionalTasks array
+      const additionalTaskIds = additionalTasks
+        .filter((task: any) => task.taskID.trim() !== "")
+        .map((task: any) => task.taskID);
+
+      // Only proceed with validation if there are valid task IDs
+      if (additionalTaskIds.length > 0) {
+        await validateAdditionalTasks(additionalTaskIds);
+      }
+    }
+  };
+
+
+  // Step 4: Create a function for validating additional tasks
+  const validateAdditionalTasks = async (taskIds: any) => {
+    setIsValidating(true);
+    try {
+      const response = await validateTasks(taskIds);
+      if (response.length > 0) {
+        setValidatedAdditionalTasks(response);
+      }
+      console.log("Validated Additional Tasks:", response);
+    } catch (error) {
+      console.error("Error validating additional tasks:", error);
+    } finally {
+      setIsValidating(false);
+    }
+  };
   // const handleSubmit = async () => {
   //     // const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
 
@@ -1863,8 +1905,8 @@ export default function EstimateNew() {
           />
         </Group>
       </Modal>
-      {/* Tasks for slected rfq file */}
-      <Modal
+
+      {/* <Modal
         opened={selectedFileTasksOpened}
         onClose={() => {
           setSelectedFileTasksOpened(false);
@@ -1898,12 +1940,9 @@ export default function EstimateNew() {
                         ?.length
                     }
                   </Button>
-                  {/* <ActionIcon size={25} color="green" variant="light" onClick={() => downloadCSV(true)}>
-                                        <IconDownload />
-                                    </ActionIcon> */}
+
                 </Tooltip>
 
-                {/* Button for Not Available Tasks */}
                 <Tooltip label="Download Not Available Tasks">
                   <Button
                     size="xs"
@@ -1917,9 +1956,7 @@ export default function EstimateNew() {
                         ?.length
                     }
                   </Button>
-                  {/* <ActionIcon size={25} color="blue" variant="light" onClick={() => downloadCSV(false)}>
-                                        <IconDownload />
-                                    </ActionIcon> */}
+
                 </Tooltip>
               </Group>
             </Group>
@@ -1947,7 +1984,6 @@ export default function EstimateNew() {
                 </Text>
                 {validatedTasks?.length > 0 ? (
                   <Badge ta="center" color="green" size="md" radius="lg">
-                    {/* {validatedTasks?.filter((ele) => ele.status === true)?.length || 0} */}
                     {Math.round(
                       (validatedTasks?.filter((ele) => ele.status === true)
                         ?.length /
@@ -1974,7 +2010,6 @@ export default function EstimateNew() {
                 </Text>
                 {validatedTasks?.length > 0 ? (
                   <Badge ta="center" color="blue" size="md" radius="lg">
-                    {/* {validatedTasks?.filter((ele) => ele.status === false)?.length || 0} */}
                     {Math.round(
                       (validatedTasks?.filter((ele) => ele.status === false)
                         ?.length /
@@ -2006,35 +2041,6 @@ export default function EstimateNew() {
           overlayProps={{ radius: "sm", blur: 2 }}
           loaderProps={{ color: "indigo", type: "bars" }}
         />
-
-        {/* <Group justify="space-between">
-                                <Group mb='xs' align="center" >
-                                    <Text size="md" fw={500}>
-                                        Tasks Available
-                                    </Text>
-                                    {
-                                        extractedTasks?.length > 0 ? (
-                                            <Badge ta='center' color="indigo" size="md" radius="lg">
-                                                {extractedTasks?.length || 0}
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="light" ta='center' color="indigo" size="md" radius="lg">
-                                                0
-                                            </Badge>
-                                        )
-                                    }
-                                </Group>
-                            </Group> */}
-
-        {/* <ScrollArea
-                                style={{
-                                    flex: 1, // Take remaining space for scrollable area
-                                    overflow: "auto",
-                                }}
-                                offsetScrollbars
-                                scrollHideDelay={1}
-                                scrollbarSize={5}
-                            > */}
         {validatedTasks?.length > 0 ? (
           <SimpleGrid cols={5}>
             {validatedTasks?.map((task, index) => (
@@ -2055,7 +2061,196 @@ export default function EstimateNew() {
             No tasks found. Please Select a file.
           </Text>
         )}
-        {/* </ScrollArea> */}
+
+      </Modal>  */}
+      {/* Updated Modal component to display both original and additional validated tasks */}
+      <Modal
+        opened={selectedFileTasksOpened}
+        onClose={() => {
+          setSelectedFileTasksOpened(false);
+          setValidatedAdditionalTasks([]);
+        }}
+        size={800}
+        title={
+          <>
+            <Group justify="space-between">
+              <Group>
+                <Badge variant="filled" color="teal" radius="sm" size="lg">
+                  {validatedTasks.length + validatedAdditionalTasks.length}
+                </Badge>
+                <Text c="gray" fw={600}>
+                  Tasks for:
+                </Text>
+                <Text fw={600}>{selectedEstimateId}</Text>
+              </Group>
+
+              <Group>
+                <Tooltip label="Download Available Tasks">
+                  <Button
+                    size="xs"
+                    color="green"
+                    variant="light"
+                    rightSection={<IconDownload size="18" />}
+                    onClick={() => downloadExcel(true)}
+                  >
+                    {
+                      [...validatedTasks, ...validatedAdditionalTasks].filter(
+                        (ele) => ele?.status === true
+                      ).length
+                    }
+                  </Button>
+                </Tooltip>
+
+                <Tooltip label="Download Not Available Tasks">
+                  <Button
+                    size="xs"
+                    color="blue"
+                    variant="light"
+                    rightSection={<IconDownload size="18" />}
+                    onClick={() => downloadExcel(false)}
+                  >
+                    {
+                      [...validatedTasks, ...validatedAdditionalTasks].filter(
+                        (ele) => ele?.status === false
+                      ).length
+                    }
+                  </Button>
+                </Tooltip>
+              </Group>
+            </Group>
+            <Space h="sm" />
+            {sheetInfo && (
+              <Group gap="xs" mb="xs">
+                <Text size="sm" c="dimmed">
+                  Sheet:
+                </Text>
+                <Badge size="sm" color="black" variant="light">
+                  {sheetInfo.sheetName}
+                </Badge>
+                <Text size="sm" c="dimmed">
+                  Column:
+                </Text>
+                <Badge size="sm" color="black" variant="light">
+                  {sheetInfo.columnName}
+                </Badge>
+              </Group>
+            )}
+            <Group justify="space-between">
+              <Group mb="xs" align="center">
+                <Text size="md" fw={500}>
+                  Tasks Available
+                </Text>
+                {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+                  <Badge ta="center" color="green" size="md" radius="lg">
+                    {Math.round(
+                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
+                        (ele) => ele?.status === true
+                      ).length /
+                        [...validatedTasks, ...validatedAdditionalTasks].length) *
+                      100 || 0
+                    )}{" "}
+                    %
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="light"
+                    ta="center"
+                    color="green"
+                    size="md"
+                    radius="lg"
+                  >
+                    0
+                  </Badge>
+                )}
+              </Group>
+              <Group mb="xs" align="center">
+                <Text size="md" fw={500}>
+                  Tasks Not-Available
+                </Text>
+                {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+                  <Badge ta="center" color="blue" size="md" radius="lg">
+                    {Math.round(
+                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
+                        (ele) => ele?.status === false
+                      ).length /
+                        [...validatedTasks, ...validatedAdditionalTasks].length) *
+                      100 || 0
+                    )}{" "}
+                    %
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="light"
+                    ta="center"
+                    color="blue"
+                    size="md"
+                    radius="lg"
+                  >
+                    0
+                  </Badge>
+                )}
+              </Group>
+            </Group>
+          </>
+        }
+        scrollAreaComponent={ScrollArea.Autosize}
+      >
+        <LoadingOverlay
+          visible={isValidating}
+          zIndex={1000}
+          overlayProps={{ radius: "sm", blur: 2 }}
+          loaderProps={{ color: "indigo", type: "bars" }}
+        />
+
+        {/* Display all validated tasks */}
+        {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+          <>
+            {validatedTasks.length > 0 && (
+              <Box mb="md">
+                <Text size="sm" fw={600} mb="xs">Original Tasks:</Text>
+                <SimpleGrid cols={5}>
+                  {validatedTasks.map((task, index) => (
+                    <Badge
+                      fullWidth
+                      key={`original-${index}`}
+                      color={task?.status === false ? "blue" : "green"}
+                      variant="light"
+                      radius="sm"
+                      style={{ margin: "0.25em" }}
+                    >
+                      {task?.taskid}
+                    </Badge>
+                  ))}
+                </SimpleGrid>
+              </Box>
+            )}
+
+            {/* Display additional validated tasks with a separator */}
+            {validatedAdditionalTasks.length > 0 && (
+              <Box>
+                <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
+                <SimpleGrid cols={5}>
+                  {validatedAdditionalTasks.map((task, index) => (
+                    <Badge
+                      fullWidth
+                      key={`additional-${index}`}
+                      color={task?.status === false ? "blue" : "green"}
+                      variant="light"
+                      radius="sm"
+                      style={{ margin: "0.25em" }}
+                    >
+                      {task?.taskid}
+                    </Badge>
+                  ))}
+                </SimpleGrid>
+              </Box>
+            )}
+          </>
+        ) : (
+          <Text ta="center" size="sm" c="dimmed">
+            No tasks found. Please select a file or add additional tasks.
+          </Text>
+        )}
       </Modal>
       {/* Remarks for Estimate id */}
       <Modal
@@ -2247,11 +2442,12 @@ export default function EstimateNew() {
                       color="#000480"
                       radius="lg"
                       variant="light"
-                      disabled={!selectedFile}
-                      onClick={() => {
-                        setSelectedEstimateId(selectedFile?.name);
-                        setSelectedFileTasksOpened(true);
-                      }}
+                      disabled={!selectedFile && additionalTasks?.length === 0}
+                      onClick={handleShowTasks}
+                      // onClick={() => {
+                      //   setSelectedEstimateId(selectedFile?.name);
+                      //   setSelectedFileTasksOpened(true);
+                      // }}
                       rightSection={<IconListCheck size={20} />}
                     >
                       Show Tasks
@@ -2301,12 +2497,8 @@ export default function EstimateNew() {
                       <th style={{ width: "100px", height: "100%" }}>
                         Task ID
                       </th>{" "}
-                      {/* Set a fixed width for Task ID */}
                       <th style={{ width: "300px" }}>Description</th>{" "}
-                      {/* Set a wider width for Description */}
-                      {/* <th style={{ width: '120px' }}>Check Type</th> Set a fixed width for Check Type */}
                       <th style={{ width: "50px" }}>Actions</th>{" "}
-                      {/* Set a fixed width for Actions */}
                     </tr>
                   </thead>
                   <tbody>
@@ -2339,16 +2531,6 @@ export default function EstimateNew() {
                             }
                           />
                         </td>
-                        {/* <td>
-                                                    <Select
-                                                        size="xs"
-                                                        // width='12vw'
-                                                        placeholder="Check Type"
-                                                        data={['Type 1', 'Type 2', 'Type 3']} // Replace with your check types
-                                                        value={task.typeOfCheck}
-                                                        onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
-                                                    />
-                                                </td> */}
                         <td>
                           <Center>
                             <ActionIcon
@@ -2615,7 +2797,7 @@ export default function EstimateNew() {
                   />
 
                   <Select
-                     key={`aircraftModel-select-${formKey}`}
+                    key={`aircraftModel-select-${formKey}`}
                     size="xs"
                     searchable
                     clearable
@@ -3397,7 +3579,7 @@ border-bottom: none;
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.overallEstimateReport?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) ||
+                        estimateReportData?.overallEstimateReport?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) ||
                         []
                       }
                       spareCostData={[
@@ -3453,7 +3635,7 @@ border-bottom: none;
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.aggregatedFindings?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) || []
+                        estimateReportData?.aggregatedFindings?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
                       spareCostData={[
                         {
@@ -3508,7 +3690,7 @@ border-bottom: none;
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
                       parts={
-                        estimateReportData?.aggregatedTasks?.spareParts?.sort((a:any,b:any) => b?.price - a?.price) || []
+                        estimateReportData?.aggregatedTasks?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
                       spareCostData={[
                         {
@@ -3778,7 +3960,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Material Cost
+                    Unbillable Material Cost
                   </Text>
                   <Text size="xs" c="black">
                     {(cappingUnbilledCostType || "")
@@ -3799,7 +3981,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Man Hours
+                    Unbillable Man Hours
                   </Text>
                   <Text size="xs" c="black">
                     {(capppingMhsType || "")
@@ -3945,7 +4127,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       flex: 1,
                       minWidth: 90,
                       filter: "agNumberColumnFilter",
-                      cellRenderer: (params : any) => {
+                      cellRenderer: (params: any) => {
                         if (params.value === null || params.value === undefined)
                           return "";
                         return <Text>
@@ -3965,7 +4147,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
         {/* Right Section - Chart (3 columns width) */}
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
-          <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
+            <Title order={5} m="xs" size="sm" fw={500} c="dimmed">
               Spare Cost Analysis
             </Title>
             <Card withBorder radius="md" p="5" bg="blue.0">
@@ -3983,7 +4165,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </Flex>
               </Group>
             </Card>
-            <Space h='5'/>
+            <Space h='5' />
 
             <Card withBorder radius="md" p="xs" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
@@ -4131,7 +4313,7 @@ const OverallFindingsReport: React.FC<any> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Material Cost
+                    Unbillable Material Cost
                   </Text>
                   <Text size="xs" c="black">
                     {(cappingUnbilledCostType || "")
@@ -4152,7 +4334,7 @@ const OverallFindingsReport: React.FC<any> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Man Hours
+                    Unbillable Man Hours
                   </Text>
                   <Text size="xs" c="black">
                     {(capppingMhsType || "")
@@ -4168,7 +4350,7 @@ const OverallFindingsReport: React.FC<any> = ({
 
             </Card>
 
-            
+
           </Card>
         </Grid.Col>
 
@@ -4304,7 +4486,7 @@ const OverallFindingsReport: React.FC<any> = ({
                 </Flex>
               </Group>
             </Card>
-            <Space h='5'/>
+            <Space h='5' />
             <Card withBorder radius="md" p="md" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
                   Spare Cost Trend
@@ -4437,7 +4619,7 @@ const OverallMPDReport: React.FC<any> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Material Cost
+                    Unbillable Material Cost
                   </Text>
                   <Text size="xs" c="black">
                     {(cappingUnbilledCostType || "")
@@ -4458,7 +4640,7 @@ const OverallMPDReport: React.FC<any> = ({
                 </ThemeIcon>
                 <Flex direction="column">
                   <Text size="sm" fw={500} c="dimmed">
-                  Unbillable Man Hours
+                    Unbillable Man Hours
                   </Text>
                   <Text size="xs" c="black">
                     {(capppingMhsType || "")
@@ -4595,8 +4777,8 @@ const OverallMPDReport: React.FC<any> = ({
               Spare Cost Analysis
             </Title>
 
-                        {/* Estimated Spares Cost */}
-                        <Card withBorder radius="md" p="5" bg="blue.0">
+            {/* Estimated Spares Cost */}
+            <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <MdOutlineMiscellaneousServices size={24} />
@@ -4611,7 +4793,7 @@ const OverallMPDReport: React.FC<any> = ({
                 </Flex>
               </Group>
             </Card>
-            <Space h='5'/>
+            <Space h='5' />
             <Card withBorder radius="md" p="md" bg="blue.0">
               {/* <Text size="sm" fw={500} c="dimmed" mb="md">
                   Spare Cost Trend
@@ -4861,7 +5043,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       unit: part.unit,
       price: part.price || 0, // Default to 0 if not specified
       prob: part.prob || 0,
-    }))?.sort((a:any,b:any)=>b?.price - a?.price);
+    }))?.sort((a: any, b: any) => b?.price - a?.price);
   }, [selectedFindingDetail]);
 
   // Flatten the data structure when findings change
@@ -6520,7 +6702,7 @@ border-bottom: none;
                           pagination
                           paginationPageSize={6}
                           domLayout="autoHeight" // Ensures height adjusts dynamically
-                          rowData={selectedTask?.spare_parts?.sort((a:any,b:any)=>b?.price - a?.price) || []}
+                          rowData={selectedTask?.spare_parts?.sort((a: any, b: any) => b?.price - a?.price) || []}
                           columnDefs={[
                             {
                               field: "partId",
