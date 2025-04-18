@@ -479,23 +479,23 @@ class ExcelUploadService:
                     }
                 ]
             }, 
-            'tatTime': {
-                '$divide': [
-                    {
-                        '$add': [
-                            {
-                                '$ifNull': [
-                                    '$estimate.aggregatedTasks.totalMhs', 0
-                                ]
-                            }, {
-                                '$ifNull': [
-                                    '$estimate.aggregatedFindings.totalMhs', 0
-                                ]
-                            }
-                        ]
-                    }, man_hours_threshold
-                ]
-            }, 
+            # 'tatTime': {
+            #     '$divide': [
+            #         {
+            #             '$add': [
+            #                 {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedTasks.totalMhs', 0
+            #                     ]
+            #                 }, {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedFindings.totalMhs', 0
+            #                     ]
+            #                 }
+            #             ]
+            #         }, man_hours_threshold
+            #     ]
+            # }, 
             'remarks': {
                 '$ifNull': [
                     '$remarks_doc.remarks', ''
@@ -507,14 +507,15 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
+            'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
             'status': '$status', 
             'totalMhs': 1, 
-            'tatTime': {
-                '$ifNull': [
-                    '$tatTime', 0.0
-                ]
-            }, 
+            # 'tatTime': {
+            #     '$ifNull': [
+            #         '$tatTime', 0.0
+            #     ]
+            # }, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
