@@ -144,12 +144,20 @@ class TaskService:
             lrhTasks=updateLhRhTasks(LhRhTasks,task_ids)
   
             existing_tasks_list = self.lhrh_task_description.find(
-                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1}
+                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1,"description": 1}
             )
             existing_tasks_list = list(existing_tasks_list)  
-            existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
+            # existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
+            task_description_map = {doc["task_number"]: doc["description"] for doc in existing_tasks_list}
+            # print("task_description_map:",task_description_map)
+            
             validated_tasks = [
-                ValidTasks(taskid=task, status=(task in existing_tasks))
+                {
+                    "taskid": task,
+                    "status": task in task_description_map,
+                    "description": task_description_map.get(task, " ")  
+                }
+
                 for task in lrhTasks
             ]
             return validated_tasks

@@ -96,6 +96,7 @@ class ValidRequest(BaseModel):
 class ValidTasks(BaseModel):
     taskid: str
     status: bool
+    description:str=""
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""
@@ -148,11 +149,25 @@ class RemarkItem(BaseModel):
 class EstimateStatusResponse(BaseModel):
     estID:str
     tasks: List[str]
+    descriptions:List[str]
     totalMhs:float
     totalPartsCost:float
     status:str
-    tatTime:float=0.0
+    # tatTime:float=0.0
     aircraftRegNo:str
+    # probability:float
+    # operator:str
+    # aircraftModel:str
+    # aircraftAge:float
+    # typeOfCheck:List[str]
+    # typeOfCheckID:str
+    # aircraftFlightHours: int
+    # aircraftFlightCycles: int
+    # areaOfOperations: str
+    # cappingDetails:Optional[Capping]=None
+    # additionalTasks: List[AdditionalTasks]
+    # miscLaborTasks: List[MiscLaborTask]
+    
     createdAt:datetime
     remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):
