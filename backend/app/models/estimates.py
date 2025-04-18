@@ -155,18 +155,18 @@ class EstimateStatusResponse(BaseModel):
     status:str
     # tatTime:float=0.0
     aircraftRegNo:str
-    probability:float
-    operator:str
-    aircraftModel:str
-    aircraftAge:float
-    typeOfCheck:List[str]
-    typeOfCheckID:str
-    aircraftFlightHours: int
-    aircraftFlightCycles: int
-    areaOfOperations: str
-    cappingDetails:Optional[Capping]=None
-    additionalTasks: List[AdditionalTasks]
-    miscLaborTasks: List[MiscLaborTask]
+    # probability:float
+    # operator:str
+    # aircraftModel:str
+    # aircraftAge:float
+    # typeOfCheck:List[str]
+    # typeOfCheckID:str
+    # aircraftFlightHours: int
+    # aircraftFlightCycles: int
+    # areaOfOperations: str
+    # cappingDetails:Optional[Capping]=None
+    # additionalTasks: List[AdditionalTasks]
+    # miscLaborTasks: List[MiscLaborTask]
     
     createdAt:datetime
     remarks: List[RemarkItem] = []

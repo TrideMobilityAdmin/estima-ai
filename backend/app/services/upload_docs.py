@@ -509,20 +509,28 @@ class ExcelUploadService:
             'tasks': '$task', 
             'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
-            'probability': 1, 
-            'operator': 1, 
-            'aircraftAge': 1, 
-            'typeOfCheck': 1, 
-            'aircraftModel': 1, 
-            'aircraftFlightHours': 1, 
-            'aircraftFlightCycles': 1, 
-            'areaOfOperations': 1, 
-            'typeOfCheckID': 1, 
+            # 'probability': 1, 
+            # 'operator': 1, 
+            # 'aircraftAge': 1, 
+            # 'typeOfCheck': {
+            #     '$ifNull': [
+            #         '$typeOfCheck', []
+            #     ]
+            # },
+            # 'aircraftModel': 1, 
+            # 'aircraftFlightHours': 1, 
+            # 'aircraftFlightCycles': 1, 
+            # 'areaOfOperations': 1, 
+            # 'typeOfCheckID': {
+            #     '$ifNull': [
+            #         '$typeOfCheckID', ''
+            #     ]
+            # }, 
             'status': '$status', 
             'totalMhs': 1, 
-            'cappingDetails': 1, 
-            'additionalTasks': 1, 
-            'miscLaborTasks': 1, 
+            # 'cappingDetails': 1, 
+            # 'additionalTasks': 1, 
+            # 'miscLaborTasks': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
