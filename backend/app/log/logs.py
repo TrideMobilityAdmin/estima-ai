@@ -1,7 +1,14 @@
 import os
 import time
 from datetime import datetime
+import logging
 
+# Configure logger with UTF-8 encoding
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s',
+    encoding='utf-8'  # Specify UTF-8 encoding
+)
 class CustomLogger:
     def __init__(self):
         self.log_dir =  "D:/app/logs"
@@ -25,7 +32,7 @@ class CustomLogger:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"{level}: {timestamp} - {message}\n"
         
-        with open(file_path, "a") as f:
+        with open(file_path, "a",encoding="utf-8") as f:
             f.write(log_message)
 
     def info(self, message: str):
