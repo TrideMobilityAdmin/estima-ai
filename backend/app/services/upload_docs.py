@@ -1382,12 +1382,38 @@ def datetime_to_str(obj):
             
 
 def replace_nan_inf(obj):
-            """Helper function to recursively replace NaN and inf values with None"""
-            if isinstance(obj, dict):
-                return {k: replace_nan_inf(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [replace_nan_inf(x) for x in obj]
-            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-                return None
-            return obj
+    """
+    Recursively replace numpy data types, NaN, and Inf values with Python native types
+    to ensure JSON serialization works properly.
+    Compatible with NumPy 2.0+
+    """
+    import numpy as np
+    import pandas as pd
+    
+    if isinstance(obj, dict):
+        return {k: replace_nan_inf(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_inf(v) for v in obj]
+    # Updated NumPy integer types
+    elif isinstance(obj, (np.int8, np.int16, np.int32, np.int64,
+                          np.uint8, np.uint16, np.uint32, np.uint64)):
+        return int(obj)
+    # Updated NumPy float types
+    elif isinstance(obj, (np.float16, np.float32, np.float64)):
+        if np.isnan(obj):
+            return None
+        elif np.isinf(obj):
+            return float('inf') if obj > 0 else float('-inf')
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return replace_nan_inf(obj.tolist())
+    elif isinstance(obj, pd.DataFrame):
+        return replace_nan_inf(obj.to_dict('records'))
+    elif isinstance(obj, pd.Series):
+        return replace_nan_inf(obj.to_dict())
+    elif obj is pd.NA or pd.isna(obj):
+        return None
+    return obj
 
