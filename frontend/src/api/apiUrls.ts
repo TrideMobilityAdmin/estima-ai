@@ -1,8 +1,8 @@
 // export const baseUrl = "https://fleet-data-gmr.evrides.in/api/";
 
 
-// export const baseUrl = "http://10.100.3.13:8000/api/v1"; // Local URL for testing
-export const baseUrl = "http://10.100.12.82:8000/api/v1"; // Production URL
+export const baseUrl = "http://10.100.3.13:8000/api/v1"; // Local URL for testing
+// export const baseUrl = "http://10.100.12.82:8000/api/v1"; // Production URL
 
 export const getUserLogin_Url =  baseUrl + '/auth/login';
 export const getValidateTasks_Url = '/validate';

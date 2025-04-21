@@ -147,11 +147,11 @@ class ExcelUploadService:
                     detail="Unsupported file type. Only .xls, .xlsx, .xlsm, and .csv files are allowed"
                 )
 
-            if excel_data.empty:
-                raise HTTPException(
-                    status_code=400,
-                    detail="The Excel file contains no data"
-                )
+            # if excel_data.empty:
+            #     raise HTTPException(
+            #         status_code=400,
+            #         detail="The Excel file contains no data"
+            #     )
 
             # Clean the data
             # cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
@@ -167,9 +167,12 @@ class ExcelUploadService:
                 processed_record[column] = column_values
             if 'TASK NUMBER' in processed_record:
                 processed_record['task'] = processed_record.pop('TASK NUMBER')
+            else:
+                processed_record['task'] = []
             if 'DESCRIPTION' in processed_record:
                 processed_record['description'] = processed_record.pop('DESCRIPTION')
-
+            else:
+                processed_record['description'] = []
             processed_record.update({
             "upload_timestamp": current_time,
             "original_filename": file.filename,
@@ -489,23 +492,23 @@ class ExcelUploadService:
                     }
                 ]
             }, 
-            'tatTime': {
-                '$divide': [
-                    {
-                        '$add': [
-                            {
-                                '$ifNull': [
-                                    '$estimate.aggregatedTasks.totalMhs', 0
-                                ]
-                            }, {
-                                '$ifNull': [
-                                    '$estimate.aggregatedFindings.totalMhs', 0
-                                ]
-                            }
-                        ]
-                    }, man_hours_threshold
-                ]
-            }, 
+            # 'tatTime': {
+            #     '$divide': [
+            #         {
+            #             '$add': [
+            #                 {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedTasks.totalMhs', 0
+            #                     ]
+            #                 }, {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedFindings.totalMhs', 0
+            #                     ]
+            #                 }
+            #             ]
+            #         }, man_hours_threshold
+            #     ]
+            # }, 
             'remarks': {
                 '$ifNull': [
                     '$remarks_doc.remarks', ''
@@ -517,14 +520,30 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
+            'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
+            # 'probability': 1, 
+            # 'operator': 1, 
+            # 'aircraftAge': 1, 
+            # 'typeOfCheck': {
+            #     '$ifNull': [
+            #         '$typeOfCheck', []
+            #     ]
+            # },
+            # 'aircraftModel': 1, 
+            # 'aircraftFlightHours': 1, 
+            # 'aircraftFlightCycles': 1, 
+            # 'areaOfOperations': 1, 
+            # 'typeOfCheckID': {
+            #     '$ifNull': [
+            #         '$typeOfCheckID', ''
+            #     ]
+            # }, 
             'status': '$status', 
             'totalMhs': 1, 
-            'tatTime': {
-                '$ifNull': [
-                    '$tatTime', 0.0
-                ]
-            }, 
+            # 'cappingDetails': 1, 
+            # 'additionalTasks': 1, 
+            # 'miscLaborTasks': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
