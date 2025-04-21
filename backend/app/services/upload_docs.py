@@ -1849,12 +1849,15 @@ def datetime_to_str(obj):
             
 
 def replace_nan_inf(obj):
-            """Helper function to recursively replace NaN and inf values with None"""
-            if isinstance(obj, dict):
-                return {k: replace_nan_inf(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [replace_nan_inf(x) for x in obj]
-            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-                return None
-            return obj
-
+    """Recursively replace NaN, inf, and convert numpy types to Python native types"""
+    if isinstance(obj, dict):
+        return {k: replace_nan_inf(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_inf(x) for x in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj
