@@ -4,7 +4,7 @@ from datetime import datetime
 
 class CustomLogger:
     def __init__(self):
-        self.log_dir =  "D:/app/logs"
+        self.log_dir =  "app/logs"
         self._setup_log_directory()
         self._setup_log_files()
 
