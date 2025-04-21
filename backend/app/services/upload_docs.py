@@ -781,14 +781,15 @@ class ExcelUploadService:
                 # Log column names as string representation to avoid encoding issues
                 logger.info(f"The dataframe columns of {filename} are successfully loaded (column names contain special characters)")
             
-            if sheet_name.lower() in ["pricing", "sheet1", "price", "page"]:
+            if sheet_name.lower().startswith(("pricing", "sheet1", "price", "page")):
                 return self._process_pricing_sheet(df, filename, config)
-            elif sheet_name == 'mlttable':
+            elif sheet_name.lower().startswith('mlttable'):
                 return self._process_mlttable_sheet(df, filename, config)
-            elif sheet_name == 'mltaskmlsec1':
+            elif sheet_name.lower().startswith('mltaskmlsec1'):
                 return self._process_mltaskmlsec1_sheet(df, filename, config)
-            elif sheet_name == 'mldpmlsec1':
+            elif sheet_name.lower().startswith('mldpmlsec1'):
                 return self._process_mldpmlsec1_sheet(df, filename, config)
+
             else:
                 df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
                 df = df[1:].reset_index(drop=True)
@@ -937,7 +938,7 @@ class ExcelUploadService:
         missing_columns = [col for col in expected_columns if col not in df.columns]
         
         if missing_columns:
-            print(f"Missing columns: {missing_columns}")
+            logger.info(f"Missing columns: {missing_columns}")
 
         # Add missing columns with None values
         for col in missing_columns:
@@ -1134,11 +1135,11 @@ class ExcelUploadService:
                     logger.info(f"Shape of task_parts: {task_parts.shape}")
 
             # Verify all required data is available
-            if sub_task_parts.empty or sub_task_description.empty or task_description.empty or task_parts.empty:
+            if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
                 error_msg = "One or more required sheets are missing from the uploaded files."
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-                
+
             # Process and compare data
             compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
             logger.info("Compare result successfully fetched")
@@ -1214,14 +1215,18 @@ class ExcelUploadService:
 
 
     def testing(self,task_description, sub_task_parts, sub_task_description, task_parts,estID):
-
         
-        sub_task_parts=self.parts_combine(sub_task_parts,task_parts)
+        if task_parts is not None and not task_parts.empty:
+            logger.info("task_parts is not empty")
+            sub_task_parts = self.parts_combine(sub_task_parts, task_parts)
+        else:
+            logger.info("task_parts is empty")
+
 
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
         if not pred_data:
-            print("None EstID Pred Data -->" + estID)
+            logger.info("None EstID Pred Data -->" + estID)
             return {}
         
         # Process tasks and findings
@@ -1471,14 +1476,14 @@ class ExcelUploadService:
         return finaloutput
     
 def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
-    print("Starting actual_cap_calculation")
-    print(f"cappingDetails: {cappingDetails}")
-    print(f"Number of eligible tasks: {len(eligibile_tasks)}")
+    logger.info("Starting actual_cap_calculation")
+    logger.info(f"cappingDetails: {cappingDetails}")
+    logger.info(f"Number of eligible tasks: {len(eligibile_tasks)}")
     
     
     # Ensure cappingDetails is a dictionary
     if not isinstance(cappingDetails, dict) or not cappingDetails:
-        print("No capping details found, returning default values")
+        logger.info("No capping details found, returning default values")
         return {
             'cappingTypeManhrs': "No capping",
             'cappingManhrs': 0.0,
@@ -1502,15 +1507,15 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         'unbillableSpareCost': 0.0
     }
     
-    print(f"Initial capping_values: {capping_values}")
+    logger.info(f"Initial capping_values: {capping_values}")
     
     # Filter sub_task_description to only include eligible tasks
     sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligibile_tasks)]
-    print(f"Filtered sub_task_description shape: {sub_task_description.shape}")
+    logger.info(f"Filtered sub_task_description shape: {sub_task_description.shape}")
     
     # Define create_group function correctly (fixed indentation)
     def create_group(df):
-        print("Creating groups for tasks")
+        logger.info("Creating groups for tasks")
         # Create a new column 'group' with default values
         df['group'] = range(len(df))
         
@@ -1539,14 +1544,14 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             if log_item in group_mapping:
                 df.at[idx, 'group'] = group_mapping[log_item]
         
-        print(f"Number of unique groups created: {df['group'].nunique()}")
+        logger.info(f"Number of unique groups created: {df['group'].nunique()}")
         return df
     
     # Apply the create_group function
     sub_task_description = create_group(sub_task_description)
     
     # Calculate task level man hours
-    print("Calculating task level man hours")
+    logger.info("Calculating task level man hours")
     task_level_mh = sub_task_description.groupby(
         ["source_task_discrepancy_number_updated"]
     ).agg(
@@ -1555,10 +1560,10 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         min_actual_man_hours=("actual_man_hours", "sum")
     ).reset_index()
     
-    print(f"task_level_mh shape: {task_level_mh.shape}")
+    logger.info(f"task_level_mh shape: {task_level_mh.shape}")
     
     # Calculate group level man hours
-    print("Calculating group level man hours")
+    logger.info("Calculating group level man hours")
     group_level_mh = sub_task_description.groupby(
         ["group"]
     ).agg(
@@ -1568,18 +1573,18 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         skill_number=("skill_number", lambda x: list(set(x)))
     ).reset_index()
     
-    print(f"group_level_mh shape: {group_level_mh.shape}")
+    logger.info(f"group_level_mh shape: {group_level_mh.shape}")
     
     # Get eligible log items
     eligible_log_items = sub_task_description["log_item_number"].unique().tolist()
-    print(f"Number of eligible log items: {len(eligible_log_items)}")
+    logger.info(f"Number of eligible log items: {len(eligible_log_items)}")
     
     # Filter sub_task_parts to only include eligible log items
     filtered_sub_task_parts = sub_task_parts[sub_task_parts['task_number'].isin(eligible_log_items)]
-    print(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
+    logger.info(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
     
     # Merge task_level_parts
-    print("Merging task level parts")
+    logger.info("Merging task level parts")
     task_level_parts = pd.merge(
         filtered_sub_task_parts,
         sub_task_description[["log_item_number", "source_task_discrepancy_number_updated"]],
@@ -1590,7 +1595,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     
     # If the merge resulted in an empty DataFrame, create an empty one with required columns
     if task_level_parts.empty:
-        print("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
+        logger.info("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
         task_level_parts = pd.DataFrame(columns=["source_task_discrepancy_number_updated", "issued_part_number", 
                                                 "billable_value_usd", "used_quantity", 
                                                 "part_description", "issued_unit_of_measurement"])
@@ -1603,10 +1608,10 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    print(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
+    logger.info(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
     
     # Add 'group' column to filtered_sub_task_parts by merging with sub_task_description
-    print("Adding group column to filtered_sub_task_parts")
+    logger.info("Adding group column to filtered_sub_task_parts")
     if 'group' not in filtered_sub_task_parts.columns:
         filtered_sub_task_parts = pd.merge(
             filtered_sub_task_parts,
@@ -1624,7 +1629,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    print(f"group_level_parts shape: {group_level_parts.shape}")
+    logger.info(f"group_level_parts shape: {group_level_parts.shape}")
     
     # Create parts_line_items DataFrame
     parts_line_items = filtered_sub_task_parts.groupby(["issued_part_number"]).agg(
@@ -1634,7 +1639,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    print(f"parts_line_items shape: {parts_line_items.shape}")
+    logger.info(f"parts_line_items shape: {parts_line_items.shape}")
     
     # Create copies for processing
     task_level_mh_cap = task_level_mh.copy()
@@ -1645,7 +1650,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         billable_value_usd=("billable_value_usd", "sum")
     ).reset_index()
     
-    print(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
+    logger.info(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
     
     # Copy group level data
     group_level_mh_cap = group_level_mh.copy()
@@ -1653,7 +1658,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     
     # Add source_task_discrepancy_number_updated column to group_level_parts_cap if it doesn't exist
     if "source_task_discrepancy_number_updated" not in group_level_parts_cap.columns:
-        print("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
+        logger.info("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
         # This is a placeholder. In real code, you would need to properly join/map this information.
         group_level_parts_cap["source_task_discrepancy_number_updated"] = "Unknown"
     
@@ -1662,7 +1667,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         billable_value_usd=("billable_value_usd", "sum")
     ).reset_index()
     
-    print(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
+    logger.info(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
     
     # Create a copy of parts_line_items for capping
     parts_line_items_result = parts_line_items.copy()
@@ -1673,11 +1678,11 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     spares_cap_type = cappingDetails.get("cappingTypeSpareCost", "No capping")
     spares_cap_amt = cappingDetails.get("cappingSpareCost", 0)
     
-    print(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
+    logger.info(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
     
     # Define man-hours capping function
     def mhs_cap(mhs_cap_type, mhs_cap_amt):
-        print(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
+        logger.info(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
         if mhs_cap_type == "per_source_card":
             # Calculate intermediate values (before applying probability)
             task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
@@ -1700,7 +1705,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = task_level_mh_cap["unbillable_mh"].sum()
             billable_sum = task_level_mh_cap["billable_mh"].sum()
-            print(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            logger.info(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
         
         elif mhs_cap_type == "per_IRC":
@@ -1725,17 +1730,17 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = group_level_mh_cap["unbillable_mh"].sum()
             billable_sum = group_level_mh_cap["billable_mh"].sum()
-            print(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            logger.info(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
         
         else:  # No capping
             total_sum = task_level_mh_cap["avg_actual_man_hours"].sum() 
-            print(f"No capping for MH: unbillable=0, billable={total_sum}")
+            logger.info(f"No capping for MH: unbillable=0, billable={total_sum}")
             return 0, total_sum
     
     # Define spares capping function
     def spares_cap(spares_cap_type, spares_cap_amt):
-        print(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
+        logger.info(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
         if spares_cap_type == "per_source_card":
             # Use the aggregated DataFrame for calculations
             task_level_parts_cap = task_level_parts_cap_agg.copy()
@@ -1760,7 +1765,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = task_level_parts_cap["unbillable_spares"].sum()
             billable_sum = task_level_parts_cap["billable_spares"].sum()
-            print(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            logger.info(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
             
         elif spares_cap_type == "per_IRC":
@@ -1788,7 +1793,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = group_level_parts_cap["unbillable_spares"].sum()
             billable_sum = group_level_parts_cap["billable_spares"].sum()
-            print(f"Per IRC spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+
             return unbillable_sum, billable_sum
             
         elif spares_cap_type == "per_line_item":
@@ -1812,23 +1817,23 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = parts_line_items_result["unbillable_spares"].sum()
             billable_sum = parts_line_items_result["billable_spares"].sum()
-            print(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            logger.info(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
             
         else:  # No capping
             total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0
-            print(f"No capping for spares: unbillable=0, billable={total_sum}")
+            logger.info(f"No capping for spares: unbillable=0, billable={total_sum}")
             return 0, total_sum
     
     # Calculate and set man-hours capping values
-    print("Calculating man-hours capping values")
+    logger.info("Calculating man-hours capping values")
     capping_values["unbillableManhrs"], capping_values["billableManhrs"] = mhs_cap(mhs_cap_type, mhs_cap_amt)
     
     # Calculate and set spare costs capping values
-    print("Calculating spare costs capping values")
+    logger.info("Calculating spare costs capping values")
     capping_values['unbillableSpareCost'], capping_values['billableSpareCost'] = spares_cap(spares_cap_type, spares_cap_amt)
     
-    print(f"Final capping_values: {capping_values}")
+    logger.info(f"Final capping_values: {capping_values}")
     return capping_values
 
 
@@ -1856,12 +1861,15 @@ def datetime_to_str(obj):
             
 
 def replace_nan_inf(obj):
-            """Helper function to recursively replace NaN and inf values with None"""
-            if isinstance(obj, dict):
-                return {k: replace_nan_inf(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [replace_nan_inf(x) for x in obj]
-            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-                return None
-            return obj
-
+    """Recursively replace NaN, inf, and convert numpy types to Python native types"""
+    if isinstance(obj, dict):
+        return {k: replace_nan_inf(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_inf(x) for x in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj
