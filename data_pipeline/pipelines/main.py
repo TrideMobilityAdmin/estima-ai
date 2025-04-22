@@ -40,13 +40,20 @@ async def main():
             print("Failed to connect to database")
             logger.error("Failed to connect to database")
             return
+        processed_files_cursor = db["processed_file_paths"].find({})
+        processed_file_paths = set([file_path["file_path"] for file_path in processed_files_cursor])
+    
         
 
         #data_path = os.path.join(dir,"..","..", "Data")
         data_path=r"D:\Projects\gmr-mro\estima-ai\Data"
-        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts = await get_processed_files(
-            data_path,"AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material"
+        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,newly_processed_files= await get_processed_files(processed_file_paths,data_path,"AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material"
         )
+        if newly_processed_files:
+            operations = [{"file_path": file} for file in newly_processed_files]
+            if operations:
+                await db["processed_file_paths"].insert_many(operations)
+                print(f"Added {len(operations)} new files to processed_file_paths collection")
 
         collections_to_process = [
             ("aircraft_details", aircraft_details),

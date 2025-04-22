@@ -147,7 +147,7 @@ def predict_column_mappings(df, expected_mappings):
 
 
 # Step 2: File Processing and Data Extraction
-async def get_processed_files(data_path, aircraft_details_initial_name, task_description_initial_name, 
+async def get_processed_files(processed_file_paths,data_path, aircraft_details_initial_name, task_description_initial_name, 
                               task_parts_initial_name, sub_task_description_initial_name, 
                               sub_task_parts_initial_name):
     """
@@ -156,6 +156,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
     try:
         
         config = load_config()  # Load once to avoid multiple reads
+        newly_processed_files = set()
 
         def read_and_process_file(file_path, sheet_name, folder_name):
             """Read and process an individual Excel file."""
@@ -222,6 +223,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
                 # Reorder columns to match expected order
                 df = df[expected_output_columns]
+                df["file_path"]= file_path
 
 
                 
@@ -281,6 +283,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
                 # Reorder dataframe to match expected column order
                 df = df[expected_columns]
+                df["file_path"]= file_path
                 
             elif sheet_name == 'mlttable':
                 df.columns = df.iloc[0].astype(str).str.strip()
@@ -320,6 +323,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
                 # Reorder columns according to the mapped values
                 df = df[list(task_parts_columns_mappings.values())]
+                df["file_path"]= file_path
 
                 
             elif sheet_name == 'mltaskmlsec1':
@@ -354,6 +358,7 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
 
                 df = df[list(task_description_columns_mappings.values())]
+                df["file_path"]= file_path
             
             elif sheet_name == 'mldpmlsec1':
                 # Ensure first row is used as column names safely
@@ -439,11 +444,13 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
 
                 df = df[list(sub_task_description_columns_mappings.values())]
+                df["file_path"]= file_path
                 
             else:
                 df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
                 df = df[1:].reset_index(drop=True)
                 df["package"] = folder_name  # Add folder name as a column
+                df["file_path"]= file_path
 
             return df
 
@@ -451,44 +458,48 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
             """Collect and process files by prefix."""
             collected_data = []
 
+
             # Ensure sheet_names is a list
             if isinstance(sheet_names, str):
                 sheet_names = [sheet_names]
 
             for root, _, files in os.walk(data_path):
                 for file in files:
-                    if file.startswith(prefix):
-                        file_path = os.path.join(root, file)
-                        folder_name = os.path.basename(root)
-                        print(f"Processing file: {file_path}")
+                    if file not in processed_file_paths:
+                        
+                        if file.startswith(prefix):
+                            file_path = os.path.join(root, file)
+                            folder_name = os.path.basename(root)
+                            print(f"Processing file: {file_path}")
 
-                        try:
-                            # Get available sheet names from the file
-                            available_sheets = pd.ExcelFile(file_path).sheet_names
-                            valid_sheets = [sheet for sheet in sheet_names if sheet in available_sheets]
+                            try:
+                                # Get available sheet names from the file
+                                available_sheets = pd.ExcelFile(file_path).sheet_names
+                                valid_sheets = [sheet for sheet in sheet_names if sheet in available_sheets]
 
-                            if not valid_sheets:
-                                print(f"⚠️ Skipping file {file_path}: None of the required sheets found.")
-                                continue  # Skip this file
+                                if not valid_sheets:
+                                    print(f"⚠️ Skipping file {file_path}: None of the required sheets found.")
+                                    continue  # Skip this file
 
-                            all_sheets_data = []  # Store data from all valid sheets
+                                all_sheets_data = []  # Store data from all valid sheets
 
-                            for sheet_name in valid_sheets:
-                                df = read_and_process_file(file_path, sheet_name, folder_name)
+                                for sheet_name in valid_sheets:
+                                    df = read_and_process_file(file_path, sheet_name, folder_name)
 
-                                if df is not None and not df.empty:
-                                    df.reset_index(drop=True, inplace=True)
-                                    all_sheets_data.append(df)
+                                    if df is not None and not df.empty:
+                                        df.reset_index(drop=True, inplace=True)
+                                        all_sheets_data.append(df)
 
-                            # Append combined data for the current file
-                            if all_sheets_data:
-                                collected_data.append(pd.concat(all_sheets_data, ignore_index=True))
+                                # Append combined data for the current file
+                                if all_sheets_data:
+                                    collected_data.append(pd.concat(all_sheets_data, ignore_index=True))
 
-                            print(f"✅ Processed file: {file_path}")
-
-                        except Exception as e:
-                            logger.error(f"❌ Error processing file: {file_path}: {e}")
-                            print(f"❌ Error processing file: {file_path}: {e}")
+                                print(f"✅ Processed file: {file_path}")
+                                processed_file_paths.add(file)
+                                newly_processed_files.add(file) 
+                            except Exception as e:
+                                logger.error(f"❌ Error processing file: {file_path}: {e}")
+                                print(f"❌ Error processing file: {file_path}: {e}")
                             
             collected_data = [df for df in collected_data if not df.empty and not df.isna().all().all()]
 
@@ -496,14 +507,14 @@ async def get_processed_files(data_path, aircraft_details_initial_name, task_des
 
 
         # Collecting data
-        #aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
-        #task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1',data_path)
-        #task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
-        #sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1',data_path)
+        aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
+        task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1',data_path)
+        task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
+        sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1',data_path)
         sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name,['PRICING',"Sheet1",'sheet1',"Pricing","Price"],data_path)
-        return pd.DataFrame(),pd.DataFrame(),  pd.DataFrame(),pd.DataFrame(),sub_task_parts,
+        #return pd.DataFrame(),pd.DataFrame(),  pd.DataFrame(),pd.DataFrame(),sub_task_parts,
 
-        #return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts
+        return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files
     except Exception as e:
         print(f"Error fetching processed files: {e}")
         return pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
