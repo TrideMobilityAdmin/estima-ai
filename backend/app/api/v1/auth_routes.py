@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends,Response
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta,timezone
-from app.models.user import UserCreate,UserResponse,Token,UserLogin
+from app.models.user import UserCreate,UserResponse,Token,UserLogin,PasswordChangeRequest
 from app.middleware.auth import hash_password,verify_password,get_current_user,validate_password
 from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
@@ -130,4 +130,56 @@ async def get_user_by_id(user_id: str,current_user: dict = Depends(get_current_u
         "username": user_found["username"],
         "email": user_found["email"],
         "createdAt": user_found.get("createdAt")
+    }
+
+
+@router.post("/change_password", response_model=dict)
+async def change_password(
+    password_data: PasswordChangeRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    # Check if new_password and confirm_password match
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password and confirm password do not match"
+        )
+    
+    # Validate new password strength
+    if not validate_password(password_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 12 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+        )
+    
+    # Verify old password matches the one in database
+    if not verify_password(password_data.old_password, current_user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect old password"
+        )
+    
+    # Hash new password
+    hashed_password = hash_password(password_data.new_password)
+    
+    # Update user record in database
+    result = users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {
+            "$set": {
+                "password": hashed_password,
+                "updatedAt": datetime.now(timezone.utc)
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Password updated successfully"
     }
