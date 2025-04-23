@@ -365,14 +365,18 @@ export default function EstimateNew() {
   // 🟢 Function to validate tasks & update UI
   const handleValidateTasks = async (tasks: string[]) => {
     setIsValidating(true);
-    const response = await validateTasks(tasks);
-
-    if (response.length > 0) {
-      setValidatedTasks(response);
-      setValidatedSkillsTasks(response);
+    try {
+      const response = await validateTasks(tasks);
+      if (response?.length > 0) {
+        setValidatedTasks(response);
+        setValidatedSkillsTasks(response);
+      }
+      return response;
+    } finally {
+      setIsValidating(false);
     }
-    setIsValidating(false);
   };
+  
 
   const handleValidateSkillsTasks = async (tasks: string[]) => {
     setIsValidating2(true);
@@ -431,13 +435,13 @@ export default function EstimateNew() {
         filteredTasks.length > 0
           ? filteredTasks.map((task) => ({
             "TASK NUMBER": task?.taskid || "",
-            //   "ESTIMATE ID": selectedEstimateId,
+            "DESCRIPTION": task?.description || "",
             STATUS: "Available",
           }))
           : [
             {
               "TASK NUMBER": "",
-              // "ESTIMATE ID": "",
+              "DESCRIPTION": "",
               STATUS: "",
             },
           ];
@@ -447,19 +451,16 @@ export default function EstimateNew() {
         filteredTasks.length > 0
           ? filteredTasks.map((task) => ({
             "TASK NUMBER": task?.taskid || "",
-            DESCRIPTION: "",
+            DESCRIPTION: task?.description || "",
             "MAN HOURS": "",
             STATUS: "Not Available",
-            //   "ESTIMATE ID": selectedEstimateId,
           }))
           : [
             {
               "TASK NUMBER": "",
               DESCRIPTION: "",
-
               "MAN HOURS": "",
               STATUS: "",
-              // "ESTIMATE ID": "",
             },
           ];
     }
@@ -475,6 +476,66 @@ export default function EstimateNew() {
       }.xlsx`
     );
   };
+
+  // const downloadAllValidatedTasks = async (tasks: any[]) => {
+  //   // Step 1: Get the latest validated tasks directly
+  //   const validated = await handleValidateTasks(tasks);
+  
+  //   if (!validated || validated.length === 0) {
+  //     showNotification({
+  //       title: "No tasks found",
+  //       message: "Validation returned no data to download.",
+  //       color: "red",
+  //     });
+  //     return;
+  //   }
+  
+  //   // Step 2: Prepare Excel data
+  //   const excelData = validated.map((task: any) => ({
+  //     "TASK NUMBER": task?.taskid || "",
+  //     DESCRIPTION: task?.description || "",
+  //     "MAN HOURS": "", // Can be modified to include actual man hours
+  //   }));
+  
+  //   // Step 3: Create and download Excel
+  //   const ws = XLSX.utils.json_to_sheet(excelData);
+  //   const wb = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(wb, ws, "MPD");
+  
+  //   XLSX.writeFile(wb, `Estimate_${selectedEstimateId}_AllTasks.xlsx`);
+  // };
+  
+  const downloadAllValidatedTasks = async (
+    tasks: string[],
+    descriptions: string[],
+    estID: string
+  ) => {
+    // Check if tasks and descriptions have data
+    const hasData = tasks.length > 0 && descriptions.length > 0;
+  
+    const excelData = hasData
+      ? tasks.map((task, index) => ({
+          "TASK NUMBER": task || "",
+          DESCRIPTION: descriptions[index] || "",
+          "FINAL MH": "",
+        }))
+      : [
+          {
+            "TASK NUMBER": "",
+            DESCRIPTION: "",
+            "FINAL MH": "",
+          },
+        ];
+  
+    // Create and download Excel
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MPD");
+    XLSX.writeFile(wb, `Estimate_${estID}.xlsx`);
+  };
+  
+  
+  
 
   // Reset counter for keys to force re-render
   const [formKey, setFormKey] = useState(0);
@@ -553,54 +614,30 @@ export default function EstimateNew() {
   // Handle Submit
   const handleSubmit = async () => {
     const validationErrors = form.validate();
-
+  
     if (validationErrors.hasErrors) {
       if (validationErrors.errors.typeOfCheck) {
-        showAppNotification(
-          "warning",
-          "Validation Error",
-          "Please select at least one Type of Check"
-        );
+        showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
       }
       if (validationErrors.errors.typeOfCheckID) {
-        showAppNotification(
-          "warning",
-          "Validation Error",
-          "Type of Check ID is required"
-        );
+        showAppNotification("warning", "Validation Error", "Type of Check ID is required");
       }
       if (validationErrors.errors.operator) {
-        showAppNotification(
-          "warning",
-          "Validation Error",
-          "Operator is required"
-        );
+        showAppNotification("warning", "Validation Error", "Operator is required");
       }
       if (validationErrors.errors.aircraftModel) {
-        showAppNotification(
-          "warning",
-          "Validation Error",
-          "Aircraft Model is required"
-        );
+        showAppNotification("warning", "Validation Error", "Aircraft Model is required");
       }
       if (validationErrors.errors.aircraftRegNo) {
-        showAppNotification(
-          "warning",
-          "Validation Error",
-          "Aircraft Registration Number is required"
-        );
+        showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
         if (aircraftRegNoRef.current) {
-          aircraftRegNoRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-          aircraftRegNoRef.current.focus(); // Focus on the input field
+          aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+          aircraftRegNoRef.current.focus();
         }
       }
       return;
     }
-
-    // Check if aircraft reg no is N/A and type of check is empty
+  
     if (
       form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
       form.values.typeOfCheck.length === 0
@@ -612,11 +649,7 @@ export default function EstimateNew() {
       );
       return;
     }
-
-    // if (!selectedFile) {
-    //   showAppNotification("warning", "Error", "Please Select File");
-    //   return;
-    // }
+  
     if (!selectedFile && additionalTasks.length === 0) {
       showAppNotification(
         "warning",
@@ -625,30 +658,25 @@ export default function EstimateNew() {
       );
       return;
     }
-    const validTasks = validatedTasks
-      ?.filter((task) => task?.status === true)
-      ?.map((task) => task?.taskid);
-
-    // Ensure at least one empty additional task if none are added
-    const defaultAdditionalTasks =
-      additionalTasks.length > 0
-        ? additionalTasks
-        : [{ taskID: "", taskDescription: "" }];
-
-    // Ensure at least one empty misc labor task if none exist
-    const defaultMiscLaborTasks =
-      selectedExpertInsightTasks.length > 0
-        ? selectedExpertInsightTasks
-        : [
-          {
-            taskID: "",
-            taskDescription: "",
-            manHours: 0,
-            skill: "",
-            spareParts: [{ partID: "", description: "", quantity: 0, unit: "", price: 0 }],
-          },
-        ];
-
+  
+    const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
+  
+    const defaultAdditionalTasks = additionalTasks.length > 0
+      ? additionalTasks
+      : [{ taskID: "", taskDescription: "" }];
+  
+    const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
+      ? selectedExpertInsightTasks
+      : [{
+          taskID: "",
+          taskDescription: "",
+          manHours: 0,
+          skill: "",
+          spareParts: [
+            { partID: "", description: "", quantity: 0, unit: "", price: 0 },
+          ],
+        }];
+  
     const requestData = {
       tasks: validTasks || [],
       probability: Number(form.values.probability) || 10,
@@ -658,37 +686,38 @@ export default function EstimateNew() {
       aircraftAge: form.values.aircraftAge || 0.0,
       aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
       aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-      areaOfOperations: form.values.areaOfOperations || "", // Ensure it's not empty
+      areaOfOperations: form.values.areaOfOperations || "",
       cappingDetails: {
         cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
         cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
-        cappingTypeSpareCost:
-          form.values.cappingDetails.cappingTypeSpareCost || "",
-        cappingSpareCost:
-          Number(form.values.cappingDetails.cappingSpareCost) || 0,
+        cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+        cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
       },
       additionalTasks: defaultAdditionalTasks,
-      typeOfCheck: form.values.typeOfCheck || [], // Updated to handle array
-      typeOfCheckID: form.values.typeOfCheckID || "", // Added new field
+      typeOfCheck: form.values.typeOfCheck || [],
+      typeOfCheckID: form.values.typeOfCheckID || "",
       miscLaborTasks: defaultMiscLaborTasks,
     };
-
-    console.log("Submitting data:", requestData);
-
+  
     try {
       setLoading(true);
-      const response = await RFQFileUpload(requestData, selectedFile);
-      console.log("RFQ API Response:", response);
-
+  
+      let fileToUpload: File | null = selectedFile;
+  
+      // ✅ Load fallback file if selectedFile is null
+      if (!fileToUpload) {
+        const response = await fetch(excelTemplateFile);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+      }
+  
+      const response = await RFQFileUpload(requestData, fileToUpload);
       if (response) {
         setRfqSubmissionResponse(response);
         setRfqSubModalOpened(true);
-        showAppNotification(
-          "success",
-          "Success!",
-          "Estimate report submitted successfully!"
-        );
-        // Reset form fields after successful submission
+        showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+  
+        // Reset form and states
         form.reset();
         form.setValues({
           tasks: [],
@@ -713,22 +742,16 @@ export default function EstimateNew() {
           miscLaborTasks: [],
           additionalTasks: [],
         });
-
-        // Reset related state variables
-        setSelectedFile(null); // Reset the selected file
-        setValidatedTasks([]); // Reset validated tasks
-        setAdditionalTasks([]); // Reset additional tasks
-        setSelectedExpertInsightTasks([]); // Reset expert insight tasks
-        // Force re-render of selects
+  
+        setSelectedFile(null);
+        setValidatedTasks([]);
+        setAdditionalTasks([]);
+        setSelectedExpertInsightTasks([]);
         setFormKey((prev) => prev + 1);
       }
     } catch (error) {
       console.error("API Error:", error);
-      showAppNotification(
-        "error",
-        "Error!",
-        "Failed to submit estimate report.!"
-      );
+      showAppNotification("error", "Error!", "Failed to submit estimate report.!");
       showNotification({
         title: "Error",
         message: "Failed to submit estimate report.",
@@ -738,6 +761,7 @@ export default function EstimateNew() {
       setLoading(false);
     }
   };
+  
 
   console.log("rfq sub >>> ", rfqSubmissionResponse);
 
@@ -782,38 +806,6 @@ export default function EstimateNew() {
 
   console.log("skillAnalysisData", skillAnalysisData);
 
-  function ChartTooltip({ label, payload }: any) {
-    if (!payload) return null;
-
-    return (
-      <Paper px="md" py="sm" withBorder shadow="md" radius="md">
-        <Text fz="sm" fw={500} mb={5}>
-          {label}
-        </Text>
-        {getFilteredChartTooltipPayload(payload).map((item: any) => (
-          <Text fw={500} key={item.name} c={item.color} fz="sm">
-            {item.name}: {item.value}
-          </Text>
-        ))}
-      </Paper>
-    );
-  }
-  // const handleBothSubmissions = async () => {
-  //     try {
-  //         setLoading(true);
-  //         await handleSubmit(); // Call the first function
-  //         await handleSubmitSkills(); // Call the second function
-  //     } catch (error) {
-  //         console.error("Error during submission:", error);
-  //         showNotification({
-  //             title: "Error",
-  //             message: "An error occurred during submission.",
-  //             color: "red",
-  //         });
-  //     } finally {
-  //         setLoading(false);
-  //     }
-  // };
   const handleCloseModal = () => {
     setRfqSubModalOpened(false);
     setSelectedFile(null); // Clear selected file
@@ -875,67 +867,6 @@ export default function EstimateNew() {
 
   const handleDownload = (id: any) => {
     downloadEstimatePdf(id);
-  };
-
-  const probabilityData = {
-    estId: "1234",
-    probData: [
-      {
-        prob: 0,
-        totalManHrs: 500,
-        totalSparesCost: 3000,
-      },
-      {
-        prob: 0.1,
-        totalManHrs: 490,
-        totalSparesCost: 2900,
-      },
-      {
-        prob: 0.2,
-        totalManHrs: 450,
-        totalSparesCost: 2800,
-      },
-      {
-        prob: 0.3,
-        totalManHrs: 430,
-        totalSparesCost: 2700,
-      },
-      {
-        prob: 0.4,
-        totalManHrs: 410,
-        totalSparesCost: 2600,
-      },
-      {
-        prob: 0.5,
-        totalManHrs: 390,
-        totalSparesCost: 2500,
-      },
-      {
-        prob: 0.6,
-        totalManHrs: 370,
-        totalSparesCost: 2400,
-      },
-      {
-        prob: 0.7,
-        totalManHrs: 350,
-        totalSparesCost: 2300,
-      },
-      {
-        prob: 0.8,
-        totalManHrs: 320,
-        totalSparesCost: 2200,
-      },
-      {
-        prob: 0.9,
-        totalManHrs: 310,
-        totalSparesCost: 2100,
-      },
-      {
-        prob: 1.0,
-        totalManHrs: 300,
-        totalSparesCost: 2000,
-      },
-    ],
   };
 
 
@@ -3373,23 +3304,23 @@ border-bottom: none;
                             <IconReport />
                           </ActionIcon>
                         </Tooltip>
-                        {/* <Tooltip label="Download Estimate">
-                                                    <ActionIcon
-                                                        size={20}
-                                                        color="lime"
-                                                        variant="light"
-                                                        disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                                                        onClick={(values: any) => {
-                                                            setSelectedDownloadEstimateId(val?.data?.estID);
-                                                            handleDownload(val?.data?.estID);
-                                                            // setAction("edit");
-                                                            // setOpened(true);
-                                                            // form.setValues(val?.data);
-                                                        }}
-                                                    >
-                                                        <IconDownload />
-                                                    </ActionIcon>
-                                                </Tooltip> */}
+                        <Tooltip label="Download Uploaded Document">
+                          <ActionIcon
+                            size={20}
+                            color="lime"
+                            variant="light"
+                            onClick={() => {
+                              downloadAllValidatedTasks(
+                                val.data.tasks,
+                                val.data.descriptions,
+                                val.data.estID // pass directly
+                              );
+                            }}
+                          >
+                            <IconFileDownload />
+                          </ActionIcon>
+                        </Tooltip>
+
                         {/* <Tooltip label="Probability Details">
                           <ActionIcon
                             size={20}

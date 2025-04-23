@@ -43,11 +43,11 @@ export const useApi = () => {
   // Function to upload form fields + file
   const RFQFileUpload = async (data: any, file: File | null) => {
     if (!file) {
-      showNotification({
-        title: "Error",
-        message: "File is required",
-        color: "red",
-      });
+      showAppNotification(
+        "error",
+        "Failed!",
+        "File is required!"
+      );
       return null;
     }
 
