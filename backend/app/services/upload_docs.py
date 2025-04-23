@@ -4,6 +4,8 @@ from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
 import os
+# Try with a different encoding approach
+import sys
 import json
 import math
 import yaml
@@ -24,8 +26,12 @@ from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
 import asyncio
+import re
 from fuzzywuzzy import process
+
 from difflib import SequenceMatcher
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
@@ -37,6 +43,7 @@ class ExcelUploadService:
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
+        self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         
        
     def clean_field_name(self, field_name: str) -> str:
