@@ -140,17 +140,37 @@ class TaskService:
 
             LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
             logger.info("LhRhTasks fetched successfully")
-    
-            lrhTasks=updateLhRhTasks(LhRhTasks,task_ids)
-  
+        
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+        
             existing_tasks_list = self.lhrh_task_description.find(
                 {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1}
             )
-            existing_tasks_list = list(existing_tasks_list)  
-            existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
+            existing_tasks_list = list(existing_tasks_list)
+
+           
+            cleaned_task_numbers = set()
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]  
+                cleaned_task_numbers.add(task_number)
+
+            logger.info(f"cleaned_task_numbers: {cleaned_task_numbers}")
+            
+           
+            cleaned_lrhTasks = set()  
+            for task in lrhTasks:
+                if " (LH)" in task or " (RH)" in task:
+                    task = task.split(" ")[0]  
+                cleaned_lrhTasks.add(task)  
+            cleaned_lrhTasks = list(cleaned_lrhTasks)
+            
+            
             validated_tasks = [
-                ValidTasks(taskid=task, status=(task in existing_tasks))
-                for task in lrhTasks
+                ValidTasks(taskid=task, status=(task in cleaned_task_numbers))
+                for task in cleaned_lrhTasks
             ]
             return validated_tasks
 
