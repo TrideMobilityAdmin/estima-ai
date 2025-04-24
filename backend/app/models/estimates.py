@@ -153,7 +153,7 @@ class RemarkItem(BaseModel):
 class EstimateStatusResponse(BaseModel):
     estID:str
     tasks: List[str]
-    descriptions:List[str]
+    # descriptions:List[str]
     totalMhs:float
     totalPartsCost:float
     status:str

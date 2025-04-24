@@ -527,7 +527,7 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
-            'descriptions': '$description', 
+            # 'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
             # 'probability': 1, 
             # 'operator': 1, 
