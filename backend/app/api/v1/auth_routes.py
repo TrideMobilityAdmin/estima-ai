@@ -49,10 +49,15 @@ async def User_register(user: UserCreate):
 @router.post("/login", response_model=Token)
 async def User_login(user: UserLogin):
     user_found = users_collection.find_one({"username": user.username})
-    if not user_found or not verify_password(user.password, user_found["password"]):
+    if not user_found:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
+            detail="Incorrect username"
+        )
+    if not verify_password(user.password, user_found["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password"
         )
     
     access_token = create_access_token(
