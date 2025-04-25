@@ -3294,7 +3294,7 @@ border-bottom: none;
                             <IconReport />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label="Download Uploaded Document">
+                        {/* <Tooltip label="Download Uploaded Document">
                           <ActionIcon
                             size={20}
                             color="lime"
@@ -3309,7 +3309,7 @@ border-bottom: none;
                           >
                             <IconFileDownload />
                           </ActionIcon>
-                        </Tooltip>
+                        </Tooltip> */}
 
                         {/* <Tooltip label="Probability Details">
                           <ActionIcon
