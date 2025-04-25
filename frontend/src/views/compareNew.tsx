@@ -129,7 +129,7 @@ export default function CompareNew() {
                 Please select the following actual data files :
                 </Text>
                 <Text c='gray' size='xs'>
-                  (Material consumption pricing, Mlttable, Mldpmlsec1,Mltaskmlsec1)
+                  (Material consumption pricing, Mldpmlsec1,Mltaskmlsec1)
                 </Text>
               </Grid.Col>
             </Grid>
