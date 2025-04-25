@@ -256,7 +256,7 @@ export const useApi = () => {
         console.log("✅ Upload successful:", response.data);
 
         if (response !== null) {
-            showAppNotification("success", "Success!", "Estimate Comparision Successfull!");
+            showAppNotification("success", "Success!", "Estimate Comparision Successfully!");
         } else {
             showAppNotification("error", "Failed!", "Failed try again");
         }

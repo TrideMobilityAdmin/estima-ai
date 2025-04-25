@@ -163,7 +163,7 @@ const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
                 // showAppNotification("success", "Skill analysis!", "Successfully Generated Skill Analysis");
             }
         } catch (error) {
-            showAppNotification("error", "Failed!", "Failed Generating, try agian");
+            showAppNotification("error", "Failed!", "Failed Skill Analysis, try agian");
             console.error("API Error:", error);
         } finally {
             setLoading(false);

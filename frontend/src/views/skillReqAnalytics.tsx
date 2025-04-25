@@ -289,46 +289,58 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
 
         const skillBasedTasks = useMemo(() => {
-            // Create a map to group tasks by skill
+            // Create a map to group tasks by skill (case-insensitive)
             const skillMap = new Map();
-    
+            
             // Handle null or empty data
             if (!data || data.length === 0) return [];
-    
+            
             // Process each task
-            data.forEach((task : any) => {
+            data.forEach((task: any) => {
                 // Handle tasks with no skills
                 if (!task.skills || task.skills.length === 0) return;
-    
+                
                 // Process each skill in the task
-                task.skills.forEach((skillData : any) => {
+                task.skills.forEach((skillData: any) => {
                     // Handle null skill name by assigning "Unknown Skill"
-                    const skillName = skillData?.skill?.trim() || "Unknown Skill";
+                    const rawSkillName = skillData?.skill?.trim() || "Unknown Skill";
+                    
+                    // Convert skill name to lowercase for case-insensitive grouping
+                    const skillNameLower = rawSkillName.toLowerCase();
+                    
+                    // Get the original case version we want to display (use the first occurrence)
+                    let displaySkillName = rawSkillName;
+                    if (skillMap.has(skillNameLower)) {
+                        displaySkillName = skillMap.get(skillNameLower).displayName;
+                    }
                     
                     // Create array for this skill if it doesn't exist
-                    if (!skillMap.has(skillName)) {
-                        skillMap.set(skillName, []);
+                    if (!skillMap.has(skillNameLower)) {
+                        skillMap.set(skillNameLower, {
+                            displayName: displaySkillName,
+                            tasks: []
+                        });
                     }
                     
                     // Add this task to the skill's array
-                    skillMap.get(skillName).push({
+                    skillMap.get(skillNameLower).tasks.push({
                         taskId: task.taskId || "Unknown Task",
                         taskDescription: task.taskDescription || "No description",
                         manHours: skillData.manHours || { min: 0, avg: 0, max: 0 }
                     });
                 });
             });
-    
+            
             // Convert the map to an array of skill groups with calculated totals
-            return Array.from(skillMap.entries()).map(([skill, tasks]) => {
+            return Array.from(skillMap.values()).map((skillGroup) => {
                 // Calculate total hours for this skill group
-                const totalMinHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.min || 0), 0);
-                const totalAvgHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.avg || 0), 0);
-                const totalMaxHours = tasks.reduce((sum : any, task : any) => sum + (task.manHours.max || 0), 0);
-    
+                const totalMinHours = skillGroup.tasks.reduce((sum: any, task: any) => sum + (task.manHours.min || 0), 0);
+                const totalAvgHours = skillGroup.tasks.reduce((sum: any, task: any) => sum + (task.manHours.avg || 0), 0);
+                const totalMaxHours = skillGroup.tasks.reduce((sum: any, task: any) => sum + (task.manHours.max || 0), 0);
+                
                 return {
-                    skill,
-                    tasks,
+                    skill: skillGroup.displayName,
+                    tasks: skillGroup.tasks,
                     totalMinHours,
                     totalAvgHours,
                     totalMaxHours
@@ -475,45 +487,63 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
         const [skillSearch, setSkillSearch] = useState("");
     
         const skillBasedFindings = useMemo(() => {
-            // Create a map to group findings by skill
+            // Create a map to group findings by skill (case-insensitive)
             const skillMap = new Map();
-    
+            
             // Handle null or empty data
             if (!data || data.length === 0) return [];
-    
+            
             // Process each finding
-            data.forEach((finding : any) => {
+            data.forEach((finding: any) => {
                 // Handle findings with no skills
                 if (!finding.skills || finding.skills.length === 0) return;
-    
+                
                 // Process each skill in the finding
-                finding.skills.forEach((skillData : any) => {
+                finding.skills.forEach((skillData: any) => {
                     // Handle null skill name by assigning "Unknown Skill"
-                    const skillName = skillData?.skill?.trim() || "Unknown Skill";
+                    const rawSkillName = skillData?.skill?.trim() || "Unknown Skill";
+                    
+                    // Convert skill name to lowercase for case-insensitive grouping
+                    const skillNameLower = rawSkillName.toLowerCase();
+                    
+                    // Get the original case version we want to display (use the first occurrence)
+                    let displaySkillName = rawSkillName;
+                    if (skillMap.has(skillNameLower)) {
+                        displaySkillName = skillMap.get(skillNameLower).displayName;
+                    }
                     
                     // Create array for this skill if it doesn't exist
-                    if (!skillMap.has(skillName)) {
-                        skillMap.set(skillName, []);
+                    if (!skillMap.has(skillNameLower)) {
+                        skillMap.set(skillNameLower, {
+                            displayName: displaySkillName,
+                            findings: []
+                        });
                     }
                     
                     // Add this finding to the skill's array
-                    skillMap.get(skillName).push({
+                    skillMap.get(skillNameLower).findings.push({
                         taskId: finding.taskId || "Unknown Task ID",
                         manHours: skillData.manHours || { min: 0, avg: 0, max: 0 }
                     });
                 });
             });
-    
+            
             // Convert the map to an array of skill groups with calculated totals
-            return Array.from(skillMap.entries()).map(([skill, findings]) => {
+            return Array.from(skillMap.values()).map((skillGroup) => {
                 // Calculate total hours for this skill group
-                const totalMinHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.min || 0), 0);
-                const totalAvgHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.avg || 0), 0);
-                const totalMaxHours = findings.reduce((sum : any, finding : any) => sum + (finding.manHours.max || 0), 0);
-    
+                const totalMinHours = skillGroup.findings.reduce(
+                    (sum: any, finding: any) => sum + (finding.manHours.min || 0), 0
+                );
+                const totalAvgHours = skillGroup.findings.reduce(
+                    (sum: any, finding: any) => sum + (finding.manHours.avg || 0), 0
+                );
+                const totalMaxHours = skillGroup.findings.reduce(
+                    (sum: any, finding: any) => sum + (finding.manHours.max || 0), 0
+                );
+                
                 return {
-                    skill,
-                    findings,
+                    skill: skillGroup.displayName,
+                    findings: skillGroup.findings,
                     totalMinHours,
                     totalAvgHours,
                     totalMaxHours

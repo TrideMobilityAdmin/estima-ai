@@ -179,7 +179,15 @@ export default function PartUsage() {
         date: item.date,
         tasks: item.tasksqty,
         findings: item.findingsqty,
-    })) || [];
+    }))?.sort((a: any, b: any) => {
+        // Create proper Date objects from the date strings
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        // Compare the dates
+        return dateA.getTime() - dateB.getTime();
+    }) || [];
+    
 
 
     // Combine tasks and nonHmvTasks arrays

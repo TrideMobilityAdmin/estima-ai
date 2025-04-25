@@ -704,7 +704,7 @@ const handleSubmit = async () => {
     if (response) {
       setRfqSubmissionResponse(response);
       setRfqSubModalOpened(true);
-      showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+      showAppNotification("success", "Success!", "RFQ submitted successfully!");
   
       // Reset form and states
       form.reset();
@@ -740,7 +740,7 @@ const handleSubmit = async () => {
     }
   } catch (error) {
     console.error("API Error:", error);
-    showAppNotification("error", "Error!", "Failed to submit estimate report!");
+    showAppNotification("error", "Error!", "Failed to submit RFQ!");
   } finally {
     setLoading(false);
   }
