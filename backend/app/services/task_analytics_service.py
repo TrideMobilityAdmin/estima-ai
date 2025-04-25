@@ -1282,12 +1282,14 @@ class TaskService:
             'aggregatedTasks': {
                 'spareParts': '$aggregatedTasks.spareParts', 
                 'estimateManhrs': '$aggregatedTasks.mhs', 
+                'totalMhs': '$aggregatedTasks.totalMhs', 
                 'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
             },  
             'findings': '$findings', 
             'aggregatedFindings': {
                 'spareParts': '$aggregatedFindings.spareParts', 
                 'estimateManhrs': '$aggregatedFindings.mhs', 
+                'totalMhs': '$aggregatedFindings.totalMhs', 
                 'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
             },  
             'originalFilename': 1, 
