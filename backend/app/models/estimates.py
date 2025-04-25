@@ -95,7 +95,11 @@ class ValidRequest(BaseModel):
      tasks: List[str]
 class ValidTasks(BaseModel):
     taskid: str
+    description: str
     status: bool
+class ValidRequestCheckCategory(BaseModel):
+    tasks: List[str]
+    typeOfCheck: List[str]
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""
@@ -148,6 +152,7 @@ class RemarkItem(BaseModel):
 class EstimateStatusResponse(BaseModel):
     estID:str
     tasks: List[str]
+    descriptions:List[str]
     totalMhs:float
     totalPartsCost:float
     status:str

@@ -520,6 +520,7 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
+            'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
             'status': '$status', 
             'totalMhs': 1, 
