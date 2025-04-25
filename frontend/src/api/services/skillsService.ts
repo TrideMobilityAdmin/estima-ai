@@ -15,7 +15,7 @@ export const useApiSkillAnalysis = () => {
           return response.data;
         } catch (error: any) {
           console.error("❌ API Error:", error.response?.data || error.message);
-          showAppNotification("error", "Failed!", "Failed Generating, try agian");
+          showAppNotification("error", "Failed!", "Skill Analysis failed, try agian");
           // Check if authentication has expired
         //   if (error.response?.data?.detail === "Invalid authentication credentials") {
         //     handleSessionExpired();

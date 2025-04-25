@@ -169,17 +169,32 @@ export default function ExpertInsights() {
   const handleSaveParts = () => {
     if (currentTaskID !== null) {
       const taskIndex = currentTaskID;
+  
+      // Check if newPart has valid data to be included
+      const isNewPartValid =
+        newPart.partID.trim() &&
+        newPart.quantity > 0;
+  
+      const partsToSave = isNewPartValid
+        ? [...selectedTaskParts, { ...newPart }]
+        : [...selectedTaskParts];
+  
       setTasks(prevTasks => {
         const updatedTasks = [...prevTasks];
         updatedTasks[taskIndex] = {
           ...updatedTasks[taskIndex],
-          spareParts: [...selectedTaskParts]
+          spareParts: partsToSave,
         };
         return updatedTasks;
       });
+  
+      // Clear modal states
+      setSelectedTaskParts([]);
+      setNewPart({ partID: '', quantity: 0, description: "", unit: "", price: "" });
       setPartsModalOpen(false);
     }
   };
+  
 
   return (
     <div style={{ padding: '20px 80px' }}>

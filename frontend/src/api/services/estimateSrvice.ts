@@ -135,8 +135,8 @@ export const useApi = () => {
       const response = await axiosInstance.get(getEstimateReport_Url+estimateId);
       console.log("✅ API Response estimate by id :", response);
       showNotification({
-        title: "Estimate Generated!",
-        message: "Successfully Estimate Report Generated",
+        title: "Estimate!",
+        message: "Estimate displaying below.",
         color: "green",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
@@ -256,7 +256,7 @@ export const useApi = () => {
         console.log("✅ Upload successful:", response.data);
 
         if (response !== null) {
-            showAppNotification("success", "Success!", "Estimate Comparision Successfull!");
+            showAppNotification("success", "Success!", "Estimate Comparision Successfully!");
         } else {
             showAppNotification("error", "Failed!", "Failed try again");
         }

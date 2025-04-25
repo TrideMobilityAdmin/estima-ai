@@ -110,10 +110,10 @@ const Landing: React.FC = () => {
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const response = await axiosInstance.put(getChangepassword_Url, {
-        password: values.password,
-        newPassword: values.newPassword,
-        conformPassword: values.conformPassword,
+      const response = await axiosInstance.post(getChangepassword_Url, {
+        old_password: values.password,
+        new_password: values.newPassword,
+        confirm_password: values.conformPassword,
       });
 
       showAppNotification(

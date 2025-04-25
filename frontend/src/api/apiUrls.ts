@@ -13,4 +13,4 @@ export const uploadEstimate_Url = "/upload-estimate";
 export const getEstimateStatus_Url = "/estimate_file_status";
 export const getConfigurations_Url = "/configurations";
 export const getProbabilityWise_Url = "/probability_wise_manhrs_sparecost/";
-export const getChangepassword_Url = "";
+export const getChangepassword_Url = "/auth/change_password";

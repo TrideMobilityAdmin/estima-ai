@@ -105,10 +105,10 @@ function Login() {
       clearAuthState();
       console.log("Error during login:", error);
       const errorMessage =
-        error.response?.data?.responseMsg || "Something went wrong!";
+        error.response?.data?.detail || "Something went wrong!";
 
       showNotification({
-        title: "Login Failed",
+        title: "Login Failed!",
         message: errorMessage,
         color: "red",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },

@@ -869,7 +869,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
-           
+        
 
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
@@ -1282,12 +1282,14 @@ class TaskService:
             'aggregatedTasks': {
                 'spareParts': '$aggregatedTasks.spareParts', 
                 'estimateManhrs': '$aggregatedTasks.mhs', 
+                'totalMhs': '$aggregatedTasks.totalMhs', 
                 'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
             },  
             'findings': '$findings', 
             'aggregatedFindings': {
                 'spareParts': '$aggregatedFindings.spareParts', 
                 'estimateManhrs': '$aggregatedFindings.mhs', 
+                'totalMhs': '$aggregatedFindings.totalMhs', 
                 'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
             },  
             'originalFilename': 1, 
@@ -2008,6 +2010,9 @@ class TaskService:
                 'partId': '$requested_part_number', 
                 # 'partDescription': '$part_description'
             }, 
+            'partDescription': {
+                '$first': '$part_description'
+            }, 
             'totalTasksQty': {
                 '$sum': '$ceilRequestedQuantity'
             }, 
@@ -2019,7 +2024,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$taskNumbers'
@@ -2106,6 +2112,9 @@ class TaskService:
                 #     }
                 # }
             }, 
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalFindingsQty': {
                 '$sum': '$ceilUsedQuantity'
             }, 
@@ -2117,7 +2126,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalFindingsQty': 1, 
             'totalFindings': {
                 '$size': '$task_numbers'
@@ -2218,7 +2228,9 @@ class TaskService:
                 #         'replacement': ''
                 #     }
                 # }
-             
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalTasksQty': {
                 '$sum': '$ceilUsedQuantity'
             }, 
