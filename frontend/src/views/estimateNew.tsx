@@ -5686,18 +5686,21 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                   Skills
                 </Text>
 
-                <SimpleGrid cols={6}>
+                <SimpleGrid cols={8}>
   {(() => {
-    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail.skill : [];
+    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail?.skill : [];
 
-    // Filter valid skills and remove duplicates
     const validSkillsSet = new Set<string>();
     let hasUnknownSkill = false;
 
     for (const skl of skills) {
       const trimmed = skl?.toString().trim();
-      if (!trimmed) {
-        hasUnknownSkill = true; // empty string, null, or undefined
+
+      if (
+        !trimmed || // handles empty, null, undefined
+        trimmed.toLowerCase() === "nan"
+      ) {
+        hasUnknownSkill = true;
       } else {
         validSkillsSet.add(trimmed);
       }
@@ -5721,6 +5724,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
     );
   })()}
 </SimpleGrid>
+
 
 
 
@@ -6612,14 +6616,17 @@ border-bottom: none;
   {(() => {
     const skills = Array.isArray(selectedTask?.skill) ? selectedTask.skill : [];
 
-    // Filter valid skills and remove duplicates
     const validSkillsSet = new Set<string>();
     let hasUnknownSkill = false;
 
     for (const skl of skills) {
       const trimmed = skl?.toString().trim();
-      if (!trimmed) {
-        hasUnknownSkill = true; // empty string, null, or undefined
+
+      if (
+        !trimmed || // handles empty, null, undefined
+        trimmed.toLowerCase() === "nan"
+      ) {
+        hasUnknownSkill = true;
       } else {
         validSkillsSet.add(trimmed);
       }
