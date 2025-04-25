@@ -1,9 +1,12 @@
+// import { Grid, Title } from "@mantine/core";
 import {
   Accordion,
   ActionIcon,
   Avatar,
   Center,
   Checkbox,
+  Indicator,
+  List,
   LoadingOverlay,
   Modal,
   MultiSelect,
@@ -36,9 +39,12 @@ import {
   TextInput,
   Title,
   useState,
+  MdPictureAsPdf,
   ThemeIcon,
+  MdOutlineTimeline,
   MdOutlineMiscellaneousServices,
   Progress,
+  axios,
   showNotification,
   Table,
   useEffect,
@@ -532,229 +538,213 @@ export default function EstimateNew() {
   
 
   // Reset counter for keys to force re-render
-  const [formKey, setFormKey] = useState(0);
-  // Form initialization
-  const form = useForm<any>({
-    initialValues: {
-      tasks: [],
-      probability: 10,
-      operator: "",
-      aircraftRegNo: "",
-      aircraftModel: "",
-      aircraftAge: 0,
-      aircraftFlightHours: "",
-      aircraftFlightCycles: "",
-      areaOfOperations: "",
-      cappingDetails: {
-        cappingTypeManhrs: "",
-        cappingManhrs: 0,
-        cappingTypeSpareCost: "",
-        cappingSpareCost: 0,
-      },
-      taskID: "",
-      taskDescription: "",
-      typeOfCheck: [], // Changed from string to array for MultiSelect
-      typeOfCheckID: "", // Added new field for typeOfCheckID
-      miscLaborTasks: [],
-      additionalTasks: [],
+const [formKey, setFormKey] = useState(0);
+// Form initialization
+const form = useForm<any>({
+  initialValues: {
+    tasks: [],
+    probability: 10,
+    operator: "",
+    aircraftRegNo: "",
+    aircraftModel: "",
+    aircraftAge: 0,
+    aircraftFlightHours: "",
+    aircraftFlightCycles: "",
+    areaOfOperations: "",
+    cappingDetails: {
+      cappingTypeManhrs: "",
+      cappingManhrs: 0,
+      cappingTypeSpareCost: "",
+      cappingSpareCost: 0,
     },
-    validateInputOnChange: true,
+    taskID: "",
+    taskDescription: "",
+    typeOfCheck: [], // Changed from string to array for MultiSelect
+    typeOfCheckID: "", // Added new field for typeOfCheckID
+    miscLaborTasks: [],
+    additionalTasks: [],
+  },
+  validateInputOnChange: true,
 
-    validate: {
-      operator: (value) => (value.trim() ? null : "Operator is required"),
-      aircraftRegNo: (value) =>
-        value.trim() ? null : "Aircraft Registration Number is required",
-      aircraftAge: (value) =>
-        value.trim() ? null : "Aircraft Age is required",
-      typeOfCheck: (value) =>
-        value.length > 0 ? null : "Type of Check is required", // Modified for array validation
-      typeOfCheckID: (value) =>
-        value.trim() ? null : "Type of Check ID is required", // Added validation
-      aircraftModel: (value) =>
-        value.trim() ? null : "Aircraft Model is required",
+  validate: {
+    operator: (value) => (value?.trim() ? null : "Operator is required"),
+    aircraftRegNo: (value) =>
+      value?.trim() ? null : "Aircraft Registration Number is required",
+    // aircraftAge: (value) =>
+    //   value ? null : "Aircraft Age is required",
+    typeOfCheck: (value) =>
+      value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
+    typeOfCheckID: (value) =>
+      value?.trim() ? null : "Type of Check ID is required", // Added validation
+    aircraftModel: (value) =>
+      value?.trim() ? null : "Aircraft Model is required",
 
-      cappingDetails: {
-        // Man Hours Capping Validation
-        cappingTypeManhrs: (value, values) => {
-          if (!value && values.cappingDetails.cappingManhrs) {
-            return "Man Hours Type is required when Man Hours are entered";
-          }
-          return null;
-        },
-        cappingManhrs: (value, values) => {
-          if (!value && values.cappingDetails.cappingTypeManhrs) {
-            return "Man Hours is required when Type is selected";
-          }
-          return null;
-        },
+    cappingDetails: {
+      // Man Hours Capping Validation
+      cappingTypeManhrs: (value, values) => {
+        if (!value && values.cappingDetails.cappingManhrs) {
+          return "Man Hours Type is required when Man Hours are entered";
+        }
+        return null;
+      },
+      cappingManhrs: (value, values) => {
+        if (!value && values.cappingDetails.cappingTypeManhrs) {
+          return "Man Hours is required when Type is selected";
+        }
+        return null;
+      },
 
-        // Spare Cost Capping Validation
-        cappingTypeSpareCost: (value, values) => {
-          if (!value && values.cappingDetails.cappingSpareCost) {
-            return "Capping Type is required when Cost is entered";
-          }
-          return null;
-        },
-        cappingSpareCost: (value, values) => {
-          if (!value && values.cappingDetails.cappingTypeSpareCost) {
-            return "Cost is required when Type is selected";
-          }
-          return null;
-        },
+      // Spare Cost Capping Validation
+      cappingTypeSpareCost: (value, values) => {
+        if (!value && values.cappingDetails.cappingSpareCost) {
+          return "Capping Type is required when Cost is entered";
+        }
+        return null;
+      },
+      cappingSpareCost: (value, values) => {
+        if (!value && values.cappingDetails.cappingTypeSpareCost) {
+          return "Cost is required when Type is selected";
+        }
+        return null;
       },
     },
-  });
+  },
+});
 
-  // Handle Submit
-  const handleSubmit = async () => {
-    const validationErrors = form.validate();
+// Handle Submit
+const handleSubmit = async () => {
+  const validationResult = form.validate();
   
-    // if (validationErrors.hasErrors) {
-    //   if (validationErrors.errors.typeOfCheck) {
-    //     showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
-    //   }
-    //   if (validationErrors.errors.typeOfCheckID) {
-    //     showAppNotification("warning", "Validation Error", "Type of Check ID is required");
-    //   }
-    //   if (validationErrors.errors.operator) {
-    //     showAppNotification("warning", "Validation Error", "Operator is required");
-    //   }
-    //   if (validationErrors.errors.aircraftModel) {
-    //     showAppNotification("warning", "Validation Error", "Aircraft Model is required");
-    //   }
-    //   if (validationErrors.errors.aircraftRegNo) {
-    //     showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
-    //     if (aircraftRegNoRef.current) {
-    //       aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    //       aircraftRegNoRef.current.focus();
-    //     }
-    //   }
-    //   return;
-    // }
-  
-    // if (
-    //   form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
-    //   form.values.typeOfCheck.length === 0
-    // ) {
-    //   showAppNotification(
-    //     "warning",
-    //     "Validation Error",
-    //     "When Aircraft Registration Number is N/A, Type of Check is mandatory"
-    //   );
-    //   return;
-    // }
-  
-    // if (!selectedFile && additionalTasks.length === 0) {
-    //   showAppNotification(
-    //     "warning",
-    //     "Error",
-    //     "Please select a file or add at least one Additional Task."
-    //   );
-    //   return;
-    // }
-  
-    const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
-  
-    const defaultAdditionalTasks = additionalTasks.length > 0
-      ? additionalTasks
-      : [{ taskID: "", taskDescription: "" }];
-  
-    const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
-      ? selectedExpertInsightTasks
-      : [{
-          taskID: "",
-          taskDescription: "",
-          manHours: 0,
-          skill: "",
-          spareParts: [
-            { partID: "", description: "", quantity: 0, unit: "", price: 0 },
-          ],
-        }];
-  
-    const requestData = {
-      tasks: validTasks || [],
-      probability: Number(form.values.probability) || 10,
-      operator: form.values.operator || "",
-      aircraftRegNo: form.values.aircraftRegNo || "",
-      aircraftModel: form.values.aircraftModel || "",
-      aircraftAge: form.values.aircraftAge || 0.0,
-      aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
-      aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-      areaOfOperations: form.values.areaOfOperations || "",
-      cappingDetails: {
-        cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-        cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
-        cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-        cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
-      },
-      additionalTasks: defaultAdditionalTasks,
-      typeOfCheck: form.values.typeOfCheck || [],
-      typeOfCheckID: form.values.typeOfCheckID || "",
-      miscLaborTasks: defaultMiscLaborTasks,
-    };
-  
-    try {
-      setLoading(true);
-  
-      let fileToUpload: File | null = selectedFile;
-  
-      // ✅ Load fallback file if selectedFile is null
-      if (!fileToUpload) {
-        const response = await fetch(excelTemplateFile);
-        const blob = await response.blob();
-        fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+  // Check if the form is valid
+  if (validationResult.hasErrors) {
+    // Find first input with error and focus it
+    const errorFields = Object.keys(form.errors);
+    if (errorFields.length > 0) {
+      // Scroll to first error field if ref is available
+      const firstErrorField = errorFields[0];
+      if (firstErrorField === 'aircraftRegNo' && aircraftRegNoRef.current) {
+        aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        aircraftRegNoRef.current.focus();
       }
-  
-      const response = await RFQFileUpload(requestData, fileToUpload);
-      if (response) {
-        setRfqSubmissionResponse(response);
-        setRfqSubModalOpened(true);
-        showAppNotification("success", "Success!", "Estimate report submitted successfully!");
-  
-        // Reset form and states
-        form.reset();
-        form.setValues({
-          tasks: [],
-          probability: 10,
-          operator: "",
-          aircraftRegNo: "",
-          aircraftModel: "",
-          aircraftAge: 0,
-          aircraftFlightHours: "",
-          aircraftFlightCycles: "",
-          areaOfOperations: "",
-          cappingDetails: {
-            cappingTypeManhrs: "",
-            cappingManhrs: 0,
-            cappingTypeSpareCost: "",
-            cappingSpareCost: 0,
-          },
-          taskID: "",
-          taskDescription: "",
-          typeOfCheck: [],
-          typeOfCheckID: "",
-          miscLaborTasks: [],
-          additionalTasks: [],
-        });
-  
-        setSelectedFile(null);
-        setValidatedTasks([]);
-        setAdditionalTasks([]);
-        setSelectedExpertInsightTasks([]);
-        setFormKey((prev) => prev + 1);
-      }
-    } catch (error) {
-      console.error("API Error:", error);
-      showAppNotification("error", "Error!", "Failed to submit estimate report.!");
-      showNotification({
-        title: "Error",
-        message: "Failed to submit estimate report.",
-        color: "red",
-      });
-    } finally {
-      setLoading(false);
     }
+    return;
+  }
+  
+  // Additional custom validations
+  if (
+    form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
+    form.values.typeOfCheck.length === 0
+  ) {
+    form.setFieldError("typeOfCheck", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
+    return;
+  }
+  
+  if (!selectedFile && additionalTasks.length === 0) {
+    showAppNotification(
+      "warning",
+      "Error",
+      "Please select a file or add at least one Additional Task."
+    );
+    return;
+  }
+  
+  const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
+  
+  const defaultAdditionalTasks = additionalTasks.length > 0
+    ? additionalTasks
+    : [{ taskID: "", taskDescription: "" }];
+  
+  const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
+    ? selectedExpertInsightTasks
+    : [{
+        taskID: "",
+        taskDescription: "",
+        manHours: 0,
+        skill: "",
+        spareParts: [
+          { partID: "", description: "", quantity: 0, unit: "", price: 0 },
+        ],
+      }];
+  
+  const requestData = {
+    tasks: validTasks || [],
+    probability: Number(form.values.probability) || 10,
+    operator: form.values.operator || "",
+    aircraftRegNo: form.values.aircraftRegNo || "",
+    aircraftModel: form.values.aircraftModel || "",
+    aircraftAge: form.values.aircraftAge || 0.0,
+    aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
+    aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
+    areaOfOperations: form.values.areaOfOperations || "",
+    cappingDetails: {
+      cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+      cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
+      cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+      cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+    },
+    additionalTasks: defaultAdditionalTasks,
+    typeOfCheck: form.values.typeOfCheck || [],
+    typeOfCheckID: form.values.typeOfCheckID || "",
+    miscLaborTasks: defaultMiscLaborTasks,
   };
+  
+  try {
+    setLoading(true);
+  
+    let fileToUpload = selectedFile;
+  
+    // ✅ Load fallback file if selectedFile is null
+    if (!fileToUpload) {
+      const response = await fetch(excelTemplateFile);
+      const blob = await response.blob();
+      fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+    }
+  
+    const response = await RFQFileUpload(requestData, fileToUpload);
+    if (response) {
+      setRfqSubmissionResponse(response);
+      setRfqSubModalOpened(true);
+      showAppNotification("success", "Success!", "Estimate report submitted successfully!");
+  
+      // Reset form and states
+      form.reset();
+      form.setValues({
+        tasks: [],
+        probability: 10,
+        operator: "",
+        aircraftRegNo: "",
+        aircraftModel: "",
+        aircraftAge: 0,
+        aircraftFlightHours: "",
+        aircraftFlightCycles: "",
+        areaOfOperations: "",
+        cappingDetails: {
+          cappingTypeManhrs: "",
+          cappingManhrs: 0,
+          cappingTypeSpareCost: "",
+          cappingSpareCost: 0,
+        },
+        taskID: "",
+        taskDescription: "",
+        typeOfCheck: [],
+        typeOfCheckID: "",
+        miscLaborTasks: [],
+        additionalTasks: [],
+      });
+  
+      setSelectedFile(null);
+      setValidatedTasks([]);
+      setAdditionalTasks([]);
+      setSelectedExpertInsightTasks([]);
+      setFormKey((prev) => prev + 1);
+    }
+  } catch (error) {
+    console.error("API Error:", error);
+    showAppNotification("error", "Error!", "Failed to submit estimate report!");
+  } finally {
+    setLoading(false);
+  }
+};
   
 
   console.log("rfq sub >>> ", rfqSubmissionResponse);
@@ -2687,6 +2677,7 @@ export default function EstimateNew() {
                       form.validateField("typeOfCheck");
                     }}
                     error={form.errors.typeOfCheck}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2698,6 +2689,7 @@ export default function EstimateNew() {
                     step="0.01"
                     {...form.getInputProps("aircraftAge")}
                     error={form.errors.aircraftAge}
+                    withAsterisk
                   />
 
                   <Select
@@ -2719,6 +2711,7 @@ export default function EstimateNew() {
                       form.validateField("operator");
                     }}
                     error={form.errors.operator}
+                    withAsterisk
                   />
 
                   <Select
@@ -2740,6 +2733,7 @@ export default function EstimateNew() {
                       form.validateField("aircraftModel");
                     }}
                     error={form.errors.aircraftModel}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2750,6 +2744,7 @@ export default function EstimateNew() {
                     label="Aircraft Reg No"
                     {...form.getInputProps("aircraftRegNo")}
                     error={form.errors.aircraftRegNo}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2758,6 +2753,7 @@ export default function EstimateNew() {
                     placeholder="Enter Check Type ID"
                     {...form.getInputProps("typeOfCheckID")}
                     error={form.errors.typeOfCheckID}
+                    withAsterisk
                   />
 
 
