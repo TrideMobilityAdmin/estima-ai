@@ -570,8 +570,8 @@ export default function EstimateNew() {
       operator: (value) => (value.trim() ? null : "Operator is required"),
       aircraftRegNo: (value) =>
         value.trim() ? null : "Aircraft Registration Number is required",
-      // aircraftAge: (value) =>
-      //   value.trim() ? null : "Aircraft Age is required",
+      aircraftAge: (value) =>
+        value.trim() ? null : "Aircraft Age is required",
       typeOfCheck: (value) =>
         value.length > 0 ? null : "Type of Check is required", // Modified for array validation
       typeOfCheckID: (value) =>
@@ -615,49 +615,49 @@ export default function EstimateNew() {
   const handleSubmit = async () => {
     const validationErrors = form.validate();
   
-    if (validationErrors.hasErrors) {
-      if (validationErrors.errors.typeOfCheck) {
-        showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
-      }
-      if (validationErrors.errors.typeOfCheckID) {
-        showAppNotification("warning", "Validation Error", "Type of Check ID is required");
-      }
-      if (validationErrors.errors.operator) {
-        showAppNotification("warning", "Validation Error", "Operator is required");
-      }
-      if (validationErrors.errors.aircraftModel) {
-        showAppNotification("warning", "Validation Error", "Aircraft Model is required");
-      }
-      if (validationErrors.errors.aircraftRegNo) {
-        showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
-        if (aircraftRegNoRef.current) {
-          aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-          aircraftRegNoRef.current.focus();
-        }
-      }
-      return;
-    }
+    // if (validationErrors.hasErrors) {
+    //   if (validationErrors.errors.typeOfCheck) {
+    //     showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
+    //   }
+    //   if (validationErrors.errors.typeOfCheckID) {
+    //     showAppNotification("warning", "Validation Error", "Type of Check ID is required");
+    //   }
+    //   if (validationErrors.errors.operator) {
+    //     showAppNotification("warning", "Validation Error", "Operator is required");
+    //   }
+    //   if (validationErrors.errors.aircraftModel) {
+    //     showAppNotification("warning", "Validation Error", "Aircraft Model is required");
+    //   }
+    //   if (validationErrors.errors.aircraftRegNo) {
+    //     showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
+    //     if (aircraftRegNoRef.current) {
+    //       aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    //       aircraftRegNoRef.current.focus();
+    //     }
+    //   }
+    //   return;
+    // }
   
-    if (
-      form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
-      form.values.typeOfCheck.length === 0
-    ) {
-      showAppNotification(
-        "warning",
-        "Validation Error",
-        "When Aircraft Registration Number is N/A, Type of Check is mandatory"
-      );
-      return;
-    }
+    // if (
+    //   form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
+    //   form.values.typeOfCheck.length === 0
+    // ) {
+    //   showAppNotification(
+    //     "warning",
+    //     "Validation Error",
+    //     "When Aircraft Registration Number is N/A, Type of Check is mandatory"
+    //   );
+    //   return;
+    // }
   
-    if (!selectedFile && additionalTasks.length === 0) {
-      showAppNotification(
-        "warning",
-        "Error",
-        "Please select a file or add at least one Additional Task."
-      );
-      return;
-    }
+    // if (!selectedFile && additionalTasks.length === 0) {
+    //   showAppNotification(
+    //     "warning",
+    //     "Error",
+    //     "Please select a file or add at least one Additional Task."
+    //   );
+    //   return;
+    // }
   
     const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
   
@@ -4047,7 +4047,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       cellRenderer: (val: any) => {
                         return (
                           <Text>
-                            {val?.data?.unit || 0}
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                           </Text>
                         );
                       },
@@ -4373,6 +4373,13 @@ const OverallFindingsReport: React.FC<any> = ({
                       headerName: "Units",
                       flex: 0.8,
                       minWidth: 80,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "price",
@@ -4679,6 +4686,13 @@ const OverallMPDReport: React.FC<any> = ({
                       headerName: "Units",
                       flex: 0.8,
                       minWidth: 80,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "price",
@@ -5125,6 +5139,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       floatingFilter: true,
       resizable: true,
       width: 100,
+      cellRenderer: (val: any) => {
+        return (
+          <Text>
+            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+          </Text>
+        );
+      },
     },
     {
       headerName: "Price ($)",
@@ -5474,7 +5495,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             <Card h="100%" w="100%" p="md" bg="none">
               <Group>
                 <Text size="md" fw={500} mb="xs" c="dimmed">
-                  Clusters for
+                  Defect Clusters for
                 </Text>
                 <Text size="md" fw={500} mb="xs">
                   {selectedTaskId || "Selected Task"}
@@ -5568,12 +5589,12 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 }}
               >
                 <Grid>
-                  <Grid.Col span={2}>
+                  <Grid.Col span={3}>
                     <Text size="md" fw={500} c="dimmed">
-                      Cluster
+                      Defect Cluster
                     </Text>
                   </Grid.Col>
-                  <Grid.Col span={10}>
+                  <Grid.Col span={7}>
                     <Text size="sm" fw={500}>
                       {selectedFindingDetail?.cluster || "-"}
                     </Text>
@@ -5675,25 +5696,42 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                   Skills
                 </Text>
 
-                <SimpleGrid cols={8}>
-                  {Array.isArray(selectedFindingDetail?.skill) && selectedFindingDetail.skill.length > 0
-                    ? selectedFindingDetail.skill.map((skl: any, index: number) => (
-                      <Badge
-                        key={index}
-                        fullWidth
-                        color="cyan"
-                        size="lg"
-                        radius="md"
-                      >
-                        {skl?.toString().trim() ? skl : "Unknown Skill"}
-                      </Badge>
-                    ))
-                    : (
-                      <Badge fullWidth color="gray" size="lg" radius="md">
-                        Unknown Skill
-                      </Badge>
-                    )}
-                </SimpleGrid>
+                <SimpleGrid cols={6}>
+  {(() => {
+    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail.skill : [];
+
+    // Filter valid skills and remove duplicates
+    const validSkillsSet = new Set<string>();
+    let hasUnknownSkill = false;
+
+    for (const skl of skills) {
+      const trimmed = skl?.toString().trim();
+      if (!trimmed) {
+        hasUnknownSkill = true; // empty string, null, or undefined
+      } else {
+        validSkillsSet.add(trimmed);
+      }
+    }
+
+    const validSkills = Array.from(validSkillsSet);
+
+    return (
+      <>
+        {validSkills.map((skill, index) => (
+          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+            {skill}
+          </Badge>
+        ))}
+        {hasUnknownSkill && (
+          <Badge fullWidth color="gray" size="lg" radius="md">
+            Unknown Skill
+          </Badge>
+        )}
+      </>
+    );
+  })()}
+</SimpleGrid>
+
 
 
                 <Space h="md" />
@@ -5792,7 +5830,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                         cellRenderer: (val: any) => {
                           return (
                             <Text>
-                              {val?.data?.unit || 0}
+                              {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                             </Text>
                           );
                         },
@@ -6125,6 +6163,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
       resizable: true,
       // flex: 1
       width: 150,
+      cellRenderer: (val: any) => {
+        return (
+          <Text>
+            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+          </Text>
+        );
+      },
     },
     {
       headerName: "Price ($)",
@@ -6574,24 +6619,40 @@ border-bottom: none;
                       </Text>
 
                       <SimpleGrid cols={8}>
-                        {Array.isArray(selectedTask?.skill) && selectedTask?.skill.length > 0
-                          ? selectedTask?.skill.map((skl: any, index: number) => (
-                            <Badge
-                              key={index}
-                              fullWidth
-                              color="cyan"
-                              size="lg"
-                              radius="md"
-                            >
-                              {skl?.toString().trim() ? skl : "Unknown Skill"}
-                            </Badge>
-                          ))
-                          : (
-                            <Badge fullWidth color="gray" size="lg" radius="md">
-                              Unknown Skill
-                            </Badge>
-                          )}
-                      </SimpleGrid>
+  {(() => {
+    const skills = Array.isArray(selectedTask?.skill) ? selectedTask.skill : [];
+
+    // Filter valid skills and remove duplicates
+    const validSkillsSet = new Set<string>();
+    let hasUnknownSkill = false;
+
+    for (const skl of skills) {
+      const trimmed = skl?.toString().trim();
+      if (!trimmed) {
+        hasUnknownSkill = true; // empty string, null, or undefined
+      } else {
+        validSkillsSet.add(trimmed);
+      }
+    }
+
+    const validSkills = Array.from(validSkillsSet);
+
+    return (
+      <>
+        {validSkills.map((skill, index) => (
+          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+            {skill}
+          </Badge>
+        ))}
+        {hasUnknownSkill && (
+          <Badge fullWidth color="gray" size="lg" radius="md">
+            Unknown Skill
+          </Badge>
+        )}
+      </>
+    );
+  })()}
+</SimpleGrid>
 
 
                       <Space h="md" />
@@ -6693,7 +6754,7 @@ border-bottom: none;
                               cellRenderer: (val: any) => {
                                 return (
                                   <Text>
-                                    {val?.data?.unit || 0}
+                                    {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                                   </Text>
                                 );
                               },

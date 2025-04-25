@@ -1,8 +1,8 @@
-import { Card, Group, SimpleGrid, Title, Text, ScrollArea, Badge, Button, Divider, Box, Flex, Space, Accordion, Progress, TextInput, LoadingOverlay, Center } from "@mantine/core";
+import { Card, Group, SimpleGrid, Title, Text, ScrollArea, Badge, Button, Divider, Box, Flex, Space, Accordion, Progress, TextInput, LoadingOverlay, Center, Tooltip, ActionIcon } from "@mantine/core";
 import { useMemo, useState } from "react";
 import DropZoneExcel from "../components/fileDropZone";
 import { MdLensBlur, MdOutlineArrowForward } from "react-icons/md";
-import { IconAlertTriangle, IconClock, IconCube, IconMessage2Down } from "@tabler/icons-react";
+import { IconAlertTriangle, IconClock, IconCube, IconFileDownload, IconMessage2Down } from "@tabler/icons-react";
 import ReactApexChart from "react-apexcharts";
 import { useApi } from "../api/services/estimateSrvice";
 import { useApiSkillAnalysis } from "../api/services/skillsService";
@@ -15,6 +15,8 @@ import { showAppNotification } from "../components/showNotificationGlobally";
 import { DonutChart } from "@mantine/charts";
 import SkillRequirementAnalytics from "./skillReqAnalytics";
 import RFQSkillsUploadDropZoneExcel from "../components/rfqSkillUploadDropzone";
+import excelTemplateFile from "../assets/RFQ_Excel_Template.xlsx";
+
 
 export default function SkillRequirement() {
     const { validateTasks } = useApi();
@@ -27,34 +29,77 @@ export default function SkillRequirement() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     // const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
     const [skillAnalysisData, setSkillAnalysisData] = useState<any>(null);
-
-
+const [isValidating, setIsValidating] = useState(false);
+const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
+  const [sheetInfo, setSheetInfo] = useState<
+    { sheetName: string; columnName: string } | undefined
+  >(undefined);
 
     // Handle file and extracted tasks
-    const handleFileChange = async (file: File | null, tasks: string[]) => {
+    // const handleFileChange = async (file: File | null, tasks: string[]) => {
+    //     setSelectedFile(file);
+    //     setTasks(tasks ?? []); // Ensure tasks is always an array
+    //     console.log("✅ Selected File:", file ? file.name : "None");
+    //     console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+
+
+    //     console.log("Extracted Tasks:", tasks);
+    //     const response = await validateTasks(tasks);
+    //     setValidatedTasks(response);
+    //     setIsLoading(false);
+
+    //     const invalidTasks = response?.filter((task) => task?.status === false);
+    //     if (invalidTasks.length > 0) {
+    //         showNotification({
+    //             title: "Tasks Not Available!",
+    //             message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
+    //             color: "orange",
+    //             style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+    //         });
+    //         // showAppNotification("warning", "Tasks Not Available!", invalidTasks.length + "tasks are not available. Only valid tasks will be used to Skill Analysis.");
+    //     }
+
+    // };
+    // Handle file and extracted tasks
+      const handleFileChange = async (
+        file: File | null,
+        tasks: string[],
+        fileSheetInfo?: { sheetName: string; columnName: string }
+      ) => {
+        setIsValidating(true);
         setSelectedFile(file);
-        setTasks(tasks ?? []); // Ensure tasks is always an array
+        setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+        setSheetInfo(fileSheetInfo);
+    
         console.log("✅ Selected File:", file ? file.name : "None");
-        console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
-
-
-        console.log("Extracted Tasks:", tasks);
-        const response = await validateTasks(tasks);
-        setValidatedTasks(response);
-        setIsLoading(false);
-
-        const invalidTasks = response?.filter((task) => task?.status === false);
-        if (invalidTasks.length > 0) {
+        console.log(
+          "📌 Extracted Tasks:",
+          tasks.length > 0 ? tasks : "No tasks found"
+        );
+        console.log("From sheet:", fileSheetInfo?.sheetName);
+        console.log("From column:", fileSheetInfo?.columnName);
+        setIsLoading(true);
+        if (tasks.length > 0) {
+          const response = await validateTasks(tasks);
+          setValidatedTasks(response);
+          setIsLoading(false)
+          const invalidTasks = response.filter((task) => task.status === false);
+          if (invalidTasks.length > 0) {
             showNotification({
-                title: "Tasks Not Available!",
-                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
-                color: "orange",
-                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+              title: "Tasks Not Available!",
+              message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
+              color: "orange",
+              style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
             });
-            // showAppNotification("warning", "Tasks Not Available!", invalidTasks.length + "tasks are not available. Only valid tasks will be used to Skill Analysis.");
-        }
+          }
 
-    };
+        } else {
+          setValidatedTasks([]);
+          setIsLoading(false)
+        }
+    
+        setIsValidating(false);
+      };
 
     const handleFiles = (files: File[]) => {
         console.log("Uploaded files:", files);
@@ -85,7 +130,7 @@ export default function SkillRequirement() {
     const handleSubmit = async () => {
         const validTasks = validatedTasks?.filter((task) => task?.status === true)?.map((task) => task?.taskid);
 
-        if (tasks.length === 0) {
+        if (validTasks.length === 0) {
             showNotification({
                 title: "Error",
                 message: "Tasks are required",
@@ -125,6 +170,52 @@ export default function SkillRequirement() {
         }
     };
 
+    const downloadEmptyExcel = async () => {
+        try {
+          // Fetch the file from your project assets
+          const response = await fetch(excelTemplateFile);
+    
+          if (!response.ok) {
+            throw new Error("Failed to load the template file");
+          }
+    
+          // Get the file as blob
+          const blob = await response.blob();
+    
+          // Create a URL for the blob
+          const url = window.URL.createObjectURL(blob);
+    
+          // Create a temporary anchor element to trigger the download
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "RFQ_Template.xlsx"; // Name that will appear when downloading
+          document.body.appendChild(a);
+    
+          // Trigger the download
+          a.click();
+    
+          // Clean up
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+    
+          // Show success notification
+          showAppNotification(
+            "success",
+            "Successful!",
+            "RFQ template downloaded successfully"
+          );
+        } catch (error) {
+          console.error("Error downloading the template:", error);
+    
+          // Show error notification
+          showAppNotification(
+            "error",
+            "Failed!",
+            "Failed to download the template file"
+          );
+        }
+      };
+
     return (
         <>
             <div style={{ paddingLeft: 70, paddingRight: 70, paddingTop: 20, paddingBottom: 20 }}>
@@ -134,23 +225,50 @@ export default function SkillRequirement() {
                         h='50vh'
                         radius='md'
                     >
-                        <Group>
-                            <Text size="md" fw={500}>
+                        
+                        <Group justify="space-between">
+                        <Text size="md" fw={500}>
                                 Select Document
                             </Text>
-                            {/* <DropZoneExcel
-                                name="Excel Files"
-                                changeHandler={handleTasks}
-                                color="green" // Optional custom border color
-                            /> */}
-                            <RFQSkillsUploadDropZoneExcel
+
+                            <Tooltip label="Download Template Example">
+                                                <ActionIcon
+                                                  color="green"
+                                                  variant="light"
+                                                  onClick={downloadEmptyExcel}
+                                                >
+                                                  <IconFileDownload />
+                                                </ActionIcon>
+                                              </Tooltip>
+                        </Group>
+                            <Space h='sm'/>
+                        
+                            {/* <RFQSkillsUploadDropZoneExcel
                                 name="Excel Files"
                                 changeHandler={handleFileChange}
                                 selectedFile={selectedFile} // Pass selectedFile as prop
                                 setSelectedFile={setSelectedFile} // Pass setSelectedFile as prop
                                 color="green" // Optional custom border color
-                            />
-                        </Group>
+                            /> */}
+                            <ScrollArea
+                style={{
+                  flex: 1, // Take remaining space for scrollable area
+                  overflow: "auto",
+                }}
+                offsetScrollbars
+                scrollHideDelay={1}
+                scrollbarSize={5}
+              >
+                <RFQUploadDropZoneExcel
+                                              name="Excel or CSV file"
+                                              changeHandler={handleFileChange}
+                                              selectedFile={selectedFile}
+                                              setSelectedFile={setSelectedFile}
+                                              color="green"
+                                            />
+              </ScrollArea>
+                            
+                   
                     </Card>
 
                     <Card withBorder h='50vh' radius='md'>
@@ -231,7 +349,7 @@ export default function SkillRequirement() {
                         gradient={{ from: 'violet', to: 'blue', deg: 0 }}
                         // variant="filled"
                         // color='#1A237E'
-                        disabled={tasks.length > 0 ? false : true}
+                        disabled={validatedTasks.length > 0 ? false : true}
                         leftSection={<MdLensBlur size={14} />}
                         rightSection={<IconMessage2Down size={14} />}
                         loading={loading}

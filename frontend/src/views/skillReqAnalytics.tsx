@@ -103,7 +103,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                 {/* Top Section: Heading & Search Input */}
             <Box mb="md">
               <Text fw={600} size="lg" mb="sm">
-                Tasks
+                MPD
               </Text>
               <TextInput
                     placeholder="Search Tasks by Task ID"
@@ -358,7 +358,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
                  {/* Top Section: Heading & Search Input */}
             <Box mb="md">
               <Text fw={600} size="lg" mb="sm">
-                Skill - Tasks
+                Skills - MPD
               </Text>
               <TextInput
                 placeholder="Search by Skill Name"
@@ -538,7 +538,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             <Card withBorder h="85vh" shadow="sm" p="md">
                 {/* Top Section: Heading & Search */}
                 <Box mb="sm">
-                    <Text fw={600} size="lg" mb="sm">Skill - Findings</Text>
+                    <Text fw={600} size="lg" mb="sm">Skills - Findings</Text>
                     <TextInput
                         placeholder="Search by Skill Name"
                         value={skillSearch}

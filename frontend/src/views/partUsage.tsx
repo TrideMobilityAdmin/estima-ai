@@ -54,13 +54,15 @@ export default function PartUsage() {
     const [selectedPartId, setSelectedPartId] = useState("");
     // const today = dayjs().startOf("day").toDate();
     // const twoDaysAgo = dayjs().subtract(2, "day").startOf("day").toDate();
-    const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
-    const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
-    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
-    // Initialize with Dayjs objects
-    // const twoDaysAgo = dayjs("2024-03-27").startOf("day"); // March 27, 2024
-    // const today = dayjs("2024-04-03").endOf("day"); // April 3, 2024
-    // const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([twoDaysAgo, today]); // Date range
+
+    const today = dayjs().endOf("day").toDate(); // Today
+    const tenDaysAgo = dayjs().subtract(9, "day").startOf("day").toDate(); // 10 days including today
+    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([tenDaysAgo, today]);
+
+    // const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
+    // const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
+    // const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
+    
     const [multiPartUsageData, setMultiPartUsageData] = useState<any>();
     const [multiPartMergedData, setMultiPartMergedData] = useState<any>();
     const [isLMultioading, setIsMultiLoading] = useState(false);
@@ -581,7 +583,7 @@ border-bottom: none;
                             <IconTool color="#14AE5C" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Tasks - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalTaskQuantity(combinedTasks) || 0}
@@ -607,7 +609,7 @@ border-bottom: none;
                             <IconMenuDeep color="#9F6BED" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Findings - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalFindingQuantity(partUsageData?.usage?.findings?.hmvTasks) || 0}
@@ -620,7 +622,7 @@ border-bottom: none;
                 <Grid>
                     <Grid.Col span={8}>
                         <Card radius="md" h="60vh">
-                            <Title order={5} c="dimmed">Daily Trend Analysis</Title>
+                            <Title order={5} c="dimmed">Date Trend Analysis</Title>
 
                             {chartData?.length > 0 ? (
                                 <div style={{ overflowX: "auto", width: "100%", height: '50vh' }}>
@@ -638,8 +640,8 @@ border-bottom: none;
                                                 textAnchor: "end",
                                             }}
                                             series={[
-                                                { name: "tasks", color: "rgba(17, 166, 0, 1)" },
-                                                { name: "findings", color: "rgba(0, 149, 255, 1)" },
+                                                { name: "tasks", color: "rgba(17, 166, 0, 1)", label: "Tasks" },
+                                                { name: "findings", color: "rgba(0, 149, 255, 1)", label: "Findings" },
                                             ]}
                                             connectNulls
                                             curveType="natural"
@@ -803,14 +805,14 @@ border-bottom: none;
                     </Grid.Col>
                 </Grid> */}
                 <Space h='md' />
-                <SimpleGrid cols={2}>
-                    {/* MPD Chart */}
+                {/* <SimpleGrid cols={2}>
+                    
                     <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
 
-                    {/* Findings Chart */}
+                    
                     <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
-                </SimpleGrid>
-                {/* <SimpleGrid cols={2}>
+                </SimpleGrid> */}
+                <SimpleGrid cols={2}>
                     <Card>
                         <Title order={5} c='dimmed'>
                             MPD - Packages & Qty
@@ -836,8 +838,8 @@ border-bottom: none;
                                     data={tasksChartData}
                                     dataKey="taskId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -878,8 +880,8 @@ border-bottom: none;
                                     data={findingChartData}
                                     dataKey="findingId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -896,7 +898,7 @@ border-bottom: none;
                         </Card>
                     </Card>
 
-                </SimpleGrid> */}
+                </SimpleGrid>
                 <Space h='md' />
                 <SimpleGrid cols={2}>
                     <Card radius="md" h={partUsageData?.usage ? "90vh" : "40vh"} style={{ overflowY: "auto" }}>

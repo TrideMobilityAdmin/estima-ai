@@ -135,8 +135,8 @@ export const useApi = () => {
       const response = await axiosInstance.get(getEstimateReport_Url+estimateId);
       console.log("✅ API Response estimate by id :", response);
       showNotification({
-        title: "Estimate Generated!",
-        message: "Successfully Estimate Report Generated",
+        title: "Estimate!",
+        message: "Estimate displaying below.",
         color: "green",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
