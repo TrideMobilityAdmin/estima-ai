@@ -1,0 +1,195 @@
+INFO: 2025-04-25 22:31:11 - Comparing estimates for estimate ID: HZ-NS27-CCHECK-FLYNAS-25042025-V01
+INFO: 2025-04-25 22:31:11 - Config file data fetched successfully
+INFO: 2025-04-25 22:31:11 - Processing the file mldpmlsec1.xlsx
+INFO: 2025-04-25 22:31:11 - Looking for sheet name: mldpmlsec1
+INFO: 2025-04-25 22:31:11 - Processing file: mldpmlsec1.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:31:11 - Reading Excel file with sheet name: mldpmlsec1
+INFO: 2025-04-25 22:31:12 - The dataframe columns of mldpmlsec1.xlsx are Index(['S', 'No', 'MIREP', 'HMV23/000154/0124/1', '28',
+       'DURING INSPECTION, OBSERVED REFUEL/DEFUEL COUPLING CAP CABLE ASSY SPLIT RING MISSING.',
+       'REFUEL/DEFUEL COUPLING CAP CABLE ASSY SPLIT RING PROVIDED WITH NEW ONE AND INSTALLED BACK LANYARD ON THE ATTACHMENT LUG AS PER AMM SUB TASK 28-25-41-420-059-A, REV-57 DTD 01 FEB 2024.',
+       'Close', 'Closed', '282541-01-1', '129', 'LINE 2A', 'Signed Off',
+       'DISC- MPD', 'IRC', 'Regular', 'REGULAR', 'Yes', 'nan', 'MR1089',
+       '2024-02-07 16:13:41', 'B1', '2024-01-31 17:14:00',
+       '2024-02-12 12:51:21', '1.5', '2024-02-08 18:15:09',
+       '2024-02-12 13:06:57', '1.0', '330', 'Hold', 'Pending Estimates',
+       '500.0', 'Hours', '', '248231',
+       '{'tplid' : 'ml_image_link', 'image' : 'edit.png'}', '7',
+       '{'tplid' : 'ml_image_link', 'image' : 'task_01.png'}', 'Y', 'N', 'H',
+       '{'tplid' : 'ml_image_link', 'image' : 'ExeHub_ClkStop.png'}',
+       '{'tplid' : 'ml_image', 'image' : 'ExeHub_Red.png'}', '0', 'CL', 'B'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:31:12 - the shape of the DataFrame before processing (53, 46)
+INFO: 2025-04-25 22:31:12 - sub_task_description_columns_mappings :{'RTModeFlag': 'rt_mode_flag', 'DeleteFlag': 'delete_flag', 'Type': 'task_type', 'Log Item #': 'log_item_number', 'ATA #': 'ata_number', 'Description': 'task_description', 'Corrective Action': 'corrective_action', 'Discrepancy #': 'discrepancy_number', 'Action': 'action_taken', 'Status': 'task_status', 'Source Task/Discrep. #': 'source_task_discrepancy_number', 'source_task_discrepancy_number_updated': 'source_task_discrepancy_number_updated', 'Source Tracking #': 'source_tracking_number', 'Work Center #': 'work_center_number', 'Sign Off Status': 'sign_off_status', 'Contract Classification': 'contract_classification', 'Category': 'task_category', 'Exe. Phase': 'execution_phase', 'Exec. Category': 'execution_category', 'Part Required?': 'part_required', 'Corrosion Related?': 'corrosion_related', 'Major Item?': 'major_item', 'Repeat?': 'is_repeat', 'Part #': 'part_number', 'Serial #': 'serial_number', 'Position Code': 'position_code', 'Part Description': 'part_description', 'Radio Communication': 'radio_communication', 'Reported By': 'reported_by', 'Reported Date': 'reported_date', 'Mech Req?': 'mechanical_required', 'Mech Sign Off': 'mechanical_sign_off', 'Mech Skill #': 'mechanical_skill_number', 'Insp Req?': 'inspection_required', 'Insp Sign Off': 'inspection_sign_off', 'Insp Skill #': 'inspection_skill_number', 'RII Req?': 'rii_required', 'RII Sign Off': 'rii_sign_off', 'RII Skill #': 'rii_skill_number', 'Addl. Sign Off': 'additional_sign_off', 'Add New Sign Off Comments': 'new_sign_off_comments', 'Previous Sign Off Comments': 'previous_sign_off_comments', 'Planned Start Date': 'planned_start_date', 'Planned End Date': 'planned_end_date', 'Est. Man Hrs.': 'estimated_man_hours', 'Actual Start Date': 'actual_start_date', 'Actual End Date': 'actual_end_date', 'Actual Man Hrs.': 'actual_man_hours', 'Seq #': 'sequence_number', 'Tracking #': 'tracking_number', 'Source Tracking #\xa0': 'source_tracking_number_with_space', 'Hold Status': 'hold_status', 'Estimation Status': 'estimation_status', 'File Name': 'file_name', 'Skill #': 'skill_number', 'Zone #': 'zone_number', 'Work Area #': 'work_area_number', 'Deferral FH': 'deferral_fh', 'Deferral FC': 'deferral_fc', 'Deferral Parameter': 'deferral_parameter', 'Deferral Value': 'deferral_value', 'Deferral Calendar Value': 'deferral_calendar_value', 'Deferral Calendar': 'deferral_calendar', 'Deferral Item #': 'deferral_item_number', 'Deferral Type': 'deferral_type', 'Reason for Deferral': 'reason_for_deferral', 'Auth. Ref. #': 'authorization_reference_number', 'Message Center': 'message_center', 'package': 'package_number'}
+INFO: 2025-04-25 22:31:13 - Missing columns: ['rt_mode_flag', 'delete_flag', 'task_type', 'log_item_number', 'ata_number', 'task_description', 'corrective_action', 'discrepancy_number', 'action_taken', 'task_status', 'source_task_discrepancy_number', 'source_task_discrepancy_number_updated', 'source_tracking_number', 'work_center_number', 'sign_off_status', 'contract_classification', 'task_category', 'execution_phase', 'execution_category', 'part_required', 'corrosion_related', 'major_item', 'is_repeat', 'part_number', 'serial_number', 'position_code', 'part_description', 'radio_communication', 'reported_by', 'reported_date', 'mechanical_required', 'mechanical_sign_off', 'mechanical_skill_number', 'inspection_required', 'inspection_sign_off', 'inspection_skill_number', 'rii_required', 'rii_sign_off', 'rii_skill_number', 'additional_sign_off', 'new_sign_off_comments', 'previous_sign_off_comments', 'planned_start_date', 'planned_end_date', 'estimated_man_hours', 'actual_start_date', 'actual_end_date', 'actual_man_hours', 'sequence_number', 'tracking_number', 'source_tracking_number_with_space', 'hold_status', 'estimation_status', 'file_name', 'skill_number', 'zone_number', 'work_area_number', 'deferral_fh', 'deferral_fc', 'deferral_parameter', 'deferral_value', 'deferral_calendar_value', 'deferral_calendar', 'deferral_item_number', 'deferral_type', 'reason_for_deferral', 'authorization_reference_number', 'message_center', 'package_number']
+INFO: 2025-04-25 22:31:13 - shape of mldpmlsec1 df (53, 69)
+INFO: 2025-04-25 22:31:13 - Successfully processed file: mldpmlsec1.xlsx
+INFO: 2025-04-25 22:31:13 - DataFrame columns: Index(['rt_mode_flag', 'delete_flag', 'task_type', 'log_item_number',
+       'ata_number', 'task_description', 'corrective_action',
+       'discrepancy_number', 'action_taken', 'task_status',
+       'source_task_discrepancy_number',
+       'source_task_discrepancy_number_updated', 'source_tracking_number',
+       'work_center_number', 'sign_off_status', 'contract_classification',
+       'task_category', 'execution_phase', 'execution_category',
+       'part_required', 'corrosion_related', 'major_item', 'is_repeat',
+       'part_number', 'serial_number', 'position_code', 'part_description',
+       'radio_communication', 'reported_by', 'reported_date',
+       'mechanical_required', 'mechanical_sign_off', 'mechanical_skill_number',
+       'inspection_required', 'inspection_sign_off', 'inspection_skill_number',
+       'rii_required', 'rii_sign_off', 'rii_skill_number',
+       'additional_sign_off', 'new_sign_off_comments',
+       'previous_sign_off_comments', 'planned_start_date', 'planned_end_date',
+       'estimated_man_hours', 'actual_start_date', 'actual_end_date',
+       'actual_man_hours', 'sequence_number', 'tracking_number',
+       'source_tracking_number_with_space', 'hold_status', 'estimation_status',
+       'file_name', 'skill_number', 'zone_number', 'work_area_number',
+       'deferral_fh', 'deferral_fc', 'deferral_parameter', 'deferral_value',
+       'deferral_calendar_value', 'deferral_calendar', 'deferral_item_number',
+       'deferral_type', 'reason_for_deferral',
+       'authorization_reference_number', 'message_center', 'package_number'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:31:13 - DataFrame shape: (53, 69)
+INFO: 2025-04-25 22:31:13 - Shape of sub_task_description: (53, 69)
+INFO: 2025-04-25 22:31:13 - Processing the file mltaskmlsec1.xlsx
+INFO: 2025-04-25 22:31:13 - Looking for sheet name: mltaskmlsec1
+INFO: 2025-04-25 22:31:13 - Processing file: mltaskmlsec1.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:31:13 - Reading Excel file with sheet name: mltaskmlsec1
+INFO: 2025-04-25 22:31:14 - The dataframe columns of mltaskmlsec1.xlsx are Index(['S', 'No', '1', 'C1+C2+OOP TASK+SB+AD+TCC', '0',
+       'CARRY OUT C1+C2+OOP TASK+SB+AD+TCC AS PER CUSTOMER REQUEST', 'nan',
+       'Closed', 'LINE 2A', 'Not Required', 'Others', 'CHK', 'Aircraft',
+       'AIRCRAFT JACKING', 'REGULAR', '2024-01-31 17:14:44',
+       '2024-01-31 18:14:44', '1.0', '2024-01-31 16:14:44',
+       '2024-02-13 21:52:12', 'Hold', 'Pending Estimates', 'TASK', 'Normal',
+       '246485', '4', '{'tplid' : 'ml_image_link', 'image' : 'menu.png'}',
+       '{'tplid' : 'ml_image_link', 'image' : 'task_03.png'}', 'N', 'AC', '',
+       '{'tplid' : 'ml_image_link', 'image' : 'ExeHub_ClkStop.png'}',
+       '{'tplid' : 'ml_image', 'image' : 'ExeHub_Red.png'}', 'CLS', 'B', '##'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:31:14 - the shape of the DataFrame before processing (338, 36)
+INFO: 2025-04-25 22:31:14 - task_description_columns_mappings :{'RTModeFlag': 'rt_mode_flag', 'DeleteFlag': 'delete_flag', 'Seq #': 'sequence_number', 'Task #': 'task_number', 'ATA #': 'ata_number', 'Description': 'description', 'Add New Execution Comments': 'add_new_execution_comments', 'Previous Execution Comments': 'previous_execution_comments', 'Status': 'status', 'Source Task/Discrep. #': 'source_task_discrepancy_number', 'Source Tracking #': 'source_tracking_number', 'Work Center #': 'work_center_number', 'Sign Off Status': 'sign_off_status', 'Task Type': 'task_type', 'Task Category': 'task_category', 'Job Type': 'job_type', 'Repair Class.': 'repair_classification', 'Exe. Phase': 'execution_phase', 'Exec. Category': 'execution_category', 'Part #': 'part_number', 'Serial #': 'serial_number', 'Position Code': 'position_code', 'Part Description': 'part_description', 'Repair Agency': 'repair_agency', 'Mech Req?': 'mechanic_required', 'Mech Sign Off': 'mechanic_sign_off', 'Insp Req?': 'inspection_required', 'Insp Sign Off': 'inspection_sign_off', 'RII Req?': 'rii_required', 'RII Sign Off': 'rii_sign_off', 'Addl. Sign Off': 'additional_sign_off', 'Add New Sign Off Comments': 'add_new_sign_off_comments', 'Previous Sign Off Comments': 'previous_sign_off_comments', 'Planned Start Date': 'planned_start_date', 'Planned End Date': 'planned_end_date', 'Est. Man Hrs.': 'estimated_man_hours', 'Actual Start Date': 'actual_start_date', 'Actual End Date': 'actual_end_date', 'Actual Man Hrs.': 'actual_man_hours', 'Tracking #': 'tracking_number', 'Maint. Manual Ref. #': 'maintenance_manual_reference_number', 'Long Description': 'long_description', 'Hold Status': 'hold_status', 'Estimation Status': 'estimation_status', 'File Name': 'file_name', 'Skill #': 'skill_number', 'Zone #': 'zone_number', 'Work Area #': 'work_area_number', 'WBS Code': 'wbs_code', 'Parent Task #': 'parent_task_number', 'Root Task #': 'root_task_number', 'Workscoping Comments': 'workscoping_comments', 'Message Center': 'message_center', 'package': 'package_number'}
+INFO: 2025-04-25 22:31:14 - Missing columns: ['rt_mode_flag', 'delete_flag', 'sequence_number', 'task_number', 'ata_number', 'description', 'add_new_execution_comments', 'previous_execution_comments', 'status', 'source_task_discrepancy_number', 'source_tracking_number', 'work_center_number', 'sign_off_status', 'task_type', 'task_category', 'job_type', 'repair_classification', 'execution_phase', 'execution_category', 'part_number', 'serial_number', 'position_code', 'part_description', 'repair_agency', 'mechanic_required', 'mechanic_sign_off', 'inspection_required', 'inspection_sign_off', 'rii_required', 'rii_sign_off', 'additional_sign_off', 'add_new_sign_off_comments', 'previous_sign_off_comments', 'planned_start_date', 'planned_end_date', 'estimated_man_hours', 'actual_start_date', 'actual_end_date', 'actual_man_hours', 'tracking_number', 'maintenance_manual_reference_number', 'long_description', 'hold_status', 'estimation_status', 'file_name', 'skill_number', 'zone_number', 'work_area_number', 'wbs_code', 'parent_task_number', 'root_task_number', 'workscoping_comments', 'message_center', 'package_number']
+INFO: 2025-04-25 22:31:14 - shape of mltaskmlsec1 df (338, 54)
+INFO: 2025-04-25 22:31:14 - Successfully processed file: mltaskmlsec1.xlsx
+INFO: 2025-04-25 22:31:14 - DataFrame columns: Index(['rt_mode_flag', 'delete_flag', 'sequence_number', 'task_number',
+       'ata_number', 'description', 'add_new_execution_comments',
+       'previous_execution_comments', 'status',
+       'source_task_discrepancy_number', 'source_tracking_number',
+       'work_center_number', 'sign_off_status', 'task_type', 'task_category',
+       'job_type', 'repair_classification', 'execution_phase',
+       'execution_category', 'part_number', 'serial_number', 'position_code',
+       'part_description', 'repair_agency', 'mechanic_required',
+       'mechanic_sign_off', 'inspection_required', 'inspection_sign_off',
+       'rii_required', 'rii_sign_off', 'additional_sign_off',
+       'add_new_sign_off_comments', 'previous_sign_off_comments',
+       'planned_start_date', 'planned_end_date', 'estimated_man_hours',
+       'actual_start_date', 'actual_end_date', 'actual_man_hours',
+       'tracking_number', 'maintenance_manual_reference_number',
+       'long_description', 'hold_status', 'estimation_status', 'file_name',
+       'skill_number', 'zone_number', 'work_area_number', 'wbs_code',
+       'parent_task_number', 'root_task_number', 'workscoping_comments',
+       'message_center', 'package_number'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:31:14 - DataFrame shape: (338, 54)
+INFO: 2025-04-25 22:31:14 - Shape of task_description: (338, 54)
+INFO: 2025-04-25 22:31:14 - Processing the file Material.xlsx
+INFO: 2025-04-25 22:31:14 - Looking for sheet name: PRICING
+INFO: 2025-04-25 22:31:14 - Processing file: Material.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:31:14 - Reading Excel file with sheet name: PRICING
+INFO: 2025-04-25 22:31:16 - Shape of sub_task_parts: (0, 0)
+INFO: 2025-04-25 22:33:16 - Comparing estimates for estimate ID: HZ-NS27-CCHECK-FLYNAS-25042025-V01
+INFO: 2025-04-25 22:33:16 - Config file data fetched successfully
+INFO: 2025-04-25 22:33:16 - Processing the file mldpmlsec1.xlsx
+INFO: 2025-04-25 22:33:16 - Looking for sheet name: mldpmlsec1
+INFO: 2025-04-25 22:33:16 - Processing file: mldpmlsec1.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:33:16 - Reading Excel file with sheet name: mldpmlsec1
+INFO: 2025-04-25 22:33:16 - The dataframe columns of mldpmlsec1.xlsx are Index(['S', 'No', 'MIREP', 'HMV23/000154/0124/1', '28',
+       'DURING INSPECTION, OBSERVED REFUEL/DEFUEL COUPLING CAP CABLE ASSY SPLIT RING MISSING.',
+       'REFUEL/DEFUEL COUPLING CAP CABLE ASSY SPLIT RING PROVIDED WITH NEW ONE AND INSTALLED BACK LANYARD ON THE ATTACHMENT LUG AS PER AMM SUB TASK 28-25-41-420-059-A, REV-57 DTD 01 FEB 2024.',
+       'Close', 'Closed', '282541-01-1', '129', 'LINE 2A', 'Signed Off',
+       'DISC- MPD', 'IRC', 'Regular', 'REGULAR', 'Yes', 'nan', 'MR1089',
+       '2024-02-07 16:13:41', 'B1', '2024-01-31 17:14:00',
+       '2024-02-12 12:51:21', '1.5', '2024-02-08 18:15:09',
+       '2024-02-12 13:06:57', '1.0', '330', 'Hold', 'Pending Estimates',
+       '500.0', 'Hours', '', '248231',
+       '{'tplid' : 'ml_image_link', 'image' : 'edit.png'}', '7',
+       '{'tplid' : 'ml_image_link', 'image' : 'task_01.png'}', 'Y', 'N', 'H',
+       '{'tplid' : 'ml_image_link', 'image' : 'ExeHub_ClkStop.png'}',
+       '{'tplid' : 'ml_image', 'image' : 'ExeHub_Red.png'}', '0', 'CL', 'B'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:33:16 - the shape of the DataFrame before processing (53, 46)
+INFO: 2025-04-25 22:33:16 - sub_task_description_columns_mappings :{'RTModeFlag': 'rt_mode_flag', 'DeleteFlag': 'delete_flag', 'Type': 'task_type', 'Log Item #': 'log_item_number', 'ATA #': 'ata_number', 'Description': 'task_description', 'Corrective Action': 'corrective_action', 'Discrepancy #': 'discrepancy_number', 'Action': 'action_taken', 'Status': 'task_status', 'Source Task/Discrep. #': 'source_task_discrepancy_number', 'source_task_discrepancy_number_updated': 'source_task_discrepancy_number_updated', 'Source Tracking #': 'source_tracking_number', 'Work Center #': 'work_center_number', 'Sign Off Status': 'sign_off_status', 'Contract Classification': 'contract_classification', 'Category': 'task_category', 'Exe. Phase': 'execution_phase', 'Exec. Category': 'execution_category', 'Part Required?': 'part_required', 'Corrosion Related?': 'corrosion_related', 'Major Item?': 'major_item', 'Repeat?': 'is_repeat', 'Part #': 'part_number', 'Serial #': 'serial_number', 'Position Code': 'position_code', 'Part Description': 'part_description', 'Radio Communication': 'radio_communication', 'Reported By': 'reported_by', 'Reported Date': 'reported_date', 'Mech Req?': 'mechanical_required', 'Mech Sign Off': 'mechanical_sign_off', 'Mech Skill #': 'mechanical_skill_number', 'Insp Req?': 'inspection_required', 'Insp Sign Off': 'inspection_sign_off', 'Insp Skill #': 'inspection_skill_number', 'RII Req?': 'rii_required', 'RII Sign Off': 'rii_sign_off', 'RII Skill #': 'rii_skill_number', 'Addl. Sign Off': 'additional_sign_off', 'Add New Sign Off Comments': 'new_sign_off_comments', 'Previous Sign Off Comments': 'previous_sign_off_comments', 'Planned Start Date': 'planned_start_date', 'Planned End Date': 'planned_end_date', 'Est. Man Hrs.': 'estimated_man_hours', 'Actual Start Date': 'actual_start_date', 'Actual End Date': 'actual_end_date', 'Actual Man Hrs.': 'actual_man_hours', 'Seq #': 'sequence_number', 'Tracking #': 'tracking_number', 'Source Tracking #\xa0': 'source_tracking_number_with_space', 'Hold Status': 'hold_status', 'Estimation Status': 'estimation_status', 'File Name': 'file_name', 'Skill #': 'skill_number', 'Zone #': 'zone_number', 'Work Area #': 'work_area_number', 'Deferral FH': 'deferral_fh', 'Deferral FC': 'deferral_fc', 'Deferral Parameter': 'deferral_parameter', 'Deferral Value': 'deferral_value', 'Deferral Calendar Value': 'deferral_calendar_value', 'Deferral Calendar': 'deferral_calendar', 'Deferral Item #': 'deferral_item_number', 'Deferral Type': 'deferral_type', 'Reason for Deferral': 'reason_for_deferral', 'Auth. Ref. #': 'authorization_reference_number', 'Message Center': 'message_center', 'package': 'package_number'}
+INFO: 2025-04-25 22:33:16 - Missing columns: ['rt_mode_flag', 'delete_flag', 'task_type', 'log_item_number', 'ata_number', 'task_description', 'corrective_action', 'discrepancy_number', 'action_taken', 'task_status', 'source_task_discrepancy_number', 'source_task_discrepancy_number_updated', 'source_tracking_number', 'work_center_number', 'sign_off_status', 'contract_classification', 'task_category', 'execution_phase', 'execution_category', 'part_required', 'corrosion_related', 'major_item', 'is_repeat', 'part_number', 'serial_number', 'position_code', 'part_description', 'radio_communication', 'reported_by', 'reported_date', 'mechanical_required', 'mechanical_sign_off', 'mechanical_skill_number', 'inspection_required', 'inspection_sign_off', 'inspection_skill_number', 'rii_required', 'rii_sign_off', 'rii_skill_number', 'additional_sign_off', 'new_sign_off_comments', 'previous_sign_off_comments', 'planned_start_date', 'planned_end_date', 'estimated_man_hours', 'actual_start_date', 'actual_end_date', 'actual_man_hours', 'sequence_number', 'tracking_number', 'source_tracking_number_with_space', 'hold_status', 'estimation_status', 'file_name', 'skill_number', 'zone_number', 'work_area_number', 'deferral_fh', 'deferral_fc', 'deferral_parameter', 'deferral_value', 'deferral_calendar_value', 'deferral_calendar', 'deferral_item_number', 'deferral_type', 'reason_for_deferral', 'authorization_reference_number', 'message_center', 'package_number']
+INFO: 2025-04-25 22:33:16 - shape of mldpmlsec1 df (53, 69)
+INFO: 2025-04-25 22:33:16 - Successfully processed file: mldpmlsec1.xlsx
+INFO: 2025-04-25 22:33:16 - DataFrame columns: Index(['rt_mode_flag', 'delete_flag', 'task_type', 'log_item_number',
+       'ata_number', 'task_description', 'corrective_action',
+       'discrepancy_number', 'action_taken', 'task_status',
+       'source_task_discrepancy_number',
+       'source_task_discrepancy_number_updated', 'source_tracking_number',
+       'work_center_number', 'sign_off_status', 'contract_classification',
+       'task_category', 'execution_phase', 'execution_category',
+       'part_required', 'corrosion_related', 'major_item', 'is_repeat',
+       'part_number', 'serial_number', 'position_code', 'part_description',
+       'radio_communication', 'reported_by', 'reported_date',
+       'mechanical_required', 'mechanical_sign_off', 'mechanical_skill_number',
+       'inspection_required', 'inspection_sign_off', 'inspection_skill_number',
+       'rii_required', 'rii_sign_off', 'rii_skill_number',
+       'additional_sign_off', 'new_sign_off_comments',
+       'previous_sign_off_comments', 'planned_start_date', 'planned_end_date',
+       'estimated_man_hours', 'actual_start_date', 'actual_end_date',
+       'actual_man_hours', 'sequence_number', 'tracking_number',
+       'source_tracking_number_with_space', 'hold_status', 'estimation_status',
+       'file_name', 'skill_number', 'zone_number', 'work_area_number',
+       'deferral_fh', 'deferral_fc', 'deferral_parameter', 'deferral_value',
+       'deferral_calendar_value', 'deferral_calendar', 'deferral_item_number',
+       'deferral_type', 'reason_for_deferral',
+       'authorization_reference_number', 'message_center', 'package_number'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:33:16 - DataFrame shape: (53, 69)
+INFO: 2025-04-25 22:33:16 - Shape of sub_task_description: (53, 69)
+INFO: 2025-04-25 22:33:16 - Processing the file mltaskmlsec1.xlsx
+INFO: 2025-04-25 22:33:16 - Looking for sheet name: mltaskmlsec1
+INFO: 2025-04-25 22:33:16 - Processing file: mltaskmlsec1.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:33:16 - Reading Excel file with sheet name: mltaskmlsec1
+INFO: 2025-04-25 22:33:17 - The dataframe columns of mltaskmlsec1.xlsx are Index(['S', 'No', '1', 'C1+C2+OOP TASK+SB+AD+TCC', '0',
+       'CARRY OUT C1+C2+OOP TASK+SB+AD+TCC AS PER CUSTOMER REQUEST', 'nan',
+       'Closed', 'LINE 2A', 'Not Required', 'Others', 'CHK', 'Aircraft',
+       'AIRCRAFT JACKING', 'REGULAR', '2024-01-31 17:14:44',
+       '2024-01-31 18:14:44', '1.0', '2024-01-31 16:14:44',
+       '2024-02-13 21:52:12', 'Hold', 'Pending Estimates', 'TASK', 'Normal',
+       '246485', '4', '{'tplid' : 'ml_image_link', 'image' : 'menu.png'}',
+       '{'tplid' : 'ml_image_link', 'image' : 'task_03.png'}', 'N', 'AC', '',
+       '{'tplid' : 'ml_image_link', 'image' : 'ExeHub_ClkStop.png'}',
+       '{'tplid' : 'ml_image', 'image' : 'ExeHub_Red.png'}', 'CLS', 'B', '##'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:33:17 - the shape of the DataFrame before processing (338, 36)
+INFO: 2025-04-25 22:33:17 - task_description_columns_mappings :{'RTModeFlag': 'rt_mode_flag', 'DeleteFlag': 'delete_flag', 'Seq #': 'sequence_number', 'Task #': 'task_number', 'ATA #': 'ata_number', 'Description': 'description', 'Add New Execution Comments': 'add_new_execution_comments', 'Previous Execution Comments': 'previous_execution_comments', 'Status': 'status', 'Source Task/Discrep. #': 'source_task_discrepancy_number', 'Source Tracking #': 'source_tracking_number', 'Work Center #': 'work_center_number', 'Sign Off Status': 'sign_off_status', 'Task Type': 'task_type', 'Task Category': 'task_category', 'Job Type': 'job_type', 'Repair Class.': 'repair_classification', 'Exe. Phase': 'execution_phase', 'Exec. Category': 'execution_category', 'Part #': 'part_number', 'Serial #': 'serial_number', 'Position Code': 'position_code', 'Part Description': 'part_description', 'Repair Agency': 'repair_agency', 'Mech Req?': 'mechanic_required', 'Mech Sign Off': 'mechanic_sign_off', 'Insp Req?': 'inspection_required', 'Insp Sign Off': 'inspection_sign_off', 'RII Req?': 'rii_required', 'RII Sign Off': 'rii_sign_off', 'Addl. Sign Off': 'additional_sign_off', 'Add New Sign Off Comments': 'add_new_sign_off_comments', 'Previous Sign Off Comments': 'previous_sign_off_comments', 'Planned Start Date': 'planned_start_date', 'Planned End Date': 'planned_end_date', 'Est. Man Hrs.': 'estimated_man_hours', 'Actual Start Date': 'actual_start_date', 'Actual End Date': 'actual_end_date', 'Actual Man Hrs.': 'actual_man_hours', 'Tracking #': 'tracking_number', 'Maint. Manual Ref. #': 'maintenance_manual_reference_number', 'Long Description': 'long_description', 'Hold Status': 'hold_status', 'Estimation Status': 'estimation_status', 'File Name': 'file_name', 'Skill #': 'skill_number', 'Zone #': 'zone_number', 'Work Area #': 'work_area_number', 'WBS Code': 'wbs_code', 'Parent Task #': 'parent_task_number', 'Root Task #': 'root_task_number', 'Workscoping Comments': 'workscoping_comments', 'Message Center': 'message_center', 'package': 'package_number'}
+INFO: 2025-04-25 22:33:17 - Missing columns: ['rt_mode_flag', 'delete_flag', 'sequence_number', 'task_number', 'ata_number', 'description', 'add_new_execution_comments', 'previous_execution_comments', 'status', 'source_task_discrepancy_number', 'source_tracking_number', 'work_center_number', 'sign_off_status', 'task_type', 'task_category', 'job_type', 'repair_classification', 'execution_phase', 'execution_category', 'part_number', 'serial_number', 'position_code', 'part_description', 'repair_agency', 'mechanic_required', 'mechanic_sign_off', 'inspection_required', 'inspection_sign_off', 'rii_required', 'rii_sign_off', 'additional_sign_off', 'add_new_sign_off_comments', 'previous_sign_off_comments', 'planned_start_date', 'planned_end_date', 'estimated_man_hours', 'actual_start_date', 'actual_end_date', 'actual_man_hours', 'tracking_number', 'maintenance_manual_reference_number', 'long_description', 'hold_status', 'estimation_status', 'file_name', 'skill_number', 'zone_number', 'work_area_number', 'wbs_code', 'parent_task_number', 'root_task_number', 'workscoping_comments', 'message_center', 'package_number']
+INFO: 2025-04-25 22:33:17 - shape of mltaskmlsec1 df (338, 54)
+INFO: 2025-04-25 22:33:17 - Successfully processed file: mltaskmlsec1.xlsx
+INFO: 2025-04-25 22:33:17 - DataFrame columns: Index(['rt_mode_flag', 'delete_flag', 'sequence_number', 'task_number',
+       'ata_number', 'description', 'add_new_execution_comments',
+       'previous_execution_comments', 'status',
+       'source_task_discrepancy_number', 'source_tracking_number',
+       'work_center_number', 'sign_off_status', 'task_type', 'task_category',
+       'job_type', 'repair_classification', 'execution_phase',
+       'execution_category', 'part_number', 'serial_number', 'position_code',
+       'part_description', 'repair_agency', 'mechanic_required',
+       'mechanic_sign_off', 'inspection_required', 'inspection_sign_off',
+       'rii_required', 'rii_sign_off', 'additional_sign_off',
+       'add_new_sign_off_comments', 'previous_sign_off_comments',
+       'planned_start_date', 'planned_end_date', 'estimated_man_hours',
+       'actual_start_date', 'actual_end_date', 'actual_man_hours',
+       'tracking_number', 'maintenance_manual_reference_number',
+       'long_description', 'hold_status', 'estimation_status', 'file_name',
+       'skill_number', 'zone_number', 'work_area_number', 'wbs_code',
+       'parent_task_number', 'root_task_number', 'workscoping_comments',
+       'message_center', 'package_number'],
+      dtype='object', name=0)
+INFO: 2025-04-25 22:33:17 - DataFrame shape: (338, 54)
+INFO: 2025-04-25 22:33:17 - Shape of task_description: (338, 54)
+INFO: 2025-04-25 22:33:17 - Processing the file Material.xlsx
+INFO: 2025-04-25 22:33:17 - Looking for sheet name: PRICING
+INFO: 2025-04-25 22:33:17 - Processing file: Material.xlsx, Extension: .xlsx
+INFO: 2025-04-25 22:33:17 - Reading Excel file with sheet name: PRICING
+INFO: 2025-04-25 22:33:20 - Combined mappings: {'Regn#': 'registration_number', 'Package #': 'package_number', 'Task #': 'task_number', 'Task Description': 'task_description', 'Issued Part #': 'issued_part_number', 'Part Description': 'part_description', 'Issued UOM': 'issued_unit_of_measurement', 'Stock Status': 'stock_status', 'Used Qty': 'used_quantity', 'Base Currency': 'base_currency', 'Base Price (USD)': 'base_price_usd', 'Freight': 'freight_cost', 'Admin Charges': 'admin_charges', 'Total Billable Price': 'total_billable_price', 'Billable Value (USD)': 'billable_value_usd', 'SOI_TRAN  #': 'soi_transaction', 'Issued Part#': 'issued_part_number', 'Package#': 'package_number', 'Task#': 'task_number', 'SOI_TRANNO': 'soi_transaction'}
+INFO: 2025-04-25 22:33:20 - Shape of sub_task_parts: (0, 0)

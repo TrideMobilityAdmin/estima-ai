@@ -613,450 +613,69 @@ class ExcelUploadService:
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
    
-    def get_best_match(self, target, candidates):
-        """
-        Find the best matching string from a list of candidates using SequenceMatcher.
-        
-        Args:
-            target (str): The expected column name.
-            candidates (list): List of candidate strings.
-        
-        Returns:
-            tuple: (best match string, similarity score) or (None, 0) if no match found.
-        """
-        best_match = None
-        best_score = 0
-
-        for candidate in candidates:
-            score = SequenceMatcher(None, target.lower(), candidate.lower()).ratio() * 100  # Convert to percentage
-            if score > best_score:
-                best_match = candidate
-                best_score = score
-
-        return (best_match, best_score) if best_score > 70 else (None, 0)  # Threshold set at 70%
-
-    def detect_header_row(self, df, expected_columns, max_rows_to_check=6):
-        """
-        Dynamically detect which row contains the header by checking for matches with expected columns.
-        
-        Args:
-            df (pd.DataFrame): DataFrame with potential header rows.
-            expected_columns (list): List of expected column names.
-            max_rows_to_check (int): Maximum number of rows to check for headers.
-        
-        Returns:
-            int or None: Best header row index or None if not found.
-        """
-        best_match_score = 0
-        best_row_index = None
-
-        # Check each of the first few rows
-        for i in range(min(max_rows_to_check, len(df))):
-            row_values = df.iloc[i].astype(str).fillna('').tolist()  # Convert row to list of strings
-
-            # Skip rows with too many missing values
-            if sum(pd.isna(df.iloc[i])) > len(row_values) / 2:
-                continue
-
-            # Calculate match score for this row
-            row_score = 0
-            for expected_col in expected_columns:
-                best_match = self.get_best_match(expected_col, row_values)  # Find best match
-                row_score += best_match[1]  # Add similarity score
-
-            # If this row has better matches than previous best, update best row
-            if row_score > best_match_score:
-                best_match_score = row_score
-                best_row_index = i
-
-        return best_row_index
-
-    def predict_column_mappings(self, df, expected_mappings):
-        """
-        Dynamically predict column mappings using fuzzy matching.
-        
-        Args:
-            df: DataFrame with the original column names
-            expected_mappings: Dictionary of expected column names to their standardized names
-        
-        Returns:
-            Dictionary mapping actual column names to standardized names
-        """
-        # Get all column names from the DataFrame
-        actual_columns = list(df.columns)
-        
-        # Create a mapping for each expected column
-        dynamic_mappings = {}
-        
-        for expected_col, standardized_name in expected_mappings.items():
-            # Find the best match among actual columns
-            best_match = process.extractOne(expected_col, actual_columns)
-            
-            if best_match and best_match[1] > 70:  # Match score above 70%
-                dynamic_mappings[best_match[0]] = standardized_name
-                logger.info(f"Mapped '{best_match[0]}' to '{standardized_name}' with score {best_match[1]}")
-            else:
-                logger.warning(f"Could not find a good match for '{expected_col}'")
-        
-        return dynamic_mappings
-        
-    def read_excel_with_multiple_sheetnames(self, content, filename, file_extension, sheet_name, config):
-        """
-        Read a specific sheet from an Excel file.
-
-        Args:
-            content (bytes): File content.
-            filename (str): Name of the file.
-            file_extension (str): File extension.
-            sheet_name (str): Name of the sheet to read.
-            config (dict): Configuration dictionary.
-
-        Returns:
-            pd.DataFrame: DataFrame containing the sheet data.
-        """
-        try:
-            pd.set_option('display.encoding', 'utf-8')
-            logger.info(f"Reading Excel file with sheet name: {sheet_name}")
-            
-            # Choose appropriate engine based on file extension
-            if file_extension.startswith('.'):
-                extension = file_extension
-            else:
-                extension = f".{file_extension}"
-                
-                
-            engine = "openpyxl" if extension in [".xlsx", ".xlsm"] else "pyxlsb" if extension == ".xlsb" else "xlrd"
-            try:
-                
-            
-                # Read the specific sheet
-                df = pd.read_excel(
-                    io.BytesIO(content), 
-                    sheet_name=sheet_name,
-                    engine=engine
-                )
-                #logger.info(f"The dataframe columns of {filename} are {df.columns}")
-                
-            except UnicodeEncodeError:
-
-                # Force UTF-8 encoding for stdout
-                if sys.stdout.encoding != 'utf-8':
-                    sys.stdout.reconfigure(encoding='utf-8')
-                
-                df = pd.read_excel(
-                    io.BytesIO(content), 
-                    sheet_name=sheet_name,
-                    engine=engine
-                )
-                # Log column names as string representation to avoid encoding issues
-                logger.info(f"The dataframe columns of {filename} are successfully loaded (column names contain special characters)")
-            
-            if sheet_name.lower().startswith(("pricing", "sheet1", "price", "page")):
-                return self._process_pricing_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mlttable'):
-                return self._process_mlttable_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mltaskmlsec1'):
-                return self._process_mltaskmlsec1_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mldpmlsec1'):
-                return self._process_mldpmlsec1_sheet(df, filename, config)
-
-            else:
-                df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
-                df = df[1:].reset_index(drop=True)
-            
-            logger.info(f"Successfully read sheet {sheet_name}")
-            logger.info(f"DataFrame headers: {list(df.columns)}")
-            logger.info(f"DataFrame shape: {df.shape}")
-            
-            return df
-        
-        except ValueError as sheet_error:
-            logger.error(f"Sheet {sheet_name} not found: {str(sheet_error)}")
-            return None
-        except Exception as error:
-            logger.error(f"Error reading Excel file: {str(error)}")
-            return None
-    
-    def _process_pricing_sheet(self, df, filename, config):
-        """Helper method to process pricing sheets"""
-        sub_task_parts_columns = config["sub_task_parts_columns"]
-        sub_task_parts_column_mappings = config["sub_task_parts_column_mappings"]
-
-        # Alternative mappings
-        alternative_mappings = {
-            "Issued Part#": "issued_part_number",
-            "Package#": "package_number",
-            "Task#": "task_number",
-            "SOI_TRANNO": "soi_transaction"
-        }
-
-        # Merge mappings
-        combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
-        logger.info(f"Combined mappings: {combined_mappings}")
-        # Detect the header row
-        header_row_index = self.detect_header_row(df, combined_mappings.keys())
-
-        if header_row_index is None:
-            logger.warning(f"Could not detect header row in {filename}")
-            return pd.DataFrame()
-
-        # Set the column names correctly
-        df.columns = df.iloc[header_row_index].astype(str).values
-
-        #logger.info(f"Detected header row at index {header_row_index} in {filename}, columns: {df.columns}")
-
-        # Extract data rows (everything after the header)
-        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
-        logger.info(f"the shape of the DataFrame before processing {df.shape}")
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
-        # Rename columns using mappings
-        df.rename(columns={k: v for k, v in combined_mappings.items() if k in df.columns}, inplace=True)
-
-        expected_output_columns = list(sub_task_parts_column_mappings.values())
-        mapped_columns = set(df.columns)
-        truly_missing = set(expected_output_columns) - mapped_columns
-        
-        if len(truly_missing) > 4:
-            return pd.DataFrame()
-
-        if truly_missing:
-            warning_msg = f"⚠️ Warning: Missing columns in {filename} that couldn't be mapped: {truly_missing}"
-      
-            logger.warning(warning_msg)
-
-        # Remove duplicate columns
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-
-        # Ensure all expected columns exist
-        for col in expected_output_columns:
-            if col not in df.columns:
-                df[col] = "None"
-
-        # Reorder columns to match expected order
-        df = df[expected_output_columns]
-        logger.info(f"shape of MCP df {df.shape}")
-        return df
-    
-    def _process_mlttable_sheet(self, df, filename, config):
-        """Helper method to process mlttable sheets"""
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
-        logger.info(f"the shape of the DataFrame before processing {df.shape}")
-
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        task_parts_columns_mappings = config["task_parts_columns_mappings"]
-        task_parts_columns = config["task_parts_columns"]
-        logger.info(f"task_parts_columns_mappings :{task_parts_columns_mappings}")
-        
-        # Check for missing and extra columns
-        missing_cols = set(task_parts_columns) - set(df.columns)
-        extra_cols = set(df.columns) - set(task_parts_columns)
-        
-        if missing_cols:
-
-            logger.warning(f"⚠️ Warning: Missing columns in {filename}: {missing_cols}")
-        if extra_cols:
-
-            logger.warning(f"⚠️ Warning: Extra columns in {filename}: {extra_cols}")
-
-        # First rename the columns that exist
-        df.rename(columns={k: v for k, v in task_parts_columns_mappings.items() if k in df.columns}, inplace=True)
-
-        # Now add any missing columns (using the final mapped column names)
-        expected_columns = list(task_parts_columns_mappings.values())
-        missing_columns = [col for col in expected_columns if col not in df.columns]
-        
-        if missing_columns:
-            logger.info(f"Missing columns: {missing_columns}")
-
-        # Add missing columns with None values
-        for col in missing_columns:
-            df[col] = None
-
-        # Reorder columns according to the mapped values
-        df = df[expected_columns]
-        logger.info(f"shape of mlttable df {df.shape}")
-        
-        return df
-    
-    def _process_mltaskmlsec1_sheet(self, df, filename, config):
-        """Helper method to process mltaskmlsec1 sheets"""
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
-        logger.info(f"the shape of the DataFrame before processing {df.shape}")
-        
-        task_description_columns = config["task_description_columns"]
-        task_description_columns_mappings = config["task_description_columns_mappings"]
-        logger.info(f"task_description_columns_mappings :{task_description_columns_mappings}")
-        missing_cols = set(task_description_columns) - set(df.columns)
-        extra_cols = set(df.columns) - set(task_description_columns)
-        
-        if missing_cols:
-
-            logger.warning(f"⚠️ Warning: Missing columns in {filename}: {missing_cols}")
-        if extra_cols:
-
-            logger.warning(f"⚠️ Warning: Extra columns in {filename}: {extra_cols}")
-
-        df.rename(columns={k: v for k, v in task_description_columns_mappings.items() if k in df.columns}, inplace=True)
-
-        # Now add any missing columns (using the final mapped column names)
-        expected_columns = list(task_description_columns_mappings.values())
-        missing_columns = [col for col in expected_columns if col not in df.columns]
-        
-        if missing_columns:
-            logger.info(f"Missing columns: {missing_columns}")
-
-        # Add missing columns with None values
-        for col in missing_columns:
-            df[col] = None
-
-        # Finally, reorder columns to match expected order
-        df = df[expected_columns]
-        
-        logger.info(f"shape of mltaskmlsec1 df {df.shape}")
-        
-        return df
-    
-    def _process_mldpmlsec1_sheet(self, df, filename, config):
-        """Helper method to process mldpmlsec1 sheets"""
-        # Ensure first row is used as column names safely
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
-        logger.info(f"the shape of the DataFrame before processing {df.shape}")
-
-        sub_task_description_columns = config["sub_task_description_columns"]
-        sub_task_description_columns_mappings = config["sub_task_description_columns_mappings"]
-        logger.info(f"sub_task_description_columns_mappings :{sub_task_description_columns_mappings}")
-
-        # Check for missing and extra columns
-        missing_cols = set(sub_task_description_columns) - set(df.columns)
-        extra_cols = set(df.columns) - set(sub_task_description_columns)
-        
-        if missing_cols:
-            warning_msg = f"⚠️ Warning: Missing columns in {filename}: {missing_cols}"
-
-            logger.warning(warning_msg)
-        
-        if extra_cols:
-            warning_msg = f"⚠️ Warning: Extra columns in {filename}: {extra_cols}"
-
-            logger.warning(warning_msg)
-
-        # Rename columns safely
-        df.rename(columns={k: v for k, v in sub_task_description_columns_mappings.items() if k in df.columns}, inplace=True)
-
-        # Add any missing columns (based on mapped names)
-        expected_columns = list(sub_task_description_columns_mappings.values())
-        missing_columns = [col for col in expected_columns if col not in df.columns]
-
-        # Print missing columns for debugging
-        if missing_columns:
-            logger.info(f"Missing columns: {missing_columns}")
-
-        # Add missing columns with None values
-        for col in missing_columns:
-            df[col] = None
-
-        # Ensure required columns exist before proceeding
-        required_columns = ["log_item_number", "source_task_discrepancy_number"]
-        for col in required_columns:
-            if col not in df.columns:
-                #print(f"⚠️ Warning: Required column '{col}' is missing in {filename}. Skipping task_findings processing.")
-                logger.warning(f"⚠️ Warning: Required column '{col}' is missing in {filename}. Skipping task_findings processing.")
-                return pd.DataFrame()  # Return empty DataFrame if required columns are missing
-
-        # Initialize the new column
-        df["source_task_discrepancy_number_updated"] = ""
-
-        # Create task_findings_dict
-        findings = df["log_item_number"].tolist()
-        tasks = df["source_task_discrepancy_number"].tolist()
-        task_findings_dict = dict(zip(findings, tasks))
-
-        # Resolve task references safely (avoid infinite loops)
-        max_iterations = 10  # Safety limit
-        for finding in findings:
-            iteration = 0
-            current = finding
-            
-            while iteration < max_iterations:
-                if current not in task_findings_dict or task_findings_dict[current] == current:
-                    break  # Stop if there's no further reference or self-referencing
-                next_value = task_findings_dict[current]
-                if next_value == finding:  # Circular reference detected
-                    break
-                current = next_value
-                iteration += 1
-            
-            # Update with the resolved reference
-            task_findings_dict[finding] = current
-
-        # Assign resolved values back to DataFrame
-        df["source_task_discrepancy_number_updated"] = df["log_item_number"].map(task_findings_dict)
-
-        # Ensure correct column order
-        df = df[expected_columns]
-        logger.info(f"shape of mldpmlsec1 df {df.shape}")
-        
-        return df
-
-    async def process_multiple_files(self, file: UploadFile, config, SheetName: str) -> pd.DataFrame:
+    async def process_multiple_files(self, files: List[UploadFile], columnMappings: Dict, SheetName: str) -> pd.DataFrame:
         """
         Read and process multiple uploaded Excel or CSV files.
 
         Args:
-            file (UploadFile): Uploaded file to process.
-            config (Dict): Configuration settings.
+            files (List[UploadFile]): List of uploaded files to process.
+            columnMappings (Dict): Column mapping configurations.
             SheetName (str): Name of the sheet to read from Excel files.
 
         Returns:
-            pd.DataFrame: Processed records from matching file
+            pd.DataFrame: Combined processed records from matching files
         """
-        logger.info(f"Processing the file {file.filename}")
+        logger.info(f"Processing {len(files)} files")
+        logger.info(f"Column Mappings: {columnMappings}")
         logger.info(f"Looking for sheet name: {SheetName}")
 
-        try:
-            # Read the file content
-            content = await file.read()
-            file_extension = os.path.splitext(file.filename)[1].lower()
-            if not file_extension:
-                file_extension = f".{file.filename.split('.')[-1].lower()}"
+        processed_dataframes = []
+
+        for file in files:
+            try:
+                # Read the file content
+                content = await file.read()
+                file_extension = file.filename.split('.')[-1].lower()
                 
-            logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
-            
-            # Handle Excel files
-            if file_extension:
-                try:
-                    # Attempt to read the specified sheet
-                    df = self.read_excel_with_multiple_sheetnames(content, file.filename, file_extension, SheetName, config)
-                    if df is not None and not df.empty:
-                        logger.info(f"Successfully processed file: {file.filename}")
-                        logger.info(f"DataFrame columns: {df.columns}")
-                        logger.info(f"DataFrame shape: {df.shape}")
+                logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
+
+                # Handle Excel files
+                if file_extension in ['xls', 'xlsx']:
+                    try:
+                        # Attempt to read the specified sheet
+                        df = self.read_excel_with_multiple_sheetnames(content, file_extension, SheetName)
                         
-                        return df
-                    else:
-                        logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
-                
-                except Exception as excel_error:
-                    logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
-        
-        except Exception as file_error:
-            logger.error(f"Error processing file {file.filename}: {str(file_error)}")
-        
-        # Reset file pointer to beginning for potential reuse
-        await file.seek(0)
+                        if df is not None and not df.empty:
+                            # Rename columns based on provided mappings
+                            df.rename(columns=columnMappings, inplace=True)
+                            
+                            logger.info(f"Successfully processed file: {file.filename}")
+                            logger.info(f"DataFrame columns: {df.columns}")
+                            logger.info(f"DataFrame shape: {df.shape}")
+                            
+                            processed_dataframes.append(df)
+                        else:
+                            logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
+                    
+                    except Exception as excel_error:
+                        logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
+            
+            except Exception as file_error:
+                logger.error(f"Error processing file {file.filename}: {str(file_error)}")
+            
+            # Reset file pointer to beginning for potential reuse
+            file.file.seek(0)
+
+        # Combine all processed dataframes
+        if processed_dataframes:
+            combined_df = pd.concat(processed_dataframes, ignore_index=True)
+            logger.info(f"Total records in combined DataFrame: {len(combined_df)}")
+            return combined_df
         
         logger.warning(f"No files found with sheet name: {SheetName}")
         return pd.DataFrame() 
-    
- 
+        
+       
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
@@ -1069,134 +688,75 @@ class ExcelUploadService:
             Dict[str, Any]: Comparison results
         """
         logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
+        # Process files and extract actual data
+
         
-        # Initialize DataFrames
-        task_description = pd.DataFrame()
-        sub_task_description = pd.DataFrame()
-        sub_task_parts = pd.DataFrame()
-        task_parts = pd.DataFrame()
-        
-        # Load configuration
         config_file_path = os.path.join("app", "config", "config.yaml")
-        try:
-            with open(config_file_path, 'r') as file:
-                config = yaml.safe_load(file)
-            logger.info("Config file data fetched successfully")
-        except Exception as e:
-            logger.error(f"Error loading config file: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error loading configuration")
+        with open(config_file_path, 'r') as file:
+            columnMappings = yaml.safe_load(file)
+        logger.info("config file data fetched sucessfully")
 
         try:
-            for file in files:
-                if file.filename.startswith("mltaskmlsec1"):
-                    task_description = await self.process_multiple_files(file, config, "mltaskmlsec1")
-                    logger.info(f"Shape of task_description: {task_description.shape}")
-                    
-                elif file.filename.startswith("mldpmlsec1"):
-                    sub_task_description = await self.process_multiple_files(file, config, "mldpmlsec1")
-                    logger.info(f"Shape of sub_task_description: {sub_task_description.shape}")
-                    
-                elif file.filename.startswith("Material"):
-                    sub_task_parts = await self.process_multiple_files(file, config, 'PRICING')
-                    logger.info(f"Shape of sub_task_parts: {sub_task_parts.shape}")
-                    
-                elif file.filename.startswith("mlttable"):
-                    task_parts = await self.process_multiple_files(file, config, "mlttable")
-                    logger.info(f"Shape of task_parts: {task_parts.shape}")
-
-            # Verify all required data is available
+            sub_task_parts =  await self.process_multiple_files(files, columnMappings['sub_task_parts_column_mappings'], "PRICING")
+            logger.info(f"sub_task_parts: {sub_task_parts}")
+            sub_task_description =  await self.process_multiple_files(files, columnMappings['sub_task_description_columns_mappings'], "mldpmlsec1")
+            logger.info(f"sub_task_description: {sub_task_description}")
+            task_description =  await self.process_multiple_files(files, columnMappings['task_description_columns_mappings'], "mltaskmlsec1")
+            logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
             if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
-                error_msg = "One or more required sheets are missing from the uploaded files."
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-
-            # Process and compare data
-            compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
-            logger.info("Compare result successfully fetched")
+                raise ValueError("One or more required sheets are missing from the uploaded files.")
+            compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
+            logger.info("compare_result successfully fetched")
 
             return compare_result
-        
-        except ValueError as ve:
-            logger.error(f"Validation error: {str(ve)}")
-            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as e:
             logger.error(f"Unexpected error in compare_estimates: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")
+    
+    def read_excel_with_multiple_sheetnames(self, content, file_extension, SheetName):
+        """
+        Read a specific sheet from an Excel file.
+
+        Args:
+            content (bytes): File content.
+            file_extension (str): File extension.
+            SheetName (str): Name of the sheet to read.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the sheet data.
+        """
+        try:
+            logger.info(f"Reading Excel file with sheet name: {SheetName}")
+            
+            # Choose appropriate engine based on file extension
+            engine = 'openpyxl' if file_extension in ['xlsx'] else 'xlrd'
+            
+            # Read the specific sheet
+            df = pd.read_excel(
+                io.BytesIO(content), 
+                sheet_name=SheetName,
+                engine=engine
+            )
+            
+            logger.info(f"Successfully read sheet {SheetName}")
+            logger.info(f"DataFrame headers: {list(df.columns)}")
+            logger.info(f"DataFrame shape: {df.shape}")
+            
+            return df
         
-    def parts_combine(self,sub_task_parts,task_parts):
-        parts_master = list(self.parts_master_collection.find({},))
-        parts_master= pd.DataFrame(parts_master)
-        parts_master = parts_master.drop(columns=["_id"], errors="ignore")
-        parts_master=parts_master.drop_duplicates()
-        task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","requested_stock_status"],inplace=True)
-        task_parts_up=task_parts[task_parts["requested_stock_status"]!="Owned"]
+        except ValueError as sheet_error:
+            logger.error(f"Sheet {SheetName} not found: {str(sheet_error)}")
+            return None
+        except Exception as error:
+            logger.error(f"Error reading Excel file: {str(error)}")
+            return None
 
-        task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
-
-        # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
-        task_parts_up = task_parts_up.rename(columns={"unit_of_measurement": "issued_unit_of_measurement"})
-        # Get column names as lists
-        sub_task_parts_columns = sub_task_parts.columns.tolist()
-        task_parts_up_columns = task_parts_up.columns.tolist()
-
-        # Find common and missing columns
-        common_columns = list(set(sub_task_parts_columns) & set(task_parts_up_columns))  # Intersection
-        missing_columns = list(set(sub_task_parts_columns) - set(task_parts_up_columns))  # Difference
-
-        # Keep only common columns
-        task_parts_up = task_parts_up[common_columns]
-
-        # Add missing columns and fill them with NaN (equivalent to `missing` in Julia)
-        for col in missing_columns:
-            task_parts_up[col] = np.nan  # Use None instead if dealing with strings
-
-        # Ensure column order matches `sub_task_parts`
-        task_parts_up = task_parts_up[sub_task_parts_columns]
-
-        for i, row in task_parts_up.iterrows():
-            # Find matching part in parts_master
-            matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
-            
-            if not matching_parts.empty:
-                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
-            
-        sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
-        # Convert to string
-        string_cols = [
-            'registration_number', 'package_number', 'task_number',
-            'task_description', 'issued_part_number', 'part_description',
-            'issued_unit_of_measurement', 'stock_status', 'base_currency',
-            'soi_transaction'
-        ]
-
-
-
-        # Apply conversions
-        for col in string_cols:
-            sub_task_parts[col] = sub_task_parts[col].astype(str)
-            
-        cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_billable_price', 'billable_value_usd', 'used_quantity']
-
-        for col in cols_to_convert:
-            sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
-            
-            
-        return sub_task_parts
-
-
-    def testing(self,task_description, sub_task_parts, sub_task_description, task_parts,estID):
-        
-        if task_parts is not None and not task_parts.empty:
-            logger.info("task_parts is not empty")
-            sub_task_parts = self.parts_combine(sub_task_parts, task_parts)
-        else:
-            logger.info("task_parts is empty")
-
+    def testing(self,task_description, sub_task_parts, sub_task_description, estID):
 
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
         if not pred_data:
-            logger.info("None EstID Pred Data -->" + estID)
+            print("None EstID Pred Data -->" + estID)
             return {}
         
         # Process tasks and findings
@@ -1446,14 +1006,14 @@ class ExcelUploadService:
         return finaloutput
     
 def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
-    logger.info("Starting actual_cap_calculation")
-    logger.info(f"cappingDetails: {cappingDetails}")
-    logger.info(f"Number of eligible tasks: {len(eligibile_tasks)}")
+    print("Starting actual_cap_calculation")
+    print(f"cappingDetails: {cappingDetails}")
+    print(f"Number of eligible tasks: {len(eligibile_tasks)}")
     
     
     # Ensure cappingDetails is a dictionary
     if not isinstance(cappingDetails, dict) or not cappingDetails:
-        logger.info("No capping details found, returning default values")
+        print("No capping details found, returning default values")
         return {
             'cappingTypeManhrs': "No capping",
             'cappingManhrs': 0.0,
@@ -1477,15 +1037,15 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         'unbillableSpareCost': 0.0
     }
     
-    logger.info(f"Initial capping_values: {capping_values}")
+    print(f"Initial capping_values: {capping_values}")
     
     # Filter sub_task_description to only include eligible tasks
     sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligibile_tasks)]
-    logger.info(f"Filtered sub_task_description shape: {sub_task_description.shape}")
+    print(f"Filtered sub_task_description shape: {sub_task_description.shape}")
     
     # Define create_group function correctly (fixed indentation)
     def create_group(df):
-        logger.info("Creating groups for tasks")
+        print("Creating groups for tasks")
         # Create a new column 'group' with default values
         df['group'] = range(len(df))
         
@@ -1514,14 +1074,14 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             if log_item in group_mapping:
                 df.at[idx, 'group'] = group_mapping[log_item]
         
-        logger.info(f"Number of unique groups created: {df['group'].nunique()}")
+        print(f"Number of unique groups created: {df['group'].nunique()}")
         return df
     
     # Apply the create_group function
     sub_task_description = create_group(sub_task_description)
     
     # Calculate task level man hours
-    logger.info("Calculating task level man hours")
+    print("Calculating task level man hours")
     task_level_mh = sub_task_description.groupby(
         ["source_task_discrepancy_number_updated"]
     ).agg(
@@ -1530,10 +1090,10 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         min_actual_man_hours=("actual_man_hours", "sum")
     ).reset_index()
     
-    logger.info(f"task_level_mh shape: {task_level_mh.shape}")
+    print(f"task_level_mh shape: {task_level_mh.shape}")
     
     # Calculate group level man hours
-    logger.info("Calculating group level man hours")
+    print("Calculating group level man hours")
     group_level_mh = sub_task_description.groupby(
         ["group"]
     ).agg(
@@ -1543,18 +1103,18 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         skill_number=("skill_number", lambda x: list(set(x)))
     ).reset_index()
     
-    logger.info(f"group_level_mh shape: {group_level_mh.shape}")
+    print(f"group_level_mh shape: {group_level_mh.shape}")
     
     # Get eligible log items
     eligible_log_items = sub_task_description["log_item_number"].unique().tolist()
-    logger.info(f"Number of eligible log items: {len(eligible_log_items)}")
+    print(f"Number of eligible log items: {len(eligible_log_items)}")
     
     # Filter sub_task_parts to only include eligible log items
     filtered_sub_task_parts = sub_task_parts[sub_task_parts['task_number'].isin(eligible_log_items)]
-    logger.info(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
+    print(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
     
     # Merge task_level_parts
-    logger.info("Merging task level parts")
+    print("Merging task level parts")
     task_level_parts = pd.merge(
         filtered_sub_task_parts,
         sub_task_description[["log_item_number", "source_task_discrepancy_number_updated"]],
@@ -1565,7 +1125,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     
     # If the merge resulted in an empty DataFrame, create an empty one with required columns
     if task_level_parts.empty:
-        logger.info("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
+        print("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
         task_level_parts = pd.DataFrame(columns=["source_task_discrepancy_number_updated", "issued_part_number", 
                                                 "billable_value_usd", "used_quantity", 
                                                 "part_description", "issued_unit_of_measurement"])
@@ -1578,10 +1138,10 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    logger.info(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
+    print(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
     
     # Add 'group' column to filtered_sub_task_parts by merging with sub_task_description
-    logger.info("Adding group column to filtered_sub_task_parts")
+    print("Adding group column to filtered_sub_task_parts")
     if 'group' not in filtered_sub_task_parts.columns:
         filtered_sub_task_parts = pd.merge(
             filtered_sub_task_parts,
@@ -1599,7 +1159,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    logger.info(f"group_level_parts shape: {group_level_parts.shape}")
+    print(f"group_level_parts shape: {group_level_parts.shape}")
     
     # Create parts_line_items DataFrame
     parts_line_items = filtered_sub_task_parts.groupby(["issued_part_number"]).agg(
@@ -1609,7 +1169,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
     ).reset_index()
     
-    logger.info(f"parts_line_items shape: {parts_line_items.shape}")
+    print(f"parts_line_items shape: {parts_line_items.shape}")
     
     # Create copies for processing
     task_level_mh_cap = task_level_mh.copy()
@@ -1620,7 +1180,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         billable_value_usd=("billable_value_usd", "sum")
     ).reset_index()
     
-    logger.info(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
+    print(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
     
     # Copy group level data
     group_level_mh_cap = group_level_mh.copy()
@@ -1628,7 +1188,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     
     # Add source_task_discrepancy_number_updated column to group_level_parts_cap if it doesn't exist
     if "source_task_discrepancy_number_updated" not in group_level_parts_cap.columns:
-        logger.info("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
+        print("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
         # This is a placeholder. In real code, you would need to properly join/map this information.
         group_level_parts_cap["source_task_discrepancy_number_updated"] = "Unknown"
     
@@ -1637,7 +1197,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
         billable_value_usd=("billable_value_usd", "sum")
     ).reset_index()
     
-    logger.info(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
+    print(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
     
     # Create a copy of parts_line_items for capping
     parts_line_items_result = parts_line_items.copy()
@@ -1648,11 +1208,11 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     spares_cap_type = cappingDetails.get("cappingTypeSpareCost", "No capping")
     spares_cap_amt = cappingDetails.get("cappingSpareCost", 0)
     
-    logger.info(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
+    print(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
     
     # Define man-hours capping function
     def mhs_cap(mhs_cap_type, mhs_cap_amt):
-        logger.info(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
+        print(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
         if mhs_cap_type == "per_source_card":
             # Calculate intermediate values (before applying probability)
             task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
@@ -1675,7 +1235,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = task_level_mh_cap["unbillable_mh"].sum()
             billable_sum = task_level_mh_cap["billable_mh"].sum()
-            logger.info(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            print(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
         
         elif mhs_cap_type == "per_IRC":
@@ -1700,17 +1260,17 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = group_level_mh_cap["unbillable_mh"].sum()
             billable_sum = group_level_mh_cap["billable_mh"].sum()
-            logger.info(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            print(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
         
         else:  # No capping
             total_sum = task_level_mh_cap["avg_actual_man_hours"].sum() 
-            logger.info(f"No capping for MH: unbillable=0, billable={total_sum}")
+            print(f"No capping for MH: unbillable=0, billable={total_sum}")
             return 0, total_sum
     
     # Define spares capping function
     def spares_cap(spares_cap_type, spares_cap_amt):
-        logger.info(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
+        print(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
         if spares_cap_type == "per_source_card":
             # Use the aggregated DataFrame for calculations
             task_level_parts_cap = task_level_parts_cap_agg.copy()
@@ -1735,7 +1295,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = task_level_parts_cap["unbillable_spares"].sum()
             billable_sum = task_level_parts_cap["billable_spares"].sum()
-            logger.info(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            print(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
             
         elif spares_cap_type == "per_IRC":
@@ -1763,7 +1323,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = group_level_parts_cap["unbillable_spares"].sum()
             billable_sum = group_level_parts_cap["billable_spares"].sum()
-
+            print(f"Per IRC spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
             
         elif spares_cap_type == "per_line_item":
@@ -1787,23 +1347,23 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
             
             unbillable_sum = parts_line_items_result["unbillable_spares"].sum()
             billable_sum = parts_line_items_result["billable_spares"].sum()
-            logger.info(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            print(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
             
         else:  # No capping
             total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0
-            logger.info(f"No capping for spares: unbillable=0, billable={total_sum}")
+            print(f"No capping for spares: unbillable=0, billable={total_sum}")
             return 0, total_sum
     
     # Calculate and set man-hours capping values
-    logger.info("Calculating man-hours capping values")
+    print("Calculating man-hours capping values")
     capping_values["unbillableManhrs"], capping_values["billableManhrs"] = mhs_cap(mhs_cap_type, mhs_cap_amt)
     
     # Calculate and set spare costs capping values
-    logger.info("Calculating spare costs capping values")
+    print("Calculating spare costs capping values")
     capping_values['unbillableSpareCost'], capping_values['billableSpareCost'] = spares_cap(spares_cap_type, spares_cap_amt)
     
-    logger.info(f"Final capping_values: {capping_values}")
+    print(f"Final capping_values: {capping_values}")
     return capping_values
 
 
