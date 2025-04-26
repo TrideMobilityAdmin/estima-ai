@@ -413,8 +413,15 @@ class ExcelUploadService:
         logger.info("Fetching all estimates")
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
-        
+        five_days_ago = datetime.utcnow() - timedelta(days=5)
         pipeline=[
+            {
+        '$match': {
+            'createdAt': {
+                '$gte': five_days_ago
+            }
+        }
+    },
     {
         '$lookup': {
             'from': 'estima_output', 
@@ -513,6 +520,7 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
+            'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
             'status': '$status', 
             'totalMhs': 1, 
