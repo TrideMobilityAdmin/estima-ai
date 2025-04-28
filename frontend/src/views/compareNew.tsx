@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider, Grid } from '@mantine/core';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider, Grid, Tooltip } from '@mantine/core';
 import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconSettingsDollar } from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
 import StatsCard from '../components/statsCardCompareEst';
@@ -45,36 +45,35 @@ export default function CompareNew() {
 
   const handleUpload = async () => {
     if (!selectedFiles.length) {
-      // alert("Please select files first!");
-      showAppNotification("error", "Failed", "Please upload Actual Files.");
+      showAppNotification("error", "Failed", "Please select Actual Files.");
       return;
     }
-
-    if (!selectedEstID) {
-      // alert("Please select an Estimate ID first!");
+  
+    if (!selectedEstID || selectedEstID === null) {
       showAppNotification("error", "Failed", "Please select an Estimate ID.");
       return;
     }
-
+  
     try {
-      setIsLoading(true); // Set loading to true
+      setIsLoading(true);
+  
       console.log("Uploading files:", selectedFiles.map((file) => file.name));
       console.log("Selected Estimate ID:", selectedEstID);
-
+  
       const response = await compareUploadFile(selectedFiles, selectedEstID);
-
+  
       if (response) {
         console.log("Upload successful:", response);
         setCompareEstimatedData(response?.data);
       }
     } catch (error) {
       console.error("Upload failed:", error);
-      // alert("Failed to upload files. Please try again.");
-      showAppNotification("error", "Failed", "Failed to upload files. Please try again.");
+      // No need to show notification here — already handled inside compareUploadFile
     } finally {
-      setIsLoading(false); // Set loading to false after request completes
+      setIsLoading(false);
     }
   };
+  
 
   console.log("Compare UI response:", compareEstimatedData);
 
@@ -147,19 +146,35 @@ export default function CompareNew() {
           </Card>
         </SimpleGrid>
         <Group justify='center'>
-          <Button
-            onClick={handleUpload}
-            // disabled={!selectedFile || !selectedEstID}
-            mt='md'
-            mb='sm'
-            radius='md'
-            variant='light'
-            loading={isLoading}
-            // rightSection={<IconArrowMoveRight />}
-            color='#000087'
-          >
-            Compare
-          </Button>
+        {(selectedFiles.length !== 3 || !selectedEstID) ? (
+  <Tooltip label="Please Select EstimateId & Actual Files">
+    <Button
+      onClick={handleUpload}
+      mt="md"
+      mb="sm"
+      radius="md"
+      variant="light"
+      loading={isLoading}
+      disabled
+      color="#000087"
+    >
+      Compare
+    </Button>
+  </Tooltip>
+) : (
+  <Button
+    onClick={handleUpload}
+    mt="md"
+    mb="sm"
+    radius="md"
+    variant="light"
+    loading={isLoading}
+    color="#000087"
+  >
+    Compare
+  </Button>
+)}
+          
         </Group>
         <Space h='sm' />
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing="md">
