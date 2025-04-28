@@ -45,10 +45,9 @@ export default function PartUsage() {
     //     setValidatedPartId(inputPartId);
     // };
     const handleCheck = () => {
-        setIsMultiLoading(true);
-        setValidatedPartIds(inputPartIds);
+        setValidatedPartIds(inputPartIds); // Only set part IDs
     };
-
+    
     const [inputPartId, setInputPartId] = useState(""); // For input field
     const [validatedPartId, setValidatedPartId] = useState(""); // For API calls
     const [selectedPartId, setSelectedPartId] = useState("");
@@ -65,7 +64,7 @@ export default function PartUsage() {
     
     const [multiPartUsageData, setMultiPartUsageData] = useState<any>();
     const [multiPartMergedData, setMultiPartMergedData] = useState<any>();
-    const [isLMultioading, setIsMultiLoading] = useState(false);
+    const [isMultioading, setIsMultiLoading] = useState(false);
     const [partUsageData, setPartUsageData] = useState<any>();
     const [isLoading, setIsLoading] = useState(false);
     const [taskSearch, setTaskSearch] = useState("");
@@ -84,59 +83,51 @@ export default function PartUsage() {
             if (!validatedPartIds || !dateRange[0] || !dateRange[1]) {
                 setIsMultiLoading(false);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Reset merged data when dependencies change
+                setMultiPartMergedData([]);
                 return;
             }
-
+    
             try {
-                // setIsMultiLoading(true);
-                setMultiPartMergedData([]); // Clear previous data before fetching new one
-
-                // Format dates
+                setIsMultiLoading(true); // Move loading here!
+                setMultiPartMergedData([]);
+    
                 const startDate = dayjs(dateRange[0]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
                 const endDate = dayjs(dateRange[1]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
-
-                // Fetch API data
+    
                 const response: any = await getMultiPartUsage(validatedPartIds, startDate, endDate);
-
+    
                 if (response) {
                     setMultiPartUsageData(response);
-
-                    // Extract necessary data from response
+    
                     const taskParts = response?.taskParts || [];
                     const findingsHMVParts = response?.findingsHMVParts || [];
                     const findingsNonHMVTasks = response?.findingsNonHMVTasks || [];
-
-                    // Merge the findings into taskParts
+    
                     const mergedData = taskParts.map((task: any) => ({
                         ...task,
-                        findingsHMVParts: findingsHMVParts.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
-                        findingsNonHMVTasks: findingsNonHMVTasks.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
+                        findingsHMVParts: findingsHMVParts.filter((finding: any) => finding?.partId === task?.partId),
+                        findingsNonHMVTasks: findingsNonHMVTasks.filter((finding: any) => finding?.partId === task?.partId),
                     }));
-
+    
                     setMultiPartMergedData(mergedData);
                 }
             } catch (error) {
                 console.error("Error fetching part usage:", error);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Ensure no old data remains on error
+                setMultiPartMergedData([]);
             } finally {
-                setIsMultiLoading(false);
+                setIsMultiLoading(false); // ✅ Finish loading after fetch
             }
         };
-
+    
         fetchMultiPartData();
-
-        // Cleanup function to clear data on unmount or dependency change
+    
         return () => {
             setMultiPartUsageData(null);
             setMultiPartMergedData([]);
         };
     }, [validatedPartIds, dateRange]);
+    
     console.log("Multi Validated Parts >>>>", validatedPartIds);
     console.log("Multi part data >>>>", multiPartUsageData);
     console.log("Multi part merged data >>>>", multiPartMergedData);
@@ -347,7 +338,7 @@ export default function PartUsage() {
                         size="xs"
                         onClick={handleCheck}
                         disabled={!inputPartId}
-                        loading={isLMultioading}
+                        loading={isMultioading}
                         color="green"
                     >
                         Submit
