@@ -570,8 +570,8 @@ const form = useForm<any>({
     operator: (value) => (value?.trim() ? null : "Operator is required"),
     aircraftRegNo: (value) =>
       value?.trim() ? null : "Aircraft Registration Number is required",
-    // aircraftAge: (value) =>
-    //   value ? null : "Aircraft Age is required",
+    aircraftAge: (value) =>
+      value ? null : "Aircraft Age is required",
     typeOfCheck: (value) =>
       value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
     typeOfCheckID: (value) =>
@@ -1193,172 +1193,6 @@ const handleSubmit = async () => {
     }
   };
 
-  //   const downloadExcelReport = () => {
-  //     if (!estimateReportData || typeof estimateReportData !== 'object') {
-  //         console.warn("No valid data available for Excel export");
-  //         return;
-  //     }
-
-  //     // Define Excel Headers (Column Titles)
-  //     const excelHeaders = [
-  //         "S.NO",
-  //         "AIRCRAFT REGISTRATION",
-  //         "AGE",
-  //         "AIRCRAFT MODEL",
-  //         "CHECK TYPE",
-  //         "MPD TASKS",
-  //         "MPD TASKS MH (WITHOUT FACTOR)",
-  //         "ADDITIONAL TASKS",
-  //         "ADDITIONAL TASKS MH",
-  //         "AD/SB TASKS",
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)",
-  //         "MISC MH",
-  //         "PRELOAD",
-  //         "TAT (DAYS)",
-  //         "UNBILLABLE MH",
-  //         "UNBILLABLE MATERIAL COST",
-  //         "REMARKS"
-  //     ];
-
-  //     // Function to process and clean data
-  //     const processField = (field : any) => (field === null || field === undefined ? "-" : field);
-
-  //     // Ensure the object has a data array or convert it into an iterable format
-  //     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
-
-  //     // Map Flattened Data to Excel Format
-  //     const excelData = reportEntries.map((est:any, index:any) => ({
-  //         "S.NO": index + 1,
-  //         "AIRCRAFT REGISTRATION": processField(est.aircraftRegNo),
-  //         "AGE": processField(est.aircraftAge),
-  //         "AIRCRAFT MODEL": processField(est.aircraftModel),
-  //         "CHECK TYPE": processField(est.typeOfCheck),
-  //         "MPD TASKS": processField(est.tasks?.length),
-  //         "MPD TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedTasks?.totalMhs),
-  //         "ADDITIONAL TASKS": "N/A",
-  //         "ADDITIONAL TASKS MH": "N/A",
-  //         "AD/SB TASKS": processField(est.findings?.length),
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedFindings?.totalMhs),
-  //         "MISC MH": "N/A",
-  //         "PRELOAD": "N/A",
-  //         "TAT (DAYS)": "-",
-  //         "UNBILLABLE MH": processField(est.capping?.unbillable_mhs),
-  //         "UNBILLABLE MATERIAL COST": processField(est.capping?.unbillable_cost),
-  //         "REMARKS": "N/A"
-  //     }));
-
-  //     // Create a new Workbook and Worksheet
-  //     const worksheet = XLSX.utils.json_to_sheet(excelData);
-
-  //     // Apply styling to the header row
-  //     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-  //     for (let C = range.s.c; C <= range.e.c; C++) {
-  //         const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-  //         if (!worksheet[cellAddress]) continue;
-  //         worksheet[cellAddress].s = {
-  //             fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
-  //             font: { bold: true, color: { rgb: "FFFFFF" } } // White text
-  //         };
-  //     }
-
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
-
-  //     // Write the file and trigger download
-  //     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
-  // };
-
-  // const downloadExcelReport = () => {
-  //     if (!estimateReportData || typeof estimateReportData !== "object") {
-  //         console.warn("No valid data available for Excel export");
-  //         return;
-  //     }
-
-  //     // Define multi-row headers
-  //     const mainHeader = ["WORK SCOPE REVIEW"]; // Merged main header
-  //     const columnHeaders = [
-  //         "S.NO",
-  //         "AIRCRAFT REGISTRATION",
-  //         "AGE",
-  //         "AIRCRAFT MODEL",
-  //         "CHECK TYPE",
-  //         "MPD TASKS",
-  //         "MPD TASKS MH (WITHOUT FACTOR)",
-  //         "ADDITIONAL TASKS",
-  //         "ADDITIONAL TASKS MH",
-  //         "AD/SB TASKS",
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)",
-  //         "MISC MH",
-  //         "PRELOAD",
-  //         "TAT (DAYS)",
-  //         "UNBILLABLE MH",
-  //         "UNBILLABLE MATERIAL COST",
-  //         "REMARKS"
-  //     ];
-
-  //     // Function to process and clean data
-  //     const processField = (field: any) => (field === null || field === undefined ? "-" : field);
-
-  //     // Ensure the object has a data array or convert it into an iterable format
-  //     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
-
-  //     // Map Flattened Data to Excel Format
-  //     const excelData = reportEntries.map((est: any, index: any) => ([
-  //         index + 1,
-  //         processField(est.aircraftRegNo),
-  //         processField(est.aircraftAge),
-  //         processField(est.aircraftModel),
-  //         processField(est.typeOfCheck),
-  //         processField(est.tasks?.length),
-  //         processField(est.aggregatedTasks?.totalMhs),
-  //         "N/A",
-  //         "N/A",
-  //         processField(est.findings?.length),
-  //         processField(est.aggregatedFindings?.totalMhs),
-  //         "N/A",
-  //         "N/A",
-  //         "-",
-  //         processField(est.capping?.unbillable_mhs),
-  //         processField(est.capping?.unbillable_cost),
-  //         "N/A"
-  //     ]));
-
-  //     // Create a new Workbook
-  //     const worksheet = XLSX.utils.aoa_to_sheet([mainHeader, columnHeaders, ...excelData]);
-
-  //     // Merge the first row across all columns
-  //     worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columnHeaders.length - 1 } }];
-
-  //     // Apply styling
-  //     const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-
-  //     for (let C = range.s.c; C <= range.e.c; C++) {
-  //         const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
-  //         const columnHeaderCell = XLSX.utils.encode_cell({ r: 1, c: C });
-
-  //         if (worksheet[headerCell]) {
-  //             worksheet[headerCell].s = {
-  //                 fill: { fgColor: { rgb: "1F497D" } }, // Dark Blue color
-  //                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
-  //                 alignment: { horizontal: "center", vertical: "center" }
-  //             };
-  //         }
-
-  //         if (worksheet[columnHeaderCell]) {
-  //             worksheet[columnHeaderCell].s = {
-  //                 fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
-  //                 font: { bold: true, color: { rgb: "FFFFFF" } },
-  //                 alignment: { horizontal: "center", vertical: "center" }
-  //             };
-  //         }
-  //     }
-
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
-
-  //     // Write the file and trigger download
-  //     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
-  // };
   const downloadExcelReport = () => {
     if (!estimateReportData || typeof estimateReportData !== "object") {
       console.warn("No valid data available for Excel export");
@@ -1402,7 +1236,10 @@ const handleSubmit = async () => {
       processField(est.aircraftRegNo),
       processField(est.aircraftAge),
       processField(est.aircraftModel),
-      processField(est.typeOfCheck),
+      // processField(est.typeOfCheck),
+      Array.isArray(est.typeOfCheck)
+      ? est.typeOfCheck.join(", ")
+      : processField(est.typeOfCheck),
       processField(est.tasks?.length),
       processField(est.aggregatedTasks?.totalMhs),
       "N/A",
@@ -2689,7 +2526,7 @@ const handleSubmit = async () => {
                     step="0.01"
                     {...form.getInputProps("aircraftAge")}
                     error={form.errors.aircraftAge}
-                    withAsterisk
+                    // withAsterisk
                   />
 
                   <Select
