@@ -44,8 +44,11 @@ export default function PartUsage() {
     // const handleCheck = () => {
     //     setValidatedPartId(inputPartId);
     // };
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
     const handleCheck = () => {
         setValidatedPartIds(inputPartIds); // Only set part IDs
+        setRefreshTrigger(prev => prev + 1); // Force useEffect to run again
     };
     
     const [inputPartId, setInputPartId] = useState(""); // For input field
@@ -80,7 +83,15 @@ export default function PartUsage() {
 
     useEffect(() => {
         const fetchMultiPartData = async () => {
-            if (!validatedPartIds || !dateRange[0] || !dateRange[1]) {
+            // Skip API call if this is the initial render (refreshTrigger is 0)
+            // or if any required data is missing
+            if (
+                refreshTrigger === 0 || // Skip the initial render
+                !validatedPartIds || 
+                validatedPartIds.length === 0 || 
+                !dateRange[0] || 
+                !dateRange[1]
+            ) {
                 setIsMultiLoading(false);
                 setMultiPartUsageData(null);
                 setMultiPartMergedData([]);
@@ -126,7 +137,7 @@ export default function PartUsage() {
             setMultiPartUsageData(null);
             setMultiPartMergedData([]);
         };
-    }, [validatedPartIds, dateRange]);
+    }, [validatedPartIds, dateRange, refreshTrigger]);
     
     console.log("Multi Validated Parts >>>>", validatedPartIds);
     console.log("Multi part data >>>>", multiPartUsageData);
