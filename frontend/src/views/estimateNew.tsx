@@ -570,8 +570,8 @@ const form = useForm<any>({
     operator: (value) => (value?.trim() ? null : "Operator is required"),
     aircraftRegNo: (value) =>
       value?.trim() ? null : "Aircraft Registration Number is required",
-    // aircraftAge: (value) =>
-    //   value ? null : "Aircraft Age is required",
+    aircraftAge: (value) =>
+      value ? null : "Aircraft Age is required",
     typeOfCheck: (value) =>
       value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
     typeOfCheckID: (value) =>
