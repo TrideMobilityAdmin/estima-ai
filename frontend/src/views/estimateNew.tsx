@@ -553,9 +553,9 @@ const form = useForm<any>({
     areaOfOperations: "",
     cappingDetails: {
       cappingTypeManhrs: "",
-      cappingManhrs: 0,
+      cappingManhrs: "",
       cappingTypeSpareCost: "",
-      cappingSpareCost: 0,
+      cappingSpareCost: "",
     },
     taskID: "",
     taskDescription: "",
@@ -676,18 +676,30 @@ const handleSubmit = async () => {
     aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
     aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
     areaOfOperations: form.values.areaOfOperations || "",
+    // cappingDetails: {
+    //   cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+    //   cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
+    //   cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+    //   cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+    // },
     cappingDetails: {
       cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-      cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
+      cappingManhrs:
+        form.values.cappingDetails.cappingManhrs?.toString().trim() === ""
+          ? 0
+          : Number(form.values.cappingDetails.cappingManhrs),
       cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-      cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+      cappingSpareCost:
+        form.values.cappingDetails.cappingSpareCost?.toString().trim() === ""
+          ? 0
+          : Number(form.values.cappingDetails.cappingSpareCost),
     },
     additionalTasks: defaultAdditionalTasks,
     typeOfCheck: form.values.typeOfCheck || [],
     typeOfCheckID: form.values.typeOfCheckID || "",
     miscLaborTasks: defaultMiscLaborTasks,
   };
-  
+  // console.log("request data >>>>",requestData);
   try {
     setLoading(true);
   
@@ -720,9 +732,9 @@ const handleSubmit = async () => {
         areaOfOperations: "",
         cappingDetails: {
           cappingTypeManhrs: "",
-          cappingManhrs: 0,
+          cappingManhrs: "",
           cappingTypeSpareCost: "",
-          cappingSpareCost: 0,
+          cappingSpareCost: "",
         },
         taskID: "",
         taskDescription: "",
@@ -4831,10 +4843,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               description: detail.description,
               cluster_id: detail.cluster,
               probability: detail.prob,
-              mhsMin: detail.mhs.min,
-              mhsMax: detail.mhs.max,
-              mhsAvg: detail.mhs.avg,
-              mhsEst: detail.mhs.est,
+              mhsMin: Math.round(detail.mhs.min),
+              mhsMax: Math.round(detail.mhs.max),
+              mhsAvg: Math.round(detail.mhs.avg),
+              mhsEst: Math.round(detail.mhs.est),
               partId: part.partId,
               partDesc: part.desc,
               unit: part.unit,
@@ -4849,10 +4861,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             description: detail.description,
             cluster_id: detail.cluster,
             probability: detail.prob,
-            mhsMin: detail.mhs.min,
-            mhsMax: detail.mhs.max,
-            mhsAvg: detail.mhs.avg,
-            mhsEst: detail.mhs.est,
+            mhsMin: Math.round(detail.mhs.min),
+            mhsMax: Math.round(detail.mhs.max),
+            mhsAvg: Math.round(detail.mhs.avg),
+            mhsEst: Math.round(detail.mhs.est),
             partId: "-",
             partDesc: "-",
             unit: "-",
@@ -4916,13 +4928,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         return (
           <Flex direction="row" justify="space-between">
             <Badge variant="light" color="teal" fullWidth>
-              Min : {val?.data?.mhsMin?.toFixed(0) || "-"}
+              Min : {val?.data?.mhsMin || "-"}
             </Badge>
-            <Badge variant="light" color="blue" fullWidth>
-              Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
+            {/* <Badge variant="light" color="blue" fullWidth>
+              Avg : {val?.data?.mhsAvg || "-"}
+            </Badge> */}
+             <Badge variant="light" color="blue" fullWidth>
+              Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
-              Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
+              Max : {val?.data?.mhsMax || "-"}
             </Badge>
           </Flex>
         );
@@ -5110,7 +5125,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Probability": task.probability || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
-        "MHS Avg": task.mhsAvg || 0,
+        // "MHS Avg": task.mhsAvg || 0,
         "MHS Est": task.mhsEst || 0,
         "Part Number": task.partId || "-",
         "Part Description": task.partDesc || "-",
@@ -5127,7 +5142,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       XLSX.utils.book_append_sheet(wb, ws, "Findings");
 
       // Write and download
-      XLSX.writeFile(wb, "Findings.xlsx");
+      XLSX.writeFile(wb, "Findings_Report.xlsx");
 
       showNotification({
         title: "Export Successful",
@@ -5143,8 +5158,32 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       });
 
       // Fallback to CSV if Excel export fails
-      downloadCSV();
+      // downloadCSV();
     }
+  };
+
+  const downloadExcelManhours = () => {
+    const rows: any[] = [];
+  
+    findings?.forEach((task:any) => {
+      task.details.forEach((detail:any) => {
+        rows.push({
+          TaskID: task.taskId,
+          Description: detail.description.replace(/\\n/g, "\n"),
+          ClusterID: detail.cluster,
+          "MHS Min": Math.round(detail.mhs.min),
+          "MHS Max": Math.round(detail.mhs.max),
+          "MHS Avg": Math.round(detail.mhs.avg),
+          "MHS Est": Math.round(detail.mhs.est),
+        });
+      });
+    });
+  
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+  
+    XLSX.writeFile(workbook, "Findings_ManHours.xlsx");
   };
 
   // UPDATED: Function to handle task selection and auto-select highest probability cluster
@@ -5175,8 +5214,12 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 Findings
               </Title>
               <Space w={50} />
-              <Button color="green" size="xs" onClick={downloadExcel} ml="60vw">
-                Download Excel
+              <Button color="green" size="xs" onClick={downloadExcel} ml="45vw">
+                Download Report
+              </Button>
+              <Space w='xs'/>
+              <Button color="green" size="xs" onClick={downloadExcelManhours}>
+                Download ManHours
               </Button>
             </div>
           </>
@@ -5834,10 +5877,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             sourceTask: task.sourceTask,
             description: task.description,
             cluster_id: task.cluster_id,
-            mhsMin: task.mhs.min,
-            mhsMax: task.mhs.max,
-            mhsAvg: task.mhs.avg,
-            mhsEst: task.mhs.est,
+            mhsMin: Math.round(task.mhs.min),
+            mhsMax: Math.round(task.mhs.max),
+            mhsAvg: Math.round(task.mhs.avg),
+            mhsEst: Math.round(task.mhs.est),
+            // skill: Array.isArray(task.skill)
+            // ? task.skill.join(", ")
+            // : task.skill,
             partId: part.partId,
             partDesc: part.desc,
             qty: part.qty,
@@ -5851,10 +5897,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
           sourceTask: task.sourceTask,
           description: task.description,
           cluster_id: task.cluster_id,
-          mhsMin: task.mhs.min,
-          mhsMax: task.mhs.max,
-          mhsAvg: task.mhs.avg,
-          mhsEst: task.mhs.est,
+          mhsMin: Math.round(task.mhs.min),
+          mhsMax: Math.round(task.mhs.max),
+          mhsAvg: Math.round(task.mhs.avg),
+          mhsEst: Math.round(task.mhs.est),
+          // skill: Array.isArray(task.skill)
+          //   ? task.skill.join(", ")
+          //   : task.skill,
           partId: "-",
           partDesc: "-",
           qty: 0,
@@ -5915,44 +5964,31 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
         return (
           <Flex direction="row" justify="space-between">
             <Badge variant="light" color="teal" fullWidth>
-              Min : {val?.data?.mhsMin?.toFixed(0) || "-"}
+              Min : {val?.data?.mhsMin || "-"}
             </Badge>
-            <Badge variant="light" color="blue" fullWidth>
-              Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
+            {/* <Badge variant="light" color="blue" fullWidth>
+              Avg : {Math.round(val?.data?.mhsAvg) || "-"}
+            </Badge> */}
+             <Badge variant="light" color="blue" fullWidth>
+              Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
-              Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
+              Max : {val?.data?.mhsMax || "-"}
             </Badge>
           </Flex>
         );
       },
     },
     // {
-    //     headerName: 'Man Hours (Max)',
-    //     field: 'mhsMax',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // {
-    //     headerName: 'Man Hours (Avg)',
-    //     field: 'mhsAvg',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // {
-    //     headerName: 'Man Hours (Est)',
-    //     field: 'mhsEst',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
+    //   headerName: "Skill",
+    //   field: "skill",
+    //   filter: true,
+    //   sortable: true,
+    //   floatingFilter: true,
+    //   resizable: true,
+    //   width: 150,
+    //   // flex: 2,
+    //   pinned: "left",
     // },
     {
       headerName: "Part Number",
@@ -6100,11 +6136,11 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const excelHeaders = [
       "Source Task",
       "Description",
-      "Cluster ID",
       "MHS Min",
       "MHS Max",
-      "MHS Avg",
+      // "MHS Avg",
       "MHS Est",
+      // "Skill",
       "Part ID",
       "Part Description",
       "Quantity",
@@ -6120,11 +6156,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const excelData = flattenedData.map((task: any) => ({
       "Source Task": processField(task.sourceTask),
       Description: processField(task.description),
-      "Cluster ID": processField(task.cluster_id),
       "MHS Min": processField(task.mhsMin),
       "MHS Max": processField(task.mhsMax),
-      "MHS Avg": processField(task.mhsAvg),
+      // "MHS Avg": processField(task.mhsAvg),
       "MHS Est": processField(task.mhsEst),
+      // "Skill": Array.isArray(task.skill)
+      // ? task.skill.join(", ")
+      // : processField(task.skill),
       "Part ID": processField(task.partId),
       "Part Description": processField(task.partDesc),
       Quantity: processField(task.qty),
@@ -6140,7 +6178,28 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "MPD_Tasks");
 
     // Write the file and trigger download
-    XLSX.writeFile(workbook, "MPD_Tasks.xlsx");
+    XLSX.writeFile(workbook, "MPD_Report.xlsx");
+  };
+
+  const downloadExcelManhours = () => {
+    const rows: any[] = [];
+
+      tasks?.forEach((detail:any) => {
+        rows.push({
+          TaskID: detail.sourceTask,
+          Description: detail.description.replace(/\\n/g, "\n"),
+          "MHS Min": Math.round(detail.mhs.min),
+          "MHS Max": Math.round(detail.mhs.max),
+          "MHS Avg": Math.round(detail.mhs.avg),
+          "MHS Est": Math.round(detail.mhs.est),
+        });
+      });
+  
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+  
+    XLSX.writeFile(workbook, "MPD_ManHours.xlsx");
   };
 
   return (
@@ -6166,12 +6225,16 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
               <Title order={4} c="white">
                 MPD
               </Title>
-              <Space w={50} />
+              <Space w={30} />
               <Text c="white">Total Source Tasks - {tasks?.length}</Text>
               {/* <Space w={600}/> */}
               {/* Button aligned to the end */}
-              <Button color="green" size="xs" onClick={downloadExcel} ml="50vw">
-                Download Excel
+              <Button color="green" size="xs" onClick={downloadExcel} ml="40vw">
+                Download Report
+              </Button>
+              <Space w='xs'/>
+              <Button color="green" size="xs" onClick={downloadExcelManhours} >
+                Download Manhours
               </Button>
             </div>
           </>
