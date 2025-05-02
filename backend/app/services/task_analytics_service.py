@@ -2,6 +2,7 @@ from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursMode
 from statistics import mean
 from fastapi import HTTPException,Depends,status
 from typing import List , Dict,Optional,Any
+import math
 import pandas as pd
 from app.middleware.auth import get_current_user
 from typing import List
@@ -13,20 +14,7 @@ import re
 from collections import defaultdict
 from app.models.estimates import (
     Estimate,
-    EstimateResponse,
-    EstimateRequest,
-    TaskDetailsWithParts,
-    AggregatedTasks,
-    SpareParts,
-    SpareResponse,
-    Details,
-    FindingsDetailsWithParts,
-    AggregatedFindingsByTask,
-    AggregatedFindings,
-    Details,
-    FindingsDetailsWithParts,
-    AggregatedFindingsByTask,
-    AggregatedFindings
+   ValidRequestCheckCategory
 )
 from app.log.logs import logger
 from app.db.database_connection import MongoDBClient
@@ -50,6 +38,10 @@ class TaskService:
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.capping_data_collection=self.mongo_client.get_collection("capping_data")
         self.estimate_file_upload=self.mongo_client.get_collection("estimate_file_upload")
+        self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
+        self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
+        self.aircraft_details_collection=self.mongo_client.get_collection("aircraft_details")
+    
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -135,15 +127,41 @@ class TaskService:
         try:
             task_ids = estimate_request.tasks
 
-            # Query MongoDB to check which tasks exist
-            existing_tasks_list = self.taskdescription_collection.find(
-                {"task_number": {"$in": task_ids}}, {"_id": 0, "task_number": 1}
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
+        
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+        
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1, "description": 1}
             )
-            existing_tasks_list = list(existing_tasks_list)  
-            existing_tasks = list(doc["task_number"] for doc in existing_tasks_list)
+            existing_tasks_list = list(existing_tasks_list)
+
+            cleaned_task_map = {}
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                description = doc["description"]
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]  
+                cleaned_task_map[task_number] = description
+
+            logger.info(f"cleaned_task_map: {cleaned_task_map}")
+
+            
+            cleaned_lrhTasks = set()  
+            for task in lrhTasks:
+                if " (LH)" in task or " (RH)" in task:
+                    task = task.split(" ")[0] 
+                cleaned_lrhTasks.add(task)
+            cleaned_lrhTasks = list(cleaned_lrhTasks)
+
             validated_tasks = [
-                ValidTasks(taskid=task, status=(task in existing_tasks))
-                for task in task_ids
+                {
+                    "taskid": task,
+                    "status": task in cleaned_task_map,
+                    "description": cleaned_task_map.get(task, " ") 
+                }
+                for task in cleaned_lrhTasks
             ]
             return validated_tasks
 
@@ -153,355 +171,7 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
-    
-    async def create_estimate(self, estimate_request: EstimateRequest,current_user:dict=Depends(get_current_user)) -> EstimateResponse:
-        """
-        Create a new estimate based on the provided tasks and parameters.
-        """
-        logger.info("Creating new estimate")
-        try:
-            current_time = datetime.now(timezone.utc)
-
-            processed_tasks = []
-            total_task_mhs=0
-            total_parts_cost = 0
-
-            findings_list=[]
-            aggregated_findings_by_task=[]
-            toatal_findings_mhs=0
-            toatal_findings_parts_cost=0
-
-            for task_id in estimate_request.tasks:
-                task_mhs = await self.get_man_hours(task_id)
-                total_task_mhs+=task_mhs.mhs.avg
-
-                spare_parts = await self.get_spare_parts(task_id)
-                task_parts_cost = sum(part.price * part.qty for part in spare_parts)
-                total_parts_cost += task_parts_cost
-
-                task_details = TaskDetailsWithParts(
-                    sourceTask=task_mhs.sourceTask,
-                    desciption=task_mhs.desciption,
-                    mhs=task_mhs.mhs,
-                    spareParts=spare_parts
-                )
-                processed_tasks.append(task_details)
-
-            aggregated_tasks=AggregatedTasks(
-                totalMhs=float(total_task_mhs),
-                totalPartsCost=float(total_parts_cost)
-            )
-
-            # findings level implementation
-            findings_man_hours = await self.get_man_hours_findings(task_id)
-            findings_spare_parts = await self.get_spare_parts_findings(task_id)
-
-            findings_details = []
-            task_findings_mhs = 0
-            task_findings_parts_cost = 0
-
-            spare_parts_by_log_item = {}
-            for spare_part in findings_spare_parts:
-                if spare_part.logItem not in spare_parts_by_log_item:
-                    spare_parts_by_log_item[spare_part.logItem] = []
-                spare_parts_by_log_item[spare_part.logItem].append(spare_part)
-
-            for mh in findings_man_hours:
-                log_item_parts = spare_parts_by_log_item.get(mh.logItem, [])
-                parts_cost = sum(part.price * part.qty for part in log_item_parts)
-                task_findings_mhs += mh.mhs.avg
-                task_findings_parts_cost += parts_cost
-
-                details = Details(
-                    logItem=mh.logItem,
-                    desciption=mh.desciption,
-                    mhs=mh.mhs,
-                    spareParts=log_item_parts
-                )
-                findings_details.append(details)
-            if findings_details:
-                findings_list.append(FindingsDetailsWithParts(
-                    taskId=task_id,
-                    details=findings_details
-                    
-                ))
-            aggregated_findings_by_task.append(AggregatedFindingsByTask(
-                taskId=task_id,
-                aggregatedMhs=ManHrs(
-                    min=min(d.mhs.min for d in findings_details),
-                    max=max(d.mhs.max for d in findings_details),
-                    avg=sum(d.mhs.avg for d in findings_details) / len(findings_details),
-                    est=sum(d.mhs.est for d in findings_details) / len(findings_details)
-                ),
-                totalPartsCost=task_findings_parts_cost
-            ))
-            toatal_findings_mhs += task_findings_mhs
-            toatal_findings_parts_cost += task_findings_parts_cost
-
-            aggregated_tasks=AggregatedTasks(
-                totalMhs=float(total_task_mhs),
-                totalPartsCost=float(total_parts_cost)
-            )
-            aggregated_findings=AggregatedFindings(
-                totalMhs=float(toatal_findings_mhs),
-                totalPartsCost=float(toatal_findings_parts_cost)
-            )
-
-                     
-            try:
-                estimate_id = await self._generate_estimate_id()
-                description = await self._get_estimate_description(estimate_request.tasks)
-                logger.info(f'description at task level: {description}')
-            except Exception as e: 
-                logger.error(f"Error generating estimate ID or description: {str(e)}")
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Failed to generate estimate ID or description")
-            estimate_doc = {
-                "estID":estimate_id,
-                "description": description,
-                "tasks": [task.model_dump() for task in processed_tasks],
-                "aggregatedTasks": aggregated_tasks.model_dump(),
-                "findings": [finding.model_dump() for finding in findings_list],
-                "aggregatedFindingsByTask": [agg.model_dump() for agg in aggregated_findings_by_task],
-                "aggregatedFindings": aggregated_findings.model_dump(),
-                "userID":current_user["_id"],
-                "createdAt": current_time,
-                "lastUpdated": current_time,
-                "createdBy":current_user["email"],
-                "updatedBy":current_user["_id"],
-                "originalFilename":description
-                
-            }
-
-            result = self.estimates_collection.insert_one(estimate_doc)
-            download_link = f"/estimates/{estimate_id}/download"
-            
-            response = EstimateResponse(
-                estID=estimate_id,
-                description=description,
-                tasks=processed_tasks,
-                aggregatedTasks=aggregated_tasks,
-                findings=findings_list,
-                aggregatedFindingsByTask=aggregated_findings_by_task,
-                aggregatedFindings=aggregated_findings,
-                userID=estimate_doc["userID"],
-                createdAt=current_time,
-                lastUpdated=current_time,
-                createdBy=estimate_doc["createdBy"],
-                updatedBy=estimate_doc["updatedBy"],
-                originalFilename=description,
-                downloadEstimate=download_link
-
-            )
-
-            return response
-
-        except Exception as e:
-            logger.error(f"Error creating estimate: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Error creating estimate: {str(e)}"
-            )
-
-    async def get_spare_parts(self, task_id: str) -> List[SpareParts]:
-        """
-        Helper method to get spare parts for a task
-        """
-        try:
-            logger.info(f"Fetching spare parts for task_id: {task_id}")
-            pipeline = [
-                {"$match": {"Task": task_id}},
-                {
-                    "$group": {
-                         "_id": "$Task",
-                        "spareParts": {
-                            "$push": {
-                                "partId": "$RequestedPart",
-                                "desc": "$PartDescription",
-                                "unit": "$UOM",
-                                "qty": "$RequestedQty",
-                                "price": {"$ifNull": ["$MaterialCost", 0.0]}
-                            }
-                        }
-                    }
-                },
-                {"$project": {"_id": 0,  "spareParts": 1}}
-            ]
-            results = list(self.task_spareparts_collection.aggregate(pipeline))
-            if not results:
-                logger.warning(f"No spare parts found for task_id: {task_id}")
-                return []
-            spare_parts = [
-                SpareParts(**part)
-                for part in results[0]["spareParts"] 
-            ]
-            return spare_parts
-    
-        except Exception as e:
-            logger.error(f"Error fetching spare parts: {str(e)}")
-            return []
-    
-    async def _get_estimate_description(self, tasks: List[str]) -> str:
-        try:
-            logger.info(f"Fetching estimate description for tasks: {tasks}")
-            estimate_doc = self.tasks_collection.find_one(
-                {"Task": {"$all": tasks}},
-                {"original_filename": 1}
-            )
-            if estimate_doc:
-                original_filename = estimate_doc.get("original_filename")
-                logger.info(f"Found estimate description: {original_filename}")
-                return original_filename
-            logger.warning("no matching document found in task_coolection")
-            return "no matching description found"
-            
-        except Exception as e:
-            logger.error(f"Error fetching estimate description: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching estimate description: {str(e)}"
-            )
-    async def _generate_estimate_id(self) -> str:
-        logger.info("Generating estimate ID")
-        try:
-            logger.info("Finding count of estimates")
-            count = self.estimates_collection.count_documents({})  # Await count
-            logger.info(f"Count of estimates: {count}")
-
-            if count == 0:
-                logger.info("No estimates found, starting with EST-001")
-                return "EST-001"
-
-        # Fetch the last inserted estimate
-            last_estimate = self.estimates_collection.find_one(
-                {},
-                sort=[("_id", -1)],  # Ensure we get the latest inserted document
-                projection={"estID": 1}
-            )
-
-            logger.info(f"Last estimate found: {last_estimate}")  # Debugging log
-
-            if not last_estimate or "estID" not in last_estimate:
-                logger.warning("No estID found in the last estimate, defaulting to EST-001")
-                return "EST-001"
-
-            last_id_str = last_estimate["estID"]
-            last_id = int(last_id_str.split("-")[1])
-            new_id = f"EST-{last_id + 1:03d}"
         
-            logger.info(f"Generated new estimate ID: {new_id}")
-            return new_id
-
-        except Exception as e:
-            logger.error(f"Error generating estimate ID: {str(e)}")
-            raise HTTPException(status_code=422, detail=f"Error generating estimate ID: {str(e)}")
-        # findings level spare parts
-    async def get_spare_parts_findings(self, task_id: str) -> List[SpareResponse]:
-        """
-        Helper method to get spare parts for a task
-        """
-        try:
-            logger.info(f"Fetching spare parts for task_id: {task_id}")
-            pipeline = [
-                {"$match": {"SourceTaskDiscrep": task_id}},
-                {'$lookup': {
-                    'from': 'sub_task_parts', 
-                    'localField': 'LogItem', 
-                    'foreignField': 'Task', 
-                    'as': 'spare'
-                    }},
-                {'$unwind': {
-                        'path': '$spare'
-                          }},
-                {
-                    "$group": {
-                         "_id": "$LogItem",
-                        "spareParts": {
-                            "$push": {
-                                "partId": "$spare.IssuedPart",
-                                "desc": "$spare.PartDescription",
-                                "unit": "$spare.IssuedUOM",
-                                "qty": "$spare.UsedQty",
-                                "price": {"$ifNull": ["$spare.TotalBillablePrice", 0.0]}
-                            }
-                        }
-                    }
-                },
-                {"$project": {"logItem": "$_id", "spareParts": 1,"_id": 0,}}
-            ]
-            results = list(self.sub_task_collection.aggregate(pipeline))
-            if not results:
-                logger.warning(f"No spare parts found for task_id: {task_id}")
-                return []
-            spareParts=[]
-            for result in results:
-                log_item=result["logItem"]
-                for spare in result["spareParts"]:
-                    spareParts.append(SpareResponse(
-                         logItem=log_item,**spare))
-
-            
-            
-            return spareParts
-    
-        except Exception as e:
-            logger.error(f"Error fetching spare parts: {str(e)}")
-            return []      
-
-    # mahhrs at findings level
-    async def get_man_hours_findings(self, source_task: str) -> List[FindingsManHoursModel]:
-        """
-        Get man hours statistics for a specific source task
-        """
-        logger.info(f"Fetching man hours for source task: {source_task}")
-
-        try:
-            pipeline = [
-                {"$match": {"SourceTaskDiscrep": source_task}},
-                {
-                    "$group": {
-                        "_id": "$LogItem",
-                        "description": {"$first": "$Description"},
-                        "probability": {"$first": "$prob"}, 
-                        "min": {"$min": "$ActualManHrs"},
-                        "max": {"$max": "$ActualManHrs"},
-                        "avg": {"$avg": "$ActualManHrs"},
-                        "est": {"$avg": "$EstManHrs"}
-                    }
-                }
-            ]
-
-            results = list(self.sub_task_collection.aggregate(pipeline))
-            logger.info(f"Aggregation results: len={len(results)}")
-
-            if not results:
-                logger.warning(f"No data found for source task: {source_task}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No data found for source task: {source_task}"
-                )
-            # task = results[0]
-            task_man_hours = [
-                FindingsManHoursModel(
-                    logItem=task["_id"],
-                    desciption=task["description"],
-                    mhs=ManHrs(
-                        min=task["min"],
-                        max=task["max"],
-                        avg=task["avg"],
-                        est=task["est"]
-            )
-            )
-            for task in results
-            ]
-            return task_man_hours
-
-        except Exception as e:
-            logger.error(f"Error fetching man hours: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error fetching man hours: {str(e)}"
-            )
-    
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
@@ -519,7 +189,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+     {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -605,7 +282,7 @@ class TaskService:
                                     {
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
-                                        'quantity': '$requested_quantity', 
+                                        'quantity': '$ceilUsedQuantity', 
                                         'stockStatus': '$requested_stock_status', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
@@ -704,7 +381,14 @@ class TaskService:
                 ]
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$facet': {
             'hmvTasks': [
                 {
@@ -759,6 +443,27 @@ class TaskService:
                                     '$lt': [
                                         '$task_info.actual_end_date', endDate
                                     ]
+                                }
+                            ]
+                        }
+                    }
+                }, 
+                {
+                    '$group': {
+                        '_id': '$task_number', 
+                        'doc': {
+                            '$first': '$$ROOT'
+                        }, 
+                        'totalQty': {
+                            '$sum': '$ceilUsedQuantity'
+                        }
+                    }
+                }, {
+                    '$replaceRoot': {
+                        'newRoot': {
+                            '$mergeObjects': [
+                                '$doc', {
+                                    'ceilUsedQuantity': '$totalQty'
                                 }
                             ]
                         }
@@ -905,7 +610,7 @@ class TaskService:
                                 'description': '$task_description', 
                                 'date': '$task_desc1.actual_start_date', 
                                 'stockStatus': '$stock_status', 
-                                'quantity': '$used_quantity', 
+                                'quantity': '$ceilUsedQuantity', 
                                 'aircraftModel': '$aircraft_info.aircraft_model'
                             }
                         }
@@ -979,7 +684,7 @@ class TaskService:
                                         ]
                                     }, 
                                     'stockStatus': '$$hmvTask.stock_status', 
-                                    'quantity': '$$hmvTask.used_quantity', 
+                                    'quantity': '$$hmvTask.ceilUsedQuantity', 
                                     'aircraftModel': '$$hmvTask.aircraft_info.aircraft_model'
                                 }
                             ]
@@ -1164,7 +869,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
-           
+        
 
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
@@ -1507,7 +1212,7 @@ class TaskService:
                     "taskDescription": task.get("taskDescription", ""),
                     "skills": [
                         {
-                            "skill": skill["skill"],
+                            "skill": skill.get("skill"),
                             "manHours": skill["manhours"]
                         }
                         for skill in task["skills"]
@@ -1515,13 +1220,14 @@ class TaskService:
                 }
                 for task in task_skill_results
             ]
+            logger.info(f"fetched tasks successfully: len={len(tasks)}")
 
             findings = [
                 {
                     "taskId": sub_task["_id"],
                     "skills": [
                         {
-                            "skill": skill["skill"],
+                            "skill": skill.get("skill"),
                             "manHours": skill["manhours"]
                         }
                         for skill in sub_task["skills"]
@@ -1561,6 +1267,7 @@ class TaskService:
         """
         logger.info(f"Fetching estimate by ID: {estimate_id}")
         configurations = self.configurations_collection.find_one()
+        configurations=replace_nan_inf(configurations)
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
 
         capping_pipeline=[
@@ -1575,7 +1282,16 @@ class TaskService:
                     'aircraftAge': 1, 
                     'aircraftModel': 1, 
                     'aircraftRegNo': 1, 
-                    'typeOfCheck': 1, 
+                    'typeOfCheckID': {
+                '$ifNull': [
+                    '$typeOfCheckID', ''
+                ]
+            }, 
+            'typeOfCheck': {
+                '$ifNull': [
+                    '$typeOfCheck', []
+                ]
+            }, 
                     'mh_type': '$cappingDetails.cappingTypeManhrs', 
                     'mhs': '$cappingDetails.cappingManhrs', 
                     'cost_type': '$cappingDetails.cappingTypeSpareCost', 
@@ -1584,64 +1300,64 @@ class TaskService:
             }
         ]
         result = list(self.estimate_file_upload.aggregate(capping_pipeline))
-        capping_result = result[0]
+        capping_result = replace_nan_inf(result[0] if result else {})
         logger.info(f"capping_result fetched: {capping_result}")
 
-        SCMH = 0
-        SCMC = 0
-        FMH = 0
-        FMC = 0
-        line_item = 0
-        # capping_type = "N/A"
+        # SCMH = 0
+        # SCMC = 0
+        # FMH = 0
+        # FMC = 0
+        # line_item = 0
+        # # capping_type = "N/A"
 
         
-        if capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type") == "per_source_card":
-            SCMH = capping_result.get("mhs")
-            SCMC = capping_result.get("mc")
-            capping_type = "per_source_card"
-        elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type") == "per_IRC":
-            FMH = capping_result.get("mhs")
-            FMC = capping_result.get("mc")
-            capping_type = "per_IRC"
-        elif capping_result.get("cost_type") == "per_line_item":
-            line_item = capping_result.get("mc")
-            capping_type = "per_line_item"
-        elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="":
-            SCMH = capping_result.get("mhs")
-            capping_type="per_source_card_no_cost"
-        elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type")=="":
-            FMH = capping_result.get("mhs")
-            FMC = 500
-            capping_type="per_IRC_no_cost"
-        elif capping_result.get("cost_type")=="per_IRC" and capping_result.get("mh_type")=="":
-            FMC = capping_result.get("mc")
-            FMH=20
-            capping_type="no_manhours_per_IRC"
-        elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="per_source_card":
-            SCMC = capping_result.get("mc")
-            capping_type="no_manhours_per_source_card" 
-        elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="":
-            capping_type = "N/A"
-        elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="per_IRC":
-            SCMH=capping_result.get("mhs")
-            SCMC=500
-            FMH=20
-            FMC=capping_result.get("mc")
-            capping_type="per_source_card_per_IRC"
-        elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type")=="per_source_card":
-            FMH=capping_result.get("mhs")
-            FMC=500
-            SCMC=capping_result.get("mc")
-            SCMH=20
-            capping_type="per_IRC_per_source_card"
+        # if capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type") == "per_source_card":
+        #     SCMH = capping_result.get("mhs")
+        #     SCMC = capping_result.get("mc")
+        #     capping_type = "per_source_card"
+        # elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type") == "per_IRC":
+        #     FMH = capping_result.get("mhs")
+        #     FMC = capping_result.get("mc")
+        #     capping_type = "per_IRC"
+        # elif capping_result.get("cost_type") == "per_line_item":
+        #     line_item = capping_result.get("mc")
+        #     capping_type = "per_line_item"
+        # elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="":
+        #     SCMH = capping_result.get("mhs")
+        #     capping_type="per_source_card_no_cost"
+        # elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type")=="":
+        #     FMH = capping_result.get("mhs")
+        #     FMC = 500
+        #     capping_type="per_IRC_no_cost"
+        # elif capping_result.get("cost_type")=="per_IRC" and capping_result.get("mh_type")=="":
+        #     FMC = capping_result.get("mc")
+        #     FMH=20
+        #     capping_type="no_manhours_per_IRC"
+        # elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="per_source_card":
+        #     SCMC = capping_result.get("mc")
+        #     capping_type="no_manhours_per_source_card" 
+        # elif capping_result.get("mh_type")=="" and capping_result.get("cost_type")=="":
+        #     capping_type = "N/A"
+        # elif capping_result.get("mh_type")=="per_source_card" and capping_result.get("cost_type")=="per_IRC":
+        #     SCMH=capping_result.get("mhs")
+        #     SCMC=500
+        #     FMH=20
+        #     FMC=capping_result.get("mc")
+        #     capping_type="per_source_card_per_IRC"
+        # elif capping_result.get("mh_type")=="per_IRC" and capping_result.get("cost_type")=="per_source_card":
+        #     FMH=capping_result.get("mhs")
+        #     FMC=500
+        #     SCMC=capping_result.get("mc")
+        #     SCMH=20
+            # capping_type="per_IRC_per_source_card"
 
             
-        logger.info(f"capping_type fetched: {capping_type}")
-        logger.info(f"capping_manhrs fetched per_source_card: {SCMH}")
-        logger.info(f"capping_cost fetched per_source_card: {SCMC}")
-        logger.info(f"line_item_cost fetched per_line_item: {line_item}")
-        logger.info(f"capping_manhrs fetched per_IRC: {FMH}")
-        logger.info(f"capping_cost fetched per_IRC: {FMC}")
+        # logger.info(f"capping_type fetched: {capping_type}")
+        # logger.info(f"capping_manhrs fetched per_source_card: {SCMH}")
+        # logger.info(f"capping_cost fetched per_source_card: {SCMC}")
+        # logger.info(f"line_item_cost fetched per_line_item: {line_item}")
+        # logger.info(f"capping_manhrs fetched per_IRC: {FMH}")
+        # logger.info(f"capping_cost fetched per_IRC: {FMC}")
         
 
         try:
@@ -1650,201 +1366,64 @@ class TaskService:
         '$match': {
             'estID': estimate_id
         }
-    }, {
+    }, 
+    {
         '$addFields': {
-            'estimate_manhrs': {
-                'min': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.min', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.min', 0
-                                                    ]
-                                                }
-                                            }
+            'aggregatedTasks': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': '$tasks.spare_parts', 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
+                    }
+                }
+            },
+            'aggregatedFindings': {
+                'spareParts': {
+                    '$reduce': {
+                        'input': {
+                            '$map': {
+                                'input': '$findings', 
+                                'as': 'finding', 
+                                'in': {
+                                    '$reduce': {
+                                        'input': '$$finding.details.spare_parts', 
+                                        'initialValue': [], 
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
                                         }
                                     }
                                 }
                             }
+                        }, 
+                        'initialValue': [], 
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
                         }
-                    ]
-                }, 
-                'max': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.max', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.max', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'avg': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.avg', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.avg', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }, 
-                'est': {
-                    '$sum': [
-                        {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$tasks', 
-                                    'as': 'task', 
-                                    'in': {
-                                        '$ifNull': [
-                                            '$$task.mhs.est', 0
-                                        ]
-                                    }
-                                }
-                            }
-                        }, {
-                            '$sum': {
-                                '$map': {
-                                    'input': '$findings', 
-                                    'as': 'finding', 
-                                    'in': {
-                                        '$sum': {
-                                            '$map': {
-                                                'input': '$$finding.details', 
-                                                'as': 'detail', 
-                                                'in': {
-                                                    '$ifNull': [
-                                                        '$$detail.mhs.est', 0
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ]
+                    }
                 }
             }
         }
-    }, {
-        '$addFields': {
-            # 'tatTime': {
-            #     '$divide': [
-            #         {
-            #             '$add': [
-            #                 {
-            #                     '$ifNull': [
-            #                         '$aggregatedTasks.totalMhs', 0
-            #                     ]
-            #                 }, {
-            #                     '$ifNull': [
-            #                         '$aggregatedFindings.totalMhs', 0
-            #                     ]
-            #                 }
-            #             ]
-            #         }, man_hours_threshold
-            #     ]
-            # }, 
-            'estimatedSpareCost': {
-                '$add': [
-                    {
-                        '$ifNull': [
-                            '$aggregatedTasks.totalPartsCost', 0
-                        ]
-                    }, {
-                        '$ifNull': [
-                            '$aggregatedFindings.totalPartsCost', 0
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
+    },
+      {
         '$project': {
             '_id': 0, 
             'estID': 1, 
             'description': 1, 
+            
+            'cappingValues': '$capping_values',
             'overallEstimateReport': {
                 # 'estimatedTatTime': '$tatTime', 
-                'estimatedSpareCost': '$estimatedSpareCost', 
-                'estimateManhrs': '$estimate_manhrs', 
+                'estimatedSpareCost': '$totalConsumption.totalPartsCost', 
+                'estimateManhrs': '$totalConsumption.mhs', 
                 'spareParts': {
                     '$filter': {
                         'input': '$totalConsumption.totalParts', 
@@ -1870,9 +1449,19 @@ class TaskService:
                     }
                 }
             }, 
-            'aggregatedTasks': 1, 
+            'aggregatedTasks': {
+                'spareParts': '$aggregatedTasks.spareParts', 
+                'estimateManhrs': '$aggregatedTasks.mhs', 
+                'totalMhs': '$aggregatedTasks.totalMhs', 
+                'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
+            },  
             'findings': '$findings', 
-            'aggregatedFindings': 1, 
+            'aggregatedFindings': {
+                'spareParts': '$aggregatedFindings.spareParts', 
+                'estimateManhrs': '$aggregatedFindings.mhs', 
+                'totalMhs': '$aggregatedFindings.totalMhs', 
+                'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
+            },  
             'originalFilename': 1, 
             'userID': {
                 '$toString': '$userID'
@@ -1892,540 +1481,542 @@ class TaskService:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
-            estimate_data = result[0]
+            estimate_data = replace_nan_inf(result[0] if result else {})
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
             estimate_data["aircraftAge"] = capping_result.get("aircraftAge")
             estimate_data["aircraftModel"] = capping_result.get("aircraftModel")
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
+            estimate_data["typeOfCheckID"] = capping_result.get("typeOfCheckID")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
             logger.info("estimate_data fetched")
-            findings_level_pipeline=[
-                    {
-                        '$match': {
-                            'estID':estimate_id
-                        }
-                    }, {
-                        '$unwind': '$findings'
-                    }, {
-                        '$unwind': '$findings.details'
-                    }, {
-                        '$group': {
-                            '_id': '$findings.details.cluster', 
-                            'totalAvgMhs': {
-                                '$sum': {
-                                    '$ifNull': [
-                                        '$findings.details.mhs.avg', 0
-                                    ]
-                                }
-                            }, 
-                            'totalSpareCost': {
-                                '$sum': {
-                                    '$sum': {
-                                        '$map': {
-                                            'input': {
-                                                '$ifNull': [
-                                                    '$findings.details.spare_parts', []
-                                                ]
-                                            }, 
-                                            'as': 'part', 
-                                            'in': {
-                                                '$ifNull': [
-                                                    '$$part.price', 0
-                                                ]
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'cluster': '$_id', 
-                            'totalAvgMhs': 1, 
-                            'totalSpareCost': 1, 
-                            'billableMhs': {
-                                '$cond': [
-                                    {
-                                        '$gte': [
-                                            '$totalAvgMhs', FMH
-                                        ]
-                                    }, {
-                                        '$subtract': [
-                                            '$totalAvgMhs', FMH
-                                        ]
-                                    }, 0
-                                ]
-                            }, 
-                            'unbillableMhs': {
-                                '$cond': [
-                                    {
-                                        '$gte': [
-                                            '$totalAvgMhs', FMH
-                                        ]
-                                    }, FMH, '$totalAvgMhs'
-                                ]
-                            }, 
-                            'billableCost': {
-                                '$cond': [
-                                    {
-                                        '$gte': [
-                                            '$totalSpareCost', FMC
-                                        ]
-                                    }, {
-                                        '$subtract': [
-                                            '$totalSpareCost', FMC
-                                        ]
-                                    }, 0
-                                ]
-                            }, 
-                            'unbillableCost': {
-                                '$cond': [
-                                    {
-                                        '$gte': [
-                                            '$totalSpareCost', FMC
-                                        ]
-                                    }, FMC, '$totalSpareCost'
-                                ]
-                            }
-                        }
-                    }, {
-                        '$group': {
-                            '_id': None, 
-                            'totalBillableMhs': {
-                                '$sum': '$billableMhs'
-                            }, 
-                            'totalUnbillableMhs': {
-                                '$sum': '$unbillableMhs'
-                            }, 
-                            'totalBillableCost': {
-                                '$sum': '$billableCost'
-                            }, 
-                            'totalUnbillableCost': {
-                                '$sum': '$unbillableCost'
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            '_id': 0, 
-                            'clusterCapping': 1, 
-                            'totalBillableMhs': 1, 
-                            'totalUnbillableMhs': 1, 
-                            'totalBillableCost': 1, 
-                            'totalUnbillableCost': 1
-                        }
-                    }
-                ]
-            findings_result=list(self.estimates_collection.aggregate(findings_level_pipeline))
-            if not findings_result:
-                findings_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
-                                "totalBillableCost": 0, "totalUnbillableCost": 0}
-            else:
-                findings_level = findings_result[0]
+    #         findings_level_pipeline=[
+    #                 {
+    #                     '$match': {
+    #                         'estID':estimate_id
+    #                     }
+    #                 }, {
+    #                     '$unwind': '$findings'
+    #                 }, {
+    #                     '$unwind': '$findings.details'
+    #                 }, {
+    #                     '$group': {
+    #                         '_id': '$findings.details.cluster', 
+    #                         'totalAvgMhs': {
+    #                             '$sum': {
+    #                                 '$ifNull': [
+    #                                     '$findings.details.mhs.avg', 0
+    #                                 ]
+    #                             }
+    #                         }, 
+    #                         'totalSpareCost': {
+    #                             '$sum': {
+    #                                 '$sum': {
+    #                                     '$map': {
+    #                                         'input': {
+    #                                             '$ifNull': [
+    #                                                 '$findings.details.spare_parts', []
+    #                                             ]
+    #                                         }, 
+    #                                         'as': 'part', 
+    #                                         'in': {
+    #                                             '$ifNull': [
+    #                                                 '$$part.price', 0
+    #                                             ]
+    #                                         }
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 }, {
+    #                     '$project': {
+    #                         'cluster': '$_id', 
+    #                         'totalAvgMhs': 1, 
+    #                         'totalSpareCost': 1, 
+    #                         'billableMhs': {
+    #                             '$cond': [
+    #                                 {
+    #                                     '$gte': [
+    #                                         '$totalAvgMhs', FMH
+    #                                     ]
+    #                                 }, {
+    #                                     '$subtract': [
+    #                                         '$totalAvgMhs', FMH
+    #                                     ]
+    #                                 }, 0
+    #                             ]
+    #                         }, 
+    #                         'unbillableMhs': {
+    #                             '$cond': [
+    #                                 {
+    #                                     '$gte': [
+    #                                         '$totalAvgMhs', FMH
+    #                                     ]
+    #                                 }, FMH, '$totalAvgMhs'
+    #                             ]
+    #                         }, 
+    #                         'billableCost': {
+    #                             '$cond': [
+    #                                 {
+    #                                     '$gte': [
+    #                                         '$totalSpareCost', FMC
+    #                                     ]
+    #                                 }, {
+    #                                     '$subtract': [
+    #                                         '$totalSpareCost', FMC
+    #                                     ]
+    #                                 }, 0
+    #                             ]
+    #                         }, 
+    #                         'unbillableCost': {
+    #                             '$cond': [
+    #                                 {
+    #                                     '$gte': [
+    #                                         '$totalSpareCost', FMC
+    #                                     ]
+    #                                 }, FMC, '$totalSpareCost'
+    #                             ]
+    #                         }
+    #                     }
+    #                 }, {
+    #                     '$group': {
+    #                         '_id': None, 
+    #                         'totalBillableMhs': {
+    #                             '$sum': '$billableMhs'
+    #                         }, 
+    #                         'totalUnbillableMhs': {
+    #                             '$sum': '$unbillableMhs'
+    #                         }, 
+    #                         'totalBillableCost': {
+    #                             '$sum': '$billableCost'
+    #                         }, 
+    #                         'totalUnbillableCost': {
+    #                             '$sum': '$unbillableCost'
+    #                         }
+    #                     }
+    #                 }, {
+    #                     '$project': {
+    #                         '_id': 0, 
+    #                         'clusterCapping': 1, 
+    #                         'totalBillableMhs': 1, 
+    #                         'totalUnbillableMhs': 1, 
+    #                         'totalBillableCost': 1, 
+    #                         'totalUnbillableCost': 1
+    #                     }
+    #                 }
+    #             ]
+    #         findings_result=replace_nan_inf(list(self.estimates_collection.aggregate(findings_level_pipeline)))
+    #         if not findings_result:
+    #             findings_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+    #                             "totalBillableCost": 0, "totalUnbillableCost": 0}
+    #         else:
+    #             findings_level = findings_result[0]
 
-            SC_NC_pipeline = [
-                {
-                    '$match': {
-                        'estID': estimate_id
-                    }
-                }, {
-                    '$unwind': '$tasks'
-                }, {
-                    '$group': {
-                        '_id': '$tasks.sourceTask', 
-                        'totalAvgMhs': {
-                            '$sum': {
-                                '$ifNull': [
-                                    '$tasks.mhs.avg', 0
-                                ]
-                            }
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'sourceTask': '$_id', 
-                        'totalAvgMhs': 1, 
-                        'billableMhs': {
-                            '$cond': [
-                                {
-                                    '$gte': [
-                                        '$totalAvgMhs', SCMH
-                                    ]
-                                }, {
-                                    '$subtract': [
-                                        '$totalAvgMhs', SCMH
-                                    ]
-                                }, 0
-                            ]
-                        }, 
-                        'unbillableMhs': {
-                            '$cond': [
-                                {
-                                    '$gte': [
-                                        '$totalAvgMhs', SCMH
-                                    ]
-                                }, SCMH, '$totalAvgMhs'
-                            ]
-                        }
-                    }
-                }, {
-                    '$group': {
-                        '_id': None, 
-                        'totalBillableMhs': {
-                            '$sum': '$billableMhs'
-                        }, 
-                        'totalUnbillableMhs': {
-                            '$sum': '$unbillableMhs'
-                        }
-                    }
-                }, {
-                    '$project': {
-                        '_id': 0, 
-                        'totalBillableMhs': 1, 
-                        'totalUnbillableMhs': 1
-                    }
-                }
-            ]
-            task_SC_result = list(self.estimates_collection.aggregate(SC_NC_pipeline))
-            if not task_SC_result:
-                task_SC_result = {"totalBillableMhs": 0, "totalUnbillableMhs": 0}
-            else:
-                task_SC_result = task_SC_result[0]
-            task_level_pipeline=[
-        {
-            '$match': {
-                'estID': estimate_id
-            }
-        }, {
-            '$unwind': '$tasks'
-        }, {
-            '$group': {
-                '_id': '$tasks.sourceTask', 
-                'totalAvgMhs': {
-                    '$sum': {
-                        '$ifNull': [
-                            '$tasks.mhs.avg', 0
-                        ]
-                    }
-                }, 
-                'totalSpareCost': {
-                    '$sum': {
-                        '$sum': {
-                            '$map': {
-                                'input': {
-                                    '$ifNull': [
-                                        '$tasks.spare_parts', []
-                                    ]
-                                }, 
-                                'as': 'part', 
-                                'in': {
-                                    '$ifNull': [
-                                        '$$part.price', 0
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }, {
-            '$project': {
-                'sourceTask': '$_id', 
-                'totalAvgMhs': 1, 
-                'totalSpareCost': 1, 
-                'billableMhs': {
-                    '$cond': [
-                        {
-                            '$gte': [
-                                '$totalAvgMhs', SCMH
-                            ]
-                        }, {
-                            '$subtract': [
-                                '$totalAvgMhs', SCMH
-                            ]
-                        }, 0
-                    ]
-                }, 
-                'unbillableMhs': {
-                    '$cond': [
-                        {
-                            '$gte': [
-                                '$totalAvgMhs', SCMH
-                            ]
-                        }, SCMH, '$totalAvgMhs'
-                    ]
-                }, 
-                'billableCost': {
-                    '$cond': [
-                        {
-                            '$gte': [
-                                '$totalSpareCost', SCMC
-                            ]
-                        }, {
-                            '$subtract': [
-                                '$totalSpareCost', SCMC
-                            ]
-                        }, 0
-                    ]
-                }, 
-                'unbillableCost': {
-                    '$cond': [
-                        {
-                            '$gte': [
-                                '$totalSpareCost', SCMC
-                            ]
-                        }, SCMC, '$totalSpareCost'
-                    ]
-                }
-            }
-        }, {
-            '$group': {
-                '_id': None, 
-                'totalBillableMhs': {
-                    '$sum': '$billableMhs'
-                }, 
-                'totalUnbillableMhs': {
-                    '$sum': '$unbillableMhs'
-                }, 
-                'totalBillableCost': {
-                    '$sum': '$billableCost'
-                }, 
-                'totalUnbillableCost': {
-                    '$sum': '$unbillableCost'
-                }
-            }
-        }, {
-            '$project': {
-                '_id': 0, 
-                'totalBillableMhs': 1, 
-                'totalUnbillableMhs': 1, 
-                'totalBillableCost': 1, 
-                'totalUnbillableCost': 1
-            }
-        }
-    ]
-            task_result=list(self.estimates_collection.aggregate(task_level_pipeline))
-            logger.info("task_level fetched")
-            if not task_result:
-                task_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
-                            "totalBillableCost": 0, "totalUnbillableCost": 0}
-            else:
-                task_level = task_result[0]
-
-            if capping_type == "per_source_card":    
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': task_level.get('totalBillableMhs', 0),
-                        'unbillable_mhs': task_level.get('totalUnbillableMhs', 0),
-                        'billable_cost': task_level.get('totalBillableCost', 0),
-                        'unbillable_cost': task_level.get('totalUnbillableCost', 0)
-                    }
-                }
+    #         SC_NC_pipeline = [
+    #             {
+    #                 '$match': {
+    #                     'estID': estimate_id
+    #                 }
+    #             }, {
+    #                 '$unwind': '$tasks'
+    #             }, {
+    #                 '$group': {
+    #                     '_id': '$tasks.sourceTask', 
+    #                     'totalAvgMhs': {
+    #                         '$sum': {
+    #                             '$ifNull': [
+    #                                 '$tasks.mhs.avg', 0
+    #                             ]
+    #                         }
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$project': {
+    #                     'sourceTask': '$_id', 
+    #                     'totalAvgMhs': 1, 
+    #                     'billableMhs': {
+    #                         '$cond': [
+    #                             {
+    #                                 '$gte': [
+    #                                     '$totalAvgMhs', SCMH
+    #                                 ]
+    #                             }, {
+    #                                 '$subtract': [
+    #                                     '$totalAvgMhs', SCMH
+    #                                 ]
+    #                             }, 0
+    #                         ]
+    #                     }, 
+    #                     'unbillableMhs': {
+    #                         '$cond': [
+    #                             {
+    #                                 '$gte': [
+    #                                     '$totalAvgMhs', SCMH
+    #                                 ]
+    #                             }, SCMH, '$totalAvgMhs'
+    #                         ]
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$group': {
+    #                     '_id': None, 
+    #                     'totalBillableMhs': {
+    #                         '$sum': '$billableMhs'
+    #                     }, 
+    #                     'totalUnbillableMhs': {
+    #                         '$sum': '$unbillableMhs'
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$project': {
+    #                     '_id': 0, 
+    #                     'totalBillableMhs': 1, 
+    #                     'totalUnbillableMhs': 1
+    #                 }
+    #             }
+    #         ]
+    #         task_SC_result = replace_nan_inf(list(self.estimates_collection.aggregate(SC_NC_pipeline)))
+    #         if not task_SC_result:
+    #             task_SC_result = {"totalBillableMhs": 0, "totalUnbillableMhs": 0}
+    #         else:
+    #             task_SC_result = task_SC_result[0]
+    #         task_level_pipeline=[
+    #     {
+    #         '$match': {
+    #             'estID': estimate_id
+    #         }
+    #     }, {
+    #         '$unwind': '$tasks'
+    #     }, {
+    #         '$group': {
+    #             '_id': '$tasks.sourceTask', 
+    #             'totalAvgMhs': {
+    #                 '$sum': {
+    #                     '$ifNull': [
+    #                         '$tasks.mhs.avg', 0
+    #                     ]
+    #                 }
+    #             }, 
+    #             'totalSpareCost': {
+    #                 '$sum': {
+    #                     '$sum': {
+    #                         '$map': {
+    #                             'input': {
+    #                                 '$ifNull': [
+    #                                     '$tasks.spare_parts', []
+    #                                 ]
+    #                             }, 
+    #                             'as': 'part', 
+    #                             'in': {
+    #                                 '$ifNull': [
+    #                                     '$$part.price', 0
+    #                                 ]
+    #                             }
+    #                         }
+    #                     }
+    #                 }
+    #             }
+    #         }
+    #     }, {
+    #         '$project': {
+    #             'sourceTask': '$_id', 
+    #             'totalAvgMhs': 1, 
+    #             'totalSpareCost': 1, 
+    #             'billableMhs': {
+    #                 '$cond': [
+    #                     {
+    #                         '$gte': [
+    #                             '$totalAvgMhs', SCMH
+    #                         ]
+    #                     }, {
+    #                         '$subtract': [
+    #                             '$totalAvgMhs', SCMH
+    #                         ]
+    #                     }, 0
+    #                 ]
+    #             }, 
+    #             'unbillableMhs': {
+    #                 '$cond': [
+    #                     {
+    #                         '$gte': [
+    #                             '$totalAvgMhs', SCMH
+    #                         ]
+    #                     }, SCMH, '$totalAvgMhs'
+    #                 ]
+    #             }, 
+    #             'billableCost': {
+    #                 '$cond': [
+    #                     {
+    #                         '$gte': [
+    #                             '$totalSpareCost', SCMC
+    #                         ]
+    #                     }, {
+    #                         '$subtract': [
+    #                             '$totalSpareCost', SCMC
+    #                         ]
+    #                     }, 0
+    #                 ]
+    #             }, 
+    #             'unbillableCost': {
+    #                 '$cond': [
+    #                     {
+    #                         '$gte': [
+    #                             '$totalSpareCost', SCMC
+    #                         ]
+    #                     }, SCMC, '$totalSpareCost'
+    #                 ]
+    #             }
+    #         }
+    #     }, {
+    #         '$group': {
+    #             '_id': None, 
+    #             'totalBillableMhs': {
+    #                 '$sum': '$billableMhs'
+    #             }, 
+    #             'totalUnbillableMhs': {
+    #                 '$sum': '$unbillableMhs'
+    #             }, 
+    #             'totalBillableCost': {
+    #                 '$sum': '$billableCost'
+    #             }, 
+    #             'totalUnbillableCost': {
+    #                 '$sum': '$unbillableCost'
+    #             }
+    #         }
+    #     }, {
+    #         '$project': {
+    #             '_id': 0, 
+    #             'totalBillableMhs': 1, 
+    #             'totalUnbillableMhs': 1, 
+    #             'totalBillableCost': 1, 
+    #             'totalUnbillableCost': 1
+    #         }
+    #     }
+    # ]
+    #         task_result=replace_nan_inf(list(self.estimates_collection.aggregate(task_level_pipeline)))
+    #         logger.info("task_level fetched")
+    #         if not task_result:
+    #             task_level = {"totalBillableMhs": 0, "totalUnbillableMhs": 0, 
+    #                         "totalBillableCost": 0, "totalUnbillableCost": 0}
+    #         else:
+    #             task_level = task_result[0]
+    #         logger.info(f"capping_type fetched:{capping_type}")
+    #         if capping_type == "per_source_card":    
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': task_level.get('totalBillableMhs', 0),
+    #                     'unbillable_mhs': task_level.get('totalUnbillableMhs', 0),
+    #                     'billable_cost': task_level.get('totalBillableCost', 0),
+    #                     'unbillable_cost': task_level.get('totalUnbillableCost', 0)
+    #                 }
+    #             }
             
-            elif capping_type == "per_IRC":
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': findings_level.get('totalBillableMhs', 0),
-                        'unbillable_mhs': findings_level.get('totalUnbillableMhs', 0),
-                        'billable_cost': findings_level.get('totalBillableCost', 0),
-                        'unbillable_cost': findings_level.get('totalUnbillableCost', 0)
-                    }
-            }
+            
+    #         elif capping_type == "per_IRC":
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': findings_level.get('totalBillableMhs', 0),
+    #                     'unbillable_mhs': findings_level.get('totalUnbillableMhs', 0),
+    #                     'billable_cost': findings_level.get('totalBillableCost', 0),
+    #                     'unbillable_cost': findings_level.get('totalUnbillableCost', 0)
+    #                 }
+    #         }
   
     
-        #per line item capping for material cost
-            elif capping_type == "per_line_item":
-                grouped_parts = {}
-                total_spare_parts_billable = 0
-                total_spare_parts_unbillable = 0
-                spare_parts = estimate_data.get('overallEstimateReport', {}).get('spareParts', [])
-                logger.info(f"spare parts:length{len(spare_parts)}")
-                for part in spare_parts:
-                    key = f"{part.get('partId')}_{part.get('desc')}"
-                    if key not in grouped_parts:
-                        grouped_parts[key] = 0
-                    grouped_parts[key] += part.get('price', 0)
+    #     #per line item capping for material cost
+    #         elif capping_type == "per_line_item":
+    #             grouped_parts = {}
+    #             total_spare_parts_billable = 0
+    #             total_spare_parts_unbillable = 0
+    #             spare_parts = estimate_data.get('overallEstimateReport', {}).get('spareParts', [])
+    #             logger.info(f"spare parts:length{len(spare_parts)}")
+    #             for part in spare_parts:
+    #                 key = f"{part.get('partId')}_{part.get('desc')}"
+    #                 if key not in grouped_parts:
+    #                     grouped_parts[key] = 0
+    #                 grouped_parts[key] += part.get('price', 0)
                 
-            #Calculate billable and unbillable in a single loop
-                logger.info(f"Grouped parts:length={len(grouped_parts)}")
-                for total_price in grouped_parts.values():
-                    if total_price >= line_item:
-                        billable = total_price - line_item
-                        unbillable = line_item
-                    else:
-                        billable = 0
-                        unbillable = total_price
+    #         #Calculate billable and unbillable in a single loop
+    #             logger.info(f"Grouped parts:length={len(grouped_parts)}")
+    #             for total_price in grouped_parts.values():
+    #                 if total_price >= line_item:
+    #                     billable = total_price - line_item
+    #                     unbillable = line_item
+    #                 else:
+    #                     billable = 0
+    #                     unbillable = total_price
                         
-                    total_spare_parts_billable += billable
-                    total_spare_parts_unbillable += unbillable
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_cost': total_spare_parts_billable,
-                        'unbillable_cost': total_spare_parts_unbillable
-                    }
-                }
-            elif capping_type =="N/A":
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': 0,
-                        'unbillable_mhs': 0,
-                        'billable_cost': 0,
-                        'unbillable_cost': 0
-                    }
-                }
-            elif capping_type=="per_IRC_no_cost":
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': findings_level.get('totalBillableMhs', 0),
-                        'unbillable_mhs': findings_level.get('totalUnbillableMhs', 0),
-                        'billable_cost': 0,
-                        'unbillable_cost': 0
-                    }
-                }
-            elif capping_type=="no_manhours_per_IRC":
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': 0,
-                        'unbillable_mhs': 0,
-                        'billable_cost': findings_level.get('totalBillableCost', 0),
-                        'unbillable_cost': findings_level.get('totalUnbillableCost', 0)
-                    }
-                }
-            elif capping_type=="per_source_card_no_cost":
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': task_SC_result.get('totalBillableMhs', 0),
-                        'unbillable_mhs': task_SC_result.get('totalUnbillableMhs', 0),
-                        'billable_cost': 0,
-                        'unbillable_cost': 0
-                }
-            }
-            elif capping_type=="no_manhours_per_source_card":
-                task_level_pipeline = [
-                {
-                    '$match': {
-                        'estID': estimate_id
-                    }
-                }, 
-                {
-                    '$unwind': '$tasks'
-                }, 
-                {
-                    '$group': {
-                        '_id': '$tasks.sourceTask', 
-                        'totalSpareCost': {
-                            '$sum': {
-                                '$sum': {
-                                    '$map': {
-                                        'input': {
-                                            '$ifNull': [
-                                                '$tasks.spare_parts', []
-                                            ]
-                                        }, 
-                                        'as': 'part', 
-                                        'in': {
-                                            '$ifNull': [
-                                                '$$part.price', 0
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'sourceTask': '$_id', 
-                        'totalSpareCost': 1, 
-                        'billableCost': {
-                            '$cond': [
-                                {
-                                    '$gte': [
-                                        '$totalSpareCost', SCMC
-                                    ]
-                                }, {
-                                    '$subtract': [
-                                        '$totalSpareCost', SCMC
-                                    ]
-                                }, 0
-                            ]
-                        }, 
-                        'unbillableCost': {
-                            '$cond': [
-                                {
-                                    '$gte': [
-                                        '$totalSpareCost', SCMC
-                                    ]
-                                }, SCMC, '$totalSpareCost'
-                            ]
-                        }
-                    }
-                }, {
-                    '$group': {
-                        '_id': None, 
-                        'totalBillableCost': {
-                            '$sum': '$billableCost'
-                        }, 
-                        'totalUnbillableCost': {
-                            '$sum': '$unbillableCost'
-                        }
-                    }
-                }, {
-                    '$project': {
-                        '_id': 0, 
-                        'totalBillableCost': 1, 
-                        'totalUnbillableCost': 1
-                    }
-                }
-            ]
+    #                 total_spare_parts_billable += billable
+    #                 total_spare_parts_unbillable += unbillable
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_cost': total_spare_parts_billable,
+    #                     'unbillable_cost': total_spare_parts_unbillable
+    #                 }
+    #             }
+    #         elif capping_type =="N/A":
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': 0,
+    #                     'unbillable_mhs': 0,
+    #                     'billable_cost': 0,
+    #                     'unbillable_cost': 0
+    #                 }
+    #             }
+    #         elif capping_type=="per_IRC_no_cost":
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': findings_level.get('totalBillableMhs', 0),
+    #                     'unbillable_mhs': findings_level.get('totalUnbillableMhs', 0),
+    #                     'billable_cost': 0,
+    #                     'unbillable_cost': 0
+    #                 }
+    #             }
+    #         elif capping_type=="no_manhours_per_IRC":
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': 0,
+    #                     'unbillable_mhs': 0,
+    #                     'billable_cost': findings_level.get('totalBillableCost', 0),
+    #                     'unbillable_cost': findings_level.get('totalUnbillableCost', 0)
+    #                 }
+    #             }
+    #         elif capping_type=="per_source_card_no_cost":
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': task_SC_result.get('totalBillableMhs', 0),
+    #                     'unbillable_mhs': task_SC_result.get('totalUnbillableMhs', 0),
+    #                     'billable_cost': 0,
+    #                     'unbillable_cost': 0
+    #             }
+    #         }
+    #         elif capping_type=="no_manhours_per_source_card":
+    #             task_level_pipeline = [
+    #             {
+    #                 '$match': {
+    #                     'estID': estimate_id
+    #                 }
+    #             }, 
+    #             {
+    #                 '$unwind': '$tasks'
+    #             }, 
+    #             {
+    #                 '$group': {
+    #                     '_id': '$tasks.sourceTask', 
+    #                     'totalSpareCost': {
+    #                         '$sum': {
+    #                             '$sum': {
+    #                                 '$map': {
+    #                                     'input': {
+    #                                         '$ifNull': [
+    #                                             '$tasks.spare_parts', []
+    #                                         ]
+    #                                     }, 
+    #                                     'as': 'part', 
+    #                                     'in': {
+    #                                         '$ifNull': [
+    #                                             '$$part.price', 0
+    #                                         ]
+    #                                     }
+    #                                 }
+    #                             }
+    #                         }
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$project': {
+    #                     'sourceTask': '$_id', 
+    #                     'totalSpareCost': 1, 
+    #                     'billableCost': {
+    #                         '$cond': [
+    #                             {
+    #                                 '$gte': [
+    #                                     '$totalSpareCost', SCMC
+    #                                 ]
+    #                             }, {
+    #                                 '$subtract': [
+    #                                     '$totalSpareCost', SCMC
+    #                                 ]
+    #                             }, 0
+    #                         ]
+    #                     }, 
+    #                     'unbillableCost': {
+    #                         '$cond': [
+    #                             {
+    #                                 '$gte': [
+    #                                     '$totalSpareCost', SCMC
+    #                                 ]
+    #                             }, SCMC, '$totalSpareCost'
+    #                         ]
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$group': {
+    #                     '_id': None, 
+    #                     'totalBillableCost': {
+    #                         '$sum': '$billableCost'
+    #                     }, 
+    #                     'totalUnbillableCost': {
+    #                         '$sum': '$unbillableCost'
+    #                     }
+    #                 }
+    #             }, {
+    #                 '$project': {
+    #                     '_id': 0, 
+    #                     'totalBillableCost': 1, 
+    #                     'totalUnbillableCost': 1
+    #                 }
+    #             }
+    #         ]
 
-                task_result = list(self.estimates_collection.aggregate(task_level_pipeline))
-                task_level = task_result[0]
+    #             task_result = list(self.estimates_collection.aggregate(task_level_pipeline))
+    #             task_level = task_result[0]
 
-                return {
-                    **estimate_data,
-                    'capping': {
-                        'billable_mhs': 0, 
-                        'unbillable_mhs': 0,
-                        'billable_cost': task_level.get('totalBillableCost', 0),
-                        'unbillable_cost': task_level.get('totalUnbillableCost', 0)
-                    }
-                }
-            elif capping_type=="per_source_card_per_IRC":
-                return{
-                    **estimate_data,
-                    'capping':{
-                        'billable_mhs':task_SC_result.get('totalBillableMhs',0),
-                        'unbillable_mhs':task_SC_result.get('totalUnbillableMhs',0),
-                        'billable_cost':findings_level.get('totalBillableCost',0),
-                        'unbillable_cost':findings_level.get('totalUnbillableCost',0)
-                    }
-                }
-            elif capping_type=="per_IRC_per_source_card":
-                return{
-                    **estimate_data,
-                    'capping':{
-                        'billable_mhs':task_result.get('totalBillableMhs',0),
-                        'unbillable_mhs':task_result.get('totalUnbillableMhs',0),
-                        'billable_cost':findings_level.get('totalBillableCost',0),
-                        'unbillable_cost':findings_level.get('totalUnbillableCost',0)
-                    }
-                }
+    #             return {
+    #                 **estimate_data,
+    #                 'capping': {
+    #                     'billable_mhs': 0, 
+    #                     'unbillable_mhs': 0,
+    #                     'billable_cost': task_level.get('totalBillableCost', 0),
+    #                     'unbillable_cost': task_level.get('totalUnbillableCost', 0)
+    #                 }
+    #             }
+    #         elif capping_type=="per_source_card_per_IRC":
+    #             return{
+    #                 **estimate_data,
+    #                 'capping':{
+    #                     'billable_mhs':task_SC_result.get('totalBillableMhs',0),
+    #                     'unbillable_mhs':task_SC_result.get('totalUnbillableMhs',0),
+    #                     'billable_cost':findings_level.get('totalBillableCost',0),
+    #                     'unbillable_cost':findings_level.get('totalUnbillableCost',0)
+    #                 }
+    #             }
+    #         elif capping_type=="per_IRC_per_source_card":
+    #             return{
+    #                 **estimate_data,
+    #                 'capping':{
+    #                     'billable_mhs':task_result.get('totalBillableMhs',0),
+    #                     'unbillable_mhs':task_result.get('totalUnbillableMhs',0),
+    #                     'billable_cost':findings_level.get('totalBillableCost',0),
+    #                     'unbillable_cost':findings_level.get('totalUnbillableCost',0)
+    #                 }
+    #             }
                     
-            logger.info("Estimated collection fetched successfully")
+    #         logger.info("Estimated collection fetched successfully")
             
             return estimate_data
 
         except Exception as e:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
 
 
     def get_probability_wise_manhrsspareparts(self,estimate_id:str)->ProbabilityWiseManhrsSpareCost:
@@ -2519,7 +2110,14 @@ class TaskService:
                 '$ne': 'Owned'
             }
         }
-    }, {
+    },
+      {
+        '$addFields': {
+            'ceilRequestedQuantity': {
+                '$ceil': '$requested_quantity'
+            }
+        }
+    },  {
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2580,10 +2178,13 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$requested_part_number', 
-                'partDescription': '$part_description'
+                # 'partDescription': '$part_description'
+            }, 
+            'partDescription': {
+                '$first': '$part_description'
             }, 
             'totalTasksQty': {
-                '$sum': '$requested_quantity'
+                '$sum': '$ceilRequestedQuantity'
             }, 
             'taskNumbers': {
                 '$push': '$task_number'
@@ -2593,7 +2194,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$taskNumbers'
@@ -2620,7 +2222,15 @@ class TaskService:
         '$match': {
             'isHMV': 'HMV'
         }
-    }, {
+    },
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },
+      {
         '$lookup': {
             'from': 'sub_task_description', 
             'localField': 'task_number', 
@@ -2664,16 +2274,19 @@ class TaskService:
         '$group': {
             '_id': {
                 'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
             }, 
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalFindingsQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_info.log_item_number'
@@ -2683,7 +2296,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalFindingsQty': 1, 
             'totalFindings': {
                 '$size': '$task_numbers'
@@ -2712,7 +2326,14 @@ class TaskService:
                 '$ne': 'HMV'
             }
         }
-    }, {
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },{
         '$lookup': {
             'from': 'task_description', 
             'let': {
@@ -2769,18 +2390,19 @@ class TaskService:
         }
     }, {
         '$group': {
-            '_id': {
-                'partId': '$issued_part_number', 
-                'partDescription': {
-                    '$replaceAll': {
-                        'input': '$part_description', 
-                        'find': ' ', 
-                        'replacement': ''
-                    }
-                }
-            }, 
+            '_id': '$issued_part_number', 
+                # 'partDescription': {
+                #     '$replaceAll': {
+                #         'input': '$part_description', 
+                #         'find': ' ', 
+                #         'replacement': ''
+                #     }
+                # }
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalTasksQty': {
-                '$sum': '$used_quantity'
+                '$sum': '$ceilUsedQuantity'
             }, 
             'task_numbers': {
                 '$addToSet': '$task_number'
@@ -2789,8 +2411,8 @@ class TaskService:
     }, {
         '$project': {
             '_id': 0, 
-            'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            'partId': '$_id', 
+            'partDescription': 1, 
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$task_numbers'
@@ -2812,4 +2434,115 @@ class TaskService:
     }
         logger.info(f"Combined results: {combined_results}")
         return combined_results
+
+
+    async def validate_tasks_checkcategory(self, estimate_request: ValidRequestCheckCategory, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        """
+        try:
+            task_ids = estimate_request.tasks
+            checks = estimate_request.typeOfCheck
+            logger.info(f"Validating tasks: {task_ids} with checks: {checks}")
+            pipeline=[
+                {
+                    '$match': {
+                        'check_category': {
+                            '$in':checks
+                        }
+                    }
+                }, {
+                '$project': {
+                    '_id': 0, 
+                    'check_category': 1, 
+                    'package_number': 1
+                }
+            }]
+
+            aircraft_details=list(self.aircraft_details_collection.aggregate(pipeline))
+            logger.info(f"aircraft_details fetched successfully:{aircraft_details}")
+
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
         
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+        
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks},
+                 "package_number": {"$in": [item['package_number'] for item in aircraft_details]}
+                },
+                {"_id": 0, "task_number": 1, "description": 1}
+            )
+            existing_tasks_list = list(existing_tasks_list)
+
+            cleaned_task_map = {}
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                description = doc["description"]
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]  
+                cleaned_task_map[task_number] = description
+
+            logger.info(f"cleaned_task_map: {cleaned_task_map}")
+
+            
+            cleaned_lrhTasks = set()  
+            for task in lrhTasks:
+                if " (LH)" in task or " (RH)" in task:
+                    task = task.split(" ")[0] 
+                cleaned_lrhTasks.add(task)
+            cleaned_lrhTasks = list(cleaned_lrhTasks)
+
+            validated_tasks = [
+                {
+                    "taskid": task,
+                    "status": task in cleaned_task_map,
+                    "description": cleaned_task_map.get(task, " ") 
+                }
+                for task in cleaned_lrhTasks
+            ]
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
+
+def replace_nan_inf(obj):
+            """Helper function to recursively replace NaN and inf values with None"""
+            if isinstance(obj, dict):
+                return {k: replace_nan_inf(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_nan_inf(x) for x in obj]
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            return obj
+
+
+def updateLhRhTasks(LhRhTasks, task_ids):
+    """
+    Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
+    Parameters:
+    - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+    - MPD_TASKS: DataFrame with 'TASK NUMBER' and 'DESCRIPTION' columns
+    Returns:
+    - Updated DataFrame with LH and RH tasks duplicated if LHRH == 1
+    """
+    
+    lhrh_task_list = [doc["TASK_CLEANED"] for doc in LhRhTasks if doc.get("LHRH") == 1]
+
+    updated_tasks = []
+    for task_id in task_ids:
+        task_str = str(task_id)
+        if task_str in lhrh_task_list:
+            # Add both LH and RH versions for LHRH tasks
+            updated_tasks.append(f"{task_str} (LH)")
+            updated_tasks.append(f"{task_str} (RH)")
+        else:
+            # Keep regular tasks unchanged
+            updated_tasks.append(task_str)
+        logger.info(f"the updated taks:{updated_tasks}")
+    
+    return updated_tasks

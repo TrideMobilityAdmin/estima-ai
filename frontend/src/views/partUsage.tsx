@@ -1,4 +1,4 @@
-import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center, ThemeIcon, Tooltip, Divider } from "@mantine/core";
+import { Card, Text, Flex, Group, Select, Notification, SimpleGrid, Space, Title, Grid, TextInput, Accordion, Badge, ScrollArea, Input, Button, ActionIcon, Center, ThemeIcon, Tooltip, Divider, Pagination } from "@mantine/core";
 import { showNotification, useEffect, useState } from "../constants/GlobalImports";
 import { DatePickerInput } from "@mantine/dates";
 import { IconAlertTriangle, IconCalendar, IconCheck, IconCube, IconMenuDeep, IconReport, IconSettingsBolt, IconSettingsDown, IconSettingsSearch, IconTool } from "@tabler/icons-react";
@@ -44,26 +44,30 @@ export default function PartUsage() {
     // const handleCheck = () => {
     //     setValidatedPartId(inputPartId);
     // };
-    const handleCheck = () => {
-        setIsMultiLoading(true);
-        setValidatedPartIds(inputPartIds);
-    };
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    const handleCheck = () => {
+        setValidatedPartIds(inputPartIds); // Only set part IDs
+        setRefreshTrigger(prev => prev + 1); // Force useEffect to run again
+    };
+    
     const [inputPartId, setInputPartId] = useState(""); // For input field
     const [validatedPartId, setValidatedPartId] = useState(""); // For API calls
     const [selectedPartId, setSelectedPartId] = useState("");
     // const today = dayjs().startOf("day").toDate();
     // const twoDaysAgo = dayjs().subtract(2, "day").startOf("day").toDate();
-    const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
-    const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
-    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
-    // Initialize with Dayjs objects
-    // const twoDaysAgo = dayjs("2024-03-27").startOf("day"); // March 27, 2024
-    // const today = dayjs("2024-04-03").endOf("day"); // April 3, 2024
-    // const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([twoDaysAgo, today]); // Date range
+
+    const today = dayjs().endOf("day").toDate(); // Today
+    const tenDaysAgo = dayjs().subtract(9, "day").startOf("day").toDate(); // 10 days including today
+    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([tenDaysAgo, today]);
+
+    // const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
+    // const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
+    // const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
+    
     const [multiPartUsageData, setMultiPartUsageData] = useState<any>();
     const [multiPartMergedData, setMultiPartMergedData] = useState<any>();
-    const [isLMultioading, setIsMultiLoading] = useState(false);
+    const [isMultioading, setIsMultiLoading] = useState(false);
     const [partUsageData, setPartUsageData] = useState<any>();
     const [isLoading, setIsLoading] = useState(false);
     const [taskSearch, setTaskSearch] = useState("");
@@ -79,62 +83,62 @@ export default function PartUsage() {
 
     useEffect(() => {
         const fetchMultiPartData = async () => {
-            if (!validatedPartIds || !dateRange[0] || !dateRange[1]) {
+            // Skip API call if this is the initial render (refreshTrigger is 0)
+            // or if any required data is missing
+            if (
+                refreshTrigger === 0 || // Skip the initial render
+                !validatedPartIds || 
+                validatedPartIds.length === 0 || 
+                !dateRange[0] || 
+                !dateRange[1]
+            ) {
                 setIsMultiLoading(false);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Reset merged data when dependencies change
+                setMultiPartMergedData([]);
                 return;
             }
-
+    
             try {
-                // setIsMultiLoading(true);
-                setMultiPartMergedData([]); // Clear previous data before fetching new one
-
-                // Format dates
+                setIsMultiLoading(true); // Move loading here!
+                setMultiPartMergedData([]);
+    
                 const startDate = dayjs(dateRange[0]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
                 const endDate = dayjs(dateRange[1]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
-
-                // Fetch API data
+    
                 const response: any = await getMultiPartUsage(validatedPartIds, startDate, endDate);
-
+    
                 if (response) {
                     setMultiPartUsageData(response);
-
-                    // Extract necessary data from response
+    
                     const taskParts = response?.taskParts || [];
                     const findingsHMVParts = response?.findingsHMVParts || [];
                     const findingsNonHMVTasks = response?.findingsNonHMVTasks || [];
-
-                    // Merge the findings into taskParts
+    
                     const mergedData = taskParts.map((task: any) => ({
                         ...task,
-                        findingsHMVParts: findingsHMVParts.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
-                        findingsNonHMVTasks: findingsNonHMVTasks.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
+                        findingsHMVParts: findingsHMVParts.filter((finding: any) => finding?.partId === task?.partId),
+                        findingsNonHMVTasks: findingsNonHMVTasks.filter((finding: any) => finding?.partId === task?.partId),
                     }));
-
+    
                     setMultiPartMergedData(mergedData);
                 }
             } catch (error) {
                 console.error("Error fetching part usage:", error);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Ensure no old data remains on error
+                setMultiPartMergedData([]);
             } finally {
-                setIsMultiLoading(false);
+                setIsMultiLoading(false); // ✅ Finish loading after fetch
             }
         };
-
+    
         fetchMultiPartData();
-
-        // Cleanup function to clear data on unmount or dependency change
+    
         return () => {
             setMultiPartUsageData(null);
             setMultiPartMergedData([]);
         };
-    }, [validatedPartIds, dateRange]);
+    }, [validatedPartIds, dateRange, refreshTrigger]);
+    
     console.log("Multi Validated Parts >>>>", validatedPartIds);
     console.log("Multi part data >>>>", multiPartUsageData);
     console.log("Multi part merged data >>>>", multiPartMergedData);
@@ -177,7 +181,15 @@ export default function PartUsage() {
         date: item.date,
         tasks: item.tasksqty,
         findings: item.findingsqty,
-    })) || [];
+    }))?.sort((a: any, b: any) => {
+        // Create proper Date objects from the date strings
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        // Compare the dates
+        return dateA.getTime() - dateB.getTime();
+    }) || [];
+    
 
 
     // Combine tasks and nonHmvTasks arrays
@@ -211,12 +223,21 @@ export default function PartUsage() {
         );
     }, [combinedTasks, taskSearch]);
 
+    // Handle pagination
+    const ITEMS_PER_PAGE = 8;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredTasks?.length / ITEMS_PER_PAGE);
+    const displayedTasks = filteredTasks?.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     console.log("Combined tasks:", combinedTasks);
 
     // Search filter for findings
     const filteredFindings = partUsageData?.usage?.findings?.hmvTasks?.filter((finding: any) =>
         finding?.taskId?.toLowerCase().includes(findingSearch?.toLowerCase())
     );
+    const [currentPageFindings, setCurrentPageFindings] = useState(1);
+    const totalPagesFindings = Math.ceil(filteredFindings?.length / ITEMS_PER_PAGE);
+    const displayedFindings = filteredFindings?.slice((currentPageFindings - 1) * ITEMS_PER_PAGE, currentPageFindings * ITEMS_PER_PAGE);
 
 
     // Prepare Data for the tasks wise Bar Graph
@@ -328,7 +349,7 @@ export default function PartUsage() {
                         size="xs"
                         onClick={handleCheck}
                         disabled={!inputPartId}
-                        loading={isLMultioading}
+                        loading={isMultioading}
                         color="green"
                     >
                         Submit
@@ -409,8 +430,8 @@ border-bottom: none;
                                     headerName: "Tasks",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Tasks" tooltipName="Total Tasks" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -430,8 +451,8 @@ border-bottom: none;
                                     headerName: "Parts Qty",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Tasks Parts Qty" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -451,8 +472,8 @@ border-bottom: none;
                                     headerName: "Findings",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Findings" tooltipName="Total Findings" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -468,14 +489,14 @@ border-bottom: none;
                                     headerName: "Parts Qty",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Findings Parts Qty" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
                                         return (
                                             <Text>
-                                                {val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0)}
+                                                {Math.round(val.data.findingsHMVParts?.reduce((sum: number, f: any) => sum + (f?.totalFindingsQty || 0), 0))}
                                             </Text>
                                         )
                                     }
@@ -572,7 +593,7 @@ border-bottom: none;
                             <IconTool color="#14AE5C" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Tasks - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalTaskQuantity(combinedTasks) || 0}
@@ -598,7 +619,7 @@ border-bottom: none;
                             <IconMenuDeep color="#9F6BED" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Findings - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalFindingQuantity(partUsageData?.usage?.findings?.hmvTasks) || 0}
@@ -610,122 +631,53 @@ border-bottom: none;
                 <Space h='sm' />
                 <Grid>
                     <Grid.Col span={8}>
-                        <Card radius='md' h='60vh'>
+                        <Card radius="md" h="60vh">
+                            <Title order={5} c="dimmed">Date Trend Analysis</Title>
 
-                            <Title order={5} c='dimmed'>
-                                Daily Trend Analysis
-                            </Title>
-                            {
-                                chartData?.length > 0 ? (
-                                    <AreaChart
-                                h={250}
-                                data={chartData}
-                                withLegend
-                                dataKey="date"
-                                xAxisLabel="Date"
-                                yAxisLabel="Count"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                series={[
-                                    { name: 'tasks', color: 'rgba(17, 166, 0, 1)' },
-                                    { name: 'findings', color: 'rgba(0, 149, 255, 1)' },
-                                ]}
-                                connectNulls
-                                curveType="natural"
-                            />
-
-                                ) : (
-                                    <Center>
-                                        <Text c='dimmed' pt={150}>
-                                            No Data Found
-                                        </Text>
-                                    </Center>
-                                    
-                                )
-                            }
-                            
+                            {chartData?.length > 0 ? (
+                                <div style={{ overflowX: "auto", width: "100%", height: '50vh' }}>
+                                    <div style={{ width: `${chartData.length * 80}px`, minWidth: "600px" }}>
+                                        <AreaChart
+                                            h={260}
+                                            data={chartData}
+                                            withLegend
+                                            dataKey="date"
+                                            xAxisLabel="Date"
+                                            yAxisLabel="Count"
+                                            xAxisProps={{
+                                                interval: 0, // Ensures all labels are displayed
+                                                angle: -45, // Rotates labels for better visibility
+                                                textAnchor: "end",
+                                            }}
+                                            series={[
+                                                { name: "tasks", color: "rgba(17, 166, 0, 1)", label: "Tasks" },
+                                                { name: "findings", color: "rgba(0, 149, 255, 1)", label: "Findings" },
+                                            ]}
+                                            connectNulls
+                                            curveType="natural"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <Center>
+                                    <Text c="dimmed" pt={150}>No Data Found</Text>
+                                </Center>
+                            )}
                         </Card>
                     </Grid.Col>
+
                     <Grid.Col span={4}>
                         <Card radius='md' h='60vh'>
                             <Title order={5} c='dimmed'>
                                 Distribution Analysis (%)
                             </Title>
-                            <DonutChartComponent partUsageData={partUsageData} />
-                            {/* <Center>
-                                <DonutChart
-                                    withLabelsLine
-                                    withLabels
-                                    withTooltip
-                                    labelsType="percent"
-                                    size={182}
-                                    thickness={30}
-                                    data={donutData}
-                                />
-                            </Center> */}
-
+                            <DonutChartComponent partUsageData={partUsageData} /> 
                         </Card>
                     </Grid.Col>
                 </Grid>
                 <Space h='md' />
                 <AircraftPieCharts partUsageData={partUsageData} />
 
-                {/* <Grid>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                MPD - Aircraft wise Quantity
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.aircraftModels || []}
-                                dataKey="aircraftModel"
-                                series={[
-                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
-                                ]}
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                  }}
-                                tickLine="y"
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40} // Adjust the gap between categories
-                            // barGap={5} // Adjust the gap between bars
-                            />
-                        </Card>
-                    </Grid.Col>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                Findings - Aircraft wise Quantity
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.aircraftModels || []}
-                                dataKey="aircraftModel"
-                                series={[
-                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
-                                ]}
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                  }}
-                                tickLine="y"
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40} // Adjust the gap between categories
-                            // barGap={5} // Adjust the gap between bars
-                            />
-                        </Card>
-                    </Grid.Col>
-                    
-                </Grid> */}
                 <Space h='md' />
                 <Grid>
                     <Grid.Col span={6}>
@@ -735,77 +687,12 @@ border-bottom: none;
                         <DonutChartComponentPartSupplied title="Findings - Part Supplied" partUsageData={partUsageData} type="Findings" />
                     </Grid.Col>
                 </Grid>
-                {/* <Grid>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                MPD - Part Supplied
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
-                                    ...status,
-                                    color: getAirlineColor(status.statusCode)
-                                })) || []}
-                                dataKey="statusCode"
-                                series={[
-                                    {
-                                        name: 'count',
-                                        color: 'blue'
-                                    },
-                                ]}
-                                tickLine="y"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40}
-                            />
-                        </Card>
-                    </Grid.Col>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                Findings - Part Supplied
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
-                                    ...status,
-                                    color: getAirlineColor(status.statusCode)
-                                })) || []}
-                                dataKey="statusCode"
-                                series={[
-                                    {
-                                        name: 'count',
-                                        color: 'blue'
-                                    },
-                                ]}
-                                tickLine="y"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40}
-                            />
-                        </Card>
-                    </Grid.Col>
-                </Grid> */}
                 <Space h='md' />
-                <SimpleGrid cols={2}>
-                    {/* MPD Chart */}
-                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
-
-                    {/* Findings Chart */}
-                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
-                </SimpleGrid>
                 {/* <SimpleGrid cols={2}>
+                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
+                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
+                </SimpleGrid> */}
+                <SimpleGrid cols={2}>
                     <Card>
                         <Title order={5} c='dimmed'>
                             MPD - Packages & Qty
@@ -831,8 +718,8 @@ border-bottom: none;
                                     data={tasksChartData}
                                     dataKey="taskId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -873,8 +760,8 @@ border-bottom: none;
                                     data={findingChartData}
                                     dataKey="findingId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -891,114 +778,137 @@ border-bottom: none;
                         </Card>
                     </Card>
 
-                </SimpleGrid> */}
+                </SimpleGrid>
                 <Space h='md' />
                 <SimpleGrid cols={2}>
-                    <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
-                        <Title order={5}>
-                            MPD
-                        </Title>
-
+                    <Card radius="md" h={partUsageData?.usage ? "90vh" : "40vh"} style={{ overflowY: "auto" }}>
+                        {/* 🔹 Section 1: Title & Search Input */}
+                        <Title order={5}>MPD</Title>
                         <TextInput
                             placeholder="Search Tasks..."
                             value={taskSearch}
                             onChange={(e) => setTaskSearch(e.currentTarget.value)}
                             mb="md"
                         />
-                        {
-                            filteredTasks?.length > 0 ? (
-                                <ScrollArea h='85vh' scrollbarSize={0} scrollHideDelay={0}>
-                                    <Accordion
-                                        variant="separated"
-                                        radius="md"
-                                        multiple
-                                        value={openItems}
-                                        onChange={handleAccordionChange}
-                                    >
-                                        {filteredTasks?.map((task: any, index: number) => {
-                                            const itemValue = `${task?.taskId} - ${index}`;
-                                            return (
-                                                <Accordion.Item key={itemValue} value={itemValue}>
-                                                    <Accordion.Control>
-                                                        <Group>
-                                                            <IconCube color="#4E66DE" />
-                                                            {task?.taskId || "-"}
-                                                        </Group>
-                                                    </Accordion.Control>
-                                                    <Accordion.Panel>
-                                                        <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
-                                                            <Text fz='xs'>
-                                                                <Text span c="gray" inherit>Description : </Text>
-                                                                {task?.taskDescription || "-"}
+
+                        {/* 🔹 Section 2: Scrollable Accordion List */}
+                        {filteredTasks.length > 0 ? (
+                            <ScrollArea h="70vh" scrollbarSize={0} scrollHideDelay={0}>
+                                <Accordion
+                                    variant="separated"
+                                    radius="md"
+                                    multiple
+                                    value={openItems}
+                                    onChange={setOpenItems}
+                                >
+                                    {displayedTasks?.map((task: any, index: any) => {
+                                        const itemValue = `${task?.taskId} - ${index}`;
+                                        return (
+                                            <Accordion.Item key={itemValue} value={itemValue}>
+                                                <Accordion.Control>
+                                                    <Group>
+                                                        <IconCube color="#4E66DE" />
+                                                        {task?.taskId || "-"}
+                                                    </Group>
+                                                </Accordion.Control>
+                                                <Accordion.Panel>
+                                                    <ScrollArea h={task?.packages?.length > 3 ? 250 : 160} scrollHideDelay={0}>
+                                                        <Text fz="xs">
+                                                            <Text span c="gray" inherit>
+                                                                Description:{" "}
                                                             </Text>
+                                                            {task?.taskDescription || "-"}
+                                                        </Text>
 
-                                                            {task?.packages?.map((pkg: any) => (
-                                                                <Card key={pkg?.packageId} p="sm" radius='md' mt="xs" bg='#ebeced'>
-                                                                    <Group justify="space-between" align="flex-start">
-                                                                        <Flex direction='column'>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Package ID :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.packageId || "-"}</Text>
-                                                                            </Group>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Aircraft Model :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.aircraftModel || "-"}</Text>
-                                                                            </Group>
-                                                                            <Group>
-                                                                                <Text c='dimmed' fz='sm'>
-                                                                                    Date :
-                                                                                </Text>
-                                                                                <Text fw={500} fz='sm'>{pkg?.date || "-"}</Text>
-                                                                            </Group>
-                                                                        </Flex>
+                                                        {task?.packages?.map((pkg: any) => (
+                                                            <Card key={pkg?.packageId} p="sm" radius="md" mt="xs" bg="#ebeced">
+                                                                <Group justify="space-between" align="flex-start">
+                                                                    <Flex direction="column">
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Package ID:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.packageId || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Aircraft Model:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.aircraftModel || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                        <Group>
+                                                                            <Text c="dimmed" fz="sm">
+                                                                                Date:
+                                                                            </Text>
+                                                                            <Text fw={500} fz="sm">
+                                                                                {pkg?.date || "-"}
+                                                                            </Text>
+                                                                        </Group>
+                                                                    </Flex>
 
-                                                                        <Flex direction='column' align='end' gap='xs'>
-                                                                            <Badge fullWidth color="blue">Qty: {pkg?.quantity || "-"}</Badge>
-                                                                            <Badge fullWidth color="yellow"> {pkg?.stockStatus || "-"}</Badge>
-                                                                        </Flex>
-                                                                    </Group>
-                                                                </Card>
-                                                            ))}
-                                                        </ScrollArea>
-                                                    </Accordion.Panel>
-                                                </Accordion.Item>
-                                            );
-                                        })}
-                                    </Accordion>
-                                </ScrollArea>
-                            ) : (
-                                <>
-                                    <Center p={50}>
-                                        <Text >
-                                            No Tasks Found
-                                        </Text>
-                                    </Center>
+                                                                    <Flex direction="column" align="end" gap="xs">
+                                                                        <Badge fullWidth color="blue">
+                                                                            Qty: {pkg?.quantity || "-"}
+                                                                        </Badge>
+                                                                        <Badge fullWidth color="yellow">{pkg?.stockStatus || "-"}</Badge>
+                                                                    </Flex>
+                                                                </Group>
+                                                            </Card>
+                                                        ))}
+                                                    </ScrollArea>
+                                                </Accordion.Panel>
+                                            </Accordion.Item>
+                                        );
+                                    })}
+                                </Accordion>
+                            </ScrollArea>
+                        ) : (
+                            <Center h="60vh">
+                                <Text>No Tasks Found</Text>
+                            </Center>
+                        )}
 
-                                </>
-                            )
-                        }
-
+                        {/* 🔹 Section 3: Pagination */}
+                        {totalPages > 1 && (
+                            <Center mt="md">
+                                <Pagination
+                                    color="#4E66DE"
+                                    total={totalPages}
+                                    value={currentPage}
+                                    onChange={setCurrentPage}
+                                    size="sm"
+                                />
+                            </Center>
+                        )}
                     </Card>
                     <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
+                        {/* Section 1: Title & Search Input */}
                         <Title order={5}>
                             Findings
                         </Title>
-
                         <TextInput
                             placeholder="Search Findings..."
                             value={findingSearch}
                             onChange={(e) => setFindingSearch(e.currentTarget.value)}
                             mb="md"
                         />
+
+                         {/* Section 2: Scrollable Accordion List */}
                         {
                             filteredFindings?.length > 0 ? (
-                                <ScrollArea h={'85vh'} scrollbarSize={0} scrollHideDelay={0}>
-                                    <Accordion variant="separated" radius="md">
-                                        {filteredFindings?.map((finding: any, index: number) => (
+                                <ScrollArea h={'70vh'} scrollbarSize={0} scrollHideDelay={0}>
+                                    <Accordion 
+                                    variant="separated" 
+                                    radius="md"
+                                    multiple
+                                    value={openItems}
+                                    onChange={setOpenItems}
+                                    >
+                                        {displayedFindings?.map((finding: any, index: number) => (
                                             <Accordion.Item key={`${finding?.taskId} - ${index}`} value={`${finding?.taskId} - ${index}`}>
                                                 <Accordion.Control>
                                                     <Group>
@@ -1065,6 +975,18 @@ border-bottom: none;
                             )
                         }
 
+                        {/* 🔹 Section 3: Pagination */}
+                        {totalPagesFindings > 1 && (
+                            <Center mt="md">
+                                <Pagination
+                                    color="#4E66DE"
+                                    total={totalPagesFindings}
+                                    value={currentPageFindings}
+                                    onChange={setCurrentPageFindings}
+                                    size="sm"
+                                />
+                            </Center>
+                        )}
                     </Card>
                 </SimpleGrid>
             </div>
@@ -1210,3 +1132,129 @@ border-bottom: none;
                                     55
                                 ]}
                             /> */}
+                            {/* <Grid>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                MPD - Aircraft wise Quantity
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.aircraftModels || []}
+                                dataKey="aircraftModel"
+                                series={[
+                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
+                                ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
+                                tickLine="y"
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40} // Adjust the gap between categories
+                            // barGap={5} // Adjust the gap between bars
+                            />
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                Findings - Aircraft wise Quantity
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.aircraftModels || []}
+                                dataKey="aircraftModel"
+                                series={[
+                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
+                                ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
+                                tickLine="y"
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40} // Adjust the gap between categories
+                            // barGap={5} // Adjust the gap between bars
+                            />
+                        </Card>
+                    </Grid.Col>
+                    
+                </Grid> */}
+                {/* <Center>
+                                <DonutChart
+                                    withLabelsLine
+                                    withLabels
+                                    withTooltip
+                                    labelsType="percent"
+                                    size={182}
+                                    thickness={30}
+                                    data={donutData}
+                                />
+                            </Center> */}
+                            {/* <Grid>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                MPD - Part Supplied
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
+                                    ...status,
+                                    color: getAirlineColor(status.statusCode)
+                                })) || []}
+                                dataKey="statusCode"
+                                series={[
+                                    {
+                                        name: 'count',
+                                        color: 'blue'
+                                    },
+                                ]}
+                                tickLine="y"
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                }}
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40}
+                            />
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                Findings - Part Supplied
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
+                                    ...status,
+                                    color: getAirlineColor(status.statusCode)
+                                })) || []}
+                                dataKey="statusCode"
+                                series={[
+                                    {
+                                        name: 'count',
+                                        color: 'blue'
+                                    },
+                                ]}
+                                tickLine="y"
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                }}
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40}
+                            />
+                        </Card>
+                    </Grid.Col>
+                </Grid> */}

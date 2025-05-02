@@ -1,9 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
+from fastapi.responses import ORJSONResponse
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
 import os
+# Try with a different encoding approach
+import sys
 import json
+import math
 import yaml
 import re
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
@@ -22,6 +26,16 @@ from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
 import asyncio
+import re
+from fuzzywuzzy import process
+
+from difflib import SequenceMatcher
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+
+
+
 class ExcelUploadService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
@@ -33,6 +47,7 @@ class ExcelUploadService:
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
+        self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -132,11 +147,11 @@ class ExcelUploadService:
                     detail="Unsupported file type. Only .xls, .xlsx, .xlsm, and .csv files are allowed"
                 )
 
-            if excel_data.empty:
-                raise HTTPException(
-                    status_code=400,
-                    detail="The Excel file contains no data"
-                )
+            # if excel_data.empty:
+            #     raise HTTPException(
+            #         status_code=400,
+            #         detail="The Excel file contains no data"
+            #     )
 
             # Clean the data
             # cleaned_columns = {col: self.clean_field_name(col) for col in excel_data.columns}
@@ -152,15 +167,20 @@ class ExcelUploadService:
                 processed_record[column] = column_values
             if 'TASK NUMBER' in processed_record:
                 processed_record['task'] = processed_record.pop('TASK NUMBER')
+            else:
+                processed_record['task'] = []
             if 'DESCRIPTION' in processed_record:
                 processed_record['description'] = processed_record.pop('DESCRIPTION')
-
+            else:
+                processed_record['description'] = []
             processed_record.update({
             "upload_timestamp": current_time,
             "original_filename": file.filename,
             "createdAt": current_time,
             "updatedAt": current_time,
-            "status": "Initiated"
+            "status": "Initiated",
+            "statusMPD":"Initiated",
+            "statusFindings":"Initiated"
         })
             logger.info("Processed record")
 
@@ -321,9 +341,12 @@ class ExcelUploadService:
         
             formatted_date = current_time.strftime("%d%m%Y")
             # remove spaces
-            type_of_check_no_spaces = estimate_request.typeOfCheck.replace(" ", "")
+            type_of_check_no_spaces = estimate_request.typeOfCheckID.replace(" ", "")
             logger.info(f"type of check is : {type_of_check_no_spaces}")
-            base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{estimate_request.operator}-{formatted_date}"
+
+            operator_no_spaces=estimate_request.operator.replace(" ","")
+            logger.info(f"operator without spaces:{operator_no_spaces}")
+            base_est_id = f"{estimate_request.aircraftRegNo}-{type_of_check_no_spaces}-{operator_no_spaces}-{formatted_date}".upper()
             logger.info(f"base_est_id: {base_est_id}")
             latest_version = 0
             version_regex_pattern = f"^{re.escape(base_est_id)}-V(\\d+)$"
@@ -334,11 +357,16 @@ class ExcelUploadService:
                 "estID": {"$regex": version_regex_pattern}
             })
             latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
-        
+            logger.info("Latest document found sucessfully")
+
             if latest_doc:
                 version_match = re.search(version_regex_pattern, latest_doc[0]["estID"])
                 if version_match:
                     latest_version = int(version_match.group(1))
+                    logger.info(f"Latest version found: {latest_version}")
+            else:
+                logger.info("No existing estimates found, starting with version 0.")
+
             new_version = latest_version + 1                             
             est_id = f"{base_est_id}-V{new_version:02d}".upper()
             logger.info(f"estID is : {est_id}")
@@ -351,6 +379,7 @@ class ExcelUploadService:
                 "probability": estimate_request.probability,
                 "operator": estimate_request.operator,
                 "typeOfCheck": estimate_request.typeOfCheck,
+                "typeOfCheckID": estimate_request.typeOfCheckID,
                 "aircraftAge": estimate_request.aircraftAge,
                 "aircraftRegNo":estimate_request.aircraftRegNo,
                 "aircraftModel": estimate_request.aircraftModel,
@@ -359,9 +388,7 @@ class ExcelUploadService:
                 "areaOfOperations": estimate_request.areaOfOperations,
                 "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
                 "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
-                "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]
-
-                
+                "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]          
                 
             }
             
@@ -373,6 +400,8 @@ class ExcelUploadService:
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",
+                "statusMPD":"Initiated",
+                "statusFindings":"Initiated",
                 "estID": est_id,
                 "msg": "File and estimated data inserted successfully",
                 "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
@@ -391,8 +420,15 @@ class ExcelUploadService:
         logger.info("Fetching all estimates")
         configurations = self.configurations_collection.find_one()
         man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
-        
+        five_days_ago = datetime.utcnow() - timedelta(days=5)
         pipeline=[
+             {
+        '$match': {
+            'createdAt': {
+                '$gte': five_days_ago
+            }
+        }
+    },
     {
         '$lookup': {
             'from': 'estima_output', 
@@ -463,23 +499,23 @@ class ExcelUploadService:
                     }
                 ]
             }, 
-            'tatTime': {
-                '$divide': [
-                    {
-                        '$add': [
-                            {
-                                '$ifNull': [
-                                    '$estimate.aggregatedTasks.totalMhs', 0
-                                ]
-                            }, {
-                                '$ifNull': [
-                                    '$estimate.aggregatedFindings.totalMhs', 0
-                                ]
-                            }
-                        ]
-                    }, man_hours_threshold
-                ]
-            }, 
+            # 'tatTime': {
+            #     '$divide': [
+            #         {
+            #             '$add': [
+            #                 {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedTasks.totalMhs', 0
+            #                     ]
+            #                 }, {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedFindings.totalMhs', 0
+            #                     ]
+            #                 }
+            #             ]
+            #         }, man_hours_threshold
+            #     ]
+            # }, 
             'remarks': {
                 '$ifNull': [
                     '$remarks_doc.remarks', ''
@@ -491,14 +527,30 @@ class ExcelUploadService:
             '_id': 0, 
             'estID': 1, 
             'tasks': '$task', 
+            'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo', 
+            # 'probability': 1, 
+            # 'operator': 1, 
+            # 'aircraftAge': 1, 
+            # 'typeOfCheck': {
+            #     '$ifNull': [
+            #         '$typeOfCheck', []
+            #     ]
+            # },
+            # 'aircraftModel': 1, 
+            # 'aircraftFlightHours': 1, 
+            # 'aircraftFlightCycles': 1, 
+            # 'areaOfOperations': 1, 
+            # 'typeOfCheckID': {
+            #     '$ifNull': [
+            #         '$typeOfCheckID', ''
+            #     ]
+            # }, 
             'status': '$status', 
             'totalMhs': 1, 
-            'tatTime': {
-                '$ifNull': [
-                    '$tatTime', 0.0
-                ]
-            }, 
+            # 'cappingDetails': 1, 
+            # 'additionalTasks': 1, 
+            # 'miscLaborTasks': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
@@ -584,76 +636,457 @@ class ExcelUploadService:
                 "message": "Remarks updated successfully",
                 "estID": estID,
                 "newRemark": new_remark if 'new_remark' in locals() else None,
-                "updatedAt": current_time
+                "updatedAt": current_time 
         }
             
         else:
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
-   
-    async def process_multiple_files(self, files: List[UploadFile], columnMappings: Dict, SheetName: str) -> pd.DataFrame:
+        
+    def get_best_match(self, target, candidates):
+        """
+        Find the best matching string from a list of candidates using SequenceMatcher.
+        
+        Args:
+            target (str): The expected column name.
+            candidates (list): List of candidate strings.
+        
+        Returns:
+            tuple: (best match string, similarity score) or (None, 0) if no match found.
+        """
+        best_match = None
+        best_score = 0
+
+        for candidate in candidates:
+            score = SequenceMatcher(None, target.lower(), candidate.lower()).ratio() * 100  # Convert to percentage
+            if score > best_score:
+                best_match = candidate
+                best_score = score
+
+        return (best_match, best_score) if best_score > 70 else (None, 0)  # Threshold set at 70%
+
+    def detect_header_row(self, df, expected_columns, max_rows_to_check=6):
+        """
+        Dynamically detect which row contains the header by checking for matches with expected columns.
+        
+        Args:
+            df (pd.DataFrame): DataFrame with potential header rows.
+            expected_columns (list): List of expected column names.
+            max_rows_to_check (int): Maximum number of rows to check for headers.
+        
+        Returns:
+            int or None: Best header row index or None if not found.
+        """
+        best_match_score = 0
+        best_row_index = None
+
+        # Check each of the first few rows
+        for i in range(min(max_rows_to_check, len(df))):
+            row_values = df.iloc[i].astype(str).fillna('').tolist()  # Convert row to list of strings
+
+            # Skip rows with too many missing values
+            if sum(pd.isna(df.iloc[i])) > len(row_values) / 2:
+                continue
+
+            # Calculate match score for this row
+            row_score = 0
+            for expected_col in expected_columns:
+                best_match = self.get_best_match(expected_col, row_values)  # Find best match
+                row_score += best_match[1]  # Add similarity score
+
+            # If this row has better matches than previous best, update best row
+            if row_score > best_match_score:
+                best_match_score = row_score
+                best_row_index = i
+
+        return best_row_index
+
+    def predict_column_mappings(self, df, expected_mappings):
+        """
+        Dynamically predict column mappings using fuzzy matching.
+        
+        Args:
+            df: DataFrame with the original column names
+            expected_mappings: Dictionary of expected column names to their standardized names
+        
+        Returns:
+            Dictionary mapping actual column names to standardized names
+        """
+        # Get all column names from the DataFrame
+        actual_columns = list(df.columns)
+        
+        # Create a mapping for each expected column
+        dynamic_mappings = {}
+        
+        for expected_col, standardized_name in expected_mappings.items():
+            # Find the best match among actual columns
+            best_match = process.extractOne(expected_col, actual_columns)
+            
+            if best_match and best_match[1] > 70:  # Match score above 70%
+                dynamic_mappings[best_match[0]] = standardized_name
+                logger.info(f"Mapped '{best_match[0]}' to '{standardized_name}' with score {best_match[1]}")
+            else:
+                logger.warning(f"Could not find a good match for '{expected_col}'")
+        
+        return dynamic_mappings
+        
+    def read_excel_with_multiple_sheetnames(self, content, filename, file_extension, sheet_name, config):
+        """
+        Read a specific sheet from an Excel file.
+
+        Args:
+            content (bytes): File content.
+            filename (str): Name of the file.
+            file_extension (str): File extension.
+            sheet_name (str): Name of the sheet to read.
+            config (dict): Configuration dictionary.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the sheet data.
+        """
+        try:
+            pd.set_option('display.encoding', 'utf-8')
+            logger.info(f"Reading Excel file with sheet name: {sheet_name}")
+            
+            # Choose appropriate engine based on file extension
+            if file_extension.startswith('.'):
+                extension = file_extension
+            else:
+                extension = f".{file_extension}"
+                
+                
+            engine = "openpyxl" if extension in [".xlsx", ".xlsm"] else "pyxlsb" if extension == ".xlsb" else "xlrd"
+            try:
+                
+            
+                # Read the specific sheet
+                df = pd.read_excel(
+                    io.BytesIO(content), 
+                    sheet_name=sheet_name,
+                    engine=engine
+                )
+                #logger.info(f"The dataframe columns of {filename} are {df.columns}")
+                
+            except UnicodeEncodeError:
+
+                # Force UTF-8 encoding for stdout
+                if sys.stdout.encoding != 'utf-8':
+                    sys.stdout.reconfigure(encoding='utf-8')
+                
+                df = pd.read_excel(
+                    io.BytesIO(content), 
+                    sheet_name=sheet_name,
+                    engine=engine
+                )
+                # Log column names as string representation to avoid encoding issues
+                logger.info(f"The dataframe columns of {filename} are successfully loaded (column names contain special characters)")
+            
+            if sheet_name.lower().startswith(("pricing", "sheet1", "price", "page")):
+                return self._process_pricing_sheet(df, filename, config)
+            elif sheet_name.lower().startswith('mlttable'):
+                return self._process_mlttable_sheet(df, filename, config)
+            elif sheet_name.lower().startswith('mltaskmlsec1'):
+                return self._process_mltaskmlsec1_sheet(df, filename, config)
+            elif sheet_name.lower().startswith('mldpmlsec1'):
+                return self._process_mldpmlsec1_sheet(df, filename, config)
+
+            else:
+                df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
+                df = df[1:].reset_index(drop=True)
+            
+            logger.info(f"Successfully read sheet {sheet_name}")
+            logger.info(f"DataFrame headers: {list(df.columns)}")
+            logger.info(f"DataFrame shape: {df.shape}")
+            
+            return df
+        
+        except ValueError as sheet_error:
+            logger.error(f"Sheet {sheet_name} not found: {str(sheet_error)}")
+            return None
+        except Exception as error:
+            logger.error(f"Error reading Excel file: {str(error)}")
+            return None
+    
+    def _process_pricing_sheet(self, df, filename, config):
+        """Helper method to process pricing sheets"""
+        sub_task_parts_columns = config["sub_task_parts_columns"]
+        sub_task_parts_column_mappings = config["sub_task_parts_column_mappings"]
+
+        # Alternative mappings
+        alternative_mappings = {
+            "Issued Part#": "issued_part_number",
+            "Package#": "package_number",
+            "Task#": "task_number",
+            "SOI_TRANNO": "soi_transaction"
+        }
+
+        # Merge mappings
+        combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
+        logger.info(f"Combined mappings: {combined_mappings}")
+        # Detect the header row
+        header_row_index = self.detect_header_row(df, combined_mappings.keys())
+
+        if header_row_index is None:
+            logger.warning(f"Could not detect header row in {filename}")
+            return pd.DataFrame()
+
+        # Set the column names correctly
+        df.columns = df.iloc[header_row_index].astype(str).values
+
+        #logger.info(f"Detected header row at index {header_row_index} in {filename}, columns: {df.columns}")
+
+        # Extract data rows (everything after the header)
+        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        logger.info(f"the shape of the DataFrame before processing {df.shape}")
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        # Rename columns using mappings
+        df.rename(columns={k: v for k, v in combined_mappings.items() if k in df.columns}, inplace=True)
+
+        expected_output_columns = list(sub_task_parts_column_mappings.values())
+        mapped_columns = set(df.columns)
+        truly_missing = set(expected_output_columns) - mapped_columns
+        
+        if len(truly_missing) > 4:
+            return pd.DataFrame()
+
+        if truly_missing:
+            warning_msg = f"⚠️ Warning: Missing columns in {filename} that couldn't be mapped: {truly_missing}"
+      
+            logger.warning(warning_msg)
+
+        # Remove duplicate columns
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+
+        # Ensure all expected columns exist
+        for col in expected_output_columns:
+            if col not in df.columns:
+                df[col] = "None"
+
+        # Reorder columns to match expected order
+        df = df[expected_output_columns]
+        logger.info(f"shape of MCP df {df.shape}")
+        return df
+    
+    def _process_mlttable_sheet(self, df, filename, config):
+        """Helper method to process mlttable sheets"""
+        df.columns = df.iloc[0].astype(str).str.strip()
+        df = df[1:].reset_index(drop=True)
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        logger.info(f"the shape of the DataFrame before processing {df.shape}")
+
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        task_parts_columns_mappings = config["task_parts_columns_mappings"]
+        task_parts_columns = config["task_parts_columns"]
+        logger.info(f"task_parts_columns_mappings :{task_parts_columns_mappings}")
+        
+        # Check for missing and extra columns
+        missing_cols = set(task_parts_columns) - set(df.columns)
+        extra_cols = set(df.columns) - set(task_parts_columns)
+        
+        if missing_cols:
+
+            logger.warning(f"⚠️ Warning: Missing columns in {filename}: {missing_cols}")
+        if extra_cols:
+
+            logger.warning(f"⚠️ Warning: Extra columns in {filename}: {extra_cols}")
+
+        # First rename the columns that exist
+        df.rename(columns={k: v for k, v in task_parts_columns_mappings.items() if k in df.columns}, inplace=True)
+
+        # Now add any missing columns (using the final mapped column names)
+        expected_columns = list(task_parts_columns_mappings.values())
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+        
+        if missing_columns:
+            logger.info(f"Missing columns: {missing_columns}")
+
+        # Add missing columns with None values
+        for col in missing_columns:
+            df[col] = None
+
+        # Reorder columns according to the mapped values
+        df = df[expected_columns]
+        logger.info(f"shape of mlttable df {df.shape}")
+        
+        return df
+    
+    def _process_mltaskmlsec1_sheet(self, df, filename, config):
+        """Helper method to process mltaskmlsec1 sheets"""
+        df.columns = df.iloc[0].astype(str).str.strip()
+        df = df[1:].reset_index(drop=True)
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        logger.info(f"the shape of the DataFrame before processing {df.shape}")
+        
+        task_description_columns = config["task_description_columns"]
+        task_description_columns_mappings = config["task_description_columns_mappings"]
+        logger.info(f"task_description_columns_mappings :{task_description_columns_mappings}")
+        missing_cols = set(task_description_columns) - set(df.columns)
+        extra_cols = set(df.columns) - set(task_description_columns)
+        
+        if missing_cols:
+
+            logger.warning(f"⚠️ Warning: Missing columns in {filename}: {missing_cols}")
+        if extra_cols:
+
+            logger.warning(f"⚠️ Warning: Extra columns in {filename}: {extra_cols}")
+
+        df.rename(columns={k: v for k, v in task_description_columns_mappings.items() if k in df.columns}, inplace=True)
+
+        # Now add any missing columns (using the final mapped column names)
+        expected_columns = list(task_description_columns_mappings.values())
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+        
+        if missing_columns:
+            logger.info(f"Missing columns: {missing_columns}")
+
+        # Add missing columns with None values
+        for col in missing_columns:
+            df[col] = None
+
+        # Finally, reorder columns to match expected order
+        df = df[expected_columns]
+        
+        logger.info(f"shape of mltaskmlsec1 df {df.shape}")
+        
+        return df
+    
+    def _process_mldpmlsec1_sheet(self, df, filename, config):
+        """Helper method to process mldpmlsec1 sheets"""
+        # Ensure first row is used as column names safely
+        df.columns = df.iloc[0].astype(str).str.strip()
+        df = df[1:].reset_index(drop=True)
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        logger.info(f"the shape of the DataFrame before processing {df.shape}")
+
+        sub_task_description_columns = config["sub_task_description_columns"]
+        sub_task_description_columns_mappings = config["sub_task_description_columns_mappings"]
+        logger.info(f"sub_task_description_columns_mappings :{sub_task_description_columns_mappings}")
+
+        # Check for missing and extra columns
+        missing_cols = set(sub_task_description_columns) - set(df.columns)
+        extra_cols = set(df.columns) - set(sub_task_description_columns)
+        
+        if missing_cols:
+            warning_msg = f"⚠️ Warning: Missing columns in {filename}: {missing_cols}"
+
+            logger.warning(warning_msg)
+        
+        if extra_cols:
+            warning_msg = f"⚠️ Warning: Extra columns in {filename}: {extra_cols}"
+
+            logger.warning(warning_msg)
+
+        # Rename columns safely
+        df.rename(columns={k: v for k, v in sub_task_description_columns_mappings.items() if k in df.columns}, inplace=True)
+
+        # Add any missing columns (based on mapped names)
+        expected_columns = list(sub_task_description_columns_mappings.values())
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+
+        # Print missing columns for debugging
+        if missing_columns:
+            logger.info(f"Missing columns: {missing_columns}")
+
+        # Add missing columns with None values
+        for col in missing_columns:
+            df[col] = None
+
+        # Ensure required columns exist before proceeding
+        required_columns = ["log_item_number", "source_task_discrepancy_number"]
+        for col in required_columns:
+            if col not in df.columns:
+                #print(f"⚠️ Warning: Required column '{col}' is missing in {filename}. Skipping task_findings processing.")
+                logger.warning(f"⚠️ Warning: Required column '{col}' is missing in {filename}. Skipping task_findings processing.")
+                return pd.DataFrame()  # Return empty DataFrame if required columns are missing
+
+        # Initialize the new column
+        df["source_task_discrepancy_number_updated"] = ""
+
+        # Create task_findings_dict
+        findings = df["log_item_number"].tolist()
+        tasks = df["source_task_discrepancy_number"].tolist()
+        task_findings_dict = dict(zip(findings, tasks))
+
+        # Resolve task references safely (avoid infinite loops)
+        max_iterations = 10  # Safety limit
+        for finding in findings:
+            iteration = 0
+            current = finding
+            
+            while iteration < max_iterations:
+                if current not in task_findings_dict or task_findings_dict[current] == current:
+                    break  # Stop if there's no further reference or self-referencing
+                next_value = task_findings_dict[current]
+                if next_value == finding:  # Circular reference detected
+                    break
+                current = next_value
+                iteration += 1
+            
+            # Update with the resolved reference
+            task_findings_dict[finding] = current
+
+        # Assign resolved values back to DataFrame
+        df["source_task_discrepancy_number_updated"] = df["log_item_number"].map(task_findings_dict)
+
+        # Ensure correct column order
+        df = df[expected_columns]
+        logger.info(f"shape of mldpmlsec1 df {df.shape}")
+        
+        return df
+
+    async def process_multiple_files(self, file: UploadFile, config, SheetName: str) -> pd.DataFrame:
         """
         Read and process multiple uploaded Excel or CSV files.
 
         Args:
-            files (List[UploadFile]): List of uploaded files to process.
-            columnMappings (Dict): Column mapping configurations.
+            file (UploadFile): Uploaded file to process.
+            config (Dict): Configuration settings.
             SheetName (str): Name of the sheet to read from Excel files.
 
         Returns:
-            pd.DataFrame: Combined processed records from matching files
+            pd.DataFrame: Processed records from matching file
         """
-        logger.info(f"Processing {len(files)} files")
-        logger.info(f"Column Mappings: {columnMappings}")
+        logger.info(f"Processing the file {file.filename}")
         logger.info(f"Looking for sheet name: {SheetName}")
 
-        processed_dataframes = []
-
-        for file in files:
-            try:
-                # Read the file content
-                content = await file.read()
-                file_extension = file.filename.split('.')[-1].lower()
+        try:
+            # Read the file content
+            content = await file.read()
+            file_extension = os.path.splitext(file.filename)[1].lower()
+            if not file_extension:
+                file_extension = f".{file.filename.split('.')[-1].lower()}"
                 
-                logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
-
-                # Handle Excel files
-                if file_extension in ['xls', 'xlsx']:
-                    try:
-                        # Attempt to read the specified sheet
-                        df = self.read_excel_with_multiple_sheetnames(content, file_extension, SheetName)
+            logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
+            
+            # Handle Excel files
+            if file_extension:
+                try:
+                    # Attempt to read the specified sheet
+                    df = self.read_excel_with_multiple_sheetnames(content, file.filename, file_extension, SheetName, config)
+                    if df is not None and not df.empty:
+                        logger.info(f"Successfully processed file: {file.filename}")
+                        logger.info(f"DataFrame columns: {df.columns}")
+                        logger.info(f"DataFrame shape: {df.shape}")
                         
-                        if df is not None and not df.empty:
-                            # Rename columns based on provided mappings
-                            df.rename(columns=columnMappings, inplace=True)
-                            
-                            logger.info(f"Successfully processed file: {file.filename}")
-                            logger.info(f"DataFrame columns: {df.columns}")
-                            logger.info(f"DataFrame shape: {df.shape}")
-                            
-                            processed_dataframes.append(df)
-                        else:
-                            logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
-                    
-                    except Exception as excel_error:
-                        logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
-            
-            except Exception as file_error:
-                logger.error(f"Error processing file {file.filename}: {str(file_error)}")
-            
-            # Reset file pointer to beginning for potential reuse
-            file.file.seek(0)
-
-        # Combine all processed dataframes
-        if processed_dataframes:
-            combined_df = pd.concat(processed_dataframes, ignore_index=True)
-            logger.info(f"Total records in combined DataFrame: {len(combined_df)}")
-            return combined_df
+                        return df
+                    else:
+                        logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
+                
+                except Exception as excel_error:
+                    logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
+        
+        except Exception as file_error:
+            logger.error(f"Error processing file {file.filename}: {str(file_error)}")
+        
+        # Reset file pointer to beginning for potential reuse
+        await file.seek(0)
         
         logger.warning(f"No files found with sheet name: {SheetName}")
         return pd.DataFrame() 
-        
-       
+    
+ 
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
@@ -666,399 +1099,745 @@ class ExcelUploadService:
             Dict[str, Any]: Comparison results
         """
         logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
-        # Process files and extract actual data
-
         
+        # Initialize DataFrames
+        task_description = pd.DataFrame()
+        sub_task_description = pd.DataFrame()
+        sub_task_parts = pd.DataFrame()
+        task_parts = pd.DataFrame()
+        
+        # Load configuration
         config_file_path = os.path.join("app", "config", "config.yaml")
-        with open(config_file_path, 'r') as file:
-            columnMappings = yaml.safe_load(file)
-        logger.info("config file data fetched sucessfully")
+        try:
+            with open(config_file_path, 'r') as file:
+                config = yaml.safe_load(file)
+            logger.info("Config file data fetched successfully")
+        except Exception as e:
+            logger.error(f"Error loading config file: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error loading configuration")
 
         try:
-            sub_task_parts =  await self.process_multiple_files(files, columnMappings['sub_task_parts_column_mappings'], "PRICING")
-            logger.info(f"sub_task_parts: {sub_task_parts}")
-            sub_task_description =  await self.process_multiple_files(files, columnMappings['sub_task_description_columns_mappings'], "mldpmlsec1")
-            logger.info(f"sub_task_description: {sub_task_description}")
-            task_description =  await self.process_multiple_files(files, columnMappings['task_description_columns_mappings'], "mltaskmlsec1")
-            logger.info(f"task_description: {task_description}, sub_task_description: {sub_task_description}, sub_task_parts: {sub_task_parts}")
+            for file in files:
+                if file.filename.startswith("mltaskmlsec1"):
+                    task_description = await self.process_multiple_files(file, config, "mltaskmlsec1")
+                    logger.info(f"Shape of task_description: {task_description.shape}")
+                    
+                elif file.filename.startswith("mldpmlsec1"):
+                    sub_task_description = await self.process_multiple_files(file, config, "mldpmlsec1")
+                    logger.info(f"Shape of sub_task_description: {sub_task_description.shape}")
+                    
+                elif file.filename.startswith("Material"):
+                    sub_task_parts = await self.process_multiple_files(file, config, 'PRICING')
+                    logger.info(f"Shape of sub_task_parts: {sub_task_parts.shape}")
+                    
+                elif file.filename.startswith("mlttable"):
+                    task_parts = await self.process_multiple_files(file, config, "mlttable")
+                    logger.info(f"Shape of task_parts: {task_parts.shape}")
+
+            # Verify all required data is available
             if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
-                raise ValueError("One or more required sheets are missing from the uploaded files.")
-            compare_result=self.testing(task_description, sub_task_parts,sub_task_description,estimate_id)
-            logger.info("compare_result")
+                error_msg = "One or more required sheets are missing from the uploaded files."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            # Process and compare data
+            compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
+            logger.info("Compare result successfully fetched")
 
             return compare_result
+        
+        except ValueError as ve:
+            logger.error(f"Validation error: {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as e:
             logger.error(f"Unexpected error in compare_estimates: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")
-    
-    def read_excel_with_multiple_sheetnames(self, content, file_extension, SheetName):
-        """
-        Read a specific sheet from an Excel file.
-
-        Args:
-            content (bytes): File content.
-            file_extension (str): File extension.
-            SheetName (str): Name of the sheet to read.
-
-        Returns:
-            pd.DataFrame: DataFrame containing the sheet data.
-        """
-        try:
-            logger.info(f"Reading Excel file with sheet name: {SheetName}")
-            
-            # Choose appropriate engine based on file extension
-            engine = 'openpyxl' if file_extension in ['xlsx'] else 'xlrd'
-            
-            # Read the specific sheet
-            df = pd.read_excel(
-                io.BytesIO(content), 
-                sheet_name=SheetName,
-                engine=engine
-            )
-            
-            logger.info(f"Successfully read sheet {SheetName}")
-            logger.info(f"DataFrame headers: {list(df.columns)}")
-            logger.info(f"DataFrame shape: {df.shape}")
-            
-            return df
         
-        except ValueError as sheet_error:
-            logger.error(f"Sheet {SheetName} not found: {str(sheet_error)}")
-            return None
-        except Exception as error:
-            logger.error(f"Error reading Excel file: {str(error)}")
-            return None
+    def parts_combine(self,sub_task_parts,task_parts):
+        parts_master = list(self.parts_master_collection.find({},))
+        parts_master= pd.DataFrame(parts_master)
+        parts_master = parts_master.drop(columns=["_id"], errors="ignore")
+        parts_master=parts_master.drop_duplicates()
+        task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","requested_stock_status"],inplace=True)
+        task_parts_up=task_parts[task_parts["requested_stock_status"]!="Owned"]
 
-    def testing(self,task_description, sub_task_parts,sub_task_description,estID):
-    # Fetch predicted data
-        # Filter the matching row(s)
-    #matching_rows = aircraft_data[aircraft_data["package_number"] == package_number]
-    
-    # Ensure at least one match exists before accessing values
+        task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
+
+        # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
+        task_parts_up = task_parts_up.rename(columns={"unit_of_measurement": "issued_unit_of_measurement"})
+        # Get column names as lists
+        sub_task_parts_columns = sub_task_parts.columns.tolist()
+        task_parts_up_columns = task_parts_up.columns.tolist()
+
+        # Find common and missing columns
+        common_columns = list(set(sub_task_parts_columns) & set(task_parts_up_columns))  # Intersection
+        missing_columns = list(set(sub_task_parts_columns) - set(task_parts_up_columns))  # Difference
+
+        # Keep only common columns
+        task_parts_up = task_parts_up[common_columns]
+
+        # Add missing columns and fill them with NaN (equivalent to `missing` in Julia)
+        for col in missing_columns:
+            task_parts_up[col] = np.nan  # Use None instead if dealing with strings
+
+        # Ensure column order matches `sub_task_parts`
+        task_parts_up = task_parts_up[sub_task_parts_columns]
+
+        for i, row in task_parts_up.iterrows():
+            # Find matching part in parts_master
+            matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
+            
+            if not matching_parts.empty:
+                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
+            
+        sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
+        # Convert to string
+        string_cols = [
+            'registration_number', 'package_number', 'task_number',
+            'task_description', 'issued_part_number', 'part_description',
+            'issued_unit_of_measurement', 'stock_status', 'base_currency',
+            'soi_transaction'
+        ]
 
 
+
+        # Apply conversions
+        for col in string_cols:
+            sub_task_parts[col] = sub_task_parts[col].astype(str)
+            
+        cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_billable_price', 'billable_value_usd', 'used_quantity']
+
+        for col in cols_to_convert:
+            sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
+            
+            
+        return sub_task_parts
+
+
+    def testing(self,task_description, sub_task_parts, sub_task_description, task_parts,estID):
+        
+        if task_parts is not None and not task_parts.empty:
+            logger.info("task_parts is not empty")
+            sub_task_parts = self.parts_combine(sub_task_parts, task_parts)
+        else:
+            logger.info("task_parts is empty")
+
+
+        # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
-        logger.info("pred_data fetched successfully")
-        if not pred_data :  # Check for empty or missing tasks
-            print("None EstID Pred Data -->" + estID)
-            return {} # Return an empty DataFrame if no valid data
-        pred_tasks_data = pd.DataFrame(pred_data[0]["tasks"])
-        # Extract 'avg', 'max', and 'min' from 'mhs' dictionary
-        pred_tasks_data["avg_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("avg") if isinstance(x, dict) else None)
-        pred_tasks_data["max_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("max") if isinstance(x, dict) else None)
-        pred_tasks_data["min_mh"] = pred_tasks_data["mhs"].apply(lambda x: x.get("min") if isinstance(x, dict) else None)
-        # Compute total billable value from spare_parts
-        pred_tasks_data["total_billable_value_usd"] = pred_tasks_data["spare_parts"].apply(
-            lambda x: sum(item["price"] for item in x if isinstance(item, dict)) if isinstance(x, list) else 0
-        )
-        # Fetch actual package data
-        pkg_tasks_data = task_description
-        pkg_tasks_data = pkg_tasks_data[pkg_tasks_data["task_type"]=="MPD"]
-        logger.info("pkg_tasks_data fetched successfully")
-        # Filter sub_task_parts for tasks belonging to the specific package_number
-        filtered_sub_task_parts = sub_task_parts
-        logger.info("filtered_sub_task_parts fetched successfully")
-        filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].isin(pkg_tasks_data["task_number"])]
-        # Compute actual task part consumption
-        task_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
-            task_part_consumption=("billable_value_usd", "sum")
-        )
-        logger.info("task_parts_consumption fetched successfully")
-        # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
-        pkg_tasks_data = pkg_tasks_data.merge(task_parts_consumption, left_on="task_number", right_on="task_number", how="left")
-        # Fill missing values to avoid NaN issues
-        pkg_tasks_data.loc[:, "task_part_consumption"] = pkg_tasks_data["task_part_consumption"].fillna(0)
-        # Ensure data types match for merging
-        pkg_tasks_data["task_number"] = pkg_tasks_data["task_number"].astype(str)
-        pkg_findings_data = sub_task_description
-        pkg_findings_data = pkg_findings_data[
-        pkg_findings_data["source_task_discrepancy_number"].isin(pkg_tasks_data["task_number"])]
-        pkg_findings_data.dropna(subset=["source_task_discrepancy_number"], inplace=True)
-        logger.info("pkg_findings_data fetched successfully")
+        if not pred_data:
+            logger.info("None EstID Pred Data -->" + estID)
+            return {}
+        
+        # Process tasks and findings
+        pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
+        pred_findings_data_full = pd.DataFrame(pred_data[0].get("findings", []))
+        
+        # Get capping details safely
+        cappingDetails = pred_data[0].get("cappingDetails", {})
+        if not isinstance(cappingDetails, dict):
+            cappingDetails = {}
+        
+        # Initialize capping_values safely
+        capping_values = pred_data[0].get("capping_values", {})
+        if not isinstance(capping_values, dict):
+            capping_values = {}
+        
+        # Populate with safe default values and overwrite if details exist
+        capping_values = {
+            'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", capping_values.get("cappingTypeManhrs", "No capping")),
+            'cappingManhrs': cappingDetails.get("cappingManhrs", capping_values.get("cappingManhrs", 0.0)),
+            'billableManhrs': capping_values.get("billableManhrs", 0.0),
+            'unbillableManhrs': capping_values.get("unbillableManhrs", 0.0),
+            'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", capping_values.get("cappingTypeSpareCost", "No capping")),
+            'cappingSpareCost': cappingDetails.get("cappingSpareCost", capping_values.get("cappingSpareCost", 0.0)),
+            'billableSpareCost': capping_values.get("billableSpareCost", 0.0),
+            'unbillableSpareCost': capping_values.get("unbillableSpareCost", 0.0)
+        }
+        
+        # Final assignment
+        pred_capping_values = capping_values
 
-        no_of_findings=len(pkg_findings_data["log_item_number"].unique().tolist())
-        logger.info(f"no_of_findings: {no_of_findings}")
-        # Filter sub_task_parts for tasks belonging to the specific package_number
-        # filtered_sub_task_parts = sub_task_parts[sub_task_parts["package_number"] == package_number]
-        logger.info("filtered_sub_task_parts fetched successfully")
-        filtered_sub_task_parts=filtered_sub_task_parts[filtered_sub_task_parts["task_number"].str.startswith("HMV")]
-        filtered_sub_task_parts = filtered_sub_task_parts.merge(
-        pkg_findings_data[["log_item_number", "source_task_discrepancy_number"]],
+
+        sub_task_description["source_task_discrepancy_number_updated"] = ""
+
+        # Create task_findings_dict
+        findings = sub_task_description["log_item_number"].tolist()
+        tasks = sub_task_description["source_task_discrepancy_number"].tolist()
+        task_findings_dict = dict(zip(findings, tasks))
+
+        # Resolve task references safely (avoid infinite loops)
+        max_iterations = 10  # Safety limit
+        for finding in findings:
+            iteration = 0
+            current = finding
+            
+            while iteration < max_iterations:
+                if current not in task_findings_dict or task_findings_dict[current] == current:
+                    break  # Stop if there's no further reference or self-referencing
+                next_value = task_findings_dict[current]
+                if next_value == finding:  # Circular reference detected
+                    break
+                current = next_value
+                iteration += 1
+            
+            # Update with the resolved reference
+            task_findings_dict[finding] = current
+
+        # Assign resolved values back to DataFrame
+        sub_task_description["source_task_discrepancy_number_updated"] = sub_task_description["log_item_number"].map(task_findings_dict)
+
+
+
+        
+        # Extract eligible tasks
+        eligibile_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
+        
+        # Calculate actual capping values
+        actual_capping_values = actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts)
+        
+        # Filter task descriptions
+        eligible_task_description = task_description[task_description["task_number"].isin(eligibile_tasks)]
+        
+        # ----- PROCESS TASKS DATA (similar to testing function) -----
+        final_mpd_data = []
+        for task in eligibile_tasks:
+            mydict = {}
+            actual_task_data = task_description[task_description["task_number"] == task]
+            actual_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
+            predicted_task_data = pred_tasks_data_full[pred_tasks_data_full["sourceTask"] == task]
+            
+            if not actual_task_data.empty:
+                # Process actual man hours
+                actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
+                
+                # Process actual spares
+                actual_spares_cost = 0
+                actual_spares_list = []
+                
+                if not actual_parts_data.empty and 'billable_value_usd' in actual_parts_data.columns:
+                    for index, row in actual_parts_data.iterrows():
+                        rowdict = row.to_dict()
+                        spares_dict = {}
+                        spares_dict["partId"] = rowdict.get("issued_part_number", "")
+                        spares_dict["price"] = rowdict.get("billable_value_usd", 0)
+                        spares_dict["qty"] = rowdict.get("used_quantity", 0)
+                        spares_dict["unit"] = rowdict.get("issued_unit_of_measurement", "")
+                        actual_spares_cost += rowdict.get("billable_value_usd", 0)
+                        actual_spares_list.append(spares_dict)
+                
+                # Add to dictionary
+                mydict["actual_manhours"] = actual_manhours
+                mydict["actual_spares_list"] = actual_spares_list
+                mydict["actual_spares_cost"] = actual_spares_cost
+                mydict["task_number"] = task
+                
+                # Process predicted data
+                mydict["predict_manhours"] = 0
+                mydict["predict_spares_cost"] = 0
+                mydict["predicted_spares_list"] = []
+                
+                for index, row in predicted_task_data.iterrows():
+                    if "description" in row:
+                        mydict["description"] = row["description"]
+                    if "mhs" in row and "avg" in row["mhs"]:
+                        mydict["predict_manhours"] = row["mhs"]["avg"]
+                    if "spare_parts" in row:
+                        spare_parts = row["spare_parts"]
+                        mydict["predicted_spares_list"] = spare_parts
+                        spsum = 0
+                        for s in spare_parts:
+                            spsum = spsum + s.get("price", 0)
+                        mydict["predict_spares_cost"] = spsum
+                
+                final_mpd_data.append(mydict)
+        
+        # Calculate summary for tasks
+        df_tasks = pd.DataFrame(final_mpd_data)
+        total_actual_spares_cost = df_tasks['actual_spares_cost'].sum() if not df_tasks.empty else 0
+        total_predict_spares_cost = df_tasks['predict_spares_cost'].sum() if not df_tasks.empty else 0
+        total_predict_manhours = df_tasks['predict_manhours'].sum() if not df_tasks.empty else 0
+        total_actual_manhours = df_tasks['actual_manhours'].sum() if not df_tasks.empty else 0
+        
+        summary_tasks_comparision = {
+            "total_actual_spares_cost": total_actual_spares_cost,
+            "total_predict_spares_cost": total_predict_spares_cost,
+            "total_predict_manhours": total_predict_manhours,
+            "total_actual_manhours": total_actual_manhours
+        }
+        
+        eligible_tasks_comparision = {
+            "eligible_tasks": final_mpd_data,
+            "summary_tasks": summary_tasks_comparision
+        }
+        
+        # ----- PROCESS FINDINGS DATA (similar to original findings function but using testing2 logic) -----
+        final_findings_data = []
+        
+        for task in eligibile_tasks:
+            mydict = {}
+            pred_findings_task = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
+            sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"] == task]
+            actual_findings_parts_data = sub_task_parts[
+                (sub_task_parts["task_number"].str.startswith("HMV")) & 
+                (sub_task_parts["task_number"].isin(sub_task_description_data["log_item_number"].tolist()))
+            ]
+            
+            # Process actual findings manhours
+            actual_manhours = 0
+            for index, row in sub_task_description_data.iterrows():
+                one_finding = row.get("actual_man_hours", 0)
+                actual_manhours += one_finding
+            
+            mydict["actual_findings_manhours"] = actual_manhours
+            
+            # Process actual findings spares
+            actual_spares_cost = 0
+            actual_spares_list = []
+            
+            for index, row in actual_findings_parts_data.iterrows():
+                rowdict = row.to_dict()
+                spares_dict = {}
+                spares_dict["partId"] = rowdict.get("issued_part_number", "")
+                spares_dict["price"] = rowdict.get("billable_value_usd", 0)
+                spares_dict["qty"] = rowdict.get("used_quantity", 0)
+                spares_dict["unit"] = rowdict.get("issued_unit_of_measurement", "")
+                actual_spares_cost += rowdict.get("billable_value_usd", 0)
+                actual_spares_list.append(spares_dict)
+            
+            mydict["actual_findings_spares_cost"] = actual_spares_cost
+            mydict["actual_findings_spares_list"] = actual_spares_list
+            mydict["task_number"] = task
+            
+            # Process predicted findings
+            predicted_finding_spares_cost = 0
+            predicted_finding_manhours = 0
+            predicted_finding_sparelist = []
+            
+            for index, row in pred_findings_task.iterrows():
+                rowdict = row.to_dict()
+                if "details" in rowdict:
+                    rowdata = rowdict["details"]
+                    for k in rowdata:
+                        manhours = 0
+                        if 'mhs' in k:
+                            manhours = k["mhs"].get("avg", 0) * (k.get("prob", 100) / 100)
+                        predicted_finding_manhours += manhours
+                        
+                        spare_parts = []
+                        if "spare_parts" in k:
+                            spare_parts = k["spare_parts"]
+                        predicted_finding_sparelist += spare_parts
+                        
+                        spsum = 0
+                        for s in spare_parts:
+                            spsum += s.get("price", 0) * (s.get("prob", 100) / 100)
+                        predicted_finding_spares_cost += spsum
+            
+            mydict["predicted_finding_spares_cost"] = predicted_finding_spares_cost
+            mydict["predicted_finding_manhours"] = predicted_finding_manhours
+            mydict["predicted_finding_sparelist"] = predicted_finding_sparelist
+            
+            final_findings_data.append(mydict)
+        
+        # Calculate summary for findings
+        df_findings = pd.DataFrame(final_findings_data)
+        total_actual_findings_spares_cost = df_findings['actual_findings_spares_cost'].sum() if not df_findings.empty else 0
+        total_predicted_finding_spares_cost = df_findings['predicted_finding_spares_cost'].sum() if not df_findings.empty else 0
+        total_predicted_finding_manhours = df_findings['predicted_finding_manhours'].sum() if not df_findings.empty else 0
+        total_actual_findings_manhours = df_findings['actual_findings_manhours'].sum() if not df_findings.empty else 0
+        
+        summary_findings_comparision = {
+            "total_actual_spares_cost": total_actual_findings_spares_cost,
+            "total_predict_spares_cost": total_predicted_finding_spares_cost,
+            "total_predict_manhours": total_predicted_finding_manhours,
+            "total_actual_manhours": total_actual_findings_manhours
+        }
+        
+        eligible_findings_comparision = {
+            "eligible_tasks": final_findings_data,
+            "summary_findings": summary_findings_comparision
+        }
+        
+
+        
+        # Create the final output structure to match testing function
+        finaloutput = {
+            "tasks": eligible_tasks_comparision,
+            "findings": eligible_findings_comparision,
+            # Adding additional aircraft info that was in testing2 but not in testing
+            "cappingDetails": {
+                "actual_capping": actual_capping_values,
+                "predicted_capping": pred_capping_values
+            }
+        }
+        finaloutput= replace_nan_inf(finaloutput)
+        
+        return finaloutput
+    
+def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
+    logger.info("Starting actual_cap_calculation")
+    logger.info(f"cappingDetails: {cappingDetails}")
+    logger.info(f"Number of eligible tasks: {len(eligibile_tasks)}")
+    
+    
+    # Ensure cappingDetails is a dictionary
+    if not isinstance(cappingDetails, dict) or not cappingDetails:
+        logger.info("No capping details found, returning default values")
+        return {
+            'cappingTypeManhrs': "No capping",
+            'cappingManhrs': 0.0,
+            'billableManhrs': 0.0,
+            'unbillableManhrs': 0.0,
+            'cappingTypeSpareCost': "No capping",
+            'cappingSpareCost': 0.0,
+            'billableSpareCost': 0.0,
+            'unbillableSpareCost': 0.0
+        }
+    
+    # Populate capping values from cappingDetails
+    capping_values = {
+        'cappingTypeManhrs': cappingDetails.get("cappingTypeManhrs", "No capping"),
+        'cappingManhrs': cappingDetails.get("cappingManhrs", 0.0),
+        'billableManhrs': 0.0,
+        'unbillableManhrs': 0.0,
+        'cappingTypeSpareCost': cappingDetails.get("cappingTypeSpareCost", "No capping"),
+        'cappingSpareCost': cappingDetails.get("cappingSpareCost", 0.0),
+        'billableSpareCost': 0.0,
+        'unbillableSpareCost': 0.0
+    }
+    
+    logger.info(f"Initial capping_values: {capping_values}")
+    
+    # Filter sub_task_description to only include eligible tasks
+    sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligibile_tasks)]
+    logger.info(f"Filtered sub_task_description shape: {sub_task_description.shape}")
+    
+    # Define create_group function correctly (fixed indentation)
+    def create_group(df):
+        logger.info("Creating groups for tasks")
+        # Create a new column 'group' with default values
+        df['group'] = range(len(df))
+        
+        # Track which rows belong to which group
+        group_mapping = {}
+        
+        # First pass: Identify groups based on source task relationships
+        for idx, row in df.iterrows():
+            if row["source_task_discrepancy_number_updated"] != row["source_task_discrepancy_number"]:
+                # This task is related to another task
+                source_task = row["source_task_discrepancy_number"]
+                
+                # Find the rows where log_item_number matches this source_task
+                # and assign them the same group
+                related_rows = df[df["log_item_number"] == source_task]
+                
+                if not related_rows.empty:
+                    # Use the first related row's group as the group for this row
+                    related_group = related_rows.iloc[0]['group']
+                    df.at[idx, 'group'] = related_group
+                    group_mapping[row['log_item_number']] = related_group
+        
+        # Second pass: Ensure consistency in group assignments
+        for idx, row in df.iterrows():
+            log_item = row['log_item_number']
+            if log_item in group_mapping:
+                df.at[idx, 'group'] = group_mapping[log_item]
+        
+        logger.info(f"Number of unique groups created: {df['group'].nunique()}")
+        return df
+    
+    # Apply the create_group function
+    sub_task_description = create_group(sub_task_description)
+    
+    # Calculate task level man hours
+    logger.info("Calculating task level man hours")
+    task_level_mh = sub_task_description.groupby(
+        ["source_task_discrepancy_number_updated"]
+    ).agg(
+        avg_actual_man_hours=("actual_man_hours", "sum"),
+        max_actual_man_hours=("actual_man_hours", "sum"),
+        min_actual_man_hours=("actual_man_hours", "sum")
+    ).reset_index()
+    
+    logger.info(f"task_level_mh shape: {task_level_mh.shape}")
+    
+    # Calculate group level man hours
+    logger.info("Calculating group level man hours")
+    group_level_mh = sub_task_description.groupby(
+        ["group"]
+    ).agg(
+        avg_actual_man_hours=("actual_man_hours", "sum"),
+        max_actual_man_hours=("actual_man_hours", "sum"),
+        min_actual_man_hours=("actual_man_hours", "sum"),
+        skill_number=("skill_number", lambda x: list(set(x)))
+    ).reset_index()
+    
+    logger.info(f"group_level_mh shape: {group_level_mh.shape}")
+    
+    # Get eligible log items
+    eligible_log_items = sub_task_description["log_item_number"].unique().tolist()
+    logger.info(f"Number of eligible log items: {len(eligible_log_items)}")
+    
+    # Filter sub_task_parts to only include eligible log items
+    filtered_sub_task_parts = sub_task_parts[sub_task_parts['task_number'].isin(eligible_log_items)]
+    logger.info(f"filtered_sub_task_parts shape: {filtered_sub_task_parts.shape}")
+    
+    # Merge task_level_parts
+    logger.info("Merging task level parts")
+    task_level_parts = pd.merge(
+        filtered_sub_task_parts,
+        sub_task_description[["log_item_number", "source_task_discrepancy_number_updated"]],
         left_on="task_number",
         right_on="log_item_number",
         how="left"
+    ).drop(columns=["log_item_number"])
+    
+    # If the merge resulted in an empty DataFrame, create an empty one with required columns
+    if task_level_parts.empty:
+        logger.info("WARNING: task_level_parts is empty, creating empty DataFrame with required columns")
+        task_level_parts = pd.DataFrame(columns=["source_task_discrepancy_number_updated", "issued_part_number", 
+                                                "billable_value_usd", "used_quantity", 
+                                                "part_description", "issued_unit_of_measurement"])
+    
+    # Aggregate task level parts
+    task_level_parts = task_level_parts.groupby(["source_task_discrepancy_number_updated", "issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    logger.info(f"task_level_parts shape after aggregation: {task_level_parts.shape}")
+    
+    # Add 'group' column to filtered_sub_task_parts by merging with sub_task_description
+    logger.info("Adding group column to filtered_sub_task_parts")
+    if 'group' not in filtered_sub_task_parts.columns:
+        filtered_sub_task_parts = pd.merge(
+            filtered_sub_task_parts,
+            sub_task_description[["log_item_number", "group"]],
+            left_on="task_number",
+            right_on="log_item_number",
+            how="left"
         )
-        logger.info("filtered_sub_task_parts merged successfully")
-
-        filtered_sub_task_parts.dropna(subset=["source_task_discrepancy_number"], inplace=True)
-        filtered_sub_task_parts["source_task_discrepancy_number"] = (
-        filtered_sub_task_parts["source_task_discrepancy_number"].astype(str)
-        )
-        logger.info("source_task_discrepancy_number converted to string successfully")
-        # Filter out rows where "source_task_discrepancy_number_updated" starts with "AWR"
-        filtered_sub_task_parts = filtered_sub_task_parts[
-            filtered_sub_task_parts["source_task_discrepancy_number"].isin(pkg_tasks_data["task_number"])
-        ]
-        logger.info("filtered_sub_task_parts filtered successfully")
-        # Compute actual task part consumption
-        findings_parts_consumption = filtered_sub_task_parts.groupby("task_number", as_index=False).agg(
-            findings_part_consumption=("billable_value_usd", "sum")
-        )
-        logger.info("findings_parts_consumption fetched successfully")
-        # Merge task_parts_consumption with pkg_tasks_data based on task_number and SourceTask
-        pkg_findings_data = pkg_findings_data.merge(findings_parts_consumption, left_on="log_item_number", right_on="task_number", how="left")
-        # Fill missing values to avoid NaN issues
-        pkg_findings_data.loc[:, "findings_part_consumption"] = pkg_findings_data["findings_part_consumption"].fillna(0)
-        pkg_findings_data=pkg_findings_data.groupby(["source_task_discrepancy_number"])[["actual_man_hours", "findings_part_consumption"]].sum()
-        pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
-        pkg_findings_data.rename(
-            columns={
-                "actual_man_hours": "actual_man_hours_findings",
-                "source_task_discrepancy_number": "task_number"
-            },
-            inplace=True
-        )
-        logger.info(f'columns of pkg_findings_data: {pkg_findings_data.columns}')
-
-        pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
-        pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
-        pkg_tasks_data["no_of_findings"]=no_of_findings
-        logger.info("pkg_tasks_data merged successfully")
-        #print(pkg_tasks_data.columns)
-        
-
-        
-        pred_tasks_data["task_number"] = pred_tasks_data["sourceTask"].astype(str)
-        pred_tasks_data.rename(columns={"avg_mh": "actual_man_hours", "total_billable_value_usd": "task_part_consumption"}, inplace=True)
-        pred_findings_data = pd.DataFrame(pred_data[0]["findings"])
-        logger.info("pred_findings_data fetched successfully")
-        
-        if "details" in pred_findings_data.columns:
-            pred_findings_data["avg_mh_findings"] = pred_findings_data["details"].apply(
-            lambda x: x[0]["mhs"].get("avg") if isinstance(x, list) and len(x) > 0 else None
+    
+    # Group parts by group and part number
+    group_level_parts = filtered_sub_task_parts.groupby(["group", "issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    logger.info(f"group_level_parts shape: {group_level_parts.shape}")
+    
+    # Create parts_line_items DataFrame
+    parts_line_items = filtered_sub_task_parts.groupby(["issued_part_number"]).agg(
+        billable_value_usd=("billable_value_usd", "sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+    ).reset_index()
+    
+    logger.info(f"parts_line_items shape: {parts_line_items.shape}")
+    
+    # Create copies for processing
+    task_level_mh_cap = task_level_mh.copy()
+    task_level_parts_cap = task_level_parts.copy()
+    
+    # Aggregate task level parts for capping
+    task_level_parts_cap_agg = task_level_parts_cap.groupby(["source_task_discrepancy_number_updated"]).agg(
+        billable_value_usd=("billable_value_usd", "sum")
+    ).reset_index()
+    
+    logger.info(f"task_level_parts_cap_agg shape: {task_level_parts_cap_agg.shape}")
+    
+    # Copy group level data
+    group_level_mh_cap = group_level_mh.copy()
+    group_level_parts_cap = group_level_parts.copy()
+    
+    # Add source_task_discrepancy_number_updated column to group_level_parts_cap if it doesn't exist
+    if "source_task_discrepancy_number_updated" not in group_level_parts_cap.columns:
+        logger.info("WARNING: source_task_discrepancy_number_updated not in group_level_parts_cap columns, adding placeholder")
+        # This is a placeholder. In real code, you would need to properly join/map this information.
+        group_level_parts_cap["source_task_discrepancy_number_updated"] = "Unknown"
+    
+    # Aggregate group level parts for capping
+    group_level_parts_cap_agg = group_level_parts_cap.groupby(["source_task_discrepancy_number_updated", "group"]).agg(
+        billable_value_usd=("billable_value_usd", "sum")
+    ).reset_index()
+    
+    logger.info(f"group_level_parts_cap_agg shape: {group_level_parts_cap_agg.shape}")
+    
+    # Create a copy of parts_line_items for capping
+    parts_line_items_result = parts_line_items.copy()
+    
+    # Get capping values from details
+    mhs_cap_type = cappingDetails.get("cappingTypeManhrs", "No capping")
+    mhs_cap_amt = cappingDetails.get("cappingManhrs", 0)
+    spares_cap_type = cappingDetails.get("cappingTypeSpareCost", "No capping")
+    spares_cap_amt = cappingDetails.get("cappingSpareCost", 0)
+    
+    logger.info(f"Capping parameters: mhs_cap_type={mhs_cap_type}, mhs_cap_amt={mhs_cap_amt}, spares_cap_type={spares_cap_type}, spares_cap_amt={spares_cap_amt}")
+    
+    # Define man-hours capping function
+    def mhs_cap(mhs_cap_type, mhs_cap_amt):
+        logger.info(f"Applying man-hours capping: {mhs_cap_type}, amount: {mhs_cap_amt}")
+        if mhs_cap_type == "per_source_card":
+            # Calculate intermediate values (before applying probability)
+            task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: min(x, mhs_cap_amt)
             )
-            pred_findings_data["max_mh_findings"] = pred_findings_data["details"].apply(
-                lambda x: x[0]["mhs"].get("max") if isinstance(x, list) and len(x) > 0 else None
+            task_level_mh_cap["billable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: max(0, x - mhs_cap_amt)
             )
-            pred_findings_data["min_mh_findings"] = pred_findings_data["details"].apply(
-                lambda x: x[0]["mhs"].get("min") if isinstance(x, list) and len(x) > 0 else None
+            task_level_mh_cap["mhs_cap_amt"] = mhs_cap_amt
+            
+            # Save intermediate results to CSV
+            #task_level_mh_cap.to_csv("task_level_mh_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            task_level_mh_cap["unbillable_mh"] = task_level_mh_cap["unbillable_mh_raw"] 
+            task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] 
+            
+            # Save final results to CSV
+            #task_level_mh_cap.to_csv("task_level_mh_cap_final.csv", index=False)
+            
+            unbillable_sum = task_level_mh_cap["unbillable_mh"].sum()
+            billable_sum = task_level_mh_cap["billable_mh"].sum()
+            logger.info(f"Per source card MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+        
+        elif mhs_cap_type == "per_IRC":
+            # Calculate intermediate values (before applying probability)
+            group_level_mh_cap["unbillable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: min(x, mhs_cap_amt)
             )
-            # Compute total billable value from spare_parts
-            pred_findings_data["findings_part_consumption"] = pred_findings_data["details"].apply(
-                lambda x: sum(item["price"] for item in x[0]["spare_parts"] if isinstance(item, dict)) if isinstance(x, list) else 0
+            group_level_mh_cap["billable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                lambda x: max(0, x - mhs_cap_amt)
             )
-            logger.info("pred_findings_data details fetched successfully")
-            pred_findings_data.groupby(["taskId"])[["avg_mh_findings", "max_mh_findings", "min_mh_findings", "findings_part_consumption"]].sum()
-            pred_findings_data.rename(columns={"avg_mh_findings": "actual_man_hours_findings","taskId":"task_number"}, inplace=True)
-            pkg_findings_data.reset_index(inplace=True)  # Moves index to a column
-            pkg_findings_data["task_number"] = pkg_findings_data["task_number"].astype(str)
-            pred_findings_data["task_number"] = pred_findings_data["task_number"].astype(str)
-            #pkg_tasks_data = pkg_tasks_data.merge(pkg_findings_data, on="task_number", how="left")
-            pred_tasks_data = pred_tasks_data.merge(pred_findings_data, on="task_number", how="left")
-            # Compute differences safely
-            pkg_tasks_data = pkg_tasks_data.drop_duplicates(subset=["task_number"])  
-            logger.info("pkg_tasks_data dropped duplicates successfully")
-            #print(pkg_tasks_data.columns)
-            pred_tasks_data = pred_tasks_data.drop_duplicates(subset=["task_number"])  # Just in case, remove duplicates here too
-            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="right")
-            #print(results.columns)
-            results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
-            results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
+            
+            group_level_mh_cap["mhs_cap_amt"] = mhs_cap_amt
+            # Save intermediate results to CSV
+            #group_level_mh_cap.to_csv("group_level_mh_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            group_level_mh_cap["unbillable_mh"] = group_level_mh_cap["unbillable_mh_raw"]
+            group_level_mh_cap["billable_mh"] = group_level_mh_cap["billable_mh_raw"] 
+            
+            # Save final results to CSV
+            #group_level_mh_cap.to_csv("group_level_mh_cap_final.csv", index=False)
+            
+            unbillable_sum = group_level_mh_cap["unbillable_mh"].sum()
+            billable_sum = group_level_mh_cap["billable_mh"].sum()
+            logger.info(f"Per IRC MH result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+        
+        else:  # No capping
+            total_sum = task_level_mh_cap["avg_actual_man_hours"].sum() 
+            logger.info(f"No capping for MH: unbillable=0, billable={total_sum}")
+            return 0, total_sum
+    
+    # Define spares capping function
+    def spares_cap(spares_cap_type, spares_cap_amt):
+        logger.info(f"Applying spares capping: {spares_cap_type}, amount: {spares_cap_amt}")
+        if spares_cap_type == "per_source_card":
+            # Use the aggregated DataFrame for calculations
+            task_level_parts_cap = task_level_parts_cap_agg.copy()
+            
+            # Calculate intermediate values (before applying probability)
+            task_level_parts_cap["unbillable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            task_level_parts_cap["billable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            task_level_parts_cap["spares_cap_amt"] = spares_cap_amt
+            
+            # Save intermediate results to CSV
+            #task_level_parts_cap.to_csv("task_level_parts_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            task_level_parts_cap["unbillable_spares"] = task_level_parts_cap["unbillable_spares_raw"] 
+            task_level_parts_cap["billable_spares"] = task_level_parts_cap["billable_spares_raw"]
+            # Save final results to CSV
+            #task_level_parts_cap.to_csv("task_level_parts_cap_final.csv", index=False)
+            
+            unbillable_sum = task_level_parts_cap["unbillable_spares"].sum()
+            billable_sum = task_level_parts_cap["billable_spares"].sum()
+            logger.info(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
+            
+        elif spares_cap_type == "per_IRC":
+            # Use the aggregated DataFrame for calculations
+            group_level_parts_cap = group_level_parts_cap_agg.copy()
+            
+            # Calculate intermediate values (before applying probability)
+            group_level_parts_cap["unbillable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            group_level_parts_cap["billable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            
+            group_level_parts_cap["spares_cap_amt"] = spares_cap_amt
+            # Save intermediate results to CSV
+            #group_level_parts_cap.to_csv("group_level_parts_cap_intermediate.csv", index=False)
+            
+            # Apply probability to get final values
+            group_level_parts_cap["unbillable_spares"] = group_level_parts_cap["unbillable_spares_raw"] 
+            group_level_parts_cap["billable_spares"] = group_level_parts_cap["billable_spares_raw"] 
+            
+            # Save final results to CSV
+            #group_level_parts_cap.to_csv("group_level_parts_cap_final.csv", index=False)
+            
+            unbillable_sum = group_level_parts_cap["unbillable_spares"].sum()
+            billable_sum = group_level_parts_cap["billable_spares"].sum()
 
-            # Merge predicted and actual data
-            results["diff_avg_mh_findings"] = results["actual_man_hours_findings_pred"].fillna(0) - results["actual_man_hours_findings_actual"].fillna(0)
-            results["diff_total_billable_value_usd_findings"] = results["findings_part_consumption_pred"].fillna(0) - results["findings_part_consumption_actual"].fillna(0)
-            logger.info("results merged successfully")
-            logger.info(f"results columns: {results.columns}")
-            # Assuming 'results' is a DataFrame
-            results_df = results[[
-                # 'package_number', 
-                'task_number', 'actual_man_hours_actual',
-                'task_part_consumption_actual', 'actual_man_hours_pred',
-                'task_part_consumption_pred', 'actual_man_hours_findings_actual',
-                'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
-                'findings_part_consumption_pred', 'diff_avg_mh',
-                'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
-                'diff_total_billable_value_usd_findings'
-            ]].copy()
+            return unbillable_sum, billable_sum
             
-            results_df.fillna(0, inplace=True)
-            logger.info("results_df filled NaN values successfully")
-            logger.info(f"results_df columns: {results_df.columns}")
+        elif spares_cap_type == "per_line_item":
+            # Calculate intermediate values (before applying probability)
+            parts_line_items_result["unbillable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            parts_line_items_result["billable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            parts_line_items_result["spares_cap_amt"] = spares_cap_amt
+            # Save intermediate results to CSV
+            #parts_line_items_result.to_csv("line_item_parts_cap_intermediate.csv", index=False)
             
-            tasks = []  # List to store task dictionaries
+            # Apply probability to get final values
+            parts_line_items_result["unbillable_spares"] = parts_line_items_result["unbillable_spares_raw"] 
+            parts_line_items_result["billable_spares"] = parts_line_items_result["billable_spares_raw"] 
             
-            for _, row in results_df.iterrows():
-                task = {
-                    # "package_number": row["package_number"],
-                    "task_number": row["task_number"],
-                    "actual_man_hours_actual": row["actual_man_hours_actual"],
-                    "task_part_consumption_actual": row["task_part_consumption_actual"],
-                    "actual_man_hours_pred": row["actual_man_hours_pred"],
-                    "task_part_consumption_pred": row["task_part_consumption_pred"],
-                    "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
-                    "findings_part_consumption_actual": row["findings_part_consumption_actual"],
-                    "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
-                    "findings_part_consumption_pred": row["findings_part_consumption_pred"],
-                    "diff_avg_mh": row["diff_avg_mh"],
-                    "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
-                    "diff_avg_mh_findings": row["diff_avg_mh_findings"],
-                    "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": ((
-                        row["actual_man_hours_pred"] + row["actual_man_hours_findings_pred"] +
-                        row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
-                    ) / (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) -1)* 100 if (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) > 0 else 0  # Avoid division by zero
-                }
-                tasks.append(task)
+            # Save final results to CSV
+            #parts_line_items_result.to_csv("line_item_parts_cap_final.csv", index=False)
             
-            # Compute aggregated accuracy
-            actual_mh_total = results_df["actual_man_hours_actual"].sum()
-            pred_mh_total = results_df["actual_man_hours_pred"].sum()
-            actual_billable_total = results_df["task_part_consumption_actual"].sum()
-            pred_billable_total = results_df["task_part_consumption_pred"].sum()
-            logger.info("actual_mh_total and pred_mh_total and actual_billable_total and pred_billable_total calculated successfully")
+            unbillable_sum = parts_line_items_result["unbillable_spares"].sum()
+            billable_sum = parts_line_items_result["billable_spares"].sum()
+            logger.info(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
+            return unbillable_sum, billable_sum
             
-            accuracy_mh = (pred_mh_total  / actual_mh_total)  if actual_mh_total > 0 else 0
-            accuracy_billable = (pred_billable_total  / actual_billable_total) if actual_billable_total > 0 else 0
-            logger.info("accuracy_mh and accuracy_billable calculated successfully")
+        else:  # No capping
+            total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0
+            logger.info(f"No capping for spares: unbillable=0, billable={total_sum}")
+            return 0, total_sum
+    
+    # Calculate and set man-hours capping values
+    logger.info("Calculating man-hours capping values")
+    capping_values["unbillableManhrs"], capping_values["billableManhrs"] = mhs_cap(mhs_cap_type, mhs_cap_amt)
+    
+    # Calculate and set spare costs capping values
+    logger.info("Calculating spare costs capping values")
+    capping_values['unbillableSpareCost'], capping_values['billableSpareCost'] = spares_cap(spares_cap_type, spares_cap_amt)
+    
+    logger.info(f"Final capping_values: {capping_values}")
+    return capping_values
 
-            results = {
-                "tasks": tasks,
-                "aggregatedTasklevel": {
-                    "avg_mh_actual": actual_mh_total,
-                    "total_billable_value_usd_tasks_actual": actual_billable_total,
-                    "avg_mh_pred": pred_mh_total,
-                    "total_billable_value_usd_tasks_pred": pred_billable_total,
-                    "diff_avg_mh": results_df["diff_avg_mh"].sum(),
-                    "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
-                    "accuracy_mh": accuracy_mh,
-                    "accuracy_total_billable_value_usd_tasks": accuracy_billable
-                },
-                "aggregatedFindingslevel": {
-                    "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
-                    "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
-                    "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
-                    "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].abs().sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].abs().sum(),
-                    "accuracy_mh": ((results_df["actual_man_hours_findings_pred"].sum()) /
-                                            results_df["actual_man_hours_findings_actual"].sum())
-                                            if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": ((results_df["findings_part_consumption_pred"].sum()) /
-                                                                results_df["findings_part_consumption_actual"].sum()) 
-                                                                if results_df["findings_part_consumption_actual"].sum() > 0 else 0
-                }
-            }
-            
 
         
-        
-            
-            return results
-            
-
-        else:
-                # Compute differences safely
-            results = pkg_tasks_data.merge(pred_tasks_data, on="task_number", suffixes=("_actual", "_pred"), how="left")
-            results["diff_avg_mh"] = results["actual_man_hours_pred"].fillna(0) - results["actual_man_hours_actual"].fillna(0)
-            results["diff_total_billable_value_usd_tasks"] = results["task_part_consumption_pred"].fillna(0) - results["task_part_consumption_actual"].fillna(0)
-            columns_to_add = ['actual_man_hours_findings_actual', 'findings_part_consumption_actual',
-                            'actual_man_hours_findings_pred', 'findings_part_consumption_pred',
-                            'diff_avg_mh_findings', 'diff_total_billable_value_usd_findings']
-            # Ensure all columns exist
-            results = results.reindex(columns=results.columns.union(columns_to_add, sort=False), fill_value=0)
-            
-            
-            # Assuming 'results' is a DataFrame
-            results_df = results[[
-                # 'package_number', 
-                'task_number', 'actual_man_hours_actual',
-                'task_part_consumption_actual', 'actual_man_hours_pred',
-                'task_part_consumption_pred', 'actual_man_hours_findings_actual',
-                'findings_part_consumption_actual', 'actual_man_hours_findings_pred',
-                'findings_part_consumption_pred', 'diff_avg_mh',
-                'diff_total_billable_value_usd_tasks', 'diff_avg_mh_findings',
-                'diff_total_billable_value_usd_findings'
-            ]].copy()  # Using .copy() to avoid SettingWithCopyWarning
-            
-            results_df.fillna(0, inplace=True)
-            
-            tasks = []  # List to store task dictionaries
-            
-            for _, row in results_df.iterrows():
-                task = {
-                    # "package_number": row["package_number"],
-                    "task_number": row["task_number"],
-                    "actual_man_hours_actual": row["actual_man_hours_actual"],
-                    "task_part_consumption_actual": row["task_part_consumption_actual"],
-                    "actual_man_hours_pred": row["actual_man_hours_pred"],
-                    "task_part_consumption_pred": row["task_part_consumption_pred"],
-                    "actual_man_hours_findings_actual": row["actual_man_hours_findings_actual"],
-                    "findings_part_consumption_actual": row["findings_part_consumption_actual"],
-                    "actual_man_hours_findings_pred": row["actual_man_hours_findings_pred"],
-                    "findings_part_consumption_pred": row["findings_part_consumption_pred"],
-                    "diff_avg_mh": row["diff_avg_mh"],
-                    "diff_total_billable_value_usd_tasks": row["diff_total_billable_value_usd_tasks"],
-                    "diff_avg_mh_findings": row["diff_avg_mh_findings"],
-                    "diff_total_billable_value_usd_findings": row["diff_total_billable_value_usd_findings"],
-                    "accuracy": ( (
-                        row["actual_man_hours_pred"] + row["actual_man_hours_findings_pred"] +
-                        row["task_part_consumption_pred"] + row["findings_part_consumption_pred"]
-                    ) / (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ))  if (
-                        row["task_part_consumption_actual"] + row["findings_part_consumption_actual"] +
-                        row["actual_man_hours_actual"] + row["actual_man_hours_findings_actual"]
-                    ) > 0 else 0  # Avoid division by zero
-                }
-                tasks.append(task)
-            
-            # Compute aggregated accuracy
-            actual_mh_total = results_df["actual_man_hours_actual"].sum()
-            pred_mh_total = results_df["actual_man_hours_pred"].sum()
-            actual_billable_total = results_df["task_part_consumption_actual"].sum()
-            pred_billable_total = results_df["task_part_consumption_pred"].sum()
-            
-            accuracy_mh = (pred_mh_total  / actual_mh_total)  if actual_mh_total > 0 else 0
-            accuracy_billable = (pred_billable_total  / actual_billable_total) if actual_billable_total > 0 else 0
-            logger.info("accuracy_mh and accuracy_billable calculated successfully")
-
-            results = {
-                "tasks": tasks,
-                "aggregatedTasklevel": {
-                    "avg_mh_actual": actual_mh_total,
-                    "total_billable_value_usd_tasks_actual": actual_billable_total,
-                    "avg_mh_pred": pred_mh_total,
-                    "total_billable_value_usd_tasks_pred": pred_billable_total,
-                    "diff_avg_mh": results_df["diff_avg_mh"].sum(),
-                    "diff_total_billable_value_usd_tasks": results_df["diff_total_billable_value_usd_tasks"].sum(),
-                    "accuracy_mh": accuracy_mh,
-                    "accuracy_total_billable_value_usd_tasks": accuracy_billable
-                },
-                "aggregatedFindingslevel": {
-                    "avg_mh_findings_actual": results_df["actual_man_hours_findings_actual"].sum(),
-                    "total_billable_value_usd_findings_actual": results_df["findings_part_consumption_actual"].sum(),
-                    "avg_mh_findings_pred": results_df["actual_man_hours_findings_pred"].sum(),
-                    "total_billable_value_usd_findings_pred": results_df["findings_part_consumption_pred"].sum(),
-                    "diff_avg_mh": results_df["diff_avg_mh_findings"].abs().sum(),
-                    "diff_total_billable_value_usd_findings": results_df["diff_total_billable_value_usd_findings"].abs().sum(),
-                    "accuracy_mh": ((results_df["actual_man_hours_findings_pred"].sum()) /
-                                            results_df["actual_man_hours_findings_actual"].sum())
-                                            if results_df["actual_man_hours_findings_actual"].sum() > 0 else 0,
-                    "accuracy_total_billable_value_usd_findings": ((results_df["findings_part_consumption_pred"].sum()) /
-                                                                results_df["findings_part_consumption_actual"].sum()) 
-                                                                if results_df["findings_part_consumption_actual"].sum() > 0 else 0
-                }
-            }
-        
-            return results
 
 
 
@@ -1081,5 +1860,16 @@ def datetime_to_str(obj):
     raise TypeError("Object of type 'datetime' is not JSON serializable")
             
 
-
-    
+def replace_nan_inf(obj):
+    """Recursively replace NaN, inf, and convert numpy types to Python native types"""
+    if isinstance(obj, dict):
+        return {k: replace_nan_inf(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_inf(x) for x in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj

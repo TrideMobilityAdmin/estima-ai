@@ -44,6 +44,9 @@ class Estimate(BaseModel):
 class SparePart(BaseModel):
     partID:str
     quantity:float
+    description:str
+    unit:str
+    price:float
 class MiscLaborTask(BaseModel):
     taskID: str
     taskDescription: str
@@ -62,12 +65,13 @@ class Capping(BaseModel):
 class EstimateRequest(BaseModel):
      tasks: List[str]
      probability: float
-     aircraftAge: int 
+     aircraftAge: float 
      aircraftFlightHours: int 
      aircraftFlightCycles: int
      areaOfOperations: str
      cappingDetails:Optional[Capping]=None
-     typeOfCheck: str
+     typeOfCheck: List[str]
+     typeOfCheckID:str
      operator: str 
      aircraftRegNo:str
      aircraftModel:str  
@@ -88,10 +92,15 @@ class EstimateRequest(BaseModel):
         }
 
 class ValidRequest(BaseModel):
-     tasks: List[str]
+    tasks: List[str]
 class ValidTasks(BaseModel):
     taskid: str
     status: bool
+    description:str=""
+
+class ValidRequestCheckCategory(BaseModel):
+    tasks: List[str]
+    typeOfCheck: List[str]
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""
@@ -144,11 +153,25 @@ class RemarkItem(BaseModel):
 class EstimateStatusResponse(BaseModel):
     estID:str
     tasks: List[str]
+    descriptions:List[str]
     totalMhs:float
     totalPartsCost:float
     status:str
-    tatTime:float=0.0
+    # tatTime:float=0.0
     aircraftRegNo:str
+    # probability:float
+    # operator:str
+    # aircraftModel:str
+    # aircraftAge:float
+    # typeOfCheck:List[str]
+    # typeOfCheckID:str
+    # aircraftFlightHours: int
+    # aircraftFlightCycles: int
+    # areaOfOperations: str
+    # cappingDetails:Optional[Capping]=None
+    # additionalTasks: List[AdditionalTasks]
+    # miscLaborTasks: List[MiscLaborTask]
+    
     createdAt:datetime
     remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):

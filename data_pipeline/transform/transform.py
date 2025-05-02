@@ -19,9 +19,8 @@ def clean_data(data):
         # Drop columns with purely numeric names
         data = data.loc[:, ~data.columns.str.isnumeric()]
 
-        # Drop duplicate rows
-        cleaned_data = data.drop_duplicates()
-
+        # Make a copy to avoid modifying the original dataframe
+        cleaned_data = data.copy()
 
         # Iterate over columns and clean based on data type
         for column in cleaned_data.columns:
@@ -54,7 +53,6 @@ def clean_data(data):
                 print(f"❌ Column '{column}' type processing error: {attr_err}")
             except Exception as col_error:
                 print(f"❌ Error processing column '{column}': {col_error}")
-
 
         # Replace infinities with None
         cleaned_data = cleaned_data.replace([np.inf, -np.inf], None)

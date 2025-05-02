@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status,UploadFile,File, Form
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import ORJSONResponse
 from app.models.user import UserResponse,UserCreate, UserLogin, Token, UserInDB
 from typing import List, Optional,Dict, Any
 from fastapi import APIRouter, Depends, Query
@@ -10,7 +11,7 @@ import shutil
 from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost,CappingData
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse
+from app.models.estimates import Estimate, EstimateRequest,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatusResponse,ValidRequestCheckCategory
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -205,6 +206,17 @@ async def validate_tasks(
 ):
     print("validate_tasks")
     return await task_service.validate_tasks(estimate_request,current_user)
+
+
+
+@router.post("/validate_tasks_checkbased",response_model=List[ValidTasks])
+async def validate_tasks_checkbased(
+    estimate_request: ValidRequestCheckCategory,
+     current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    
+    return await task_service.validate_tasks_checkcategory(estimate_request,current_user)
 
 @router.post("/upload-estimate/")
 async def upload_estimate(

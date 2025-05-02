@@ -24,12 +24,12 @@ export const useApi = () => {
 
   // Function to handle session expiration and navigate to login
   const handleSessionExpired = () => {
-    showNotification({
-      title: "Session Expired!",
-      message: "Your session has expired. Please log in again.",
-      color: "red",
-      style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-    });
+    // showNotification({
+    //   title: "Session Expired!",
+    //   message: "Your session has expired. Please log in again.",
+    //   color: "red",
+    //   style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+    // });
     showAppNotification("error", "Session Expired!", "Your session has expired. Please log in again.");
 
     // Clear authentication tokens (modify as needed)
@@ -43,11 +43,11 @@ export const useApi = () => {
   // Function to upload form fields + file
   const RFQFileUpload = async (data: any, file: File | null) => {
     if (!file) {
-      showNotification({
-        title: "Error",
-        message: "File is required",
-        color: "red",
-      });
+      showAppNotification(
+        "error",
+        "Failed!",
+        "File is required!"
+      );
       return null;
     }
 
@@ -65,6 +65,7 @@ export const useApi = () => {
       cappingDetails: data.cappingDetails,
       additionalTasks: data.additionalTasks,
       typeOfCheck: data.typeOfCheck, 
+      typeOfCheckID : data.typeOfCheckID,
       miscLaborTasks: data.miscLaborTasks
     };
 
@@ -134,8 +135,8 @@ export const useApi = () => {
       const response = await axiosInstance.get(getEstimateReport_Url+estimateId);
       console.log("✅ API Response estimate by id :", response);
       showNotification({
-        title: "Estimate Generated!",
-        message: "Successfully Estimate Report Generated",
+        title: "Estimate!",
+        message: "Estimate displayed below.",
         color: "green",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
@@ -230,50 +231,55 @@ export const useApi = () => {
   // New function to upload a file with Estimate ID
   const compareUploadFile = async (files: File[], selectedEstID: string) => {
     if (!files.length || !selectedEstID) {
-        console.error("Missing required parameters:", { files, selectedEstID });
-        return null;
+      console.error("Missing required parameters:", { files, selectedEstID });
+      return null;
     }
-
-    // Create FormData
+  
     const formData = new FormData();
-    files.forEach((file, index) => {
-        formData.append("files", file); // Sending multiple files
+    files.forEach((file) => {
+      formData.append("files", file);
     });
-
+  
     try {
-        // Make the API call with the files in FormData and estimateId in URL
-        const response = await axiosInstance.post(
-            `${getEstimateReport_Url}${selectedEstID}/compare`,
-            formData,
-            {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            }
-        );
-
-        console.log("✅ Upload successful:", response.data);
-
-        if (response !== null) {
-            showAppNotification("success", "Success!", "Estimate Comparision Successfull!");
-        } else {
-            showAppNotification("error", "Failed!", "Failed try again");
+      const response = await axiosInstance.post(
+        `${getEstimateReport_Url}${selectedEstID}/compare`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         }
-
-        return response;
+      );
+  
+      console.log("✅ Upload successful:", response.data);
+  
+      showAppNotification("success", "Success!", "Estimate Comparison Successfully!");
+  
+      return response;
     } catch (error: any) {
-        console.error("❌ Upload failed:", error);
-
-        if (error.response?.data?.detail === "Invalid authentication credentials") {
-            handleSessionExpired();
+      console.error("❌ Upload failed:", error);
+  
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+        return;
+      }
+  
+      if (error.response?.data?.detail) {
+        // Special case for missing sheets error
+        if (error.response.data.detail === "One or more required sheets are missing from the uploaded files.") {
+          showAppNotification("error", "Upload Failed!", "Flease select valid Actual files.");
+        } else {
+          showAppNotification("error", "Upload Failed!", error.response.data.detail);
         }
-
-        showAppNotification("error", "Upload Failed!", `${error.response?.data?.message || "Failed to upload files, please try again."}`);
-
-        throw error;
+      } else if (error.response?.data?.message) {
+        showAppNotification("error", "Upload Failed!", error.response.data.message);
+      } else {
+        showAppNotification("error", "Upload Failed!", "Failed to upload. Please try again.");
+      }
+  
+      throw error;
     }
-};
-
+  };
 
   // New function to download the PDF
   const downloadEstimatePdf = async (estimateId: string) => {
@@ -318,7 +324,6 @@ export const useApi = () => {
       // });
     }
   };
-
 
   const getAllDataExpertInsights = async () => {
     try {
@@ -381,7 +386,7 @@ export const useApi = () => {
       
       showNotification({
         title: "Success!",
-        message: "Successfully updated probability wise data",
+        message: "Successfully updated data",
         color: "green",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
@@ -400,7 +405,7 @@ export const useApi = () => {
       } else {
         showNotification({
           title: "Failed!",
-          message: "Failed to update probability wise data, please try again...",
+          message: "Failed to update data, please try again...",
           color: "orange",
           style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
         });

@@ -17,26 +17,12 @@ import {
   axios,
   showNotification,
   Space
-  // entityID,
-  // roleID,
-  // userID,
-  // userToken,
-  // getUserLogin_Url,
-  // clearAuthState,
-  // saveAuthData,
-  // airportTrolleyImg,
 } from "../constants/GlobalImports";
-import flightBg  from '../../public/airCraft8.jpg'
+import flightBg from '../../public/airCraft8.jpg'
 import { Overlay } from "@mantine/core";
-import { entityID, roleID, userEmail, userID, userName, userToken } from "../components/tokenJotai";
+import { entityID, roleID, userEmail, userID, userName, userToken } from "../api/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
-
-// const validCredentials = [
-//   { email: "gmr@evrides.live", password: "gmr@evrides" },
-//   { email: "admin@tridemobility.com", password: "admin" },
-//   { email: "smarttrolley@evrides", password: "smarttrolley" },
-// ];
 
 type LoginInput = {
   username: string;
@@ -48,24 +34,6 @@ function Login() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // const verify = (values: LoginInput) => {
-  //   const isValid = validCredentials.some(
-  //     (cred) => cred.email === values.email && cred.password === values.password
-  //   );
-
-  //   if (isValid) {
-  //     navigate("/home/tracking");
-  //   } else {
-  //     setErrorMessage("Invalid email or password. Please try again.");
-  //     form.reset(); // Clear the input fields
-  //   }
-  // };
-  // useEffect(() => {
-  //   if (errorMessage) {
-  //     const timer = setTimeout(() => setErrorMessage(""), 5000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [errorMessage]);
   const form = useForm<any>({
     initialValues: {
       username: "",
@@ -78,6 +46,7 @@ function Login() {
   const [email, setEmail] = useAtom(userEmail);
   // const [roleId, setRoleID] = useAtom(roleID);
   // const [entityId, setEntityID] = useAtom(entityID);
+  
   const login = async (values: LoginInput) => {
     setIsLoading(true);
     try {
@@ -95,9 +64,8 @@ function Login() {
         // entityID 
       } = response.data;
 
-      // console.log("responese login >>>>",response.data)
       if (response.status === 200) {
-        // Save user details and token
+        // Update Jotai atoms
         setToken(accessToken);
         setUserID(userID);
         setName(username);
@@ -105,21 +73,18 @@ function Login() {
         // setRoleID(roleID);
         // setEntityID(entityID);
 
-        sessionStorage.setItem("token", accessToken);
-        sessionStorage.setItem("userID", userID);
-        sessionStorage.setItem("username", username);
-        sessionStorage.setItem("email", email);
-        // sessionStorage.setItem("roleID", roleID);
-        // sessionStorage.setItem("entityID", entityID);
+        // Save to sessionStorage using the helper function
+        saveAuthData({ 
+          token: accessToken, 
+          userID, 
+          username, 
+          email 
+        });
+
         // Verify that the token is stored
-        const storedToken = sessionStorage.getItem("token");
-        const storedName = sessionStorage.getItem("username");
-        const storedeMAIL = sessionStorage.getItem("email");
-        
-        console.log("✅ Token stored in sessionStorage:", storedToken);  
-        console.log("user stored in sessionStorage:", storedName);  
-        console.log("email stored in sessionStorage:", storedeMAIL);  
-        saveAuthData({ token, status: "authenticated" });
+        console.log("✅ Token stored in sessionStorage:", accessToken.substring(0, 10) + "...");  
+        console.log("✅ User stored in sessionStorage:", username);  
+        console.log("✅ Email stored in sessionStorage:", email);  
 
         showNotification({
           title: "Login Successful",
@@ -127,10 +92,10 @@ function Login() {
           color: "green",
           style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
         });
+        
         setIsLoading(false);
         // Redirect to dashboard
         navigate("/home");
-        // window.location.reload();
       } else {
         setIsLoading(false);
         throw new Error("Invalid credentials or server error");
@@ -138,21 +103,18 @@ function Login() {
     } catch (error: any) {
       setIsLoading(false);
       clearAuthState();
-      console.log("errorrrrr", error);
+      console.log("Error during login:", error);
       const errorMessage =
-        error.response?.data?.responseMsg || "Something went wrong!";
+        error.response?.data?.detail || "Something went wrong!";
 
       showNotification({
-        title: "Login Failed",
+        title: "Login Failed!",
         message: errorMessage,
         color: "red",
         style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
       });
     }
   };
-
-  // console.log("token.....",token);
-  // console.log("userId.....",userId);
 
   return (
     <div
@@ -217,7 +179,6 @@ function Login() {
             </Flex>
             <Space h='50'/>
             
-
             <TextInput
               label="Username"
               placeholder="hello@gmail.com"
@@ -238,23 +199,6 @@ function Login() {
           </form>
         </Paper>
       </Flex>
-
-      {/* {errorMessage && (
-        <Notification
-          color="red"
-          onClose={() => setErrorMessage("")}
-          style={{
-            position: "fixed",
-            bottom: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "90%",
-            maxWidth: "400px",
-          }}
-        >
-          {errorMessage}
-        </Notification>
-      )} */}
     </div>
   );
 }
