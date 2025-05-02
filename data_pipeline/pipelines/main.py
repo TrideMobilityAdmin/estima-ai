@@ -24,7 +24,50 @@ def load_config(config_path='D:/Projects/gmr-mro/estima-ai/data_pipeline/config.
     """Load configuration from YAML file."""
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
+# Load config.yaml
+def load_config(config_path='D:/Projects/gmr-mro/estima-ai/data_pipeline/config.yaml'):
+    """Load configuration from YAML file."""
+    with open(config_path, "r") as file:
+        return yaml.safe_load(file)
 
+async def update_processed_files_db(db, newly_processed_files):
+    """Update the database with newly processed files."""
+    if not newly_processed_files:
+        return
+        
+    try:
+        operations = [{"file_path": file} for file in newly_processed_files]
+        if operations:
+            result = await db["processed_file_paths"].insert_many(operations)
+            print(f"Added {len(operations)} new files to processed_file_paths collection")
+            logger.info(f"Added {len(operations)} new files to processed_file_paths collection")
+            return True
+    except Exception as e:
+        print(f"Error updating processed files database: {e}")
+        logger.error(f"Error updating processed files database: {e}")
+        return False
+
+async def process_collection(db, collection_name, dataframe):
+    """Process a single collection's data."""
+    if dataframe.empty:
+        print(f"Skipping {collection_name}: Empty dataframe")
+        return False
+        
+    try:
+        processed_data = clean_data(dataframe)
+        if processed_data.empty:
+            print(f"Skipping {collection_name}: No data after cleaning")
+            return False
+            
+        await append_to_database(db[collection_name], processed_data)
+        print(f"Successfully processed {collection_name}")
+        logger.info(f"Successfully processed {collection_name}")
+        return True
+    except Exception as e:
+        print(f"Error processing {collection_name}: {e}")
+        logger.error(f"Error processing {collection_name}: {e}")
+        return False
+    
 async def main():
     """
     Main execution function to manage the data pipeline.
