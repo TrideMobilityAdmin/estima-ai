@@ -92,11 +92,15 @@ class EstimateRequest(BaseModel):
         }
 
 class ValidRequest(BaseModel):
-     tasks: List[str]
+    tasks: List[str]
 class ValidTasks(BaseModel):
     taskid: str
     status: bool
     description:str=""
+
+class ValidRequestCheckCategory(BaseModel):
+    tasks: List[str]
+    typeOfCheck: List[str]
 class SpareParts(BaseModel):
     partId: str=""
     desc: str = ""

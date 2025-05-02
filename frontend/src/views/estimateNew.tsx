@@ -538,229 +538,225 @@ export default function EstimateNew() {
   
 
   // Reset counter for keys to force re-render
-  const [formKey, setFormKey] = useState(0);
-  // Form initialization
-  const form = useForm<any>({
-    initialValues: {
-      tasks: [],
-      probability: 10,
-      operator: "",
-      aircraftRegNo: "",
-      aircraftModel: "",
-      aircraftAge: 0,
-      aircraftFlightHours: "",
-      aircraftFlightCycles: "",
-      areaOfOperations: "",
-      cappingDetails: {
-        cappingTypeManhrs: "",
-        cappingManhrs: 0,
-        cappingTypeSpareCost: "",
-        cappingSpareCost: 0,
-      },
-      taskID: "",
-      taskDescription: "",
-      typeOfCheck: [], // Changed from string to array for MultiSelect
-      typeOfCheckID: "", // Added new field for typeOfCheckID
-      miscLaborTasks: [],
-      additionalTasks: [],
+const [formKey, setFormKey] = useState(0);
+// Form initialization
+const form = useForm<any>({
+  initialValues: {
+    tasks: [],
+    probability: 10,
+    operator: "",
+    aircraftRegNo: "",
+    aircraftModel: "",
+    aircraftAge: 0,
+    aircraftFlightHours: "",
+    aircraftFlightCycles: "",
+    areaOfOperations: "",
+    cappingDetails: {
+      cappingTypeManhrs: "",
+      cappingManhrs: "",
+      cappingTypeSpareCost: "",
+      cappingSpareCost: "",
     },
-    validateInputOnChange: true,
+    taskID: "",
+    taskDescription: "",
+    typeOfCheck: [], // Changed from string to array for MultiSelect
+    typeOfCheckID: "", // Added new field for typeOfCheckID
+    miscLaborTasks: [],
+    additionalTasks: [],
+  },
+  validateInputOnChange: true,
 
-    validate: {
-      operator: (value) => (value.trim() ? null : "Operator is required"),
-      aircraftRegNo: (value) =>
-        value.trim() ? null : "Aircraft Registration Number is required",
-      // aircraftAge: (value) =>
-      //   value.trim() ? null : "Aircraft Age is required",
-      typeOfCheck: (value) =>
-        value.length > 0 ? null : "Type of Check is required", // Modified for array validation
-      typeOfCheckID: (value) =>
-        value.trim() ? null : "Type of Check ID is required", // Added validation
-      aircraftModel: (value) =>
-        value.trim() ? null : "Aircraft Model is required",
+  validate: {
+    operator: (value) => (value?.trim() ? null : "Operator is required"),
+    aircraftRegNo: (value) =>
+      value?.trim() ? null : "Aircraft Registration Number is required",
+    // aircraftAge: (value) =>
+    //   value ? null : "Aircraft Age is required",
+    typeOfCheck: (value) =>
+      value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
+    typeOfCheckID: (value) =>
+      value?.trim() ? null : "Type of Check ID is required", // Added validation
+    aircraftModel: (value) =>
+      value?.trim() ? null : "Aircraft Model is required",
 
-      cappingDetails: {
-        // Man Hours Capping Validation
-        cappingTypeManhrs: (value, values) => {
-          if (!value && values.cappingDetails.cappingManhrs) {
-            return "Man Hours Type is required when Man Hours are entered";
-          }
-          return null;
-        },
-        cappingManhrs: (value, values) => {
-          if (!value && values.cappingDetails.cappingTypeManhrs) {
-            return "Man Hours is required when Type is selected";
-          }
-          return null;
-        },
-
-        // Spare Cost Capping Validation
-        cappingTypeSpareCost: (value, values) => {
-          if (!value && values.cappingDetails.cappingSpareCost) {
-            return "Capping Type is required when Cost is entered";
-          }
-          return null;
-        },
-        cappingSpareCost: (value, values) => {
-          if (!value && values.cappingDetails.cappingTypeSpareCost) {
-            return "Cost is required when Type is selected";
-          }
-          return null;
-        },
-      },
-    },
-  });
-
-  // Handle Submit
-  const handleSubmit = async () => {
-    const validationErrors = form.validate();
-  
-    if (validationErrors.hasErrors) {
-      if (validationErrors.errors.typeOfCheck) {
-        showAppNotification("warning", "Validation Error", "Please select at least one Type of Check");
-      }
-      if (validationErrors.errors.typeOfCheckID) {
-        showAppNotification("warning", "Validation Error", "Type of Check ID is required");
-      }
-      if (validationErrors.errors.operator) {
-        showAppNotification("warning", "Validation Error", "Operator is required");
-      }
-      if (validationErrors.errors.aircraftModel) {
-        showAppNotification("warning", "Validation Error", "Aircraft Model is required");
-      }
-      if (validationErrors.errors.aircraftRegNo) {
-        showAppNotification("warning", "Validation Error", "Aircraft Registration Number is required");
-        if (aircraftRegNoRef.current) {
-          aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-          aircraftRegNoRef.current.focus();
+    cappingDetails: {
+      // Man Hours Capping Validation
+      cappingTypeManhrs: (value, values) => {
+        if (!value && values.cappingDetails.cappingManhrs) {
+          return "Man Hours Type is required when Man Hours are entered";
         }
-      }
-      return;
-    }
-  
-    if (
-      form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
-      form.values.typeOfCheck.length === 0
-    ) {
-      showAppNotification(
-        "warning",
-        "Validation Error",
-        "When Aircraft Registration Number is N/A, Type of Check is mandatory"
-      );
-      return;
-    }
-  
-    if (!selectedFile && additionalTasks.length === 0) {
-      showAppNotification(
-        "warning",
-        "Error",
-        "Please select a file or add at least one Additional Task."
-      );
-      return;
-    }
-  
-    const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
-  
-    const defaultAdditionalTasks = additionalTasks.length > 0
-      ? additionalTasks
-      : [{ taskID: "", taskDescription: "" }];
-  
-    const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
-      ? selectedExpertInsightTasks
-      : [{
-          taskID: "",
-          taskDescription: "",
-          manHours: 0,
-          skill: "",
-          spareParts: [
-            { partID: "", description: "", quantity: 0, unit: "", price: 0 },
-          ],
-        }];
-  
-    const requestData = {
-      tasks: validTasks || [],
-      probability: Number(form.values.probability) || 10,
-      operator: form.values.operator || "",
-      aircraftRegNo: form.values.aircraftRegNo || "",
-      aircraftModel: form.values.aircraftModel || "",
-      aircraftAge: form.values.aircraftAge || 0.0,
-      aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
-      aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-      areaOfOperations: form.values.areaOfOperations || "",
-      cappingDetails: {
-        cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-        cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
-        cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-        cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+        return null;
       },
-      additionalTasks: defaultAdditionalTasks,
-      typeOfCheck: form.values.typeOfCheck || [],
-      typeOfCheckID: form.values.typeOfCheckID || "",
-      miscLaborTasks: defaultMiscLaborTasks,
-    };
+      cappingManhrs: (value, values) => {
+        if (!value && values.cappingDetails.cappingTypeManhrs) {
+          return "Man Hours is required when Type is selected";
+        }
+        return null;
+      },
+
+      // Spare Cost Capping Validation
+      cappingTypeSpareCost: (value, values) => {
+        if (!value && values.cappingDetails.cappingSpareCost) {
+          return "Capping Type is required when Cost is entered";
+        }
+        return null;
+      },
+      cappingSpareCost: (value, values) => {
+        if (!value && values.cappingDetails.cappingTypeSpareCost) {
+          return "Cost is required when Type is selected";
+        }
+        return null;
+      },
+    },
+  },
+});
+
+// Handle Submit
+const handleSubmit = async () => {
+  const validationResult = form.validate();
   
-    try {
-      setLoading(true);
-  
-      let fileToUpload: File | null = selectedFile;
-  
-      // ✅ Load fallback file if selectedFile is null
-      if (!fileToUpload) {
-        const response = await fetch(excelTemplateFile);
-        const blob = await response.blob();
-        fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+  // Check if the form is valid
+  if (validationResult.hasErrors) {
+    // Find first input with error and focus it
+    const errorFields = Object.keys(form.errors);
+    if (errorFields.length > 0) {
+      // Scroll to first error field if ref is available
+      const firstErrorField = errorFields[0];
+      if (firstErrorField === 'aircraftRegNo' && aircraftRegNoRef.current) {
+        aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        aircraftRegNoRef.current.focus();
       }
-  
-      const response = await RFQFileUpload(requestData, fileToUpload);
-      if (response) {
-        setRfqSubmissionResponse(response);
-        setRfqSubModalOpened(true);
-        showAppNotification("success", "Success!", "Estimate report submitted successfully!");
-  
-        // Reset form and states
-        form.reset();
-        form.setValues({
-          tasks: [],
-          probability: 10,
-          operator: "",
-          aircraftRegNo: "",
-          aircraftModel: "",
-          aircraftAge: 0,
-          aircraftFlightHours: "",
-          aircraftFlightCycles: "",
-          areaOfOperations: "",
-          cappingDetails: {
-            cappingTypeManhrs: "",
-            cappingManhrs: 0,
-            cappingTypeSpareCost: "",
-            cappingSpareCost: 0,
-          },
-          taskID: "",
-          taskDescription: "",
-          typeOfCheck: [],
-          typeOfCheckID: "",
-          miscLaborTasks: [],
-          additionalTasks: [],
-        });
-  
-        setSelectedFile(null);
-        setValidatedTasks([]);
-        setAdditionalTasks([]);
-        setSelectedExpertInsightTasks([]);
-        setFormKey((prev) => prev + 1);
-      }
-    } catch (error) {
-      console.error("API Error:", error);
-      showAppNotification("error", "Error!", "Failed to submit estimate report.!");
-      showNotification({
-        title: "Error",
-        message: "Failed to submit estimate report.",
-        color: "red",
-      });
-    } finally {
-      setLoading(false);
     }
+    return;
+  }
+  
+  // Additional custom validations
+  if (
+    form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
+    form.values.typeOfCheck.length === 0
+  ) {
+    form.setFieldError("typeOfCheck", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
+    return;
+  }
+  
+  if (!selectedFile && additionalTasks.length === 0) {
+    showAppNotification(
+      "warning",
+      "Error",
+      "Please select a file or add at least one Additional Task."
+    );
+    return;
+  }
+  
+  const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
+  
+  const defaultAdditionalTasks = additionalTasks.length > 0
+    ? additionalTasks
+    : [{ taskID: "", taskDescription: "" }];
+  
+  const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
+    ? selectedExpertInsightTasks
+    : [{
+        taskID: "",
+        taskDescription: "",
+        manHours: 0,
+        skill: "",
+        spareParts: [
+          { partID: "", description: "", quantity: 0, unit: "", price: 0 },
+        ],
+      }];
+  
+  const requestData = {
+    tasks: validTasks || [],
+    probability: Number(form.values.probability) || 10,
+    operator: form.values.operator || "",
+    aircraftRegNo: form.values.aircraftRegNo || "",
+    aircraftModel: form.values.aircraftModel || "",
+    aircraftAge: form.values.aircraftAge || 0.0,
+    aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
+    aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
+    areaOfOperations: form.values.areaOfOperations || "",
+    // cappingDetails: {
+    //   cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+    //   cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
+    //   cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+    //   cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+    // },
+    cappingDetails: {
+      cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+      cappingManhrs:
+        form.values.cappingDetails.cappingManhrs?.toString().trim() === ""
+          ? 0
+          : Number(form.values.cappingDetails.cappingManhrs),
+      cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+      cappingSpareCost:
+        form.values.cappingDetails.cappingSpareCost?.toString().trim() === ""
+          ? 0
+          : Number(form.values.cappingDetails.cappingSpareCost),
+    },
+    additionalTasks: defaultAdditionalTasks,
+    typeOfCheck: form.values.typeOfCheck || [],
+    typeOfCheckID: form.values.typeOfCheckID || "",
+    miscLaborTasks: defaultMiscLaborTasks,
   };
+  // console.log("request data >>>>",requestData);
+  try {
+    setLoading(true);
+  
+    let fileToUpload = selectedFile;
+  
+    // ✅ Load fallback file if selectedFile is null
+    if (!fileToUpload) {
+      const response = await fetch(excelTemplateFile);
+      const blob = await response.blob();
+      fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+    }
+  
+    const response = await RFQFileUpload(requestData, fileToUpload);
+    if (response) {
+      setRfqSubmissionResponse(response);
+      setRfqSubModalOpened(true);
+      showAppNotification("success", "Success!", "RFQ submitted successfully!");
+  
+      // Reset form and states
+      form.reset();
+      form.setValues({
+        tasks: [],
+        probability: 10,
+        operator: "",
+        aircraftRegNo: "",
+        aircraftModel: "",
+        aircraftAge: 0,
+        aircraftFlightHours: "",
+        aircraftFlightCycles: "",
+        areaOfOperations: "",
+        cappingDetails: {
+          cappingTypeManhrs: "",
+          cappingManhrs: "",
+          cappingTypeSpareCost: "",
+          cappingSpareCost: "",
+        },
+        taskID: "",
+        taskDescription: "",
+        typeOfCheck: [],
+        typeOfCheckID: "",
+        miscLaborTasks: [],
+        additionalTasks: [],
+      });
+  
+      setSelectedFile(null);
+      setValidatedTasks([]);
+      setAdditionalTasks([]);
+      setSelectedExpertInsightTasks([]);
+      setFormKey((prev) => prev + 1);
+    }
+  } catch (error) {
+    console.error("API Error:", error);
+    showAppNotification("error", "Error!", "Failed to submit RFQ!");
+  } finally {
+    setLoading(false);
+  }
+};
   
 
   console.log("rfq sub >>> ", rfqSubmissionResponse);
@@ -1209,172 +1205,6 @@ export default function EstimateNew() {
     }
   };
 
-  //   const downloadExcelReport = () => {
-  //     if (!estimateReportData || typeof estimateReportData !== 'object') {
-  //         console.warn("No valid data available for Excel export");
-  //         return;
-  //     }
-
-  //     // Define Excel Headers (Column Titles)
-  //     const excelHeaders = [
-  //         "S.NO",
-  //         "AIRCRAFT REGISTRATION",
-  //         "AGE",
-  //         "AIRCRAFT MODEL",
-  //         "CHECK TYPE",
-  //         "MPD TASKS",
-  //         "MPD TASKS MH (WITHOUT FACTOR)",
-  //         "ADDITIONAL TASKS",
-  //         "ADDITIONAL TASKS MH",
-  //         "AD/SB TASKS",
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)",
-  //         "MISC MH",
-  //         "PRELOAD",
-  //         "TAT (DAYS)",
-  //         "UNBILLABLE MH",
-  //         "UNBILLABLE MATERIAL COST",
-  //         "REMARKS"
-  //     ];
-
-  //     // Function to process and clean data
-  //     const processField = (field : any) => (field === null || field === undefined ? "-" : field);
-
-  //     // Ensure the object has a data array or convert it into an iterable format
-  //     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
-
-  //     // Map Flattened Data to Excel Format
-  //     const excelData = reportEntries.map((est:any, index:any) => ({
-  //         "S.NO": index + 1,
-  //         "AIRCRAFT REGISTRATION": processField(est.aircraftRegNo),
-  //         "AGE": processField(est.aircraftAge),
-  //         "AIRCRAFT MODEL": processField(est.aircraftModel),
-  //         "CHECK TYPE": processField(est.typeOfCheck),
-  //         "MPD TASKS": processField(est.tasks?.length),
-  //         "MPD TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedTasks?.totalMhs),
-  //         "ADDITIONAL TASKS": "N/A",
-  //         "ADDITIONAL TASKS MH": "N/A",
-  //         "AD/SB TASKS": processField(est.findings?.length),
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)": processField(est.aggregatedFindings?.totalMhs),
-  //         "MISC MH": "N/A",
-  //         "PRELOAD": "N/A",
-  //         "TAT (DAYS)": "-",
-  //         "UNBILLABLE MH": processField(est.capping?.unbillable_mhs),
-  //         "UNBILLABLE MATERIAL COST": processField(est.capping?.unbillable_cost),
-  //         "REMARKS": "N/A"
-  //     }));
-
-  //     // Create a new Workbook and Worksheet
-  //     const worksheet = XLSX.utils.json_to_sheet(excelData);
-
-  //     // Apply styling to the header row
-  //     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-  //     for (let C = range.s.c; C <= range.e.c; C++) {
-  //         const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-  //         if (!worksheet[cellAddress]) continue;
-  //         worksheet[cellAddress].s = {
-  //             fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
-  //             font: { bold: true, color: { rgb: "FFFFFF" } } // White text
-  //         };
-  //     }
-
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
-
-  //     // Write the file and trigger download
-  //     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
-  // };
-
-  // const downloadExcelReport = () => {
-  //     if (!estimateReportData || typeof estimateReportData !== "object") {
-  //         console.warn("No valid data available for Excel export");
-  //         return;
-  //     }
-
-  //     // Define multi-row headers
-  //     const mainHeader = ["WORK SCOPE REVIEW"]; // Merged main header
-  //     const columnHeaders = [
-  //         "S.NO",
-  //         "AIRCRAFT REGISTRATION",
-  //         "AGE",
-  //         "AIRCRAFT MODEL",
-  //         "CHECK TYPE",
-  //         "MPD TASKS",
-  //         "MPD TASKS MH (WITHOUT FACTOR)",
-  //         "ADDITIONAL TASKS",
-  //         "ADDITIONAL TASKS MH",
-  //         "AD/SB TASKS",
-  //         "AD/SB TASKS MH (WITHOUT FACTOR)",
-  //         "MISC MH",
-  //         "PRELOAD",
-  //         "TAT (DAYS)",
-  //         "UNBILLABLE MH",
-  //         "UNBILLABLE MATERIAL COST",
-  //         "REMARKS"
-  //     ];
-
-  //     // Function to process and clean data
-  //     const processField = (field: any) => (field === null || field === undefined ? "-" : field);
-
-  //     // Ensure the object has a data array or convert it into an iterable format
-  //     const reportEntries = Array.isArray(estimateReportData.records) ? estimateReportData.records : [estimateReportData];
-
-  //     // Map Flattened Data to Excel Format
-  //     const excelData = reportEntries.map((est: any, index: any) => ([
-  //         index + 1,
-  //         processField(est.aircraftRegNo),
-  //         processField(est.aircraftAge),
-  //         processField(est.aircraftModel),
-  //         processField(est.typeOfCheck),
-  //         processField(est.tasks?.length),
-  //         processField(est.aggregatedTasks?.totalMhs),
-  //         "N/A",
-  //         "N/A",
-  //         processField(est.findings?.length),
-  //         processField(est.aggregatedFindings?.totalMhs),
-  //         "N/A",
-  //         "N/A",
-  //         "-",
-  //         processField(est.capping?.unbillable_mhs),
-  //         processField(est.capping?.unbillable_cost),
-  //         "N/A"
-  //     ]));
-
-  //     // Create a new Workbook
-  //     const worksheet = XLSX.utils.aoa_to_sheet([mainHeader, columnHeaders, ...excelData]);
-
-  //     // Merge the first row across all columns
-  //     worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columnHeaders.length - 1 } }];
-
-  //     // Apply styling
-  //     const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-
-  //     for (let C = range.s.c; C <= range.e.c; C++) {
-  //         const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
-  //         const columnHeaderCell = XLSX.utils.encode_cell({ r: 1, c: C });
-
-  //         if (worksheet[headerCell]) {
-  //             worksheet[headerCell].s = {
-  //                 fill: { fgColor: { rgb: "1F497D" } }, // Dark Blue color
-  //                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
-  //                 alignment: { horizontal: "center", vertical: "center" }
-  //             };
-  //         }
-
-  //         if (worksheet[columnHeaderCell]) {
-  //             worksheet[columnHeaderCell].s = {
-  //                 fill: { fgColor: { rgb: "4B0082" } }, // Indigo color
-  //                 font: { bold: true, color: { rgb: "FFFFFF" } },
-  //                 alignment: { horizontal: "center", vertical: "center" }
-  //             };
-  //         }
-  //     }
-
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "SUMMARY");
-
-  //     // Write the file and trigger download
-  //     XLSX.writeFile(workbook, "Estimate_Report.xlsx");
-  // };
   const downloadExcelReport = () => {
     if (!estimateReportData || typeof estimateReportData !== "object") {
       console.warn("No valid data available for Excel export");
@@ -1418,13 +1248,16 @@ export default function EstimateNew() {
       processField(est.aircraftRegNo),
       processField(est.aircraftAge),
       processField(est.aircraftModel),
-      processField(est.typeOfCheck),
+      // processField(est.typeOfCheck),
+      Array.isArray(est.typeOfCheck)
+      ? est.typeOfCheck.join(", ")
+      : processField(est.typeOfCheck),
       processField(est.tasks?.length),
-      processField(est.aggregatedTasks?.totalMhs),
+      processField(Math.round(est.aggregatedTasks?.totalMhs)),
       "N/A",
       "N/A",
       processField(est.findings?.length),
-      processField(est.aggregatedFindings?.totalMhs),
+      processField(Math.round(est.aggregatedFindings?.totalMhs)),
       "N/A",
       "N/A",
       "-",
@@ -1549,11 +1382,11 @@ export default function EstimateNew() {
       processField(est.aircraftModel),
       processField(est.typeOfCheck),
       processField(est.tasks?.length),
-      processField(est.aggregatedTasks?.totalMhs),
+      processField(Math.round(est.aggregatedTasks?.totalMhs)),
       "N/A",
       "N/A",
       processField(est.findings?.length),
-      processField(est.aggregatedFindings?.totalMhs),
+      processField(Math.round(est.aggregatedFindings?.totalMhs)),
       "N/A",
       "N/A",
       "-",
@@ -2693,6 +2526,7 @@ export default function EstimateNew() {
                       form.validateField("typeOfCheck");
                     }}
                     error={form.errors.typeOfCheck}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2704,6 +2538,7 @@ export default function EstimateNew() {
                     step="0.01"
                     {...form.getInputProps("aircraftAge")}
                     error={form.errors.aircraftAge}
+                    // withAsterisk
                   />
 
                   <Select
@@ -2725,6 +2560,7 @@ export default function EstimateNew() {
                       form.validateField("operator");
                     }}
                     error={form.errors.operator}
+                    withAsterisk
                   />
 
                   <Select
@@ -2746,6 +2582,7 @@ export default function EstimateNew() {
                       form.validateField("aircraftModel");
                     }}
                     error={form.errors.aircraftModel}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2756,6 +2593,7 @@ export default function EstimateNew() {
                     label="Aircraft Reg No"
                     {...form.getInputProps("aircraftRegNo")}
                     error={form.errors.aircraftRegNo}
+                    withAsterisk
                   />
 
                   <TextInput
@@ -2764,6 +2602,7 @@ export default function EstimateNew() {
                     placeholder="Enter Check Type ID"
                     {...form.getInputProps("typeOfCheckID")}
                     error={form.errors.typeOfCheckID}
+                    withAsterisk
                   />
 
 
@@ -3304,7 +3143,7 @@ border-bottom: none;
                             <IconReport />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label="Download Uploaded Document">
+                        {/* <Tooltip label="Download Uploaded Document">
                           <ActionIcon
                             size={20}
                             color="lime"
@@ -3319,7 +3158,7 @@ border-bottom: none;
                           >
                             <IconFileDownload />
                           </ActionIcon>
-                        </Tooltip>
+                        </Tooltip> */}
 
                         {/* <Tooltip label="Probability Details">
                           <ActionIcon
@@ -4047,7 +3886,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       cellRenderer: (val: any) => {
                         return (
                           <Text>
-                            {val?.data?.unit || 0}
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                           </Text>
                         );
                       },
@@ -4373,6 +4212,13 @@ const OverallFindingsReport: React.FC<any> = ({
                       headerName: "Units",
                       flex: 0.8,
                       minWidth: 80,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "price",
@@ -4679,6 +4525,13 @@ const OverallMPDReport: React.FC<any> = ({
                       headerName: "Units",
                       flex: 0.8,
                       minWidth: 80,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Text>
+                            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+                          </Text>
+                        );
+                      },
                     },
                     {
                       field: "price",
@@ -4990,10 +4843,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               description: detail.description,
               cluster_id: detail.cluster,
               probability: detail.prob,
-              mhsMin: detail.mhs.min,
-              mhsMax: detail.mhs.max,
-              mhsAvg: detail.mhs.avg,
-              mhsEst: detail.mhs.est,
+              mhsMin: Math.round(detail.mhs.min),
+              mhsMax: Math.round(detail.mhs.max),
+              mhsAvg: Math.round(detail.mhs.avg),
+              mhsEst: Math.round(detail.mhs.est),
               partId: part.partId,
               partDesc: part.desc,
               unit: part.unit,
@@ -5008,10 +4861,10 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             description: detail.description,
             cluster_id: detail.cluster,
             probability: detail.prob,
-            mhsMin: detail.mhs.min,
-            mhsMax: detail.mhs.max,
-            mhsAvg: detail.mhs.avg,
-            mhsEst: detail.mhs.est,
+            mhsMin: Math.round(detail.mhs.min),
+            mhsMax: Math.round(detail.mhs.max),
+            mhsAvg: Math.round(detail.mhs.avg),
+            mhsEst: Math.round(detail.mhs.est),
             partId: "-",
             partDesc: "-",
             unit: "-",
@@ -5075,13 +4928,16 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         return (
           <Flex direction="row" justify="space-between">
             <Badge variant="light" color="teal" fullWidth>
-              Min : {val?.data?.mhsMin?.toFixed(0) || "-"}
+              Min : {val?.data?.mhsMin || "-"}
             </Badge>
-            <Badge variant="light" color="blue" fullWidth>
-              Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
+            {/* <Badge variant="light" color="blue" fullWidth>
+              Avg : {val?.data?.mhsAvg || "-"}
+            </Badge> */}
+             <Badge variant="light" color="blue" fullWidth>
+              Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
-              Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
+              Max : {val?.data?.mhsMax || "-"}
             </Badge>
           </Flex>
         );
@@ -5125,6 +4981,13 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       floatingFilter: true,
       resizable: true,
       width: 100,
+      cellRenderer: (val: any) => {
+        return (
+          <Text>
+            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+          </Text>
+        );
+      },
     },
     {
       headerName: "Price ($)",
@@ -5262,7 +5125,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Probability": task.probability || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
-        "MHS Avg": task.mhsAvg || 0,
+        // "MHS Avg": task.mhsAvg || 0,
         "MHS Est": task.mhsEst || 0,
         "Part Number": task.partId || "-",
         "Part Description": task.partDesc || "-",
@@ -5279,7 +5142,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       XLSX.utils.book_append_sheet(wb, ws, "Findings");
 
       // Write and download
-      XLSX.writeFile(wb, "Findings.xlsx");
+      XLSX.writeFile(wb, "Findings_Report.xlsx");
 
       showNotification({
         title: "Export Successful",
@@ -5295,8 +5158,32 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       });
 
       // Fallback to CSV if Excel export fails
-      downloadCSV();
+      // downloadCSV();
     }
+  };
+
+  const downloadExcelManhours = () => {
+    const rows: any[] = [];
+  
+    findings?.forEach((task:any) => {
+      task.details.forEach((detail:any) => {
+        rows.push({
+          TaskID: task.taskId,
+          Description: detail.description.replace(/\\n/g, "\n"),
+          ClusterID: detail.cluster,
+          "MHS Min": Math.round(detail.mhs.min),
+          "MHS Max": Math.round(detail.mhs.max),
+          "MHS Avg": Math.round(detail.mhs.avg),
+          "MHS Est": Math.round(detail.mhs.est),
+        });
+      });
+    });
+  
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+  
+    XLSX.writeFile(workbook, "Findings_ManHours.xlsx");
   };
 
   // UPDATED: Function to handle task selection and auto-select highest probability cluster
@@ -5327,8 +5214,12 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 Findings
               </Title>
               <Space w={50} />
-              <Button color="green" size="xs" onClick={downloadExcel} ml="60vw">
-                Download Excel
+              <Button color="green" size="xs" onClick={downloadExcel} ml="45vw">
+                Download Report
+              </Button>
+              <Space w='xs'/>
+              <Button color="green" size="xs" onClick={downloadExcelManhours}>
+                Download ManHours
               </Button>
             </div>
           </>
@@ -5474,7 +5365,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             <Card h="100%" w="100%" p="md" bg="none">
               <Group>
                 <Text size="md" fw={500} mb="xs" c="dimmed">
-                  Clusters for
+                  Defect Clusters for
                 </Text>
                 <Text size="md" fw={500} mb="xs">
                   {selectedTaskId || "Selected Task"}
@@ -5568,12 +5459,12 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 }}
               >
                 <Grid>
-                  <Grid.Col span={2}>
+                  <Grid.Col span={3}>
                     <Text size="md" fw={500} c="dimmed">
-                      Cluster
+                      Defect Cluster
                     </Text>
                   </Grid.Col>
-                  <Grid.Col span={10}>
+                  <Grid.Col span={7}>
                     <Text size="sm" fw={500}>
                       {selectedFindingDetail?.cluster || "-"}
                     </Text>
@@ -5676,24 +5567,45 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 </Text>
 
                 <SimpleGrid cols={8}>
-                  {Array.isArray(selectedFindingDetail?.skill) && selectedFindingDetail.skill.length > 0
-                    ? selectedFindingDetail.skill.map((skl: any, index: number) => (
-                      <Badge
-                        key={index}
-                        fullWidth
-                        color="cyan"
-                        size="lg"
-                        radius="md"
-                      >
-                        {skl?.toString().trim() ? skl : "Unknown Skill"}
-                      </Badge>
-                    ))
-                    : (
-                      <Badge fullWidth color="gray" size="lg" radius="md">
-                        Unknown Skill
-                      </Badge>
-                    )}
-                </SimpleGrid>
+  {(() => {
+    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail?.skill : [];
+
+    const validSkillsSet = new Set<string>();
+    let hasUnknownSkill = false;
+
+    for (const skl of skills) {
+      const trimmed = skl?.toString().trim();
+
+      if (
+        !trimmed || // handles empty, null, undefined
+        trimmed.toLowerCase() === "nan"
+      ) {
+        hasUnknownSkill = true;
+      } else {
+        validSkillsSet.add(trimmed);
+      }
+    }
+
+    const validSkills = Array.from(validSkillsSet);
+
+    return (
+      <>
+        {validSkills.map((skill, index) => (
+          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+            {skill}
+          </Badge>
+        ))}
+        {hasUnknownSkill && (
+          <Badge fullWidth color="gray" size="lg" radius="md">
+            Unknown Skill
+          </Badge>
+        )}
+      </>
+    );
+  })()}
+</SimpleGrid>
+
+
 
 
                 <Space h="md" />
@@ -5792,7 +5704,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                         cellRenderer: (val: any) => {
                           return (
                             <Text>
-                              {val?.data?.unit || 0}
+                              {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                             </Text>
                           );
                         },
@@ -5965,10 +5877,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             sourceTask: task.sourceTask,
             description: task.description,
             cluster_id: task.cluster_id,
-            mhsMin: task.mhs.min,
-            mhsMax: task.mhs.max,
-            mhsAvg: task.mhs.avg,
-            mhsEst: task.mhs.est,
+            mhsMin: Math.round(task.mhs.min),
+            mhsMax: Math.round(task.mhs.max),
+            mhsAvg: Math.round(task.mhs.avg),
+            mhsEst: Math.round(task.mhs.est),
+            // skill: Array.isArray(task.skill)
+            // ? task.skill.join(", ")
+            // : task.skill,
             partId: part.partId,
             partDesc: part.desc,
             qty: part.qty,
@@ -5982,10 +5897,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
           sourceTask: task.sourceTask,
           description: task.description,
           cluster_id: task.cluster_id,
-          mhsMin: task.mhs.min,
-          mhsMax: task.mhs.max,
-          mhsAvg: task.mhs.avg,
-          mhsEst: task.mhs.est,
+          mhsMin: Math.round(task.mhs.min),
+          mhsMax: Math.round(task.mhs.max),
+          mhsAvg: Math.round(task.mhs.avg),
+          mhsEst: Math.round(task.mhs.est),
+          // skill: Array.isArray(task.skill)
+          //   ? task.skill.join(", ")
+          //   : task.skill,
           partId: "-",
           partDesc: "-",
           qty: 0,
@@ -6046,44 +5964,31 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
         return (
           <Flex direction="row" justify="space-between">
             <Badge variant="light" color="teal" fullWidth>
-              Min : {val?.data?.mhsMin?.toFixed(0) || "-"}
+              Min : {val?.data?.mhsMin || "-"}
             </Badge>
-            <Badge variant="light" color="blue" fullWidth>
-              Avg : {val?.data?.mhsAvg?.toFixed(0) || "-"}
+            {/* <Badge variant="light" color="blue" fullWidth>
+              Avg : {Math.round(val?.data?.mhsAvg) || "-"}
+            </Badge> */}
+             <Badge variant="light" color="blue" fullWidth>
+              Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
-              Max : {val?.data?.mhsMax?.toFixed(0) || "-"}
+              Max : {val?.data?.mhsMax || "-"}
             </Badge>
           </Flex>
         );
       },
     },
     // {
-    //     headerName: 'Man Hours (Max)',
-    //     field: 'mhsMax',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // {
-    //     headerName: 'Man Hours (Avg)',
-    //     field: 'mhsAvg',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
-    // },
-    // {
-    //     headerName: 'Man Hours (Est)',
-    //     field: 'mhsEst',
-    //     filter: true,
-    //     sortable:true,
-    //     floatingFilter: true,
-    //     resizable: true,
-    //     flex: 1
+    //   headerName: "Skill",
+    //   field: "skill",
+    //   filter: true,
+    //   sortable: true,
+    //   floatingFilter: true,
+    //   resizable: true,
+    //   width: 150,
+    //   // flex: 2,
+    //   pinned: "left",
     // },
     {
       headerName: "Part Number",
@@ -6125,6 +6030,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
       resizable: true,
       // flex: 1
       width: 150,
+      cellRenderer: (val: any) => {
+        return (
+          <Text>
+            {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
+          </Text>
+        );
+      },
     },
     {
       headerName: "Price ($)",
@@ -6224,11 +6136,11 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const excelHeaders = [
       "Source Task",
       "Description",
-      "Cluster ID",
       "MHS Min",
       "MHS Max",
-      "MHS Avg",
+      // "MHS Avg",
       "MHS Est",
+      // "Skill",
       "Part ID",
       "Part Description",
       "Quantity",
@@ -6244,11 +6156,13 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     const excelData = flattenedData.map((task: any) => ({
       "Source Task": processField(task.sourceTask),
       Description: processField(task.description),
-      "Cluster ID": processField(task.cluster_id),
       "MHS Min": processField(task.mhsMin),
       "MHS Max": processField(task.mhsMax),
-      "MHS Avg": processField(task.mhsAvg),
+      // "MHS Avg": processField(task.mhsAvg),
       "MHS Est": processField(task.mhsEst),
+      // "Skill": Array.isArray(task.skill)
+      // ? task.skill.join(", ")
+      // : processField(task.skill),
       "Part ID": processField(task.partId),
       "Part Description": processField(task.partDesc),
       Quantity: processField(task.qty),
@@ -6264,7 +6178,28 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "MPD_Tasks");
 
     // Write the file and trigger download
-    XLSX.writeFile(workbook, "MPD_Tasks.xlsx");
+    XLSX.writeFile(workbook, "MPD_Report.xlsx");
+  };
+
+  const downloadExcelManhours = () => {
+    const rows: any[] = [];
+
+      tasks?.forEach((detail:any) => {
+        rows.push({
+          TaskID: detail.sourceTask,
+          Description: detail.description.replace(/\\n/g, "\n"),
+          "MHS Min": Math.round(detail.mhs.min),
+          "MHS Max": Math.round(detail.mhs.max),
+          "MHS Avg": Math.round(detail.mhs.avg),
+          "MHS Est": Math.round(detail.mhs.est),
+        });
+      });
+  
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+  
+    XLSX.writeFile(workbook, "MPD_ManHours.xlsx");
   };
 
   return (
@@ -6290,12 +6225,16 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
               <Title order={4} c="white">
                 MPD
               </Title>
-              <Space w={50} />
+              <Space w={30} />
               <Text c="white">Total Source Tasks - {tasks?.length}</Text>
               {/* <Space w={600}/> */}
               {/* Button aligned to the end */}
-              <Button color="green" size="xs" onClick={downloadExcel} ml="50vw">
-                Download Excel
+              <Button color="green" size="xs" onClick={downloadExcel} ml="40vw">
+                Download Report
+              </Button>
+              <Space w='xs'/>
+              <Button color="green" size="xs" onClick={downloadExcelManhours} >
+                Download Manhours
               </Button>
             </div>
           </>
@@ -6574,24 +6513,43 @@ border-bottom: none;
                       </Text>
 
                       <SimpleGrid cols={8}>
-                        {Array.isArray(selectedTask?.skill) && selectedTask?.skill.length > 0
-                          ? selectedTask?.skill.map((skl: any, index: number) => (
-                            <Badge
-                              key={index}
-                              fullWidth
-                              color="cyan"
-                              size="lg"
-                              radius="md"
-                            >
-                              {skl?.toString().trim() ? skl : "Unknown Skill"}
-                            </Badge>
-                          ))
-                          : (
-                            <Badge fullWidth color="gray" size="lg" radius="md">
-                              Unknown Skill
-                            </Badge>
-                          )}
-                      </SimpleGrid>
+  {(() => {
+    const skills = Array.isArray(selectedTask?.skill) ? selectedTask.skill : [];
+
+    const validSkillsSet = new Set<string>();
+    let hasUnknownSkill = false;
+
+    for (const skl of skills) {
+      const trimmed = skl?.toString().trim();
+
+      if (
+        !trimmed || // handles empty, null, undefined
+        trimmed.toLowerCase() === "nan"
+      ) {
+        hasUnknownSkill = true;
+      } else {
+        validSkillsSet.add(trimmed);
+      }
+    }
+
+    const validSkills = Array.from(validSkillsSet);
+
+    return (
+      <>
+        {validSkills.map((skill, index) => (
+          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+            {skill}
+          </Badge>
+        ))}
+        {hasUnknownSkill && (
+          <Badge fullWidth color="gray" size="lg" radius="md">
+            Unknown Skill
+          </Badge>
+        )}
+      </>
+    );
+  })()}
+</SimpleGrid>
 
 
                       <Space h="md" />
@@ -6693,7 +6651,7 @@ border-bottom: none;
                               cellRenderer: (val: any) => {
                                 return (
                                   <Text>
-                                    {val?.data?.unit || 0}
+                                    {val?.data?.unit === "nan" ? "Unknown" : val?.data?.unit}
                                   </Text>
                                 );
                               },

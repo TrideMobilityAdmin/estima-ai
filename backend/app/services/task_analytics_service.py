@@ -14,20 +14,7 @@ import re
 from collections import defaultdict
 from app.models.estimates import (
     Estimate,
-    EstimateResponse,
-    EstimateRequest,
-    TaskDetailsWithParts,
-    AggregatedTasks,
-    SpareParts,
-    SpareResponse,
-    Details,
-    FindingsDetailsWithParts,
-    AggregatedFindingsByTask,
-    AggregatedFindings,
-    Details,
-    FindingsDetailsWithParts,
-    AggregatedFindingsByTask,
-    AggregatedFindings
+   ValidRequestCheckCategory
 )
 from app.log.logs import logger
 from app.db.database_connection import MongoDBClient
@@ -53,6 +40,8 @@ class TaskService:
         self.estimate_file_upload=self.mongo_client.get_collection("estimate_file_upload")
         self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
         self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
+        self.aircraft_details_collection=self.mongo_client.get_collection("aircraft_details")
+    
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
@@ -880,7 +869,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching parts usage for this api: {str(e)}")
             return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found"}}
-           
+        
 
     async def get_skills_analysis(self, source_tasks: list[str]):
         """
@@ -1293,12 +1282,14 @@ class TaskService:
             'aggregatedTasks': {
                 'spareParts': '$aggregatedTasks.spareParts', 
                 'estimateManhrs': '$aggregatedTasks.mhs', 
+                'totalMhs': '$aggregatedTasks.totalMhs', 
                 'estimatedSpareCost': '$aggregatedTasks.totalPartsCost'
             },  
             'findings': '$findings', 
             'aggregatedFindings': {
                 'spareParts': '$aggregatedFindings.spareParts', 
                 'estimateManhrs': '$aggregatedFindings.mhs', 
+                'totalMhs': '$aggregatedFindings.totalMhs', 
                 'estimatedSpareCost': '$aggregatedFindings.totalPartsCost'
             },  
             'originalFilename': 1, 
@@ -2019,6 +2010,9 @@ class TaskService:
                 'partId': '$requested_part_number', 
                 # 'partDescription': '$part_description'
             }, 
+            'partDescription': {
+                '$first': '$part_description'
+            }, 
             'totalTasksQty': {
                 '$sum': '$ceilRequestedQuantity'
             }, 
@@ -2030,7 +2024,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalTasksQty': 1, 
             'totalTasks': {
                 '$size': '$taskNumbers'
@@ -2117,6 +2112,9 @@ class TaskService:
                 #     }
                 # }
             }, 
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalFindingsQty': {
                 '$sum': '$ceilUsedQuantity'
             }, 
@@ -2128,7 +2126,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'partId': '$_id.partId', 
-            'partDescription': '$_id.partDescription', 
+            # 'partDescription': '$_id.partDescription', 
+            'partDescription': 1,
             'totalFindingsQty': 1, 
             'totalFindings': {
                 '$size': '$task_numbers'
@@ -2229,7 +2228,9 @@ class TaskService:
                 #         'replacement': ''
                 #     }
                 # }
-             
+            'partDescription': {
+                '$first': '$part_description'
+            },
             'totalTasksQty': {
                 '$sum': '$ceilUsedQuantity'
             }, 
@@ -2263,6 +2264,82 @@ class TaskService:
     }
         logger.info(f"Combined results: {combined_results}")
         return combined_results
+
+
+    async def validate_tasks_checkcategory(self, estimate_request: ValidRequestCheckCategory, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        """
+        try:
+            task_ids = estimate_request.tasks
+            checks = estimate_request.typeOfCheck
+            logger.info(f"Validating tasks: {task_ids} with checks: {checks}")
+            pipeline=[
+                {
+                    '$match': {
+                        'check_category': {
+                            '$in':checks
+                        }
+                    }
+                }, {
+                '$project': {
+                    '_id': 0, 
+                    'check_category': 1, 
+                    'package_number': 1
+                }
+            }]
+
+            aircraft_details=list(self.aircraft_details_collection.aggregate(pipeline))
+            logger.info(f"aircraft_details fetched successfully:{aircraft_details}")
+
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
+        
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+        
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks},
+                 "package_number": {"$in": [item['package_number'] for item in aircraft_details]}
+                },
+                {"_id": 0, "task_number": 1, "description": 1}
+            )
+            existing_tasks_list = list(existing_tasks_list)
+
+            cleaned_task_map = {}
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                description = doc["description"]
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]  
+                cleaned_task_map[task_number] = description
+
+            logger.info(f"cleaned_task_map: {cleaned_task_map}")
+
+            
+            cleaned_lrhTasks = set()  
+            for task in lrhTasks:
+                if " (LH)" in task or " (RH)" in task:
+                    task = task.split(" ")[0] 
+                cleaned_lrhTasks.add(task)
+            cleaned_lrhTasks = list(cleaned_lrhTasks)
+
+            validated_tasks = [
+                {
+                    "taskid": task,
+                    "status": task in cleaned_task_map,
+                    "description": cleaned_task_map.get(task, " ") 
+                }
+                for task in cleaned_lrhTasks
+            ]
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
+
 def replace_nan_inf(obj):
             """Helper function to recursively replace NaN and inf values with None"""
             if isinstance(obj, dict):
