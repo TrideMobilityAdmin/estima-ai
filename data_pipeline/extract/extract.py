@@ -5,8 +5,8 @@ import yaml
 from logs.Log_config import setup_logging
 import re
 from fuzzywuzzy import process
-
 from difflib import SequenceMatcher
+
 # Initialize logger
 logger = setup_logging()
 
@@ -33,6 +33,9 @@ async def connect_to_database(db_uri, db_name):
         return None
 
 def convert_package_number(package_number):
+    if not isinstance(package_number, str):
+        return package_number
+        
     match = re.search(r"HMV(\d{2})(\d{6})(\d{4})", package_number)
     if match:
         part1 = match.group(1)  # The first two digits after HMV
@@ -41,7 +44,6 @@ def convert_package_number(package_number):
        
         return f"HMV{part1}/{part2}/{part3}"
     
-    print("package_number does not match:", package_number)  
     return package_number 
 
 def clean_fly_hours(value):
@@ -52,10 +54,6 @@ def clean_fly_hours(value):
         else:
             value = pd.to_numeric(value, errors='coerce')  # Convert to float if possible
     return value
-
-
-
-
 
 def get_best_match(target, candidates):
     """
@@ -115,7 +113,6 @@ def detect_header_row(df, expected_columns, max_rows_to_check=6):
 
     return best_row_index
 
-
 def predict_column_mappings(df, expected_mappings):
     """
     Dynamically predict column mappings using fuzzy matching.
@@ -145,319 +142,299 @@ def predict_column_mappings(df, expected_mappings):
     
     return dynamic_mappings
 
-
 # Step 2: File Processing and Data Extraction
-async def get_processed_files(processed_file_paths,data_path, aircraft_details_initial_name, task_description_initial_name, 
+async def get_processed_files(processed_file_paths, data_path, aircraft_details_initial_name, task_description_initial_name, 
                               task_parts_initial_name, sub_task_description_initial_name, 
                               sub_task_parts_initial_name):
     """
     Extract and combine data from Excel files into dataframes.
+    Returns processed dataframes and a set of newly processed files.
     """
     try:
-        
         config = load_config()  # Load once to avoid multiple reads
         newly_processed_files = set()
 
         def read_and_process_file(file_path, sheet_name, folder_name):
             """Read and process an individual Excel file."""
-            file_extension = os.path.splitext(file_path)[1]
-            engine = "openpyxl" if file_extension in [".xlsx", ".xlsm"] else "pyxlsb" if file_extension == ".xlsb" else "xlrd"
+            try:
+                file_extension = os.path.splitext(file_path)[1]
+                engine = "openpyxl" if file_extension in [".xlsx", ".xlsm"] else "pyxlsb" if file_extension == ".xlsb" else "xlrd"
 
-            df = pd.read_excel(file_path, engine=engine, sheet_name=sheet_name)
+                df = pd.read_excel(file_path, engine=engine, sheet_name=sheet_name)
 
-            if sheet_name.lower() in ["pricing", "sheet1", "price","page"]:
-                sub_task_parts_columns = config["sub_task_parts_columns"]
-                sub_task_parts_column_mappings = config["sub_task_parts_column_mappings"]
+                if sheet_name.lower() in ["pricing", "sheet1", "price", "page"]:
+                    sub_task_parts_columns = config["sub_task_parts_columns"]
+                    sub_task_parts_column_mappings = config["sub_task_parts_column_mappings"]
 
-                # Alternative mappings
-                alternative_mappings = {
-                    "Issued Part#": "issued_part_number",
-                    "Package#": "package_number",
-                    "Task#": "task_number",
-                    "SOI_TRANNO": "soi_transaction"
-                }
+                    # Alternative mappings
+                    alternative_mappings = {
+                        "Issued Part#": "issued_part_number",
+                        "Package#": "package_number",
+                        "Task#": "task_number",
+                        "SOI_TRANNO": "soi_transaction"
+                    }
 
-                # Merge mappings
-                combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
+                    # Merge mappings
+                    combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
 
-                # Detect the header row
-                header_row_index = detect_header_row(df, combined_mappings.keys())
+                    # Detect the header row
+                    header_row_index = detect_header_row(df, combined_mappings.keys())
 
-                if header_row_index is None:
-                    logger.warning(f"Could not detect header row in {file_path}")
-                    return None
+                    if header_row_index is None:
+                        logger.warning(f"Could not detect header row in {file_path}")
+                        return None
 
-                # Set the column names correctly
-                df.columns = df.iloc[header_row_index].astype(str).values  # ✅ Convert to array/list
+                    # Set the column names correctly
+                    df.columns = df.iloc[header_row_index].astype(str).values
 
-                logger.info(f"Detected header row at index{file_path} {header_row_index}, columns: {df.columns}")
+                    logger.info(f"Detected header row at index {header_row_index} for {file_path}, columns: {df.columns}")
 
-                # Extract data rows (everything after the header)
-                df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+                    # Extract data rows (everything after the header)
+                    df = df.iloc[header_row_index + 1:].reset_index(drop=True)
 
-                print(f"The Excel is read as DataFrame, header row was at index {header_row_index}")
+                    # Rename columns using mappings
+                    df.rename(columns={k: v for k, v in combined_mappings.items() if k in df.columns}, inplace=True)
 
-                # Rename columns using mappings
-                df.rename(columns={k: v for k, v in combined_mappings.items() if k in df.columns}, inplace=True)
+                    expected_output_columns = list(sub_task_parts_column_mappings.values())
+                    mapped_columns = set(df.columns)
+                    truly_missing = set(expected_output_columns) - mapped_columns
+                    if len(truly_missing) > 4:
+                        return pd.DataFrame()
 
-                expected_output_columns = list(sub_task_parts_column_mappings.values())
-                mapped_columns = set(df.columns)
-                truly_missing = set(expected_output_columns) - mapped_columns
-                if len(truly_missing) > 4:
+                    if truly_missing:
+                        warning_msg = f"⚠️ Warning: Missing columns in {file_path} that couldn't be mapped: {truly_missing}"
+                        print(warning_msg)
+                        logger.warning(warning_msg)
+
+                    # Remove duplicate columns
+                    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+                    # Ensure all expected columns exist
+                    for col in expected_output_columns:
+                        if col not in df.columns:
+                            df[col] = "None"
+
+                    # Reorder columns to match expected order
+                    df = df[expected_output_columns]
+                    df["file_path"] = file_path
                     
-                    return pd.DataFrame()
-                
+                elif sheet_name == "HMV" or sheet_name[:2] == "20":
+                    if sheet_name[2:] == "19":
+                        return pd.DataFrame()
+                    df.columns = df.columns.astype(str).str.strip()  # Strip spaces from column names
+                    df = df.loc[:, ~df.columns.duplicated()].copy()  # Remove duplicate columns
+                    df = df.reset_index(drop=True)  # Reset index
 
-                if truly_missing:
-                    warning_msg = f"⚠️ Warning: Missing columns in {file_path} that couldn't be mapped: {truly_missing}"
-                    print(warning_msg)
-                    logger.warning(warning_msg)
+                    aircraft_details_column_mappings = config["aircraft_details_column_mappings"]
+                    aircraft_details_columns = [col.strip() for col in config["aircraft_details_columns"]]
 
-                # Remove duplicate columns
-                df = df.loc[:, ~df.columns.duplicated()].copy()
+                    # Identify missing and extra columns
+                    missing_cols = set(aircraft_details_columns) - set(df.columns)
+                    extra_cols = set(df.columns) - set(aircraft_details_columns)
 
-                # Ensure all expected columns exist
-                for col in expected_output_columns:
-                    if col not in df.columns:
-                        df[col] = "None"
+                    if missing_cols:
+                        print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                        logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    
+                    if extra_cols:
+                        print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                        logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
 
-                # Reorder columns to match expected order
-                df = df[expected_output_columns]
-                df["file_path"]= file_path
+                    df["year"] = int(folder_name)  # Add the 'year' column
 
+                    # Rename columns if they exist in the dataframe
+                    df.rename(columns={k: v for k, v in aircraft_details_column_mappings.items() if k in df.columns}, inplace=True)
+                    
+                    # Convert 'aircraft_age' and 'aircraft_age_2024' safely
+                    for col in ["aircraft_age", "aircraft_age_2024"]:
+                        if col in df.columns:
+                            df[col] = (
+                                df[col]
+                                .astype(str)  # Convert all values to string
+                                .str.strip()  # Remove extra spaces
+                                .str.extract(r'(\d+\.?\d*)')[0]  # Extract numeric part
+                                .astype(float)  # Convert to float
+                            )
+                    
+                    df["issue_date"] = pd.to_datetime(df["issue_date"], errors='coerce')
+                    df["issue_date"] = df["issue_date"].dt.tz_localize('UTC')
+                    df["issue_date"] = df["issue_date"].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))       
+                    
+                    # Add missing expected columns with None values
+                    expected_columns = list(aircraft_details_column_mappings.values())
+                    for col in expected_columns:
+                        if col not in df.columns:
+                            df[col] = None
+                            
+                    df['flight_hours'] = df['flight_hours'].apply(clean_fly_hours)
 
-                
-                
-            elif  sheet_name == "HMV" or sheet_name[:2] == "20" :
-                if sheet_name[2:] == "19":
-                    return pd.DataFrame()
-                df.columns = df.columns.astype(str).str.strip()  # Strip spaces from column names
-                df = df.loc[:, ~df.columns.duplicated()].copy()  # Remove duplicate columns
-                df = df.reset_index(drop=True)  # Reset index
+                    # Reorder dataframe to match expected column order
+                    df = df[expected_columns]
+                    df["file_path"] = file_path
+                    
+                elif sheet_name == 'mlttable':
+                    df.columns = df.iloc[0].astype(str).str.strip()
+                    df = df[1:].reset_index(drop=True)
 
-                aircraft_details_column_mappings = config["aircraft_details_column_mappings"]
-                aircraft_details_columns = [col.strip() for col in config["aircraft_details_columns"]]
-                #print(f"Columns in {file_path}: {df.columns.tolist()}")
-                #print(df["A/C AGE"].isna().sum(), " ", df["A/C AGE"].notna().sum())
-
-                # Identify missing and extra columns
-                missing_cols = set(aircraft_details_columns) - set(df.columns)
-                extra_cols = set(df.columns) - set(aircraft_details_columns)
-
-                if missing_cols:
-                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                
-                if extra_cols:
-                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-
-                df["year"] = int(folder_name)  # Add the 'year' column
-
-                # Rename columns if they exist in the dataframe
-                df.rename(columns={k: v for k, v in aircraft_details_column_mappings.items() if k in df.columns}, inplace=True)
-                
-
-                # Convert 'aircraft_age' and 'aircraft_age_2024' safely
-                for col in ["aircraft_age", "aircraft_age_2024"]:
-                    if col in df.columns:
-                        df[col] = (
-                            df[col]
-                            .astype(str)  # Convert all values to string
-                            .str.strip()  # Remove extra spaces
-                            .str.extract(r'(\d+\.?\d*)')[0]  # Extract numeric part
-                            .astype(float)  # Convert to float
-                        )
-                #print(df["aircraft_age"].isna().sum())
-                #print(f"Columns in {file_path}: {df.columns.tolist()}")
-                df["issue_date"] = pd.to_datetime(df["issue_date"], errors='coerce')
-                df["issue_date"] = df["issue_date"].dt.tz_localize('UTC')
-                df["issue_date"] = df["issue_date"].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))       
-                # Add missing expected columns with None values
-                expected_columns = list(aircraft_details_column_mappings.values())
-                for col in expected_columns:
-                    if col not in df.columns:
-                        df[col] = None
+                    df = df.loc[:, ~df.columns.duplicated()].copy()
+                    task_parts_columns_mappings = config["task_parts_columns_mappings"]
+                    task_parts_columns = config["task_parts_columns"]
+                    
+                    # Ensure correct columns
+                    missing_cols = set(task_parts_columns) - set(df.columns)
+                    extra_cols = set(df.columns) - set(task_parts_columns)
+                    
+                    if missing_cols:
+                        print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                        logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    if extra_cols:
+                        print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                        logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
                         
-                df['flight_hours'] = df['flight_hours'].apply(clean_fly_hours)
-
-                # Reorder dataframe to match expected column order
-                df = df[expected_columns]
-                df["file_path"]= file_path
-                
-            elif sheet_name == 'mlttable':
-                df.columns = df.iloc[0].astype(str).str.strip()
-                df = df[1:].reset_index(drop=True)
-
-                df = df.loc[:, ~df.columns.duplicated()].copy()
-                task_parts_columns_mappings = config["task_parts_columns_mappings"]
-                task_parts_columns=config["task_parts_columns"]
-                # Ensure correct columns
-                missing_cols = set(task_parts_columns) - set(df.columns)
-                
-                #print(f"Missing columns: {missing_cols}")
-                extra_cols = set(df.columns) - set(task_parts_columns)
-                if missing_cols:
-                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                if extra_cols:
-                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-                df["package"] = folder_name  # Add folder name as a column
-                df['package'] = df['package'].apply(convert_package_number)
-                
-                # First rename the columns that exist
-                df.rename(columns={k: v for k, v in task_parts_columns_mappings.items() if k in df.columns}, inplace=True)
-
-                # Now add any missing columns (using the final mapped column names)
-                expected_columns = list(task_parts_columns_mappings.values())
-                missing_columns = [col for col in expected_columns if col not in df.columns]
-                print(f"Missing columns: {missing_columns}")
-
-                # Add missing columns with None values
-                for col in missing_columns:
-                    df[col] = None
-
-                # Finally, reorder columns to match expected order
-                df = df[expected_columns]
-
-                # Reorder columns according to the mapped values
-                df = df[list(task_parts_columns_mappings.values())]
-                df["file_path"]= file_path
-
-                
-            elif sheet_name == 'mltaskmlsec1':
-                df.columns = df.iloc[0].astype(str).str.strip()
-                df = df[1:].reset_index(drop=True)
-                df = df.loc[:, ~df.columns.duplicated()].copy()
-                task_description_columns=config["task_description_columns"]
-                task_description_columns_mappings=config["task_description_columns_mappings"]
-                missing_cols = set(task_description_columns) - set(df.columns)
-                extra_cols = set(df.columns) - set(task_description_columns)
-                if missing_cols:
-                    print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                    logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
-                if extra_cols:
-                    print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-                    logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
-                df["package"] = folder_name
-                df['package'] = df['package'].apply(convert_package_number)
-                df.rename(columns={k: v for k, v in task_description_columns_mappings.items() if k in df.columns}, inplace=True)
-
-                # Now add any missing columns (using the final mapped column names)
-                expected_columns = list(task_description_columns_mappings.values())
-                missing_columns = [col for col in expected_columns if col not in df.columns]
-                print(f"Missing columns: {missing_columns}")
-
-                # Add missing columns with None values
-                for col in missing_columns:
-                    df[col] = None
-
-                # Finally, reorder columns to match expected order
-                df = df[expected_columns]
-
-
-                df = df[list(task_description_columns_mappings.values())]
-                df["file_path"]= file_path
-            
-            elif sheet_name == 'mldpmlsec1':
-                # Ensure first row is used as column names safely
-                df.columns = df.iloc[0].astype(str).str.strip()
-                df = df[1:].reset_index(drop=True)
-                df = df.loc[:, ~df.columns.duplicated()].copy()
-
-                sub_task_description_columns = config["sub_task_description_columns"]
-                sub_task_description_columns_mappings = config["sub_task_description_columns_mappings"]
-
-                # Check for missing and extra columns
-                missing_cols = set(sub_task_description_columns) - set(df.columns)
-                extra_cols = set(df.columns) - set(sub_task_description_columns)
-                
-                if missing_cols:
-                    warning_msg = f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}"
-                    print(warning_msg)
-                    logger.warning(warning_msg)
-                
-                if extra_cols:
-                    warning_msg = f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}"
-                    print(warning_msg)
-                    logger.warning(warning_msg)
-
-                df["package"] = folder_name
-                df["package"] = df["package"].apply(convert_package_number)
-
-                # Rename columns safely
-                df.rename(columns={k: v for k, v in sub_task_description_columns_mappings.items() if k in df.columns}, inplace=True)
-
-                # Add any missing columns (based on mapped names)
-                expected_columns = list(sub_task_description_columns_mappings.values())
-                missing_columns = [col for col in expected_columns if col not in df.columns]
-
-                # Print missing columns for debugging
-                if missing_columns:
-                    print(f"Missing columns: {missing_columns}")
-
-                # Add missing columns with None values
-                for col in missing_columns:
-                    df[col] = None
-
-                # Ensure required columns exist before proceeding
-                required_columns = ["log_item_number", "source_task_discrepancy_number"]
-                for col in required_columns:
-                    if col not in df.columns:
-                        print(f"⚠️ Warning: Required column '{col}' is missing in {file_path}. Skipping task_findings processing.")
-                        logger.warning(f"⚠️ Warning: Required column '{col}' is missing in {file_path}. Skipping task_findings processing.")
-                        return  # Exit this branch early if required columns are missing
-
-                # Initialize the new column
-                df["source_task_discrepancy_number_updated"] = ""
-
-                # Create task_findings_dict
-                findings = df["log_item_number"].tolist()
-                tasks = df["source_task_discrepancy_number"].tolist()
-                task_findings_dict = dict(zip(findings, tasks))
-
-                # Resolve task references safely (avoid infinite loops)
-                max_iterations = 10  # Safety limit
-                for finding in findings:
-                    iteration = 0
-                    current = finding
+                    df["package"] = folder_name  # Add folder name as a column
+                    df['package'] = df['package'].apply(convert_package_number)
                     
-                    while iteration < max_iterations:
-                        if current not in task_findings_dict or task_findings_dict[current] == current:
-                            break  # Stop if there's no further reference or self-referencing
-                        next_value = task_findings_dict[current]
-                        if next_value == finding:  # Circular reference detected
-                            break
-                        current = next_value
-                        iteration += 1
+                    # First rename the columns that exist
+                    df.rename(columns={k: v for k, v in task_parts_columns_mappings.items() if k in df.columns}, inplace=True)
+
+                    # Now add any missing columns (using the final mapped column names)
+                    expected_columns = list(task_parts_columns_mappings.values())
+                    missing_columns = [col for col in expected_columns if col not in df.columns]
+
+                    # Add missing columns with None values
+                    for col in missing_columns:
+                        df[col] = None
+
+                    # Finally, reorder columns to match expected order
+                    df = df[expected_columns]
+                    df["file_path"] = file_path
                     
-                    # Update with the resolved reference
-                    task_findings_dict[finding] = current
+                elif sheet_name == 'mltaskmlsec1':
+                    df.columns = df.iloc[0].astype(str).str.strip()
+                    df = df[1:].reset_index(drop=True)
+                    df = df.loc[:, ~df.columns.duplicated()].copy()
+                    task_description_columns = config["task_description_columns"]
+                    task_description_columns_mappings = config["task_description_columns_mappings"]
+                    missing_cols = set(task_description_columns) - set(df.columns)
+                    extra_cols = set(df.columns) - set(task_description_columns)
+                    
+                    if missing_cols:
+                        print(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                        logger.warning(f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}")
+                    if extra_cols:
+                        print(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                        logger.warning(f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}")
+                        
+                    df["package"] = folder_name
+                    df['package'] = df['package'].apply(convert_package_number)
+                    df.rename(columns={k: v for k, v in task_description_columns_mappings.items() if k in df.columns}, inplace=True)
 
-                # Assign resolved values back to DataFrame
-                df["source_task_discrepancy_number_updated"] = df["log_item_number"].map(task_findings_dict)
+                    # Now add any missing columns (using the final mapped column names)
+                    expected_columns = list(task_description_columns_mappings.values())
+                    missing_columns = [col for col in expected_columns if col not in df.columns]
 
-                # Ensure correct column order
-                df = df[expected_columns]
+                    # Add missing columns with None values
+                    for col in missing_columns:
+                        df[col] = None
 
-
-
-                df = df[list(sub_task_description_columns_mappings.values())]
-                df["file_path"]= file_path
+                    # Finally, reorder columns to match expected order
+                    df = df[expected_columns]
+                    df["file_path"] = file_path
                 
-            else:
-                df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
-                df = df[1:].reset_index(drop=True)
-                df["package"] = folder_name  # Add folder name as a column
-                df["file_path"]= file_path
+                elif sheet_name == 'mldpmlsec1':
+                    # Ensure first row is used as column names safely
+                    df.columns = df.iloc[0].astype(str).str.strip()
+                    df = df[1:].reset_index(drop=True)
+                    df = df.loc[:, ~df.columns.duplicated()].copy()
 
-            return df
+                    sub_task_description_columns = config["sub_task_description_columns"]
+                    sub_task_description_columns_mappings = config["sub_task_description_columns_mappings"]
+
+                    # Check for missing and extra columns
+                    missing_cols = set(sub_task_description_columns) - set(df.columns)
+                    extra_cols = set(df.columns) - set(sub_task_description_columns)
+                    
+                    if missing_cols:
+                        warning_msg = f"⚠️ Warning: Missing columns in {file_path}: {missing_cols}"
+                        print(warning_msg)
+                        logger.warning(warning_msg)
+                    
+                    if extra_cols:
+                        warning_msg = f"⚠️ Warning: Extra columns in {file_path}: {extra_cols}"
+                        print(warning_msg)
+                        logger.warning(warning_msg)
+
+                    df["package"] = folder_name
+                    df["package"] = df["package"].apply(convert_package_number)
+
+                    # Rename columns safely
+                    df.rename(columns={k: v for k, v in sub_task_description_columns_mappings.items() if k in df.columns}, inplace=True)
+
+                    # Add any missing columns (based on mapped names)
+                    expected_columns = list(sub_task_description_columns_mappings.values())
+                    missing_columns = [col for col in expected_columns if col not in df.columns]
+                    
+                    # Add missing columns with None values
+                    for col in missing_columns:
+                        df[col] = None
+
+                    # Ensure required columns exist before proceeding
+                    required_columns = ["log_item_number", "source_task_discrepancy_number"]
+                    for col in required_columns:
+                        if col not in df.columns:
+                            print(f"⚠️ Warning: Required column '{col}' is missing in {file_path}. Skipping task_findings processing.")
+                            logger.warning(f"⚠️ Warning: Required column '{col}' is missing in {file_path}. Skipping task_findings processing.")
+                            return pd.DataFrame()  # Return empty DataFrame if required columns are missing
+
+                    # Initialize the new column
+                    df["source_task_discrepancy_number_updated"] = ""
+
+                    # Create task_findings_dict
+                    findings = df["log_item_number"].tolist()
+                    tasks = df["source_task_discrepancy_number"].tolist()
+                    task_findings_dict = dict(zip(findings, tasks))
+
+                    # Resolve task references safely (avoid infinite loops)
+                    max_iterations = 10  # Safety limit
+                    for finding in findings:
+                        iteration = 0
+                        current = finding
+                        
+                        while iteration < max_iterations:
+                            if current not in task_findings_dict or task_findings_dict[current] == current:
+                                break  # Stop if there's no further reference or self-referencing
+                            next_value = task_findings_dict[current]
+                            if next_value == finding:  # Circular reference detected
+                                break
+                            current = next_value
+                            iteration += 1
+                        
+                        # Update with the resolved reference
+                        task_findings_dict[finding] = current
+
+                    # Assign resolved values back to DataFrame
+                    df["source_task_discrepancy_number_updated"] = df["log_item_number"].map(task_findings_dict)
+
+                    # Ensure correct column order
+                    df = df[expected_columns]
+                    df["file_path"] = file_path
+                    
+                else:
+                    df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
+                    df = df[1:].reset_index(drop=True)
+                    df["package"] = folder_name  # Add folder name as a column
+                    df["file_path"] = file_path
+
+                return df
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}, sheet {sheet_name}: {e}")
+                print(f"Error processing file {file_path}, sheet {sheet_name}: {e}")
+                return pd.DataFrame()
 
         def collect_files_by_prefix(prefix, sheet_names, data_path):
             """Collect and process files by prefix."""
             collected_data = []
-
 
             # Ensure sheet_names is a list
             if isinstance(sheet_names, str):
@@ -465,8 +442,8 @@ async def get_processed_files(processed_file_paths,data_path, aircraft_details_i
 
             for root, _, files in os.walk(data_path):
                 for file in files:
+                    # Check if file is not already processed
                     if file not in processed_file_paths:
-                        
                         if file.startswith(prefix):
                             file_path = os.path.join(root, file)
                             folder_name = os.path.basename(root)
@@ -474,7 +451,8 @@ async def get_processed_files(processed_file_paths,data_path, aircraft_details_i
 
                             try:
                                 # Get available sheet names from the file
-                                available_sheets = pd.ExcelFile(file_path).sheet_names
+                                excel_file = pd.ExcelFile(file_path)
+                                available_sheets = excel_file.sheet_names
                                 valid_sheets = [sheet for sheet in sheet_names if sheet in available_sheets]
 
                                 if not valid_sheets:
@@ -495,26 +473,26 @@ async def get_processed_files(processed_file_paths,data_path, aircraft_details_i
                                     collected_data.append(pd.concat(all_sheets_data, ignore_index=True))
 
                                 print(f"✅ Processed file: {file_path}")
-                                processed_file_paths.add(file)
-                                newly_processed_files.add(file) 
+                                newly_processed_files.add(file)
                             except Exception as e:
                                 logger.error(f"❌ Error processing file: {file_path}: {e}")
                                 print(f"❌ Error processing file: {file_path}: {e}")
                             
-            collected_data = [df for df in collected_data if not df.empty and not df.isna().all().all()]
-
+            # Make sure we're not returning an empty DataFrame
+            if not collected_data:
+                return pd.DataFrame()
+                
             return pd.concat(collected_data, ignore_index=True) if collected_data else pd.DataFrame()
 
-
         # Collecting data
-        aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"],data_path)      
-        task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1',data_path)
-        task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable',data_path)
-        sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1',data_path)
-        sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name,['PRICING',"Sheet1",'sheet1',"Pricing","Price"],data_path)
-        #return pd.DataFrame(),pd.DataFrame(),  pd.DataFrame(),pd.DataFrame(),sub_task_parts,
+        aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"], data_path)      
+        task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1', data_path)
+        task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable', data_path)
+        sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1', data_path)
+        sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name, ['PRICING', "Sheet1", 'sheet1', "Pricing", "Price"], data_path)
 
         return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files
     except Exception as e:
+        logger.error(f"Error in get_processed_files: {e}")
         print(f"Error fetching processed files: {e}")
-        return pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), set()
