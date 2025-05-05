@@ -1,4 +1,3 @@
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import pandas as pd
 import yaml
@@ -6,7 +5,8 @@ from logs.Log_config import setup_logging
 import re
 from fuzzywuzzy import process
 from difflib import SequenceMatcher
-
+from pymongo import MongoClient
+import numpy as np
 # Initialize logger
 logger = setup_logging()
 
@@ -17,20 +17,21 @@ def load_config(config_path='D:/Projects/gmr-mro/estima-ai/data_pipeline/config.
         return yaml.safe_load(file)
 
 # Step 1: Establish Database Connection
-async def connect_to_database(db_uri, db_name):
+def connect_to_database(db_uri: str, db_name: str):
     """
-    Connect to MongoDB asynchronously and return the database object.
+    Connect to MongoDB synchronously using pymongo and return the database object.
     """
     try:
-        client = AsyncIOMotorClient(db_uri)
+        client = MongoClient(db_uri)
         db = client[db_name]  # Get database reference
-        await client.admin.command("ping")  # Check connection
+        client.admin.command("ping")  # Check connection
         print(f"✅ Connected to database: {db_name}")
         return db
     except Exception as e:
         print(f"❌ Error connecting to MongoDB: {e}")
-        logger.error(f"Error connecting to MongoDB: {e}")
+        logger.error("Error connecting to MongoDB", exc_info=True)
         return None
+
 
 def convert_package_number(package_number):
     if not isinstance(package_number, str):
@@ -143,7 +144,7 @@ def predict_column_mappings(df, expected_mappings):
     return dynamic_mappings
 
 # Step 2: File Processing and Data Extraction
-async def get_processed_files(processed_file_paths, data_path, aircraft_details_initial_name, task_description_initial_name, 
+def get_processed_files(processed_file_paths, data_path, aircraft_details_initial_name, task_description_initial_name, 
                               task_parts_initial_name, sub_task_description_initial_name, 
                               sub_task_parts_initial_name):
     """
@@ -208,6 +209,22 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
 
                     # Remove duplicate columns
                     df = df.loc[:, ~df.columns.duplicated()].copy()
+                    # Convert to string
+                    string_cols = [
+                        'registration_number', 'package_number', 'task_number',
+                        'task_description', 'issued_part_number', 'part_description',
+                        'issued_unit_of_measurement', 'stock_status', 'base_currency',
+                        'soi_transaction'
+                    ]
+
+                    # Apply conversions
+                    for col in string_cols:
+                        df[col] = df[col].astype(str)
+                        
+                    numeric_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_billable_price', 'billable_value_usd', 'used_quantity']
+
+                    for col in numeric_convert:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
 
                     # Ensure all expected columns exist
                     for col in expected_output_columns:
@@ -244,32 +261,72 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
 
                     # Rename columns if they exist in the dataframe
                     df.rename(columns={k: v for k, v in aircraft_details_column_mappings.items() if k in df.columns}, inplace=True)
-                    
-                    # Convert 'aircraft_age' and 'aircraft_age_2024' safely
+                    df['flight_hours'] = df['flight_hours'].apply(clean_fly_hours)
+
+                    # Handling aircraft age columns
                     for col in ["aircraft_age", "aircraft_age_2024"]:
                         if col in df.columns:
+                            # Try to extract numeric values from strings, handle errors safely
                             df[col] = (
                                 df[col]
                                 .astype(str)  # Convert all values to string
                                 .str.strip()  # Remove extra spaces
                                 .str.extract(r'(\d+\.?\d*)')[0]  # Extract numeric part
-                                .astype(float)  # Convert to float
+                                .astype(float, errors='ignore')  # Convert to float with error handling
                             )
-                    
-                    df["issue_date"] = pd.to_datetime(df["issue_date"], errors='coerce')
-                    df["issue_date"] = df["issue_date"].dt.tz_localize('UTC')
-                    df["issue_date"] = df["issue_date"].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))       
-                    
+                            # Additional safety conversion with proper error handling
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+                    # Handle datetime columns
+                    datetime_cols = ["issue_date", 'start_date', 'end_date', 'last_maintenance_date']
+                    for col in datetime_cols:
+                        if col in df.columns:
+                            # Convert to datetime with error handling
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                            # Only localize non-NaT values to avoid TypeError
+                            mask = ~df[col].isna()
+                            if mask.any():
+                                df.loc[mask, col] = df.loc[mask, col].dt.tz_localize('UTC')
+                            # Fill NaT values with a default timestamp (already timezone aware)
+                            df[col] = df[col].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))
+
+                    # Define string columns
+                    string_cols = [
+                        'customer_order_number', 'customer_name', 'package_number',
+                        'aircraft_registration_number', 'aircraft_model',
+                        'release_tracking_number', 'package_details', 'check_category',
+                        'train_data', 'test_data', 'type_of_check'
+                    ]
+
+                    # Convert string columns, handling None values
+                    for col in string_cols:
+                        if col in df.columns:
+                            df[col] = df[col].fillna('').astype(str)
+                        else:
+                            df[col] = ''
+
+                    # Define numeric columns
+                    numeric_cols = ['year', 'flight_hours', 'flight_cycles', 'aircraft_age', 
+                                'aircraft_age_2024', 'turnaround_time']
+
+                    # Convert numeric columns with error handling
+                    for col in numeric_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                        else:
+                            df[col] = np.nan
+
                     # Add missing expected columns with None values
                     expected_columns = list(aircraft_details_column_mappings.values())
-                    for col in expected_columns:
-                        if col not in df.columns:
-                            df[col] = None
-                            
-                    df['flight_hours'] = df['flight_hours'].apply(clean_fly_hours)
+                    missing_columns = [col for col in expected_columns if col not in df.columns]
+                    for col in missing_columns:
+                        df[col] = None
 
-                    # Reorder dataframe to match expected column order
-                    df = df[expected_columns]
+                    # Ensure the dataframe has all expected columns before reordering
+                    reorder_columns = [col for col in expected_columns if col in df.columns]
+                    df = df.reindex(columns=reorder_columns)
+
+                    # Add file path column
                     df["file_path"] = file_path
                     
                 elif sheet_name == 'mlttable':
@@ -300,8 +357,24 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
                     # Now add any missing columns (using the final mapped column names)
                     expected_columns = list(task_parts_columns_mappings.values())
                     missing_columns = [col for col in expected_columns if col not in df.columns]
-
+                    string_cols=['rt_mode_flag', 'delete_flag', 'task_number', 'requested_part_number',
+                    'issued_part_number', 'issued_serial_number', 'issued_lot_number',
+                    
+                    'part_description', 'requested_stock_status', 'material_request_number',
+                    'part_type', 'issued_stock_status', 'issue_number',  'package_number']
                     # Add missing columns with None values
+                    
+                    # Apply conversions
+                    for col in string_cols:
+                        df[col] = df[col].astype(str)
+                        
+                    numeric_convert = ['issued_quantity', 'used_quantity', 'unit_of_measurement',
+                    'pending_return_quantity', 'returned_quantity_excess','material_cost',
+                    'requested_quantity']
+
+                    for col in numeric_convert:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        
                     for col in missing_columns:
                         df[col] = None
 
@@ -332,6 +405,57 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
                     # Now add any missing columns (using the final mapped column names)
                     expected_columns = list(task_description_columns_mappings.values())
                     missing_columns = [col for col in expected_columns if col not in df.columns]
+                    
+                    # Handle datetime columns
+                    datetime_cols = ['planned_start_date',
+                        'planned_end_date',  'actual_start_date',
+                        'actual_end_date']
+                    for col in datetime_cols:
+                        if col in df.columns:
+                            # Convert to datetime with error handling
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                            # Only localize non-NaT values to avoid TypeError
+                            mask = ~df[col].isna()
+                            if mask.any():
+                                df.loc[mask, col] = df.loc[mask, col].dt.tz_localize('UTC')
+                            # Fill NaT values with a default timestamp (already timezone aware)
+                            df[col] = df[col].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))
+
+                    # Define string columns
+                    string_cols = [
+                        '', 'rt_mode_flag', 'delete_flag', 'sequence_number', 'task_number',
+                        'ata_number', 'description', 'status', 'work_center_number',
+                        'sign_off_status', 'task_type', 'task_category', 'job_type',
+                        'execution_phase', 'execution_category', 'mechanic_required',
+                        'inspection_required', 'rii_required',  'tracking_number',
+                        'long_description', 'hold_status', 'estimation_status', 'skill_number',
+                        'wbs_code', 'package_number', 'source_task_discrepancy_number',
+                        'source_tracking_number', 'zone_number', 'parent_task_number',
+                        'root_task_number', 'previous_execution_comments', 'mechanic_sign_off',
+                        'inspection_sign_off', 'rii_sign_off', 'additional_sign_off',
+                        'previous_sign_off_comments', 'workscoping_comments', 'repair_agency',
+                        'repair_classification', 'maintenance_manual_reference_number'
+                    ]
+                    
+
+                    # Convert string columns, handling None values
+                    for col in string_cols:
+                        if col in df.columns:
+                            df[col] = df[col].fillna('').astype(str)
+                        else:
+                            df[col] = ''
+
+                    # Define numeric columns
+                    numeric_cols = ['estimated_man_hours','actual_man_hours']
+
+                    # Convert numeric columns with error handling
+                    for col in numeric_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                        else:
+                            df[col] = np.nan
+                    
+                    
 
                     # Add missing columns with None values
                     for col in missing_columns:
@@ -374,6 +498,54 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
                     expected_columns = list(sub_task_description_columns_mappings.values())
                     missing_columns = [col for col in expected_columns if col not in df.columns]
                     
+                    # Handle datetime columns
+                    datetime_cols = ['planned_start_date',
+                        'planned_end_date',  'actual_start_date',
+                        'actual_end_date']
+                    for col in datetime_cols:
+                        if col in df.columns:
+                            # Convert to datetime with error handling
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                            # Only localize non-NaT values to avoid TypeError
+                            mask = ~df[col].isna()
+                            if mask.any():
+                                df.loc[mask, col] = df.loc[mask, col].dt.tz_localize('UTC')
+                            # Fill NaT values with a default timestamp (already timezone aware)
+                            df[col] = df[col].fillna(pd.Timestamp('0001-01-01T00:00:00.000', tz='UTC'))
+                            
+                    string_cols = ['', 'rt_mode_flag', 'delete_flag', 'task_type', 'log_item_number',
+                    'ata_number', 'task_description', 'corrective_action',
+                    'discrepancy_number', 'action_taken', 'task_status',
+                    'source_task_discrepancy_number',
+                    'source_task_discrepancy_number_updated', 'source_tracking_number',
+                    'work_center_number', 'sign_off_status', 'contract_classification',
+                    'task_category', 'execution_phase', 'execution_category',
+                    'part_required', 'corrosion_related', 'major_item', 'is_repeat',
+                    'reported_by', 'reported_date', 'mechanical_required',
+                    'mechanical_sign_off', 'inspection_required', 'inspection_sign_off',
+                    'rii_required', 'sequence_number', 'tracking_number', 'hold_status',
+                    'estimation_status', 'deferral_calendar', 'deferral_type',
+                    'package_number', 'zone_number', 'skill_number', 'additional_sign_off',
+                    'part_number', 'serial_number', 'part_description', 'position_code',
+                    'previous_sign_off_comments', 'radio_communication',
+                    'mechanical_skill_number', 'inspection_skill_number', 'rii_sign_off',
+                    'rii_skill_number']
+                    # Convert string columns, handling None values
+                    for col in string_cols:
+                        if col in df.columns:
+                            df[col] = df[col].fillna('').astype(str)
+                        else:
+                            df[col] = ''
+
+                    # Define numeric columns
+                    numeric_cols = ['estimated_man_hours','actual_man_hours']
+
+                    # Convert numeric columns with error handling
+                    for col in numeric_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                        else:
+                            df[col] = np.nan
                     # Add missing columns with None values
                     for col in missing_columns:
                         df[col] = None
@@ -442,8 +614,9 @@ async def get_processed_files(processed_file_paths, data_path, aircraft_details_
 
             for root, _, files in os.walk(data_path):
                 for file in files:
+                    file_path = os.path.join(root, file)
                     # Check if file is not already processed
-                    if file not in processed_file_paths:
+                    if file_path in processed_file_paths:
                         if file.startswith(prefix):
                             file_path = os.path.join(root, file)
                             folder_name = os.path.basename(root)

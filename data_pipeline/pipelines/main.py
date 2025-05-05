@@ -11,7 +11,11 @@ from transform.transform import clean_data
 from load.load import append_to_database
 import yaml
 from logs.Log_config import setup_logging
+import pandas as pd
+import warnings
 
+# Suppress FutureWarning to keep logs clean
+warnings.simplefilter(action='ignore', category=FutureWarning)
 # Initialize logger
 logger = setup_logging()
 
@@ -46,47 +50,60 @@ def get_file_info(file_path):
             "size": 0
         }
 
-async def update_processed_files_db(db, newly_processed_files, successfully_processed=None):
+def update_processed_files_db(db, newly_processed_files, successfully_processed=None):
     """Update the database with newly processed files.
-    
+
     Args:
         db: Database connection
-        newly_processed_files: Set of files that were newly processed
-        successfully_processed: Optional set of files that were successfully processed
-                               If provided, only mark files that were also successfully processed
+        newly_processed_files: Iterable of files that were newly processed
+        successfully_processed: Optional iterable of files that were successfully processed
     """
     if not newly_processed_files:
         return
-        
+
     try:
-        # If successfully_processed is provided, only mark files that were actually processed
-        files_to_mark = newly_processed_files
-        if successfully_processed is not None:
-            files_to_mark = newly_processed_files.intersection(successfully_processed)
-            
+        # Convert to sets for set operations
+        newly_processed_files_set = set(newly_processed_files)
+        successfully_processed_set = set(successfully_processed) if successfully_processed is not None else None
+
+        files_to_mark = newly_processed_files_set
+        if successfully_processed_set is not None:
+            files_to_mark = newly_processed_files_set.intersection(successfully_processed_set)
+
         if not files_to_mark:
             print("No files to mark as processed")
             return False
-            
-        operations = [{"file_path": file} for file in files_to_mark]
+
+        operations = []
+        for file in files_to_mark:
+            try:
+                stat = os.stat(file)
+                operations.append({
+                    "file_path": file,
+                    "modified_time": stat.st_mtime,  # Unix timestamp
+                    "size": stat.st_size  # in bytes
+                })
+            except FileNotFoundError:
+                print(f"⚠️ File not found: {file}")
         if operations:
-            result = await db["processed_file_paths"].insert_many(operations)
+            result = db["processed_file_paths"].insert_many(operations)
             num_added = len(result.inserted_ids)
-            print(f"Added {num_added} new files to processed_file_paths collection")
+            print(f"✅ Added {num_added} new files to processed_file_paths collection")
             logger.info(f"Added {num_added} new files to processed_file_paths collection")
-            
-            # Log files that couldn't be processed if there's a discrepancy
-            if successfully_processed is not None and len(files_to_mark) < len(newly_processed_files):
-                not_processed = newly_processed_files - successfully_processed
-                logger.warning(f"Some files were not successfully processed: {not_processed}")
-                
+
+            if successfully_processed_set is not None and len(files_to_mark) < len(newly_processed_files_set):
+                not_processed = newly_processed_files_set - successfully_processed_set
+                logger.warning(f"⚠️ Some files were not successfully processed: {not_processed}")
+
             return True
+
     except Exception as e:
-        print(f"Error updating processed files database: {e}")
+        print(f"❌ Error updating processed files database: {e}")
         logger.error(f"Error updating processed files database: {e}")
         return False
 
-async def process_collection(db, collection_name, dataframe, updated_files=None):
+
+def process_collection(db, collection_name, dataframe, updated_files=None):
     """Process a single collection's data.
     
     Args:
@@ -125,13 +142,13 @@ async def process_collection(db, collection_name, dataframe, updated_files=None)
                 if updated_for_collection:
                     print(f"Removing old data for {len(updated_for_collection)} updated files in {collection_name}")
                     try:
-                        delete_result = await db[collection_name].delete_many({"file_path": {"$in": updated_for_collection}})
+                        delete_result =  db[collection_name].delete_many({"file_path": {"$in": updated_for_collection}})
                         print(f"Deleted {delete_result.deleted_count} old records for updated files")
                     except Exception as delete_error:
                         logger.error(f"Error deleting old data: {delete_error}")
         
         # Insert into database
-        inserted_count = await append_to_database(db[collection_name], processed_data)
+        inserted_count =  append_to_database(db[collection_name], processed_data)
         
         if inserted_count is not None and inserted_count > 0:
             print(f"Successfully processed {collection_name}: {inserted_count} records inserted")
@@ -146,7 +163,100 @@ async def process_collection(db, collection_name, dataframe, updated_files=None)
         print(f"Error processing {collection_name}: {e}")
         logger.error(f"Error processing {collection_name}: {e}")
         return False
+def update_lh_rh_tasks(task):
+    """
+    Convert LH/RH suffix to a standardized format.
     
+    Args:
+        task: String containing task number/name
+        
+    Returns:
+        String with standardized LH/RH format
+    """
+    task = task.strip()
+    if task.endswith(" LH") or task.endswith("_LH"):
+        return task[:-3] + " (LH)"
+    elif task.endswith("LH"):
+        return task[:-2] + " (LH)"
+    elif task.endswith(" RH") or task.endswith("_RH"):
+        return task[:-3] + " (RH)"
+    elif task.endswith("RH"):
+        return task[:-2] + " (RH)"
+    else:
+        return task
+
+def remove_outliers(df, column_name, threshold=500):
+    """
+    Remove outliers from a dataframe based on a threshold value.
+    
+    Args:
+        df: Pandas DataFrame
+        column_name: Column to check for outliers
+        threshold: Maximum value to keep (values above will be filtered out)
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in dataframe")
+    
+    return df[df[column_name].between(0, threshold)].copy()
+
+def convert_task_numbers_format(df, task_number_columns=["task_number","source_task_discrepancy_number_updated"]):
+    """
+    Apply LH/RH formatting to task numbers in a dataframe.
+    
+    Args:
+        df: Pandas DataFrame
+        task_number_column: Column containing task numbers
+        
+    Returns:
+        DataFrame with updated task numbers
+    """
+    
+    for  task_number_column  in task_number_columns:
+        if task_number_column  in df.columns:
+            result_df = df.copy()
+            result_df[task_number_column] = result_df[task_number_column].apply(update_lh_rh_tasks)
+            return result_df
+
+def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_description, sub_task_parts, 
+                                       manhour_column="actual_man_hours", task_columns=["task_number","source_task_discrepancy_number_updated"], 
+                                       threshold=500):
+    """
+    Perform outlier removal and LHRH conversion on the provided dataframes.
+    
+    Args:
+        task_description: DataFrame containing task descriptions
+        task_parts: DataFrame containing task parts
+        sub_task_description: DataFrame containing sub-task descriptions
+        sub_task_parts: DataFrame containing sub-task parts
+        manhour_column: Column name for manhours data
+        task_column: Column name for task number data
+        threshold: Maximum manhour value to keep
+        
+    Returns:
+        Tuple of processed DataFrames:
+        (task_description_processed, task_parts_processed, 
+         sub_task_description_processed, sub_task_parts_processed)
+    """
+    # Process task description - remove outliers and convert task format
+    task_description_processed = remove_outliers(task_description, manhour_column, threshold)
+    task_description_processed = convert_task_numbers_format(task_description_processed, task_columns)
+    
+    # Process task parts - just convert task format
+    task_parts_processed = convert_task_numbers_format(task_parts, task_columns)
+    
+    # Process sub-task description - remove outliers and convert task format
+    sub_task_description_processed = remove_outliers(sub_task_description, manhour_column, threshold)
+    sub_task_description_processed = convert_task_numbers_format(sub_task_description_processed, task_columns)
+    
+    # Process sub-task parts - just convert task format
+    sub_task_parts_processed = convert_task_numbers_format(sub_task_parts, task_columns)
+    
+    # Return the processed dataframes
+    return (task_description_processed, task_parts_processed, 
+            sub_task_description_processed, sub_task_parts_processed)
 async def main():
     """
     Main execution function to manage the data pipeline.
@@ -159,7 +269,7 @@ async def main():
         db_name = config["database"]["database"]
         
         # Connect to database
-        db = await connect_to_database(db_uri, db_name)
+        db =  connect_to_database(db_uri, db_name)
         if db is None:
             print("Failed to connect to database")
             logger.error("Failed to connect to database")
@@ -170,7 +280,7 @@ async def main():
         processed_file_paths = set()
         file_info_map = {}
         
-        async for doc in processed_files_cursor:
+        for doc in processed_files_cursor:
             file_path = doc["file_path"]
             processed_file_paths.add(file_path)
             # Store timestamp information for later comparison
@@ -182,12 +292,12 @@ async def main():
         
         # Determine data path - try relative path first, then fallback to absolute
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, '..', '..', 'Data')
+        #data_path = os.path.join(current_dir, '..', '..', 'Data')
         
         # Fallback to absolute path if directory doesn't exist
-        if not os.path.exists(data_path):
-            data_path = r"D:\Projects\gmr-mro\estima-ai\Data"
-        
+        #if not os.path.exists(data_path):
+        #    data_path = r"D:\Projects\gmr-mro\estima-ai\Data"
+        data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
@@ -228,8 +338,10 @@ async def main():
         
         # Extract data from files - note: we're passing processed_file_paths which doesn't include updated files
         # This is intentional because we want get_processed_files to reprocess the updated files
-        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files = await get_processed_files(
-            processed_file_paths - updated_files,  # Exclude updated files so they get reprocessed
+        files_to_process = set(files_to_process).union(set(updated_files))
+
+        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files =  get_processed_files(
+            files_to_process,  
             data_path,
             "AIRCRAFT", 
             "mltaskmlsec1", 
@@ -237,14 +349,23 @@ async def main():
             "mldpmlsec1", 
             "Material"
         )
-        
+        task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(
+            task_description, 
+            task_parts, 
+            sub_task_description, 
+            sub_task_parts
+        )
         # Process all collections and track successful file processing
         collections_to_process = [
             ("aircraft_details", aircraft_details),
             ("task_description", task_description),
             ("task_parts", task_parts),
             ("sub_task_description", sub_task_description),
-            ("sub_task_parts", sub_task_parts)
+            ("sub_task_parts", sub_task_parts),
+            ("task_description_max500mh_lhrh", task_description_max500mh_lhrh),
+            ("task_parts_lhrh", task_parts_lhrh),
+            ("sub_task_description_max500mh_lhrh", sub_task_description_max500mh_lhrh),
+            ("sub_task_parts_lhrh", sub_task_parts_lhrh)
         ]
         
         # Keep track of which files were successfully processed 
@@ -257,20 +378,20 @@ async def main():
                     collection_files = set(dataframe["file_path"].unique())
                     
                     # Process this collection (pass updated_files to handle properly)
-                    success = await process_collection(db, collection_name, dataframe, updated_files)
+                    success =  process_collection(db, collection_name, dataframe, updated_files)
                     
                     if success:
                         # Add successfully processed files to our tracking set
                         successfully_processed_files.update(collection_files)
                 else:
                     logger.warning(f"No 'file_path' column in {collection_name} dataframe")
-                    await process_collection(db, collection_name, dataframe)
+                    process_collection(db, collection_name, dataframe)
         
         # Add newly processed files AND updated files to track all changes
         all_processed_files = set().union(newly_processed_files, updated_files)
         
         # Only update entries for files that were successfully loaded
-        await update_processed_files_db(db, file_info_dict, successfully_processed_files)
+        update_processed_files_db(db, file_info_dict, successfully_processed_files)
 
         print("Process completed")
         logger.info("Process completed")

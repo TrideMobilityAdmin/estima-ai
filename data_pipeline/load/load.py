@@ -1,7 +1,7 @@
 from datetime import timedelta
 import pandas as pd
 
-async def append_to_database(collection, data):
+def append_to_database(collection, data):
     """
     Insert cleaned data into MongoDB collection in batches.
     """
@@ -21,7 +21,7 @@ async def append_to_database(collection, data):
         for i in range(0, len(cleaned_records), 1000):
             batch = cleaned_records[i:i + 1000]
             try:
-                result = await collection.insert_many(batch)
+                result =  collection.insert_many(batch)
                 inserted_count += len(result.inserted_ids)
             except Exception as batch_error:
                 print(f"Error inserting batch {i // 1000}: {batch_error}")
