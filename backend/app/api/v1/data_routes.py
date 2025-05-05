@@ -209,6 +209,7 @@ async def validate_tasks(
 
 
 
+
 @router.post("/validate_tasks_checkbased",response_model=List[ValidTasks])
 async def validate_tasks_checkbased(
     estimate_request: ValidRequestCheckCategory,
@@ -239,6 +240,21 @@ async def get_estimate_status(
     current_user: dict = Depends(get_current_user)
 ):
     return await excel_service.estimate_status()
+
+@router.get("/compare_estimate_status", response_model=List[Dict])
+async def get_compare_estimate_status(
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.compare_estimate_status()
+
+
+@router.get("/compare_estimate_id/{estimate_id}", response_model=Dict)
+async def get_compare_estimate_id(
+    estimate_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.get_compare_estimate_id(estimate_id)
+
 @router.put("/estimates/{estID}/remarks", response_model=Dict[str, Any])
 async def update_remarks(
     estID: str,
@@ -260,3 +276,23 @@ async def get_all_capping_data(
 ):
     return await config_service.get_all_capping_data()
 
+@router.post("/operator_master_list", response_model=Dict[str, str])
+async def upload_operator_master_list(
+    operator:str,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Endpoint to handle Excel file uploads for operator master list
+    """
+    return await task_service.upload_operator_list(operator)
+
+@router.get("/operator_master_list", response_model=List[Dict])
+async def get_operator_master_list(
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Endpoint to retrieve the operator master list
+    """
+    return await task_service.get_master_operator_list()

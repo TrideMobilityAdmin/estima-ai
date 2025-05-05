@@ -46,6 +46,7 @@ class ExcelUploadService:
         self.estimate_output=self.mongo_client.get_collection("estima_output")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
+        self.compare_estimate_collection=self.mongo_client.get_collection("compare_estimate")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         
@@ -419,7 +420,7 @@ class ExcelUploadService:
         """
         logger.info("Fetching all estimates")
         configurations = self.configurations_collection.find_one()
-        man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        # man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
         five_days_ago = datetime.utcnow() - timedelta(days=5)
         pipeline=[
              {
@@ -1474,6 +1475,74 @@ class ExcelUploadService:
         finaloutput= replace_nan_inf(finaloutput)
         
         return finaloutput
+    async def compare_estimate_status(self) -> List[Dict]:
+        """
+        Get all estimate status documents from the compare_estimate collection
+        """
+        logger.info("Fetching all comparison estimates")
+        
+        # five_days_ago = datetime.utcnow() - timedelta(days=5)
+        # logger.info(f"Fetching estimates created after: {five_days_ago}")
+        
+        pipeline = [
+            # {
+            #     '$match': {
+            #         'createdAt': {
+            #             '$gte': five_days_ago
+            #         }
+            #     }
+            # },
+            {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'cappingDetails': 1, 
+            'createdAt': 1, 
+            'summary_tasks': '$tasks.summary_tasks', 
+            'summary_findings': '$findings.summary_findings'
+        }
+            }
+        ]
+
+        try:
+            estimates = list(self.compare_estimate_collection.aggregate(pipeline))
+            logger.info(f"Fetched {len(estimates)} comparison estimates")
+
+            if not estimates:
+                logger.info("No comparison estimates found")
+                return {"estimates": []}
+            cleaned_estimates = replace_nan_inf(estimates)
+
+            return cleaned_estimates
+
+        except Exception as e:
+            logger.error(f"Error fetching comparison estimates: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching comparison estimates")
+    
+    async def get_compare_estimate_id(self, estID: str) -> Dict:
+        """
+        Get a specific estimate by ID from the compare_estimate collection
+        """
+        logger.info(f"Fetching estimate with ID: {estID}")
+        
+        try:
+            
+            estimate = self.compare_estimate_collection.find_one(
+                {"estID": estID},
+                {"_id": 0}
+            )
+            logger.info("Estimate fetched successfully")
+            if not estimate:
+                logger.info(f"No estimate found with ID: {estID}")
+                return {"message": "Estimate not found"}
+        
+            cleaned_estimate = replace_nan_inf(estimate)
+
+            return cleaned_estimate
+
+        except Exception as e:
+            logger.error(f"Error fetching estimate with ID {estID}: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching estimate")
     
 def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
     logger.info("Starting actual_cap_calculation")
@@ -1838,9 +1907,6 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
 
 
         
-
-
-
 def convert_hash_to_ack_id(hash_hex: str) -> str:
     hash_bytes = bytes.fromhex(hash_hex)
     base64_string = base64.urlsafe_b64encode(hash_bytes).decode('utf-8')

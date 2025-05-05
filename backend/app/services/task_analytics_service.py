@@ -41,6 +41,7 @@ class TaskService:
         self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
         self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
         self.aircraft_details_collection=self.mongo_client.get_collection("aircraft_details")
+        self.operator_master_data_collection=self.mongo_client.get_collection("operators_master")
     
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -2510,6 +2511,69 @@ class TaskService:
                 detail=f"Error validating tasks: {str(e)}"
             )
 
+    async def upload_operator_list(self, operator: str) -> Dict[str, str]:
+        logger.info(f"Uploading operator data: {operator}")
+        try:
+            logger.info(f"Uploading operator data: {operator}")
+            if not operator:
+                logger.error("Operator name cannot be empty")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Operator name cannot be empty"
+                )
+            operator_doc = {
+                "operator": operator,
+                "createdAt": datetime.now(timezone.utc)
+            }
+
+            result = self.operator_master_data_collection.insert_one(operator_doc)
+
+            if result.inserted_id:
+                logger.info(f"Successfully uploaded operator: {operator}")
+                return {
+                    "status": "success", 
+                    "message": f"Operator {operator} uploaded successfully"
+                }
+            else:
+                logger.error("Failed to insert operator")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to insert operator data"
+                )
+
+        except Exception as e:
+            logger.error(f"Error uploading operator data: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error uploading operator data: {str(e)}"
+            )
+
+    async def get_master_operator_list(self) -> List[Dict]:
+        logger.info("Fetching operator list")
+        pipeline=[
+    {
+        '$project': {
+            '_id': 0, 
+            'operator': 1
+        }
+    }
+]
+        try:
+            operators_list = list(self.operator_master_data_collection.aggregate(pipeline))
+            logger.info(f"Fetched {len(operators_list)} in operators_master_data")
+
+            if not operators_list:
+                logger.info("No operator  found")
+                return {"operators": []}
+            
+            return operators_list
+        except Exception as e:
+            logger.error(f"Error fetching operator list: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching operator list: {str(e)}"
+            )        
+        
 def replace_nan_inf(obj):
             """Helper function to recursively replace NaN and inf values with None"""
             if isinstance(obj, dict):
