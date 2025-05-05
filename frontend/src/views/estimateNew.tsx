@@ -5173,7 +5173,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
           ClusterID: detail.cluster,
           "MHS Min": Math.round(detail.mhs.min),
           "MHS Max": Math.round(detail.mhs.max),
-          "MHS Avg": Math.round(detail.mhs.avg),
+          // "MHS Avg": Math.round(detail.mhs.avg),
           "MHS Est": Math.round(detail.mhs.est),
         });
       });
@@ -6190,7 +6190,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
           Description: detail.description.replace(/\\n/g, "\n"),
           "MHS Min": Math.round(detail.mhs.min),
           "MHS Max": Math.round(detail.mhs.max),
-          "MHS Avg": Math.round(detail.mhs.avg),
+          // "MHS Avg": Math.round(detail.mhs.avg),
           "MHS Est": Math.round(detail.mhs.est),
         });
       });
