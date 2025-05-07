@@ -86,17 +86,7 @@ client = MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]
 
 
-# List of test package numbers to exclude
-test_packages = [
-    "HMV23/000064/0923", "HMV23/000046/0823", "HMV23/000007/0723",
-    "HMV22/000210/0423", "HMV22/000165/0123", "HMV22/000132/1122",
-    "HMV22/000115/1022", "HMV22/000100/0922", "HMV22/000076/0822",
-    "HMV21/000145/0122", "HMV21/000118/1121", "HMV21/000099/1021",
-    "HMV21/000091/0921", "HMV21/000062/0821", "HMV21/000047/0721",
-    "HMV21/000032/0621", "HMV20/000152/0221", "HMV20/000134/0121",
-    "HMV20/000063/0920", "HMV23/000150/0124"
-]
-
+test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
 aircraft_cursor = aircraft_details_collection.find({})
@@ -131,7 +121,7 @@ sub_task_parts = list(sub_task_parts.find({},))
 sub_task_parts = pd.DataFrame(sub_task_parts)
 # Drop the MongoDB _id column if not needed
 sub_task_parts = sub_task_parts.drop(columns=["_id"], errors="ignore")
-sub_task_parts=sub_task_parts.drop_duplicates()
+#sub_task_parts=sub_task_parts.drop_duplicates()
 
 parts_master=db["parts_master"]
 parts_master = list(parts_master.find({},))
@@ -141,9 +131,9 @@ parts_master=parts_master.drop_duplicates()
 
 
 task_parts_collection = db["task_parts_lhrh"]
-task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1}))
+task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1}))
 task_parts =  pd.DataFrame(task_parts)
-task_parts.dropna(subset=["task_number","issued_part_number","used_quantity","requested_stock_status"],inplace=True)
+task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","requested_stock_status"],inplace=True)
 task_parts_up=task_parts[task_parts["requested_stock_status"]!="Owned"]
 
 task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
@@ -174,8 +164,30 @@ for i, row in task_parts_up.iterrows():
     
     if not matching_parts.empty:
         task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
+        task_parts_up.at[i, "total_billable_price"]=matching_parts.iloc[0]["agg_base_price_usd"]
     
 sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
+# Convert to string
+string_cols = [
+    'registration_number', 'package_number', 'task_number',
+    'task_description', 'issued_part_number', 'part_description',
+    'issued_unit_of_measurement', 'stock_status', 'base_currency',
+    'soi_transaction'
+]
+
+
+
+# Apply conversions
+for col in string_cols:
+    sub_task_parts[col] = sub_task_parts[col].astype(str)
+    
+cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_billable_price', 'billable_value_usd', 'used_quantity']
+
+for col in cols_to_convert:
+    sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
+
+
+
 #sub_task_description_collection="sub_task_description"
 task_description = db["task_description_max500mh_lhrh"]
 task_description = list(task_description.find({},))
@@ -196,28 +208,43 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 
-def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,age_cap=3):
+def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap=3):
 
-    def updateLhRhTasks(LhRhTasks,MPD_TASKS):
-        
-        # Initialize an empty DataFrame with correct column definition using a list of columns
-        mpdLhRhTasks = pd.DataFrame(columns=["TASK NUMBER", "DESCRIPTION"])
-        
-        # Assuming LhRhTasks is a globally accessible DataFrame
+    def updateLhRhTasks(LhRhTasks, MPD_TASKS):
+        """
+        Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
+    
+        Parameters:
+        - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+        - MPD_TASKS: DataFrame with 'TASK NUMBER' and 'DESCRIPTION' columns
+    
+        Returns:
+        - Updated DataFrame with LH and RH tasks duplicated if LHRH == 1
+        """
+        # Get list of task numbers where LHRH is 1
         LhRhTasks_list = LhRhTasks[LhRhTasks["LHRH"] == 1]["TASK_CLEANED"].tolist()
         
+        # List to collect rows
+        data = []
+    
         for _, row in MPD_TASKS.iterrows():
-            if row["TASK NUMBER"] in LhRhTasks_list:
-                # Use pd.concat or pd.DataFrame.loc to append rows correctly
-                mpdLhRhTasks.loc[len(mpdLhRhTasks)] = [row["TASK NUMBER"] + " (LH)", row["DESCRIPTION"]]
-                mpdLhRhTasks.loc[len(mpdLhRhTasks)] = [row["TASK NUMBER"] + " (RH)", row["DESCRIPTION"]]
+            task_number = str(row["TASK NUMBER"])
+            description = row["DESCRIPTION"]
+    
+            if task_number in LhRhTasks_list:
+                data.append({"TASK NUMBER": f"{task_number} (LH)", "DESCRIPTION": description})
+                data.append({"TASK NUMBER": f"{task_number} (RH)", "DESCRIPTION": description})
             else:
-                mpdLhRhTasks.loc[len(mpdLhRhTasks)] = [row["TASK NUMBER"], row["DESCRIPTION"]]
+                data.append({"TASK NUMBER": task_number, "DESCRIPTION": description})
         
+        # Convert list of rows to DataFrame
+        mpdLhRhTasks = pd.DataFrame(data)
         return mpdLhRhTasks
+
         
     mpd_task_data=updateLhRhTasks(LhRhTasks,mpd_task_data)
 
+    print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
     # Convert aircraft_age to float
     aircraft_age = float(aircraft_age)
     aircraft_details['aircraft_age'] = aircraft_details['aircraft_age'].astype(float)
@@ -235,10 +262,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         aircraft_model_family = [aircraft_model]  # Corrected this line
     else:
         aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
-        
+
+
+    print(f"type(age_cap): {type(age_cap)}, value: {age_cap}")
+    print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
     print(f"The aircraft_model is {aircraft_model} and check_category is {check_category} and aircraft_age is {aircraft_age}")
     train_packages=[]
-    if aircraft_age!=0:
+    if aircraft_age> 0.0:
         # Continue increasing age_cap until we get at least 5 packages or reach the maximum age limit
         while len(train_packages) < 5:  # Changed from >4 to <5 to keep looping until we have at least 5 packages
             train_packages = aircraft_details[
@@ -259,16 +289,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 break 
     else:
         train_packages = aircraft_details[
-                (aircraft_details["aircraft_model"] == aircraft_model) & 
+                (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
                 (aircraft_details["check_category"].isin(check_category)) 
             ]["package_number"].unique().tolist()
         
 
     # At this point, train_packages contains either at least 5 packages or the maximum we could find
-    print(f"Found {len(train_packages)} packages with age_cap of {age_cap}")
+    print(f"Found {len(train_packages)} packages and the age is {aircraft_age} and   with age_cap of {age_cap}")
     
     print("Training packages are extracted")
     print("Processing the tasks")
+    #no_of_task_packages=len(train_packages)
     
     # Filter task data based on packages and task numbers
     task_data =  task_description[task_description['package_number'].isin(train_packages)]
@@ -281,6 +312,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
     sub_parts_data = sub_task_parts[sub_task_parts['package_number'].isin(train_packages)]
+    no_of_task_packages=len(sub_parts_data["package_number"].unique().tolist())
     #print(f"the shape of dataframe sub parts data 1{sub_parts_data.shape}")
     sub_parts_data = sub_parts_data[sub_parts_data["task_number"].isin(mpd_task_data["TASK NUMBER"])]
  
@@ -318,11 +350,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             'avg_est': avg_estimated
         }
     
-        return result 
+        return result
+
     
-    def get_sub_task_parts(mpd_task_data):
-        # Import pandas if not already imported
-        import pandas as pd
+    def get_sub_task_parts(mpd_task_data,no_of_task_packages):
+        
+
         
         # Create an empty DataFrame to store all task parts
         all_task_parts_df = pd.DataFrame(columns=[
@@ -334,31 +367,41 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             task_number = row['TASK NUMBER']
             filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number]
             
+
+            
             if filtered_data.empty:
                 continue
             
             
             # Group by issued_part_number
             grouped_data = filtered_data.groupby('issued_part_number', as_index=False).agg(
-                partId_count=('issued_part_number', 'size'),
                 avg_qty_used=('used_quantity', 'mean'),
                 max_qty_used=('used_quantity', 'max'),
                 min_qty_used=('used_quantity', 'min'),
                 total_billable=('billable_value_usd', 'sum'),
+                max_price=('total_billable_price','max'),
                 total_quantity=('used_quantity', 'sum'),
                 part_description=("part_description", 'first'),
                 issued_unit_of_measurement=("issued_unit_of_measurement", 'first')
             )
             
             # Now calculate unit price afterward
+            # Replace NaNs with 0 first
+            grouped_data['total_quantity'] = grouped_data['total_quantity'].fillna(0)
+            grouped_data["avg_qty_used"]= grouped_data['total_quantity']/no_of_task_packages
+            grouped_data['total_billable'] = grouped_data['total_billable'].fillna(0)
+            
+            # Avoid division by zero
             grouped_data['avg_cost_per_unit'] = np.where(
-            grouped_data['total_quantity'] != 0,
-            grouped_data['total_billable'] / grouped_data['total_quantity'],
-            0
+                grouped_data['total_quantity'] != 0,
+                grouped_data['total_billable'] / grouped_data['total_quantity'],
+                0
             )
+
             grouped_data['estimated_billable_value_max'] = grouped_data['max_qty_used'] * grouped_data['avg_cost_per_unit']
             grouped_data['estimated_billable_value_min'] = grouped_data['min_qty_used'] * grouped_data['avg_cost_per_unit']
-            grouped_data['estimated_billable_value_avg'] = grouped_data['avg_qty_used'] * grouped_data['avg_cost_per_unit']
+            grouped_data['estimated_billable_value_avg'] = grouped_data['avg_qty_used'] * grouped_data['max_price']#grouped_data['avg_cost_per_unit']
+            
             
             # Create a DataFrame for task parts
             for _, part_row in grouped_data.iterrows():
@@ -368,14 +411,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                     "part_description": [part_row["part_description"]],
                     "issued_unit_of_measurement": [part_row["issued_unit_of_measurement"]],
                     "used_quantity": [part_row['avg_qty_used']],
+                    "max_price":[part_row["max_price"]],
                     "billable_value_usd": [part_row['estimated_billable_value_avg']]
                 })
                 all_task_parts_df = pd.concat([all_task_parts_df, part_df], ignore_index=True)
         
         return all_task_parts_df
     
+
+    
     # Process tasks and get parts
-    task_parts = get_sub_task_parts(mpd_task_data)
+    task_parts = get_sub_task_parts(mpd_task_data,no_of_task_packages)
     
     # Process each task and its parts
     processed_task_manhours = []
@@ -585,6 +631,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             how="left"
         ).drop(columns=["task_number"])  # Drop duplicate column
         exdata_parts_updated.to_csv(f"{filepath}/{estID}_clustering.csv")
+                
+        def prob(row):
+            prob = (len(row["packages_list"]) / len(all_package_numbers))*100
+            
+            return prob
         # Select required columns
         group_level_mh = exdata[[
         "source_task_discrepancy_number","full_description",
@@ -593,22 +644,80 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "group",
         "package_number"
         ]]
+        group_level_mh.drop_duplicates(inplace=True)
+        task_level_mh= group_level_mh.copy()
+        #task_level
+        task_level_mh=task_level_mh.groupby(
+            ["source_task_discrepancy_number","package_number"]
+        ).agg(
+            avg_actual_man_hours=("actual_man_hours", "sum"),
+            max_actual_man_hours=("actual_man_hours", "sum"),
+            min_actual_man_hours=("actual_man_hours", "sum")
+        
+        ).reset_index()
+        
+        # Aggregate man-hour statistics
+        # Get all unique package numbers once
+        all_package_numbers =  task_level_mh["package_number"].unique()
+        
+        # Aggregate man-hour statistics
+        # Aggregate man-hour statistics
+        aggregated = task_level_mh.groupby(
+            ["source_task_discrepancy_number"]
+        ).agg(
+            avg_actual_man_hours=("avg_actual_man_hours", "mean"),
+            max_actual_man_hours=("max_actual_man_hours", "max"),
+            min_actual_man_hours=("min_actual_man_hours", "min")
+        ).reset_index()
+        
+        # Create a crosstab for package indicators (much faster than iterating)
+        package_indicators = pd.crosstab(
+            index=[task_level_mh["source_task_discrepancy_number"]],
+            columns= task_level_mh["package_number"]
+        ).clip(upper=1)  # Convert counts to binary indicators
+        
+        # Merge the aggregated data with package indicators
+        task_level_mh_result = pd.merge(
+            aggregated,
+            package_indicators,
+            on=["source_task_discrepancy_number"]
+        )
+        
+        
+        # If you still need the packages_list column
+        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
+            packages_by_group = task_level_mh.groupby(["source_task_discrepancy_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
+            task_level_mh_result["packages_list"] = task_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
+            
+        
+        # Apply the function row-wise
+        task_level_mh_result["prob"] =task_level_mh_result.apply(prob, axis=1)
         
         # Get all unique package numbers once
         all_package_numbers = group_level_mh["package_number"].unique()
+        # First level aggregation
+        group_level_mh = group_level_mh.groupby(
+            ["source_task_discrepancy_number", "group", "package_number"]
+        ).agg(
+            avg_actual_man_hours=("actual_man_hours", "sum"),
+            max_actual_man_hours=("actual_man_hours", "sum"),
+            min_actual_man_hours=("actual_man_hours", "sum"),
+            description=("full_description", "first"),
+            skill_number=("skill_number", lambda x: list(set(x)))
+        ).reset_index()
         
-        # Aggregate man-hour statistics
-        # Aggregate man-hour statistics
+        # Second level aggregation
         aggregated = group_level_mh.groupby(
             ["source_task_discrepancy_number", "group"]
         ).agg(
-            avg_actual_man_hours=("actual_man_hours", "mean"),
-            max_actual_man_hours=("actual_man_hours", "max"),
-            min_actual_man_hours=("actual_man_hours", "min"),
-            description=("full_description", "first"),
-            skill_number=("skill_number",lambda x: list(set(x)))
+            avg_actual_man_hours=("avg_actual_man_hours", "mean"),
+            max_actual_man_hours=("max_actual_man_hours", "max"),
+            min_actual_man_hours=("min_actual_man_hours", "min"),
+            description=("description", "first"),
+            skill_number=("skill_number", lambda x: list(set(sum(x, []))))  # Flatten list of lists and remove duplicates
         ).reset_index()
-    
+        
+        
         # Create a crosstab for package indicators (much faster than iterating)
         package_indicators = pd.crosstab(
             index=[group_level_mh["source_task_discrepancy_number"], group_level_mh["group"]],
@@ -628,23 +737,152 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             group_level_mh_result["packages_list"] = group_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
             
         
-        def prob(row):
-            prob = (len(row["packages_list"]) / len(all_package_numbers))*100
-            
-            return prob
-        
         # Apply the function row-wise
         group_level_mh_result["prob"] =group_level_mh_result.apply(prob, axis=1)
-        print(exdata_parts_updated.columns)
+        #print(exdata_parts_updated.columns)
         group_level_parts=exdata_parts_updated[["log_item_number","source_task_discrepancy_number","group","package_number",
         "issued_part_number",'part_description','issued_unit_of_measurement',"used_quantity","billable_value_usd"]]
+        #task_level_parts
+        task_level_parts=group_level_parts.copy()
+        all_package_numbers =  task_level_mh["package_number"].unique()
+        task_level_parts= task_level_parts.groupby(["source_task_discrepancy_number", "issued_part_number","package_number"]).agg(
+        billable_value_usd=("billable_value_usd","sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+        
+        aggregated = task_level_parts.groupby(["source_task_discrepancy_number", "issued_part_number"]).agg(
+            avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
+            max_used_qty=("used_quantity", "max"),
+            min_used_qty=("used_quantity", "min"),
+            total_billable_value_usd=("billable_value_usd", "sum"),
+            total_used_qty=("used_quantity", "sum"),
+            part_description=('part_description', "first"),
+            issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+        
+        # Get all unique package numbers once
+        #all_package_numbers = group_level_parts["package_number"].unique()
+        
+        task_level_parts["source_task_discrepancy_number"] = task_level_parts["source_task_discrepancy_number"].astype(str)
+        task_level_parts["issued_part_number"] = task_level_parts["issued_part_number"].astype(str)
+        
+        
+        # Create a crosstab for package indicators (much faster than iterating)
+        package_indicators = pd.crosstab(
+        index=[task_level_parts["source_task_discrepancy_number"], task_level_parts["issued_part_number"]],
+        columns=task_level_parts["package_number"]
+        ).clip(upper=1)  # Convert counts to binary indicators
+        
+        # Merge the aggregated data with package indicators
+        task_level_parts_result = pd.merge(
+        aggregated,
+        package_indicators,
+        on=["source_task_discrepancy_number","issued_part_number"]
+        )
+        # If you still need the packages_list column
+        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
+            packages_by_group = task_level_parts.groupby(["source_task_discrepancy_number","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
+            task_level_parts_result["packages_list"] = task_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
+            task_level_parts_result["prob"] =task_level_parts_result.apply(prob, axis=1)
+        
+        def float_round(value):
+            if pd.notna(value):  # Better check for non-null values
+                return round(float(value), 2)
+            return 0
+        
+        def parts_price(row):
+            if row["total_used_qty"] and row["total_used_qty"] > 0:
+                return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
+        
+            else:
+                return 0  # Better to return 0 than None
+        # Apply the function row-wise
+        task_level_parts_result["billable_value_usd"] = task_level_parts_result.apply(parts_price, axis=1)
+        
+        
+        
+        
+        ##line item calculation
+        
+        
+        #parts_line_items
+        parts_line_items=group_level_parts.copy()
+        all_package_numbers =  group_level_mh["package_number"].unique()
+        parts_line_items= parts_line_items.groupby(["issued_part_number","package_number"]).agg(
+        billable_value_usd=("billable_value_usd","sum"),
+        used_quantity=("used_quantity", "sum"),
+        part_description=('part_description', "first"),
+        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+        
+        aggregated = parts_line_items.groupby(["issued_part_number"]).agg(
+            avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
+            max_used_qty=("used_quantity", "max"),
+            min_used_qty=("used_quantity", "min"),
+            total_billable_value_usd=("billable_value_usd", "sum"),
+            total_used_qty=("used_quantity", "sum"),
+            part_description=('part_description', "first"),
+            issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+        
+        # Get all unique package numbers once
+        #all_package_numbers = group_level_parts["package_number"].unique()
+        
+        parts_line_items["issued_part_number"] = parts_line_items["issued_part_number"].astype(str)
+        
+        
+        # Create a crosstab for package indicators (much faster than iterating)
+        package_indicators = pd.crosstab(
+        index=[parts_line_items["issued_part_number"]],
+        columns=parts_line_items["package_number"]
+        ).clip(upper=1)  # Convert counts to binary indicators
+        
+        # Merge the aggregated data with package indicators
+        parts_line_items_result = pd.merge(
+        aggregated,
+        package_indicators,
+        on=["issued_part_number"]
+        )
+        # If you still need the packages_list column
+        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
+            packages_by_group = parts_line_items.groupby(["issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
+            parts_line_items_result["packages_list"] = parts_line_items_result.index.map(lambda idx: packages_by_group.get(idx, []))
+            parts_line_items_result["prob"] =parts_line_items_result.apply(prob, axis=1)
+        
+        def float_round(value):
+            if pd.notna(value):  # Better check for non-null values
+                return round(float(value), 2)
+            return 0
+        
+        def parts_price(row):
+            if row["total_used_qty"] and row["total_used_qty"] > 0:
+                return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
+        
+            else:
+                return 0  # Better to return 0 than None
+        # Apply the function row-wise
+        parts_line_items_result["billable_value_usd"] =  parts_line_items_result.apply(parts_price, axis=1)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        #group_level_parts
+        all_package_numbers =  group_level_mh["package_number"].unique()
+        
         group_level_parts= group_level_parts.groupby(["source_task_discrepancy_number", "group","issued_part_number","package_number"]).agg(
         billable_value_usd=("billable_value_usd","sum"),
         used_quantity=("used_quantity", "sum"),
         part_description=('part_description', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
-
+        
         aggregated = group_level_parts.groupby(["source_task_discrepancy_number", "group", "issued_part_number"]).agg(
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
             max_used_qty=("used_quantity", "max"),
@@ -655,14 +893,14 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
         
-
+        
         
         # Get all unique package numbers once
         #all_package_numbers = group_level_parts["package_number"].unique()
         
         group_level_parts["source_task_discrepancy_number"] = group_level_parts["source_task_discrepancy_number"].astype(str)
         group_level_parts["issued_part_number"] = group_level_parts["issued_part_number"].astype(str)
-    
+        
         
         # Create a crosstab for package indicators (much faster than iterating)
         package_indicators = pd.crosstab(
@@ -682,7 +920,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             packages_by_group = group_level_parts.groupby(["source_task_discrepancy_number", "group","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             group_level_parts_result["packages_list"] = group_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
             group_level_parts_result["prob"] =group_level_parts_result.apply(prob, axis=1)
-    
+        
         def float_round(value):
             if pd.notna(value):  # Better check for non-null values
                 return round(float(value), 2)
@@ -691,18 +929,25 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
-    
+        
             else:
                 return 0  # Better to return 0 than None
         
         # Apply the function row-wise
         group_level_parts_result["billable_value_usd"] = group_level_parts_result.apply(parts_price, axis=1)
         
+        
+        
+        
         group_level_mh_result.to_csv(f"{filepath}/{estID}group_level_mh_result.csv")
         group_level_parts_result.to_csv(f"{filepath}/{estID}group_level_parts_result.csv")
+        task_level_mh_result.to_csv(f"{filepath}/{estID}_task_level_mh_result.csv")
+        task_level_parts_result.to_csv(f"{filepath}/{estID}_task_level_parts_result.csv")
+        parts_line_items_result.to_csv(f"{filepath}/{estID}_parts_line_items_result.csv")
         group_level_mh_result = group_level_mh_result.drop(["packages_list"], axis=1)
+        task_level_mh_result =task_level_mh_result.drop(["packages_list"], axis=1)
 
-    #print("tasks and defects json processing ")
+    print("tasks and defects json processing ")
     # Initialize variables
     tasks = []
     task_parts_list = []
@@ -804,10 +1049,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     final_pred = pd.DataFrame([tasks_summary])
     
     # Initialize disc_pred if not defined (it wasn't defined in the original)
+    print("group level disc final is processing")
     disc_pred = []
+    disc_pred_list = []
     for finding in findings:
         if finding["details"]:
-            disc_pred.append({
+            disc_pred_list.append({
                 "taskId": finding["taskId"],
                 "avg_mh": finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100),
                 "min_mh": finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100),
@@ -819,43 +1066,284 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 )
             })
     
+    # Store the original list before converting to DataFrame
+    original_disc_pred = disc_pred_list.copy()
+            
+    # Create DataFrame from the list
+    disc_pred = pd.DataFrame(disc_pred_list)
+    disc_pred.to_csv(f"{filepath}/{estID}__disc_final_result.csv")
+
+    
+    print("task level disc final is processing")
+
+    # Create findings list
+    task_level_findings = []
+    for _, row in task_level_mh_result.iterrows():
+        spare_parts = []
+    
+        # Filter task_parts where task_number matches
+        spare_filtered = task_level_parts_result[task_level_parts_result["source_task_discrepancy_number"] == row["source_task_discrepancy_number"]]
+    
+        for _, part in spare_filtered.iterrows():
+            spare_parts.append({
+                "partId": part["issued_part_number"],
+                "desc": part["part_description"],
+                "unit": part["issued_unit_of_measurement"],
+                "qty": float_round(part["avg_used_qty"]),
+                "price": float_round(part["billable_value_usd"]),
+                "prob": float_round(part["prob"])
+            })
+            
+        finding = {
+            "taskId": row["source_task_discrepancy_number"],
+            "details": [{
+                "mhs": {
+                    "max": float_round(row["max_actual_man_hours"]),
+                    "min": float_round(row["min_actual_man_hours"]),
+                    "avg": float_round(row["avg_actual_man_hours"]),
+                    "est": float_round(row["max_actual_man_hours"])
+                },
+                "prob": float_round(row["prob"]),
+                "spare_parts": spare_parts
+            }]
+        }
+        
+        task_level_findings.append(finding)
+        # Initialize disc_pred if not defined (it wasn't defined in the original)
+    task_level_disc_pred = []
+    for finding in task_level_findings:
+        if finding["details"]:
+            task_level_disc_pred.append({
+                "taskId": finding["taskId"],
+                "avg_mh": finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100),
+                "min_mh": finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100),
+                "max_mh": finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100),
+                "prob": finding["details"][0]["prob"],
+                "exp_cons": finding["details"][0].get("spare_parts", []),
+                "billable_value_usd": sum(
+                    part.get("price", 0)*(part.get("prob", 0) / 100) for part in finding["details"][0].get("spare_parts", [])
+                )
+            })
+            
+    task_level_disc_pred=pd.DataFrame(task_level_disc_pred)
+    task_level_disc_pred.to_csv(f"{filepath}/{estID}__task_disc_final_result.csv")
+
+    print("computations are completed")
+    
     # Correctly create probability graph
     probability_graph = {}
     
     for i in range(10, 101, 10):
         key = f"prob({i})"
-        
+    
         # Base values from tasks
         total_mh = final_pred["avg_mh"].iloc[0] if not final_pred.empty else 0
         total_cost = final_pred["total_cons"].iloc[0] if not final_pred.empty else 0
-        
-        # Add findings based on probability threshold
-        for row in disc_pred:
-            if row.get("prob") is not None and row["prob"] > i:
-                total_mh += float(row["avg_mh"]) if pd.notna(row["avg_mh"]) else 0
-                
+    
+        # Use the original list of dictionaries to avoid string conversion issues
+        for item in original_disc_pred:
+            if item.get("prob") is not None and item["prob"] > i:
+                total_mh += float(item["avg_mh"]) if pd.notna(item["avg_mh"]) else 0
+    
                 # Sum costs from spare parts
                 spare_parts_cost = 0
-                if "exp_cons" in row and row["exp_cons"]:
-                    for part in row["exp_cons"]:
-                        spare_parts_cost += part.get("price", 0)
+                exp_cons = item.get("exp_cons", [])
                 
+                if isinstance(exp_cons, list):
+                    for part in exp_cons:
+                        if isinstance(part, dict):
+                            spare_parts_cost += part.get("price", 0) * (part.get("prob", 0) / 100)
+    
                 total_cost += spare_parts_cost
-        
+    
         probability_graph[key] = {
             "mh": float_round(total_mh),
             "spareCost": float_round(total_cost)
         }
     
-    
     print("Probability graph is generated.")
-    disc_pred=pd.DataFrame(disc_pred)
-    disc_pred.to_csv(f"{filepath}/{estID}__disc_final_result.csv")
+    print("capping is computing")
+    capping_values = {
+    'cappingTypeManhrs': cappingDetails["cappingTypeManhrs"],
+    'billableManhrs': 0.0,
+    'unbillableManhrs': 0.0,
+    'cappingTypeSpareCost': cappingDetails["cappingTypeSpareCost"],
+    'billableSpareCost': 0.0,
+    'unbillableSpareCost': 0.0
+    }
+
+    if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
+        # Create copies for processing
+        task_level_mh_cap = task_level_mh_result.copy()
+        task_level_parts_cap = task_level_parts_result.copy()
+        
+        # Aggregate task level parts
+        task_level_parts_cap = task_level_parts_cap.groupby(["source_task_discrepancy_number"]).agg(
+            billable_value_usd=("billable_value_usd", sum)
+        ).reset_index()
+        
+        # Merge with probability data
+        task_level_parts_cap = task_level_parts_cap.merge(
+            task_level_mh_result[["source_task_discrepancy_number", "prob"]],
+            on="source_task_discrepancy_number",
+            how="left"
+        )
+        
+        # Copy group level data
+        group_level_mh_cap = group_level_mh_result.copy()
+        group_level_parts_cap = group_level_parts_result.copy()
+        
+        # Aggregate group level parts
+        group_level_parts_cap = group_level_parts_cap.groupby(["source_task_discrepancy_number", "group"]).agg(
+            billable_value_usd=("billable_value_usd", sum)
+        ).reset_index()
+        
+        # Merge with probability data
+        group_level_parts_cap = group_level_parts_cap.merge(
+            group_level_mh_result[["source_task_discrepancy_number", "group", "prob"]],
+            on=["source_task_discrepancy_number", "group"],
+            how="left"
+        )
     
+        # Get capping values from details
+        mhs_cap_type = cappingDetails["cappingTypeManhrs"]
+        mhs_cap_amt = cappingDetails["cappingManhrs"]
+        spares_cap_type = cappingDetails["cappingTypeSpareCost"]
+        spares_cap_amt = cappingDetails["cappingSpareCost"]
+        
+        def mhs_cap(mhs_cap_type, mhs_cap_amt):
+            if mhs_cap_type == "per_source_card":
+                # Calculate intermediate values (before applying probability)
+                task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                    lambda x: min(x, mhs_cap_amt)
+                )
+                task_level_mh_cap["billable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
+                    lambda x: max(0, x - mhs_cap_amt)
+                )
+                task_level_mh_cap["mhs_cap_amt"]=mhs_cap_amt
+                
+                # Save intermediate results to CSV
+                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                task_level_mh_cap["unbillable_mh"] = task_level_mh_cap["unbillable_mh_raw"] * (task_level_mh_cap["prob"]/100)
+                task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] * (task_level_mh_cap["prob"]/100)
+                
+                # Save final results to CSV
+                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
+                
+                return task_level_mh_cap["unbillable_mh"].sum(), task_level_mh_cap["billable_mh"].sum()
+            
+            elif mhs_cap_type == "per_IRC":
+                # Calculate intermediate values (before applying probability)
+                group_level_mh_cap["unbillable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                    lambda x: min(x, mhs_cap_amt)
+                )
+                group_level_mh_cap["billable_mh_raw"] = group_level_mh_cap["avg_actual_man_hours"].apply(
+                    lambda x: max(0, x - mhs_cap_amt)
+                )
+                
+                group_level_mh_cap["mhs_cap_amt"]=mhs_cap_amt
+                # Save intermediate results to CSV
+                group_level_mh_cap.to_csv(f"{filepath}/{estID}_group_level_mh_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                group_level_mh_cap["unbillable_mh"] = group_level_mh_cap["unbillable_mh_raw"] * (group_level_mh_cap["prob"]/100)
+                group_level_mh_cap["billable_mh"] = group_level_mh_cap["billable_mh_raw"] * (group_level_mh_cap["prob"]/100)
+                
+                # Save final results to CSV
+                group_level_mh_cap.to_csv(f"{filepath}/{estID}_group_level_mh_cap_final.csv", index=False)
+                
+                return group_level_mh_cap["unbillable_mh"].sum(), group_level_mh_cap["billable_mh"].sum()
+        
+        # Calculate and set man-hours capping values
+        if cappingDetails["cappingTypeManhrs"] != "":
+            capping_values["unbillableManhrs"], capping_values["billableManhrs"] = mhs_cap(mhs_cap_type, mhs_cap_amt)
     
+        def spares_cap(spares_cap_type, spares_cap_amt):
+            if spares_cap_type == "per_source_card":
+                # Calculate intermediate values (before applying probability)
+                task_level_parts_cap["unbillable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                    lambda x: min(x, spares_cap_amt)
+                )
+                task_level_parts_cap["billable_spares_raw"] = task_level_parts_cap["billable_value_usd"].apply(
+                    lambda x: max(0, x - spares_cap_amt)
+                )
+                task_level_parts_cap["spares_cap_amt"]=spares_cap_amt
+                
+                # Save intermediate results to CSV
+                task_level_parts_cap.to_csv(f"{filepath}/{estID}_task_level_parts_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                task_level_parts_cap["unbillable_spares"] = task_level_parts_cap["unbillable_spares_raw"] * (task_level_parts_cap["prob"]/100)
+                task_level_parts_cap["billable_spares"] = task_level_parts_cap["billable_spares_raw"] * (task_level_parts_cap["prob"]/100)
+                
+                # Save final results to CSV
+                task_level_parts_cap.to_csv(f"{filepath}/{estID}_task_level_parts_cap_final.csv", index=False)
+                
+                return task_level_parts_cap["unbillable_spares"].sum(), task_level_parts_cap["billable_spares"].sum()
+                
+            elif spares_cap_type == "per_IRC":
+                # Calculate intermediate values (before applying probability)
+                group_level_parts_cap["unbillable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                    lambda x: min(x, spares_cap_amt)
+                )
+                group_level_parts_cap["billable_spares_raw"] = group_level_parts_cap["billable_value_usd"].apply(
+                    lambda x: max(0, x - spares_cap_amt)
+                )
+                
+                group_level_parts_cap["spares_cap_amt"]=spares_cap_amt
+                # Save intermediate results to CSV
+                group_level_parts_cap.to_csv(f"{filepath}/{estID}_group_level_parts_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                group_level_parts_cap["unbillable_spares"] = group_level_parts_cap["unbillable_spares_raw"] * (group_level_parts_cap["prob"]/100)
+                group_level_parts_cap["billable_spares"] = group_level_parts_cap["billable_spares_raw"] * (group_level_parts_cap["prob"]/100)
+                
+                # Save final results to CSV
+                group_level_parts_cap.to_csv(f"{filepath}/{estID}_group_level_parts_cap_final.csv", index=False)
+                
+                return group_level_parts_cap["unbillable_spares"].sum(), group_level_parts_cap["billable_spares"].sum()
+                
+            elif spares_cap_type == "per_line_item":
+                # Calculate intermediate values (before applying probability)
+                parts_line_items_result["unbillable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                    lambda x: min(x, spares_cap_amt)
+                )
+                parts_line_items_result["billable_spares_raw"] = parts_line_items_result["billable_value_usd"].apply(
+                    lambda x: max(0, x - spares_cap_amt)
+                )
+                parts_line_items_result["spares_cap_amt"]=spares_cap_amt
+                # Save intermediate results to CSV
+                parts_line_items_result.to_csv(f"{filepath}/{estID}_line_item_parts_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                parts_line_items_result["unbillable_spares"] = parts_line_items_result["unbillable_spares_raw"] * (parts_line_items_result["prob"]/100)
+                parts_line_items_result["billable_spares"] = parts_line_items_result["billable_spares_raw"] * (parts_line_items_result["prob"]/100)
+                
+                # Save final results to CSV
+                parts_line_items_result.to_csv(f"{filepath}/{estID}_line_item_parts_cap_final.csv", index=False)
+                
+                return parts_line_items_result["unbillable_spares"].sum(), parts_line_items_result["billable_spares"].sum()
+    
+        # Calculate and set spare costs capping values
+        if cappingDetails["cappingTypeSpareCost"] != "":
+            capping_values['unbillableSpareCost'], capping_values['billableSpareCost'] = spares_cap(spares_cap_type, spares_cap_amt)
+        
+    if not capping_values:
+        capping_values = {
+            'cappingTypeManhrs': cappingDetails["cappingTypeManhrs"],
+            'billableManhrs': 0.0,
+            'unbillableManhrs': 0.0,
+            'cappingTypeSpareCost': cappingDetails["cappingTypeSpareCost"],
+            'billableSpareCost': 0.0,
+            'unbillableSpareCost': 0.0
+        }
+      
+    print("capping is completed ")
     # Get tasks_list from tasks if not defined
     tasks_list = tasks
-    
+    task_level_findings
     # Properly calculate totals for JSON output
     tasks_total_mhs = sum(task["mhs"]["avg"] for task in tasks)
     tasks_total_parts_cost = sum(sum(part["price"] for part in task["spare_parts"]) for task in tasks)
@@ -867,6 +1355,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
 
     
+    task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    task_findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+
+
+    
+
+    print("generating the output dict")
     # Construct output JSON data
     output_data = {
         "estID": estID,
@@ -885,11 +1382,23 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "aggregatedFindings": {
             "totalMhs": float_round(findings_total_mhs),
             "totalPartsCost": float_round(findings_total_parts_cost),
+            
+            "task_totalMhs": float_round(task_findings_total_mhs),
+            "task_totalPartsCost": float_round(task_findings_total_parts_cost),
+            
             "mhs": {
                 "avg_mh": float_round(findings_total_mhs),
                 "min_mh": float_round(findings_min_mhs),
                 "max_mh": float_round(findings_max_mhs)
+            },
+            "task_mhs":{
+                "avg_mh": float_round(task_findings_total_mhs),
+                "min_mh": float_round(task_findings_min_mhs),
+                "max_mh": float_round(task_findings_max_mhs)
+                
             }
+
+            
         },
         "totalConsumption": {
             "totalMhs": float_round(tasks_total_mhs + findings_total_mhs),
@@ -902,8 +1411,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             }
         },
         "probabilityGraph": probability_graph,
-        "createdAt": datetime.datetime.now().isoformat(),
-        "lastUpdated": datetime.datetime.now().isoformat(),
+        "capping_values":capping_values,
+        "cappingDetails":cappingDetails,
+        "createdAt": datetime.datetime.fromisoformat(datetime.datetime.now().isoformat()),
+        "lastUpdated": datetime.datetime.fromisoformat(datetime.datetime.now().isoformat()),
         "createdBy": "estimaai@evrides.live"
     }
             

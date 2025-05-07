@@ -46,28 +46,39 @@ def process_document(estID):
     
     try:
         # Extract data from bson_data
+        # Extract data from bson_data
         task_numbers = bson_data.get("task", [])
         descriptions = bson_data.get("description", [])
+        add_tasks = bson_data.get("additionalTasks", [])  # Changed default from {} to []
         customer_name = bson_data.get("operator", " ")
         probability = bson_data.get("probability", 10)
         aircraft_model = bson_data.get("aircraftModel", " ")
         check_category = bson_data.get("typeOfCheck", " ")
-        aircraft_age = bson_data.get("aircraftAge", 1)
+        aircraft_age = bson_data.get("aircraftAge", 0)
+        cappingDetails = bson_data.get("cappingDetails", "capping details not found")
         
         # Convert to strings
         task_numbers = [str(task) for task in task_numbers]
         descriptions = [str(desc) for desc in descriptions]
         
+        # Extract data from additional tasks
+        add_task_numbers = [str(task["taskID"]) for task in add_tasks]
+        add_descriptions = [str(task["taskDescription"]) for task in add_tasks]  
+        
+        # Combine lists
+        task_numbers_combined = task_numbers + add_task_numbers  # Fixed: extend() modifies in-place and returns None
+        descriptions_combined = descriptions + add_descriptions   # Fixed: use + operator instead
+        
         # Create DataFrame for mpd_task_data
         mpd_task_data = pd.DataFrame({
-            "TASK NUMBER": task_numbers,
-            "DESCRIPTION": descriptions
+            "TASK NUMBER": task_numbers_combined,
+            "DESCRIPTION": descriptions_combined
         })
         
         print(f"Processed document with estID: {estID}")
         
         # Call defects_prediction function with correct parameters
-        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath)
+        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails)
         
         print("Output JSON is generated")
         sys.stdout.flush()
