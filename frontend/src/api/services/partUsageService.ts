@@ -74,21 +74,28 @@ const getMultiPartUsage = async (partIds: string[], startDate: any, endDate: any
 
         // Make the POST request
         const response = await axiosInstance.post(`${getMultiPartUsage_Url}?startDate=${startDate}&endDate=${endDate}`, requestBody);
-
-        if (response.data && response.data.data && response.data.data.length > 0) {
+        console.log("response part multiple >>>>", response.data);
+        if (response.data?.findingsHMVParts?.length > 0 &&
+            response.data?.findingsNonHMVTasks?.length > 0 &&
+            response.data?.taskParts?.length > 0) {
             showNotification({
                 title: "Successful!",
-                message: "Part Usage Generated",
+                message: "Part Usage Analysis",
                 color: "green",
                 style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
             });
-        } else {
-            // showNotification({
-            //     title: "Not Found!",
-            //     message: "No Part Found, Try another ID",
-            //     color: "red",
-            //     style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
-            // });
+        } else if (
+            response.data?.findingsHMVParts?.length === 0 &&
+            response.data?.findingsNonHMVTasks?.length === 0 &&
+            response.data?.taskParts?.length === 0
+          )
+           {
+            showNotification({
+                title: "Not Found!",
+                message: "No Data Found, Try another Part ID",
+                color: "red",
+                style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
+            });
         }
 
         console.log("response multiple >>>>", response.data);

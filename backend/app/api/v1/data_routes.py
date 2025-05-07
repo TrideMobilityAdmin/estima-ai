@@ -11,7 +11,7 @@ import shutil
 from datetime import datetime
 from app.services.upload_docs import ExcelUploadService
 from app.models.task_models import UpdateRemarksRequest,SkillsAnalysisRequest,ProbabilityWiseManhrsSpareCost,CappingData
-from app.models.estimates import Estimate, EstimateRequest, EstimateResponse,ComparisonResponse,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatus,EstimateStatusResponse,ValidRequestCheckCategory
+from app.models.estimates import Estimate, EstimateRequest,ConfigurationsResponse,ValidTasks,ValidRequest,EstimateStatusResponse,ValidRequestCheckCategory
 from app.services.task_analytics_service import TaskService
 from app.log.logs import logger
 from app.services.configurations import ConfigurationService
@@ -180,6 +180,7 @@ async def validate_tasks(
     return await task_service.validate_tasks(estimate_request,current_user)
 
 
+
 @router.post("/validate_tasks_checkbased",response_model=List[ValidTasks])
 async def validate_tasks_checkbased(
     estimate_request: ValidRequestCheckCategory,
@@ -188,7 +189,6 @@ async def validate_tasks_checkbased(
 ):
     
     return await task_service.validate_tasks_checkcategory(estimate_request,current_user)
-
 
 @router.post("/upload-estimate/")
 async def upload_estimate(

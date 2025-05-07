@@ -28,11 +28,28 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
 
     const total = totalTasks + totalFindings;
     if (total > 0) {
-      setHasData(true);
-      setDonutData([
-        { name: "Tasks", value: (totalTasks / total) * 100 },
-        { name: "Findings", value: (totalFindings / total) * 100 },
-      ]);
+      // Calculate percentages for each section
+      const tasksPercentage = (totalTasks / total) * 100;
+      const findingsPercentage = (totalFindings / total) * 100;
+      
+      // Filter out sections with 0 values and only include sections above 0.6
+      const filteredData = [];
+      
+      if (tasksPercentage > 0.6) {
+        filteredData.push({ name: "Tasks", value: tasksPercentage });
+      }
+      
+      if (findingsPercentage > 0.6) {
+        filteredData.push({ name: "Findings", value: findingsPercentage });
+      }
+      
+      if (filteredData.length > 0) {
+        setHasData(true);
+        setDonutData(filteredData);
+      } else {
+        setHasData(false);
+        setDonutData([]);
+      }
     } else {
       setHasData(false);
       setDonutData([]);
@@ -44,8 +61,14 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
     if (chartRef.current && hasData) {
       const myChart = echarts.init(chartRef.current);
       const option = {
-        tooltip: { trigger: "item", formatter: "{b}: {c}%" },
-        legend: { bottom: "5%", left: "center" },
+        tooltip: { 
+          trigger: "item", 
+          formatter: "{b}: {c}%" 
+        },
+        legend: { 
+          bottom: "5%", 
+          left: "center" 
+        },
         series: [
           {
             name: "Distribution Analysis",
@@ -68,12 +91,24 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
             labelLine: { show: false },
             data: donutData.map((item) => ({
               name: item.name,
-              value: item.value.toFixed(2),
+              value: Math.round(item.value),
             })),
           },
         ],
       };
       myChart.setOption(option);
+      
+      // Handle chart resize when window size changes
+      window.addEventListener('resize', () => {
+        myChart.resize();
+      });
+      
+      return () => {
+        window.removeEventListener('resize', () => {
+          myChart.resize();
+        });
+        myChart.dispose();
+      };
     }
   };
 
@@ -85,9 +120,13 @@ const DonutChartComponent = ({ partUsageData }: { partUsageData: any }) => {
   }, [partUsageData]);
 
   useEffect(() => {
-    if (hasData) {
-      initDonutChart();
-    }
+    const chartInstance = initDonutChart();
+    
+    return () => {
+      if (chartInstance) {
+        chartInstance();
+      }
+    };
   }, [donutData]);
 
   return (

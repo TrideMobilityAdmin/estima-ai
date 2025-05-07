@@ -44,26 +44,30 @@ export default function PartUsage() {
     // const handleCheck = () => {
     //     setValidatedPartId(inputPartId);
     // };
-    const handleCheck = () => {
-        setIsMultiLoading(true);
-        setValidatedPartIds(inputPartIds);
-    };
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    const handleCheck = () => {
+        setValidatedPartIds(inputPartIds); // Only set part IDs
+        setRefreshTrigger(prev => prev + 1); // Force useEffect to run again
+    };
+    
     const [inputPartId, setInputPartId] = useState(""); // For input field
     const [validatedPartId, setValidatedPartId] = useState(""); // For API calls
     const [selectedPartId, setSelectedPartId] = useState("");
     // const today = dayjs().startOf("day").toDate();
     // const twoDaysAgo = dayjs().subtract(2, "day").startOf("day").toDate();
-    const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
-    const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
-    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
-    // Initialize with Dayjs objects
-    // const twoDaysAgo = dayjs("2024-03-27").startOf("day"); // March 27, 2024
-    // const today = dayjs("2024-04-03").endOf("day"); // April 3, 2024
-    // const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([twoDaysAgo, today]); // Date range
+
+    const today = dayjs().endOf("day").toDate(); // Today
+    const tenDaysAgo = dayjs().subtract(9, "day").startOf("day").toDate(); // 10 days including today
+    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([tenDaysAgo, today]);
+
+    // const twoDaysAgo = dayjs("2023-01-21").startOf("day").toDate(); // March 27, 2024
+    // const today = dayjs("2023-09-03").endOf("day").toDate(); // April 3, 2024
+    // const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([twoDaysAgo, today]); // Date range
+    
     const [multiPartUsageData, setMultiPartUsageData] = useState<any>();
     const [multiPartMergedData, setMultiPartMergedData] = useState<any>();
-    const [isLMultioading, setIsMultiLoading] = useState(false);
+    const [isMultioading, setIsMultiLoading] = useState(false);
     const [partUsageData, setPartUsageData] = useState<any>();
     const [isLoading, setIsLoading] = useState(false);
     const [taskSearch, setTaskSearch] = useState("");
@@ -79,62 +83,62 @@ export default function PartUsage() {
 
     useEffect(() => {
         const fetchMultiPartData = async () => {
-            if (!validatedPartIds || !dateRange[0] || !dateRange[1]) {
+            // Skip API call if this is the initial render (refreshTrigger is 0)
+            // or if any required data is missing
+            if (
+                refreshTrigger === 0 || // Skip the initial render
+                !validatedPartIds || 
+                validatedPartIds.length === 0 || 
+                !dateRange[0] || 
+                !dateRange[1]
+            ) {
                 setIsMultiLoading(false);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Reset merged data when dependencies change
+                setMultiPartMergedData([]);
                 return;
             }
-
+    
             try {
-                // setIsMultiLoading(true);
-                setMultiPartMergedData([]); // Clear previous data before fetching new one
-
-                // Format dates
+                setIsMultiLoading(true); // Move loading here!
+                setMultiPartMergedData([]);
+    
                 const startDate = dayjs(dateRange[0]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
                 const endDate = dayjs(dateRange[1]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
-
-                // Fetch API data
+    
                 const response: any = await getMultiPartUsage(validatedPartIds, startDate, endDate);
-
+    
                 if (response) {
                     setMultiPartUsageData(response);
-
-                    // Extract necessary data from response
+    
                     const taskParts = response?.taskParts || [];
                     const findingsHMVParts = response?.findingsHMVParts || [];
                     const findingsNonHMVTasks = response?.findingsNonHMVTasks || [];
-
-                    // Merge the findings into taskParts
+    
                     const mergedData = taskParts.map((task: any) => ({
                         ...task,
-                        findingsHMVParts: findingsHMVParts.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
-                        findingsNonHMVTasks: findingsNonHMVTasks.filter(
-                            (finding: any) => finding?.partId === task?.partId
-                        ),
+                        findingsHMVParts: findingsHMVParts.filter((finding: any) => finding?.partId === task?.partId),
+                        findingsNonHMVTasks: findingsNonHMVTasks.filter((finding: any) => finding?.partId === task?.partId),
                     }));
-
+    
                     setMultiPartMergedData(mergedData);
                 }
             } catch (error) {
                 console.error("Error fetching part usage:", error);
                 setMultiPartUsageData(null);
-                setMultiPartMergedData([]); // Ensure no old data remains on error
+                setMultiPartMergedData([]);
             } finally {
-                setIsMultiLoading(false);
+                setIsMultiLoading(false); // ✅ Finish loading after fetch
             }
         };
-
+    
         fetchMultiPartData();
-
-        // Cleanup function to clear data on unmount or dependency change
+    
         return () => {
             setMultiPartUsageData(null);
             setMultiPartMergedData([]);
         };
-    }, [validatedPartIds, dateRange]);
+    }, [validatedPartIds, dateRange, refreshTrigger]);
+    
     console.log("Multi Validated Parts >>>>", validatedPartIds);
     console.log("Multi part data >>>>", multiPartUsageData);
     console.log("Multi part merged data >>>>", multiPartMergedData);
@@ -177,7 +181,15 @@ export default function PartUsage() {
         date: item.date,
         tasks: item.tasksqty,
         findings: item.findingsqty,
-    })) || [];
+    }))?.sort((a: any, b: any) => {
+        // Create proper Date objects from the date strings
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        // Compare the dates
+        return dateA.getTime() - dateB.getTime();
+    }) || [];
+    
 
 
     // Combine tasks and nonHmvTasks arrays
@@ -337,7 +349,7 @@ export default function PartUsage() {
                         size="xs"
                         onClick={handleCheck}
                         disabled={!inputPartId}
-                        loading={isLMultioading}
+                        loading={isMultioading}
                         color="green"
                     >
                         Submit
@@ -418,8 +430,8 @@ border-bottom: none;
                                     headerName: "Tasks",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Tasks" tooltipName="Total Tasks" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -439,8 +451,8 @@ border-bottom: none;
                                     headerName: "Parts Qty",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Tasks Parts Qty" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -460,8 +472,8 @@ border-bottom: none;
                                     headerName: "Findings",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Findings" tooltipName="Total Findings" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -477,8 +489,8 @@ border-bottom: none;
                                     headerName: "Parts Qty",
                                     headerComponent: (params: any) => <CustomHeader defaultName="Parts Qty" tooltipName="Findings Parts Qty" />,
                                     sortable: true,
-                                    filter: true,
-                                    floatingFilter: true,
+                                    // filter: true,
+                                    // floatingFilter: true,
                                     resizable: true,
                                     flex: 1,
                                     cellRenderer: (val: any) => {
@@ -581,7 +593,7 @@ border-bottom: none;
                             <IconTool color="#14AE5C" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Tasks - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalTaskQuantity(combinedTasks) || 0}
@@ -607,7 +619,7 @@ border-bottom: none;
                             <IconMenuDeep color="#9F6BED" size='39' />
                             <Flex direction='column'>
                                 <Text fw={500} fz='sm' c='dimmed'>
-                                    Parts Quantity
+                                    Findings - Parts Quantity
                                 </Text>
                                 <Text fw={600} fz='h2' >
                                     {calculateTotalFindingQuantity(partUsageData?.usage?.findings?.hmvTasks) || 0}
@@ -620,7 +632,7 @@ border-bottom: none;
                 <Grid>
                     <Grid.Col span={8}>
                         <Card radius="md" h="60vh">
-                            <Title order={5} c="dimmed">Daily Trend Analysis</Title>
+                            <Title order={5} c="dimmed">Date Trend Analysis</Title>
 
                             {chartData?.length > 0 ? (
                                 <div style={{ overflowX: "auto", width: "100%", height: '50vh' }}>
@@ -638,8 +650,8 @@ border-bottom: none;
                                                 textAnchor: "end",
                                             }}
                                             series={[
-                                                { name: "tasks", color: "rgba(17, 166, 0, 1)" },
-                                                { name: "findings", color: "rgba(0, 149, 255, 1)" },
+                                                { name: "tasks", color: "rgba(17, 166, 0, 1)", label: "Tasks" },
+                                                { name: "findings", color: "rgba(0, 149, 255, 1)", label: "Findings" },
                                             ]}
                                             connectNulls
                                             curveType="natural"
@@ -659,78 +671,13 @@ border-bottom: none;
                             <Title order={5} c='dimmed'>
                                 Distribution Analysis (%)
                             </Title>
-                            <DonutChartComponent partUsageData={partUsageData} />
-                            {/* <Center>
-                                <DonutChart
-                                    withLabelsLine
-                                    withLabels
-                                    withTooltip
-                                    labelsType="percent"
-                                    size={182}
-                                    thickness={30}
-                                    data={donutData}
-                                />
-                            </Center> */}
-
+                            <DonutChartComponent partUsageData={partUsageData} /> 
                         </Card>
                     </Grid.Col>
                 </Grid>
                 <Space h='md' />
                 <AircraftPieCharts partUsageData={partUsageData} />
 
-                {/* <Grid>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                MPD - Aircraft wise Quantity
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.aircraftModels || []}
-                                dataKey="aircraftModel"
-                                series={[
-                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
-                                ]}
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                  }}
-                                tickLine="y"
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40} // Adjust the gap between categories
-                            // barGap={5} // Adjust the gap between bars
-                            />
-                        </Card>
-                    </Grid.Col>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                Findings - Aircraft wise Quantity
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.aircraftModels || []}
-                                dataKey="aircraftModel"
-                                series={[
-                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
-                                ]}
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                  }}
-                                tickLine="y"
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40} // Adjust the gap between categories
-                            // barGap={5} // Adjust the gap between bars
-                            />
-                        </Card>
-                    </Grid.Col>
-                    
-                </Grid> */}
                 <Space h='md' />
                 <Grid>
                     <Grid.Col span={6}>
@@ -740,77 +687,12 @@ border-bottom: none;
                         <DonutChartComponentPartSupplied title="Findings - Part Supplied" partUsageData={partUsageData} type="Findings" />
                     </Grid.Col>
                 </Grid>
-                {/* <Grid>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                MPD - Part Supplied
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
-                                    ...status,
-                                    color: getAirlineColor(status.statusCode)
-                                })) || []}
-                                dataKey="statusCode"
-                                series={[
-                                    {
-                                        name: 'count',
-                                        color: 'blue'
-                                    },
-                                ]}
-                                tickLine="y"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40}
-                            />
-                        </Card>
-                    </Grid.Col>
-                    <Grid.Col span={6}>
-                        <Card radius='md' h='60vh'>
-                            <Title order={5} c='dimmed'>
-                                Findings - Part Supplied
-                            </Title>
-                            <BarChart
-                                h={300}
-                                withLegend
-                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
-                                    ...status,
-                                    color: getAirlineColor(status.statusCode)
-                                })) || []}
-                                dataKey="statusCode"
-                                series={[
-                                    {
-                                        name: 'count',
-                                        color: 'blue'
-                                    },
-                                ]}
-                                tickLine="y"
-                                xAxisProps={{
-                                    interval: 0, // Ensures all labels are displayed
-                                    angle: -45, // Rotates labels for better visibility
-                                    textAnchor: 'end',
-                                }}
-                                barProps={{ radius: 10 }}
-                                maxBarWidth={40}
-                            />
-                        </Card>
-                    </Grid.Col>
-                </Grid> */}
                 <Space h='md' />
-                <SimpleGrid cols={2}>
-                    {/* MPD Chart */}
-                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
-
-                    {/* Findings Chart */}
-                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
-                </SimpleGrid>
                 {/* <SimpleGrid cols={2}>
+                    <MixedChartComponent title="MPD - Packages & Qty" data={tasksChartData} dataKey1="taskId" />
+                    <MixedChartComponent title="Findings - Packages & Qty" data={findingChartData} dataKey1="findingId" />
+                </SimpleGrid> */}
+                <SimpleGrid cols={2}>
                     <Card>
                         <Title order={5} c='dimmed'>
                             MPD - Packages & Qty
@@ -836,8 +718,8 @@ border-bottom: none;
                                     data={tasksChartData}
                                     dataKey="taskId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -878,8 +760,8 @@ border-bottom: none;
                                     data={findingChartData}
                                     dataKey="findingId"
                                     series={[
-                                        { name: 'packages', color: '#1445B6' },
-                                        { name: 'quantity', color: '#D6B575' },
+                                        { name: 'packages', color: '#1445B6', label:"Packages" },
+                                        { name: 'quantity', color: '#D6B575', label:"Quantity" },
                                     ]}
                                     xAxisProps={{
                                         interval: 0, // Ensures all labels are displayed
@@ -896,7 +778,7 @@ border-bottom: none;
                         </Card>
                     </Card>
 
-                </SimpleGrid> */}
+                </SimpleGrid>
                 <Space h='md' />
                 <SimpleGrid cols={2}>
                     <Card radius="md" h={partUsageData?.usage ? "90vh" : "40vh"} style={{ overflowY: "auto" }}>
@@ -1004,7 +886,7 @@ border-bottom: none;
                         )}
                     </Card>
                     <Card radius='md' h={partUsageData?.usage! ? '90vh' : '40vh'} style={{ overflowY: "auto" }}>
-                        {/* 🔹 Section 1: Title & Search Input */}
+                        {/* Section 1: Title & Search Input */}
                         <Title order={5}>
                             Findings
                         </Title>
@@ -1015,7 +897,7 @@ border-bottom: none;
                             mb="md"
                         />
 
-                         {/* 🔹 Section 2: Scrollable Accordion List */}
+                         {/* Section 2: Scrollable Accordion List */}
                         {
                             filteredFindings?.length > 0 ? (
                                 <ScrollArea h={'70vh'} scrollbarSize={0} scrollHideDelay={0}>
@@ -1250,3 +1132,129 @@ border-bottom: none;
                                     55
                                 ]}
                             /> */}
+                            {/* <Grid>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                MPD - Aircraft wise Quantity
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.aircraftModels || []}
+                                dataKey="aircraftModel"
+                                series={[
+                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
+                                ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
+                                tickLine="y"
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40} // Adjust the gap between categories
+                            // barGap={5} // Adjust the gap between bars
+                            />
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                Findings - Aircraft wise Quantity
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.aircraftModels || []}
+                                dataKey="aircraftModel"
+                                series={[
+                                    { name: 'count', color: 'rgba(0, 49, 196, 1)' },
+                                ]}
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                  }}
+                                tickLine="y"
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40} // Adjust the gap between categories
+                            // barGap={5} // Adjust the gap between bars
+                            />
+                        </Card>
+                    </Grid.Col>
+                    
+                </Grid> */}
+                {/* <Center>
+                                <DonutChart
+                                    withLabelsLine
+                                    withLabels
+                                    withTooltip
+                                    labelsType="percent"
+                                    size={182}
+                                    thickness={30}
+                                    data={donutData}
+                                />
+                            </Center> */}
+                            {/* <Grid>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                MPD - Part Supplied
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
+                                    ...status,
+                                    color: getAirlineColor(status.statusCode)
+                                })) || []}
+                                dataKey="statusCode"
+                                series={[
+                                    {
+                                        name: 'count',
+                                        color: 'blue'
+                                    },
+                                ]}
+                                tickLine="y"
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                }}
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40}
+                            />
+                        </Card>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                        <Card radius='md' h='60vh'>
+                            <Title order={5} c='dimmed'>
+                                Findings - Part Supplied
+                            </Title>
+                            <BarChart
+                                h={300}
+                                withLegend
+                                data={partUsageData?.aircraftDetails?.sub_task_parts_aircraft_details?.stockStatuses?.map((status: any) => ({
+                                    ...status,
+                                    color: getAirlineColor(status.statusCode)
+                                })) || []}
+                                dataKey="statusCode"
+                                series={[
+                                    {
+                                        name: 'count',
+                                        color: 'blue'
+                                    },
+                                ]}
+                                tickLine="y"
+                                xAxisProps={{
+                                    interval: 0, // Ensures all labels are displayed
+                                    angle: -45, // Rotates labels for better visibility
+                                    textAnchor: 'end',
+                                }}
+                                barProps={{ radius: 10 }}
+                                maxBarWidth={40}
+                            />
+                        </Card>
+                    </Grid.Col>
+                </Grid> */}

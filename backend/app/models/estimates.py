@@ -92,11 +92,13 @@ class EstimateRequest(BaseModel):
         }
 
 class ValidRequest(BaseModel):
-     tasks: List[str]
+    tasks: List[str]
 class ValidTasks(BaseModel):
     taskid: str
     description: str
     status: bool
+    description:str=""
+
 class ValidRequestCheckCategory(BaseModel):
     tasks: List[str]
     typeOfCheck: List[str]
@@ -156,8 +158,21 @@ class EstimateStatusResponse(BaseModel):
     totalMhs:float
     totalPartsCost:float
     status:str
-    tatTime:float=0.0
+    # tatTime:float=0.0
     aircraftRegNo:str
+    # probability:float
+    # operator:str
+    # aircraftModel:str
+    # aircraftAge:float
+    # typeOfCheck:List[str]
+    # typeOfCheckID:str
+    # aircraftFlightHours: int
+    # aircraftFlightCycles: int
+    # areaOfOperations: str
+    # cappingDetails:Optional[Capping]=None
+    # additionalTasks: List[AdditionalTasks]
+    # miscLaborTasks: List[MiscLaborTask]
+    
     createdAt:datetime
     remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):
