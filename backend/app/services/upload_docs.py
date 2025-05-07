@@ -173,6 +173,7 @@ class ExcelUploadService:
                 processed_record['description'] = processed_record.pop('DESCRIPTION')
             else:
                 processed_record['description'] = []
+
             processed_record.update({
             "upload_timestamp": current_time,
             "original_filename": file.filename,
@@ -353,7 +354,6 @@ class ExcelUploadService:
             
             # Query for existing estimates with the same aircraft registration and base ID pattern
             existing_estimates = self.estima_collection.find({
-                # "aircraftRegNo": estimate_request.aircraftRegNo,
                 "estID": {"$regex": version_regex_pattern}
             })
             latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
