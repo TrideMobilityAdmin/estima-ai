@@ -353,7 +353,7 @@ class ExcelUploadService:
             
             # Query for existing estimates with the same aircraft registration and base ID pattern
             existing_estimates = self.estima_collection.find({
-                "aircraftRegNo": estimate_request.aircraftRegNo,
+                # "aircraftRegNo": estimate_request.aircraftRegNo,
                 "estID": {"$regex": version_regex_pattern}
             })
             latest_doc = list(existing_estimates.sort("estID", -1).limit(1))
