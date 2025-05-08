@@ -144,7 +144,7 @@ def predict_column_mappings(df, expected_mappings):
     return dynamic_mappings
 
 # Step 2: File Processing and Data Extraction
-def get_processed_files(processed_file_paths, data_path, aircraft_details_initial_name, task_description_initial_name, 
+def get_processed_files(files_to_process, data_path, aircraft_details_initial_name, task_description_initial_name, 
                               task_parts_initial_name, sub_task_description_initial_name, 
                               sub_task_parts_initial_name):
     """
@@ -161,9 +161,23 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                 file_extension = os.path.splitext(file_path)[1]
                 engine = "openpyxl" if file_extension in [".xlsx", ".xlsm"] else "pyxlsb" if file_extension == ".xlsb" else "xlrd"
 
-                df = pd.read_excel(file_path, engine=engine, sheet_name=sheet_name)
+
+
+                # First, read the Excel file using ExcelFile to inspect sheets
+                excel_file = pd.ExcelFile(file_path, engine=engine)
+                #print(f"sheet names: {excel_file.sheet_names}")
+
+                # Then, read the specific sheet into a DataFrame
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+
+                #print(f"df.shape: {df.shape}")
+                #print(f"df.columns: {df.columns}")
+
+
+
 
                 if sheet_name.lower() in ["pricing", "sheet1", "price", "page"]:
+
                     sub_task_parts_columns = config["sub_task_parts_columns"]
                     sub_task_parts_column_mappings = config["sub_task_parts_column_mappings"]
 
@@ -180,18 +194,24 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
 
                     # Detect the header row
                     header_row_index = detect_header_row(df, combined_mappings.keys())
+                    print("df.shape:", df.shape, "of file:", file_path)
 
-                    if header_row_index is None:
+                    if header_row_index is not None:
+                        df.columns = df.iloc[header_row_index].astype(str).values
+                        print("df.columns:", df.columns, "of file:", file_path)
+
+                        logger.info(f"Detected header row at index {header_row_index} for {file_path}, columns: {df.columns}")
+
+                        # Extract data rows (everything after the header)
+                        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+                    else:
+                        # If no header row is detected, use the first row as header and log a warning
+                        
                         logger.warning(f"Could not detect header row in {file_path}")
-                        return None
+                        print(f"Could not detect header row in {file_path}")
 
-                    # Set the column names correctly
-                    df.columns = df.iloc[header_row_index].astype(str).values
 
-                    logger.info(f"Detected header row at index {header_row_index} for {file_path}, columns: {df.columns}")
 
-                    # Extract data rows (everything after the header)
-                    df = df.iloc[header_row_index + 1:].reset_index(drop=True)
 
                     # Rename columns using mappings
                     df.rename(columns={k: v for k, v in combined_mappings.items() if k in df.columns}, inplace=True)
@@ -209,6 +229,10 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
 
                     # Remove duplicate columns
                     df = df.loc[:, ~df.columns.duplicated()].copy()
+                    # Ensure all expected columns exist
+                    for col in expected_output_columns:
+                        if col not in df.columns:
+                            df[col] = None
                     # Convert to string
                     string_cols = [
                         'registration_number', 'package_number', 'task_number',
@@ -226,18 +250,12 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                     for col in numeric_convert:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
 
-                    # Ensure all expected columns exist
-                    for col in expected_output_columns:
-                        if col not in df.columns:
-                            df[col] = "None"
-
                     # Reorder columns to match expected order
                     df = df[expected_output_columns]
                     df["file_path"] = file_path
+                    print("Processed sub_task_parts file:", file_path)
                     
                 elif sheet_name == "HMV" or sheet_name[:2] == "20":
-                    if sheet_name[2:] == "19":
-                        return pd.DataFrame()
                     df.columns = df.columns.astype(str).str.strip()  # Strip spaces from column names
                     df = df.loc[:, ~df.columns.duplicated()].copy()  # Remove duplicate columns
                     df = df.reset_index(drop=True)  # Reset index
@@ -261,6 +279,12 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
 
                     # Rename columns if they exist in the dataframe
                     df.rename(columns={k: v for k, v in aircraft_details_column_mappings.items() if k in df.columns}, inplace=True)
+                                        
+                    # Add missing expected columns with None values
+                    expected_columns = list(aircraft_details_column_mappings.values())
+                    missing_columns = [col for col in expected_columns if col not in df.columns]
+                    for col in missing_columns:
+                        df[col] = None
                     df['flight_hours'] = df['flight_hours'].apply(clean_fly_hours)
 
                     # Handling aircraft age columns
@@ -276,6 +300,7 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                             )
                             # Additional safety conversion with proper error handling
                             df[col] = pd.to_numeric(df[col], errors='coerce')
+
 
                     # Handle datetime columns
                     datetime_cols = ["issue_date", 'start_date', 'end_date', 'last_maintenance_date']
@@ -302,8 +327,7 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                     for col in string_cols:
                         if col in df.columns:
                             df[col] = df[col].fillna('').astype(str)
-                        else:
-                            df[col] = ''
+
 
                     # Define numeric columns
                     numeric_cols = ['year', 'flight_hours', 'flight_cycles', 'aircraft_age', 
@@ -313,14 +337,8 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                     for col in numeric_cols:
                         if col in df.columns:
                             df[col] = pd.to_numeric(df[col], errors='coerce')
-                        else:
-                            df[col] = np.nan
 
-                    # Add missing expected columns with None values
-                    expected_columns = list(aircraft_details_column_mappings.values())
-                    missing_columns = [col for col in expected_columns if col not in df.columns]
-                    for col in missing_columns:
-                        df[col] = None
+
 
                     # Ensure the dataframe has all expected columns before reordering
                     reorder_columns = [col for col in expected_columns if col in df.columns]
@@ -613,10 +631,13 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                 sheet_names = [sheet_names]
 
             for root, _, files in os.walk(data_path):
+                if "2019" in os.path.normpath(root).split(os.sep):
+                    continue  # Skip any folder in the path that is '2019'
+                
                 for file in files:
                     file_path = os.path.join(root, file)
                     # Check if file is not already processed
-                    if file_path in processed_file_paths:
+                    if file_path  in files_to_process:
                         if file.startswith(prefix):
                             file_path = os.path.join(root, file)
                             folder_name = os.path.basename(root)
@@ -635,7 +656,9 @@ def get_processed_files(processed_file_paths, data_path, aircraft_details_initia
                                 all_sheets_data = []  # Store data from all valid sheets
 
                                 for sheet_name in valid_sheets:
+                                    #print(f"Processing sheet: {sheet_name} in file: {file_path}")
                                     df = read_and_process_file(file_path, sheet_name, folder_name)
+                                    #print("size of df:", df.shape,"of file:", file_path)
 
                                     if df is not None and not df.empty:
                                         df.reset_index(drop=True, inplace=True)

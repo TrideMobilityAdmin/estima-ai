@@ -32,13 +32,13 @@ def clean_data(data):
                     cleaned_data[column] = col_data.astype(str)
 
                 elif isinstance(col_data, pd.Series):  # Ensure we are working with a Series
-                    if pd.api.types.is_datetime64_any_dtype(col_data):
+                    """if pd.api.types.is_datetime64_any_dtype(col_data):
                         # Convert datetime columns to ISO format strings
                         cleaned_data[column] = col_data.apply(
                             lambda x: x.isoformat() if pd.notnull(x) else None
                         )
-
-                    elif pd.api.types.is_timedelta64_dtype(col_data):
+                    """
+                    if pd.api.types.is_timedelta64_dtype(col_data):
                         # Convert timedelta columns to total seconds
                         cleaned_data[column] = col_data.dt.total_seconds()
 

@@ -240,19 +240,30 @@ def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_d
         (task_description_processed, task_parts_processed, 
          sub_task_description_processed, sub_task_parts_processed)
     """
-    # Process task description - remove outliers and convert task format
-    task_description_processed = remove_outliers(task_description, manhour_column, threshold)
-    task_description_processed = convert_task_numbers_format(task_description_processed, task_columns)
+    if not task_description.empty: 
+        # Process task description - remove outliers and convert task format
+        task_description_processed = remove_outliers(task_description, manhour_column, threshold)
+        task_description_processed = convert_task_numbers_format(task_description_processed, task_columns)
+    else:
+        task_description_processed = pd.DataFrame()
+    if not task_parts.empty : 
+        # Process task parts - just convert task format
+        task_parts_processed = convert_task_numbers_format(task_parts, task_columns)
+    else:
+        task_parts_processed = pd.DataFrame()
+    if not sub_task_description.empty:
+        # Process sub-task description - remove outliers and convert task format
+        sub_task_description_processed = remove_outliers(sub_task_description, manhour_column, threshold)
+        sub_task_description_processed = convert_task_numbers_format(sub_task_description_processed, task_columns)
+    else:
+        sub_task_description_processed = pd.DataFrame()
+        
+    if not sub_task_parts.empty:
     
-    # Process task parts - just convert task format
-    task_parts_processed = convert_task_numbers_format(task_parts, task_columns)
-    
-    # Process sub-task description - remove outliers and convert task format
-    sub_task_description_processed = remove_outliers(sub_task_description, manhour_column, threshold)
-    sub_task_description_processed = convert_task_numbers_format(sub_task_description_processed, task_columns)
-    
-    # Process sub-task parts - just convert task format
-    sub_task_parts_processed = convert_task_numbers_format(sub_task_parts, task_columns)
+        # Process sub-task parts - just convert task format
+        sub_task_parts_processed = convert_task_numbers_format(sub_task_parts, task_columns)
+    else:
+        sub_task_parts_processed = pd.DataFrame()
     
     # Return the processed dataframes
     return (task_description_processed, task_parts_processed, 
@@ -297,7 +308,8 @@ async def main():
         # Fallback to absolute path if directory doesn't exist
         #if not os.path.exists(data_path):
         #    data_path = r"D:\Projects\gmr-mro\estima-ai\Data"
-        data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
+        data_path=config["excel_files"]["data_path"] 
+        #data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
@@ -349,6 +361,7 @@ async def main():
             "mldpmlsec1", 
             "Material"
         )
+        
         task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(
             task_description, 
             task_parts, 
