@@ -824,19 +824,20 @@ class ExcelUploadService:
         combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
         logger.info(f"Combined mappings: {combined_mappings}")
         # Detect the header row
-        header_row_index = self.detect_header_row(df, combined_mappings.keys())
+        header_row_index = self.detect_header_row(df, list(combined_mappings.keys()))
+        if header_row_index is not None:
+            df.columns = df.iloc[header_row_index].astype(str).values
+            print("df.columns:", df.columns)
 
-        if header_row_index is None:
+            logger.info(f"Detected header row at index {header_row_index} , columns: {df.columns}")
+
+            # Extract data rows (everything after the header)
+            df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        else:
+            # If no header row is detected, use the first row as header and log a warning
+            
             logger.warning(f"Could not detect header row in {filename}")
-            return pd.DataFrame()
-
-        # Set the column names correctly
-        df.columns = df.iloc[header_row_index].astype(str).values
-
-        #logger.info(f"Detected header row at index {header_row_index} in {filename}, columns: {df.columns}")
-
-        # Extract data rows (everything after the header)
-        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+            print(f"Could not detect header row in {filename}. Using first row as header.")
         logger.info(f"the shape of the DataFrame before processing {df.shape}")
         logger.info(f"The dataframe columns of {filename} are {df.columns}")
         # Rename columns using mappings
