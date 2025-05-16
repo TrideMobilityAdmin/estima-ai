@@ -296,3 +296,11 @@ async def get_operator_master_list(
     Endpoint to retrieve the operator master list
     """
     return await task_service.get_master_operator_list()
+
+@router.get("/file_upload_estimate/{estimate_id}")
+async def get_upload_estimate_byId(
+    estimate_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    file_upload=await excel_service.get_upload_estimate_byId(estimate_id)
+    return file_upload
