@@ -10,8 +10,8 @@ import sys
 from model.ml_pipeline import defects_prediction
 
 # Connect to MongoDB
-client = MongoClient("mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl")
-db = client["gmr-mro-test-5y"]
+client = MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
+db = client["gmr-mro-staging-5y"]
 input_collection = db["estimate_file_upload"]
 output_collection = db["estima_output"]
 
