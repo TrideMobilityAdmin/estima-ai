@@ -8,6 +8,7 @@ import {
   Indicator,
   List,
   LoadingOverlay,
+  Menu,
   Modal,
   MultiSelect,
   NumberInput,
@@ -17,6 +18,9 @@ import {
   Stack,
   Textarea,
   Tooltip,
+  Combobox,
+  useCombobox,
+  InputBase
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -51,6 +55,7 @@ import {
   useForm,
   XLSX,
   useAtom,
+  useDisclosure,
 } from "../constants/GlobalImports";
 import { AreaChart, getFilteredChartTooltipPayload } from "@mantine/charts";
 import "../App.css";
@@ -80,6 +85,7 @@ import {
   IconListCheck,
   IconListDetails,
   IconLoader,
+  IconMenu,
   IconMessage,
   IconMessage2Plus,
   IconMinimize,
@@ -196,6 +202,7 @@ export default function EstimateNew() {
   // const [isLoading, setIsLoading] = useState(false);
   console.log("selected remarks >>>>", selectedEstRemarksData);
 
+  const [menuOpened, { open, close }] = useDisclosure(false);
   // const fetchEstimatesStatus = async () => {
   //     setLoading(true);
   //     const data = await getAllEstimatesStatus();
@@ -376,7 +383,7 @@ export default function EstimateNew() {
       setIsValidating(false);
     }
   };
-  
+
 
   const handleValidateSkillsTasks = async (tasks: string[]) => {
     setIsValidating2(true);
@@ -480,7 +487,7 @@ export default function EstimateNew() {
   // const downloadAllValidatedTasks = async (tasks: any[]) => {
   //   // Step 1: Get the latest validated tasks directly
   //   const validated = await handleValidateTasks(tasks);
-  
+
   //   if (!validated || validated.length === 0) {
   //     showNotification({
   //       title: "No tasks found",
@@ -489,22 +496,22 @@ export default function EstimateNew() {
   //     });
   //     return;
   //   }
-  
+
   //   // Step 2: Prepare Excel data
   //   const excelData = validated.map((task: any) => ({
   //     "TASK NUMBER": task?.taskid || "",
   //     DESCRIPTION: task?.description || "",
   //     "MAN HOURS": "", // Can be modified to include actual man hours
   //   }));
-  
+
   //   // Step 3: Create and download Excel
   //   const ws = XLSX.utils.json_to_sheet(excelData);
   //   const wb = XLSX.utils.book_new();
   //   XLSX.utils.book_append_sheet(wb, ws, "MPD");
-  
+
   //   XLSX.writeFile(wb, `Estimate_${selectedEstimateId}_AllTasks.xlsx`);
   // };
-  
+
   const downloadAllValidatedTasks = async (
     tasks: string[],
     descriptions: string[],
@@ -512,151 +519,174 @@ export default function EstimateNew() {
   ) => {
     // Check if tasks and descriptions have data
     const hasData = tasks.length > 0 && descriptions.length > 0;
-  
+
     const excelData = hasData
       ? tasks.map((task, index) => ({
-          "TASK NUMBER": task || "",
-          DESCRIPTION: descriptions[index] || "",
-          "FINAL MH": "",
-        }))
+        "TASK NUMBER": task || "",
+        DESCRIPTION: descriptions[index] || "",
+        "FINAL MH": "",
+      }))
       : [
-          {
-            "TASK NUMBER": "",
-            DESCRIPTION: "",
-            "FINAL MH": "",
-          },
-        ];
-  
+        {
+          "TASK NUMBER": "",
+          DESCRIPTION: "",
+          "FINAL MH": "",
+        },
+      ];
+
     // Create and download Excel
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "MPD");
     XLSX.writeFile(wb, `Estimate_${estID}.xlsx`);
   };
-  
-  
-  
 
   // Reset counter for keys to force re-render
-const [formKey, setFormKey] = useState(0);
-// Form initialization
-const form = useForm<any>({
-  initialValues: {
-    tasks: [],
-    probability: 10,
-    operator: "",
-    aircraftRegNo: "",
-    aircraftModel: "",
-    aircraftAge: 0,
-    aircraftFlightHours: "",
-    aircraftFlightCycles: "",
-    areaOfOperations: "",
-    cappingDetails: {
-      cappingTypeManhrs: "",
-      cappingManhrs: "",
-      cappingTypeSpareCost: "",
-      cappingSpareCost: "",
+  const [formKey, setFormKey] = useState(0);
+  // Form initialization
+  const form = useForm<any>({
+    initialValues: {
+      tasks: [],
+      probability: 10,
+      operator: "",
+      aircraftRegNo: "",
+      aircraftModel: "",
+      aircraftAge: 0,
+      aircraftFlightHours: "",
+      aircraftFlightCycles: "",
+      areaOfOperations: "",
+      cappingDetails: {
+        cappingTypeManhrs: "",
+        cappingManhrs: "",
+        cappingTypeSpareCost: "",
+        cappingSpareCost: "",
+      },
+      taskID: "",
+      taskDescription: "",
+      typeOfCheck: [], // Changed from string to array for MultiSelect
+      typeOfCheckID: "", // Added new field for typeOfCheckID
+      miscLaborTasks: [],
+      additionalTasks: [],
     },
-    taskID: "",
-    taskDescription: "",
-    typeOfCheck: [], // Changed from string to array for MultiSelect
-    typeOfCheckID: "", // Added new field for typeOfCheckID
-    miscLaborTasks: [],
-    additionalTasks: [],
-  },
-  validateInputOnChange: true,
+    validateInputOnChange: true,
 
-  validate: {
-    operator: (value) => (value?.trim() ? null : "Operator is required"),
-    aircraftRegNo: (value) =>
-      value?.trim() ? null : "Aircraft Registration Number is required",
-    // aircraftAge: (value) =>
-    //   value ? null : "Aircraft Age is required",
-    typeOfCheck: (value) =>
-      value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
-    typeOfCheckID: (value) =>
-      value?.trim() ? null : "Type of Check ID is required", // Added validation
-    aircraftModel: (value) =>
-      value?.trim() ? null : "Aircraft Model is required",
+    validate: {
+      operator: (value) => (value?.trim() ? null : "Operator is required"),
+      aircraftRegNo: (value) =>
+        value?.trim() ? null : "Aircraft Registration Number is required",
+      // aircraftAge: (value) =>
+      //   value ? null : "Aircraft Age is required",
+      typeOfCheck: (value) =>
+        value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
+      typeOfCheckID: (value) =>
+        value?.trim() ? null : "Type of Check ID is required", // Added validation
+      aircraftModel: (value) =>
+        value?.trim() ? null : "Aircraft Model is required",
 
-    cappingDetails: {
-      // Man Hours Capping Validation
-      cappingTypeManhrs: (value, values) => {
-        if (!value && values.cappingDetails.cappingManhrs) {
-          return "Man Hours Type is required when Man Hours are entered";
-        }
-        return null;
-      },
-      cappingManhrs: (value, values) => {
-        if (!value && values.cappingDetails.cappingTypeManhrs) {
-          return "Man Hours is required when Type is selected";
-        }
-        return null;
-      },
+      cappingDetails: {
+        // Man Hours Capping Validation
+        cappingTypeManhrs: (value, values) => {
+          if (!value && values.cappingDetails.cappingManhrs) {
+            return "Man Hours Type is required when Man Hours are entered";
+          }
+          return null;
+        },
+        cappingManhrs: (value, values) => {
+          if (!value && values.cappingDetails.cappingTypeManhrs) {
+            return "Man Hours is required when Type is selected";
+          }
+          return null;
+        },
 
-      // Spare Cost Capping Validation
-      cappingTypeSpareCost: (value, values) => {
-        if (!value && values.cappingDetails.cappingSpareCost) {
-          return "Capping Type is required when Cost is entered";
-        }
-        return null;
-      },
-      cappingSpareCost: (value, values) => {
-        if (!value && values.cappingDetails.cappingTypeSpareCost) {
-          return "Cost is required when Type is selected";
-        }
-        return null;
+        // Spare Cost Capping Validation
+        cappingTypeSpareCost: (value, values) => {
+          if (!value && values.cappingDetails.cappingSpareCost) {
+            return "Capping Type is required when Cost is entered";
+          }
+          return null;
+        },
+        cappingSpareCost: (value, values) => {
+          if (!value && values.cappingDetails.cappingTypeSpareCost) {
+            return "Cost is required when Type is selected";
+          }
+          return null;
+        },
       },
     },
-  },
-});
+  });
 
-// Handle Submit
-const handleSubmit = async () => {
-  const validationResult = form.validate();
-  
-  // Check if the form is valid
-  if (validationResult.hasErrors) {
-    // Find first input with error and focus it
-    const errorFields = Object.keys(form.errors);
-    if (errorFields.length > 0) {
-      // Scroll to first error field if ref is available
-      const firstErrorField = errorFields[0];
-      if (firstErrorField === 'aircraftRegNo' && aircraftRegNoRef.current) {
-        aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-        aircraftRegNoRef.current.focus();
-      }
-    }
-    return;
-  }
-  
-  // Additional custom validations
-  if (
-    form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
-    form.values.typeOfCheck.length === 0
-  ) {
-    form.setFieldError("typeOfCheck", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
-    return;
-  }
-  
-  if (!selectedFile && additionalTasks.length === 0) {
-    showAppNotification(
-      "warning",
-      "Error",
-      "Please select a file or add at least one Additional Task."
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+  });
+
+  const [data, setData] = useState(operatorsList);
+  const [search, setSearch] = useState(form.values.operator);
+
+  const exactOptionMatch = data.some((item) => item.toLowerCase() === search.toLowerCase());
+  const filteredOptions = exactOptionMatch
+    ? data
+    : data.filter((item) =>
+      item.toLowerCase().includes(search.toLowerCase().trim())
     );
-    return;
-  }
-  
-  const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
-  
-  const defaultAdditionalTasks = additionalTasks.length > 0
-    ? additionalTasks
-    : [{ taskID: "", taskDescription: "" }];
-  
-  const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
-    ? selectedExpertInsightTasks
-    : [{
+
+  const options = filteredOptions.map((item) => (
+    <Combobox.Option value={item} key={item}>
+      {item}
+    </Combobox.Option>
+  ));
+
+  const clearSelection = () => {
+    form.setFieldValue('operator', '');
+    setSearch('');
+    form.validateField('operator');
+  };
+
+  // Handle Submit
+  const handleSubmit = async () => {
+    const validationResult = form.validate();
+
+    // Check if the form is valid
+    if (validationResult.hasErrors) {
+      // Find first input with error and focus it
+      const errorFields = Object.keys(form.errors);
+      if (errorFields.length > 0) {
+        // Scroll to first error field if ref is available
+        const firstErrorField = errorFields[0];
+        if (firstErrorField === 'aircraftRegNo' && aircraftRegNoRef.current) {
+          aircraftRegNoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+          aircraftRegNoRef.current.focus();
+        }
+      }
+      return;
+    }
+
+    // Additional custom validations
+    if (
+      form.values.aircraftRegNo.trim().toLowerCase() === "n/a" &&
+      form.values.typeOfCheck.length === 0
+    ) {
+      form.setFieldError("typeOfCheck", "When Aircraft Registration Number is N/A, Type of Check is mandatory");
+      return;
+    }
+
+    if (!selectedFile && additionalTasks.length === 0) {
+      showAppNotification(
+        "warning",
+        "Error",
+        "Please select a file or add at least one Additional Task."
+      );
+      return;
+    }
+
+    const validTasks = validatedTasks?.filter((task) => task?.status)?.map((task) => task?.taskid);
+
+    const defaultAdditionalTasks = additionalTasks.length > 0
+      ? additionalTasks
+      : [{ taskID: "", taskDescription: "" }];
+
+    const defaultMiscLaborTasks = selectedExpertInsightTasks.length > 0
+      ? selectedExpertInsightTasks
+      : [{
         taskID: "",
         taskDescription: "",
         manHours: 0,
@@ -665,99 +695,99 @@ const handleSubmit = async () => {
           { partID: "", description: "", quantity: 0, unit: "", price: 0 },
         ],
       }];
-  
-  const requestData = {
-    tasks: validTasks || [],
-    probability: Number(form.values.probability) || 10,
-    operator: form.values.operator || "",
-    aircraftRegNo: form.values.aircraftRegNo || "",
-    aircraftModel: form.values.aircraftModel || "",
-    aircraftAge: form.values.aircraftAge || 0.0,
-    aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
-    aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
-    areaOfOperations: form.values.areaOfOperations || "",
-    // cappingDetails: {
-    //   cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-    //   cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
-    //   cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-    //   cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
-    // },
-    cappingDetails: {
-      cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-      cappingManhrs:
-        form.values.cappingDetails.cappingManhrs?.toString().trim() === ""
-          ? 0
-          : Number(form.values.cappingDetails.cappingManhrs),
-      cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-      cappingSpareCost:
-        form.values.cappingDetails.cappingSpareCost?.toString().trim() === ""
-          ? 0
-          : Number(form.values.cappingDetails.cappingSpareCost),
-    },
-    additionalTasks: defaultAdditionalTasks,
-    typeOfCheck: form.values.typeOfCheck || [],
-    typeOfCheckID: form.values.typeOfCheckID || "",
-    miscLaborTasks: defaultMiscLaborTasks,
+
+    const requestData = {
+      tasks: validTasks || [],
+      probability: Number(form.values.probability) || 10,
+      operator: form.values.operator || "",
+      aircraftRegNo: form.values.aircraftRegNo || "",
+      aircraftModel: form.values.aircraftModel || "",
+      aircraftAge: form.values.aircraftAge || 0.0,
+      aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
+      aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
+      areaOfOperations: form.values.areaOfOperations || "",
+      // cappingDetails: {
+      //   cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+      //   cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
+      //   cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+      //   cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
+      // },
+      cappingDetails: {
+        cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
+        cappingManhrs:
+          form.values.cappingDetails.cappingManhrs?.toString().trim() === ""
+            ? 0
+            : Number(form.values.cappingDetails.cappingManhrs),
+        cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
+        cappingSpareCost:
+          form.values.cappingDetails.cappingSpareCost?.toString().trim() === ""
+            ? 0
+            : Number(form.values.cappingDetails.cappingSpareCost),
+      },
+      additionalTasks: defaultAdditionalTasks,
+      typeOfCheck: form.values.typeOfCheck || [],
+      typeOfCheckID: form.values.typeOfCheckID || "",
+      miscLaborTasks: defaultMiscLaborTasks,
+    };
+    // console.log("request data >>>>",requestData);
+    try {
+      setLoading(true);
+
+      let fileToUpload = selectedFile;
+
+      // ✅ Load fallback file if selectedFile is null
+      if (!fileToUpload) {
+        const response = await fetch(excelTemplateFile);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
+      }
+
+      const response = await RFQFileUpload(requestData, fileToUpload);
+      if (response) {
+        setRfqSubmissionResponse(response);
+        setRfqSubModalOpened(true);
+        showAppNotification("success", "Success!", "RFQ submitted successfully!");
+
+        // Reset form and states
+        form.reset();
+        form.setValues({
+          tasks: [],
+          probability: 10,
+          operator: "",
+          aircraftRegNo: "",
+          aircraftModel: "",
+          aircraftAge: 0,
+          aircraftFlightHours: "",
+          aircraftFlightCycles: "",
+          areaOfOperations: "",
+          cappingDetails: {
+            cappingTypeManhrs: "",
+            cappingManhrs: "",
+            cappingTypeSpareCost: "",
+            cappingSpareCost: "",
+          },
+          taskID: "",
+          taskDescription: "",
+          typeOfCheck: [],
+          typeOfCheckID: "",
+          miscLaborTasks: [],
+          additionalTasks: [],
+        });
+
+        // setSelectedFile(null);
+        setValidatedTasks([]);
+        setAdditionalTasks([]);
+        setSelectedExpertInsightTasks([]);
+        setFormKey((prev) => prev + 1);
+      }
+    } catch (error) {
+      console.error("API Error:", error);
+      showAppNotification("error", "Error!", "Failed to submit RFQ!");
+    } finally {
+      setLoading(false);
+    }
   };
-  // console.log("request data >>>>",requestData);
-  try {
-    setLoading(true);
-  
-    let fileToUpload = selectedFile;
-  
-    // ✅ Load fallback file if selectedFile is null
-    if (!fileToUpload) {
-      const response = await fetch(excelTemplateFile);
-      const blob = await response.blob();
-      fileToUpload = new File([blob], "empty-template.xlsx", { type: blob.type });
-    }
-  
-    const response = await RFQFileUpload(requestData, fileToUpload);
-    if (response) {
-      setRfqSubmissionResponse(response);
-      setRfqSubModalOpened(true);
-      showAppNotification("success", "Success!", "RFQ submitted successfully!");
-  
-      // Reset form and states
-      form.reset();
-      form.setValues({
-        tasks: [],
-        probability: 10,
-        operator: "",
-        aircraftRegNo: "",
-        aircraftModel: "",
-        aircraftAge: 0,
-        aircraftFlightHours: "",
-        aircraftFlightCycles: "",
-        areaOfOperations: "",
-        cappingDetails: {
-          cappingTypeManhrs: "",
-          cappingManhrs: "",
-          cappingTypeSpareCost: "",
-          cappingSpareCost: "",
-        },
-        taskID: "",
-        taskDescription: "",
-        typeOfCheck: [],
-        typeOfCheckID: "",
-        miscLaborTasks: [],
-        additionalTasks: [],
-      });
-  
-      setSelectedFile(null);
-      setValidatedTasks([]);
-      setAdditionalTasks([]);
-      setSelectedExpertInsightTasks([]);
-      setFormKey((prev) => prev + 1);
-    }
-  } catch (error) {
-    console.error("API Error:", error);
-    showAppNotification("error", "Error!", "Failed to submit RFQ!");
-  } finally {
-    setLoading(false);
-  }
-};
-  
+
 
   console.log("rfq sub >>> ", rfqSubmissionResponse);
 
@@ -804,7 +834,7 @@ const handleSubmit = async () => {
 
   const handleCloseModal = () => {
     setRfqSubModalOpened(false);
-    setSelectedFile(null); // Clear selected file
+    // setSelectedFile(null); // Clear selected file
     setExtractedTasks([]); // Clear extracted tasks
     form.reset();
     fetchEstimatesStatus();
@@ -1250,8 +1280,8 @@ const handleSubmit = async () => {
       processField(est.aircraftModel),
       // processField(est.typeOfCheck),
       Array.isArray(est.typeOfCheck)
-      ? est.typeOfCheck.join(", ")
-      : processField(est.typeOfCheck),
+        ? est.typeOfCheck.join(", ")
+        : processField(est.typeOfCheck),
       processField(est.tasks?.length),
       processField(Math.round(est.aggregatedTasks?.totalMhs)),
       "N/A",
@@ -2204,7 +2234,7 @@ const handleSubmit = async () => {
                     <Button
                       size="xs"
                       color="#000480"
-                      radius="lg"
+                      radius="md"
                       variant="light"
                       disabled={!selectedFile && additionalTasks?.length === 0}
                       onClick={handleShowTasks}
@@ -2419,8 +2449,75 @@ const handleSubmit = async () => {
 
           <Grid.Col span={{ base: 12, md: 4, lg: 4 }}>
             <Card withBorder h="60vh" radius="md">
-              {/* <Card bg='#dce1fc'> */}
-              <Group
+
+              <Group justify="flex-end">
+                <Menu
+                  shadow="md"
+                  width={250}
+                  opened={menuOpened}
+                  onOpen={open}
+                  onClose={close}
+                  withinPortal
+                >
+                  <Menu.Target>
+                    {/* <Group>
+            <Text size="md" fw={500}>
+              Input Parameters
+            </Text>
+            <ActionIcon
+              variant="light"
+              color="#000480"
+              // onClick={(event) => {
+              //   event.stopPropagation();
+              //   menuOpened ? close() : open();
+              // }}
+            > <IconMenu/>
+            </ActionIcon>
+          </Group> */}
+                    <Button
+                      size="xs"
+                      color="#000480"
+                      radius="md"
+                      variant="light"
+                      rightSection={<IconChevronDown size={16} />}
+                      style={{ width: 180 }}
+                    >
+                      Input Parameters
+                    </Button>
+                  </Menu.Target>
+
+                  <Menu.Dropdown>
+                    <Menu.Label>Input Parameters</Menu.Label>
+                    <ScrollArea type="auto" style={{ maxHeight: 300 }} offsetScrollbars>
+                      <Stack gap="xs" p="xs">
+                        {fields.map((field) => (
+                          <Checkbox
+                            key={field.name}
+                            label={field.label}
+                            checked={selectedFields.includes(field.name)}
+                            onChange={() => toggleFieldSelection(field.name)}
+                          />
+                        ))}
+                      </Stack>
+                    </ScrollArea>
+
+                    <Divider my="xs" />
+
+                    <Button
+                      fullWidth
+                      variant="light"
+                      onClick={() => {
+                        setShowFields([...selectedFields]);
+                        close(); // Close the menu
+                      }}
+                    >
+                      Show Inputs
+                    </Button>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
+
+              {/* <Group
                 justify="space-between"
                 onClick={() => setExpanded(!expanded)}
                 style={{ cursor: "pointer" }}
@@ -2436,7 +2533,6 @@ const handleSubmit = async () => {
                   )}
                 </Group>
               </Group>
-              {/* </Card> */}
 
               {expanded && (
                 <ScrollArea
@@ -2473,7 +2569,7 @@ const handleSubmit = async () => {
                     </Button>
                   </Group>
                 </ScrollArea>
-              )}
+              )} */}
 
               <ScrollArea
                 style={{ flex: 1, overflow: "auto" }}
@@ -2527,6 +2623,17 @@ const handleSubmit = async () => {
                     }}
                     error={form.errors.typeOfCheck}
                     withAsterisk
+                    styles={{
+                      input: {
+                        backgroundColor: '#edf4ff',
+                      },
+                      pill: {
+                        backgroundColor: '#ffffff',
+                      },
+                      // dropdown: {
+                      //   backgroundColor: '#edf4ff',
+                      // },
+                    }}
                   />
 
                   <TextInput
@@ -2534,14 +2641,16 @@ const handleSubmit = async () => {
                     leftSection={<MdPin />}
                     placeholder="Ex: 5.5"
                     label="Aircraft Age"
-                    type="number"
-                    step="0.01"
                     {...form.getInputProps("aircraftAge")}
                     error={form.errors.aircraftAge}
-                    // withAsterisk
+                    styles={{
+                      input: {
+                        backgroundColor: '#edf4ff',
+                      },
+                    }}
                   />
 
-                  <Select
+                  {/* <Select
                     key={`operator-select-${formKey}`}
                     size="xs"
                     searchable
@@ -2550,10 +2659,6 @@ const handleSubmit = async () => {
                     placeholder="Indigo, AirIndia"
                     label="Operator"
                     data={operatorsList}
-                    // data={aircraftOperators.map((el) => ({
-                    //   label: el.operatorName,
-                    //   value: el.operatorName,
-                    // }))}
                     value={form.values.operator}
                     onChange={(value) => {
                       form.setFieldValue("operator", value || "");
@@ -2561,7 +2666,97 @@ const handleSubmit = async () => {
                     }}
                     error={form.errors.operator}
                     withAsterisk
-                  />
+                    styles={{
+                      input: {
+                        backgroundColor: '#edf4ff',
+                      },
+                    }}
+                  /> */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        marginBottom: '4px',
+                        display: 'block',
+                      }}
+                    >
+                      Operator <span style={{ color: 'red' }}>*</span>
+                    </label>
+
+                    <Combobox
+                      store={combobox}
+                      withinPortal={false}
+                      onOptionSubmit={(val) => {
+                        if (val === '$create') {
+                          setData((current) => [...current, search]);
+                          form.setFieldValue('operator', search);
+                          setSearch(search);
+                        } else {
+                          form.setFieldValue('operator', val);
+                          setSearch(val);
+                        }
+                        // form.validateField('operator');
+                        combobox.closeDropdown();
+                      }}
+                    >
+                      <Combobox.Target>
+                        <InputBase
+                          size="xs"
+                          leftSection={<IconPlaneTilt size={20} />}
+                          rightSection={
+                            search ? (
+                              <IconX
+                                size={16}
+                                style={{ cursor: 'pointer' }}
+                                onClick={clearSelection}
+                              />
+                            ) : (
+                              <Combobox.Chevron />
+                            )
+                          }
+                          value={search}
+                          onChange={(event) => {
+                            combobox.openDropdown();
+                            combobox.updateSelectedOptionIndex();
+                            setSearch(event.currentTarget.value);
+                          }}
+                          onClick={() => combobox.openDropdown()}
+                          onFocus={() => combobox.openDropdown()}
+                          onBlur={() => {
+                            combobox.closeDropdown();
+                            setSearch(form.values.operator || '');
+                            form.validateField('operator');
+                          }}
+                          placeholder="Indigo, AirIndia"
+                          rightSectionPointerEvents="auto"
+                          error={form.errors.operator}
+                          styles={{
+                            input: {
+                              backgroundColor: '#edf4ff',
+                            },
+                          }}
+                        />
+                      </Combobox.Target>
+
+                      <Combobox.Dropdown>
+                        <Combobox.Options style={{ maxHeight: 200, overflowY: 'auto' }}>
+                          {options}
+                          {!exactOptionMatch && search.trim().length > 0 && (
+                            <Combobox.Option value="$create">
+                              + Create "{search}"
+                            </Combobox.Option>
+                          )}
+                        </Combobox.Options>
+                      </Combobox.Dropdown>
+                    </Combobox>
+
+                    {/* {form.errors.operator && (
+                      <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>
+                        {form.errors.operator}
+                      </div>
+                    )} */}
+                  </div>
 
                   <Select
                     key={`aircraftModel-select-${formKey}`}
@@ -2572,10 +2767,6 @@ const handleSubmit = async () => {
                     placeholder="Select Aircraft Model"
                     label="Aircraft Model"
                     data={models}
-                    // data={aircraftMOdelsData.map((el) => ({
-                    //   label: el.model,
-                    //   value: el.model,
-                    // }))}
                     value={form.values.aircraftModel}
                     onChange={(value) => {
                       form.setFieldValue("aircraftModel", value || "");
@@ -2583,6 +2774,11 @@ const handleSubmit = async () => {
                     }}
                     error={form.errors.aircraftModel}
                     withAsterisk
+                    styles={{
+                      input: {
+                        backgroundColor: '#edf4ff',
+                      },
+                    }}
                   />
 
                   <TextInput
@@ -2594,6 +2790,11 @@ const handleSubmit = async () => {
                     {...form.getInputProps("aircraftRegNo")}
                     error={form.errors.aircraftRegNo}
                     withAsterisk
+                  // styles={{
+                  //   input: {
+                  //     backgroundColor: '#ebfffe',
+                  //   },
+                  // }}
                   />
 
                   <TextInput
@@ -2603,26 +2804,13 @@ const handleSubmit = async () => {
                     {...form.getInputProps("typeOfCheckID")}
                     error={form.errors.typeOfCheckID}
                     withAsterisk
+                  // styles={{
+                  //   input: {
+                  //     backgroundColor: '#ebfffe',
+                  //   },
+                  // }}
                   />
 
-
-
-                  {/* <TextInput
-                                        // ref={aircraftRegNoRef}
-                                        size="xs"
-                                        leftSection={<IconPlaneTilt size='20' />}
-                                        placeholder="Ex: A320"
-                                        label="Aircraft Model"
-                                        {...form.getInputProps("aircraftModel")}
-                                    />
-                                    */}
-                  {/* <TextInput
-                    size="xs"
-                    leftSection={<IconPlaneTilt size="20" />}
-                    placeholder="Indigo, AirIndia"
-                    label="Operator"
-                    {...form.getInputProps("operator")}
-                  /> */}
                 </SimpleGrid>
                 <Space h="xs" />
                 {showFields?.length > 0 ? (
@@ -4933,7 +5121,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             {/* <Badge variant="light" color="blue" fullWidth>
               Avg : {val?.data?.mhsAvg || "-"}
             </Badge> */}
-             <Badge variant="light" color="blue" fullWidth>
+            <Badge variant="light" color="blue" fullWidth>
               Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
@@ -5164,9 +5352,9 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
 
   const downloadExcelManhours = () => {
     const rows: any[] = [];
-  
-    findings?.forEach((task:any) => {
-      task.details.forEach((detail:any) => {
+
+    findings?.forEach((task: any) => {
+      task.details.forEach((detail: any) => {
         rows.push({
           TaskID: task.taskId,
           Description: detail.description.replace(/\\n/g, "\n"),
@@ -5178,11 +5366,11 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         });
       });
     });
-  
+
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
-  
+
     XLSX.writeFile(workbook, "Findings_ManHours.xlsx");
   };
 
@@ -5217,7 +5405,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               <Button color="green" size="xs" onClick={downloadExcel} ml="45vw">
                 Download Report
               </Button>
-              <Space w='xs'/>
+              <Space w='xs' />
               <Button color="green" size="xs" onClick={downloadExcelManhours}>
                 Download ManHours
               </Button>
@@ -5567,43 +5755,43 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 </Text>
 
                 <SimpleGrid cols={8}>
-  {(() => {
-    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail?.skill : [];
+                  {(() => {
+                    const skills = Array.isArray(selectedFindingDetail?.skill) ? selectedFindingDetail?.skill : [];
 
-    const validSkillsSet = new Set<string>();
-    let hasUnknownSkill = false;
+                    const validSkillsSet = new Set<string>();
+                    let hasUnknownSkill = false;
 
-    for (const skl of skills) {
-      const trimmed = skl?.toString().trim();
+                    for (const skl of skills) {
+                      const trimmed = skl?.toString().trim();
 
-      if (
-        !trimmed || // handles empty, null, undefined
-        trimmed.toLowerCase() === "nan"
-      ) {
-        hasUnknownSkill = true;
-      } else {
-        validSkillsSet.add(trimmed);
-      }
-    }
+                      if (
+                        !trimmed || // handles empty, null, undefined
+                        trimmed.toLowerCase() === "nan"
+                      ) {
+                        hasUnknownSkill = true;
+                      } else {
+                        validSkillsSet.add(trimmed);
+                      }
+                    }
 
-    const validSkills = Array.from(validSkillsSet);
+                    const validSkills = Array.from(validSkillsSet);
 
-    return (
-      <>
-        {validSkills.map((skill, index) => (
-          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
-            {skill}
-          </Badge>
-        ))}
-        {hasUnknownSkill && (
-          <Badge fullWidth color="gray" size="lg" radius="md">
-            Unknown Skill
-          </Badge>
-        )}
-      </>
-    );
-  })()}
-</SimpleGrid>
+                    return (
+                      <>
+                        {validSkills.map((skill, index) => (
+                          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+                            {skill}
+                          </Badge>
+                        ))}
+                        {hasUnknownSkill && (
+                          <Badge fullWidth color="gray" size="lg" radius="md">
+                            Unknown Skill
+                          </Badge>
+                        )}
+                      </>
+                    );
+                  })()}
+                </SimpleGrid>
 
 
 
@@ -5969,7 +6157,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
             {/* <Badge variant="light" color="blue" fullWidth>
               Avg : {Math.round(val?.data?.mhsAvg) || "-"}
             </Badge> */}
-             <Badge variant="light" color="blue" fullWidth>
+            <Badge variant="light" color="blue" fullWidth>
               Est : {val?.data?.mhsEst || "-"}
             </Badge>
             <Badge variant="light" color="violet" fullWidth>
@@ -6184,21 +6372,21 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
   const downloadExcelManhours = () => {
     const rows: any[] = [];
 
-      tasks?.forEach((detail:any) => {
-        rows.push({
-          TaskID: detail.sourceTask,
-          Description: detail.description.replace(/\\n/g, "\n"),
-          "MHS Min": Math.round(detail.mhs.min),
-          "MHS Max": Math.round(detail.mhs.max),
-          // "MHS Avg": Math.round(detail.mhs.avg),
-          "MHS Est": Math.round(detail.mhs.est),
-        });
+    tasks?.forEach((detail: any) => {
+      rows.push({
+        TaskID: detail.sourceTask,
+        Description: detail.description.replace(/\\n/g, "\n"),
+        "MHS Min": Math.round(detail.mhs.min),
+        "MHS Max": Math.round(detail.mhs.max),
+        // "MHS Avg": Math.round(detail.mhs.avg),
+        "MHS Est": Math.round(detail.mhs.est),
       });
-  
+    });
+
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
-  
+
     XLSX.writeFile(workbook, "MPD_ManHours.xlsx");
   };
 
@@ -6232,7 +6420,7 @@ const PreloadWiseSection: React.FC<{ tasks: any[] }> = ({ tasks }) => {
               <Button color="green" size="xs" onClick={downloadExcel} ml="40vw">
                 Download Report
               </Button>
-              <Space w='xs'/>
+              <Space w='xs' />
               <Button color="green" size="xs" onClick={downloadExcelManhours} >
                 Download Manhours
               </Button>
@@ -6513,43 +6701,43 @@ border-bottom: none;
                       </Text>
 
                       <SimpleGrid cols={8}>
-  {(() => {
-    const skills = Array.isArray(selectedTask?.skill) ? selectedTask.skill : [];
+                        {(() => {
+                          const skills = Array.isArray(selectedTask?.skill) ? selectedTask.skill : [];
 
-    const validSkillsSet = new Set<string>();
-    let hasUnknownSkill = false;
+                          const validSkillsSet = new Set<string>();
+                          let hasUnknownSkill = false;
 
-    for (const skl of skills) {
-      const trimmed = skl?.toString().trim();
+                          for (const skl of skills) {
+                            const trimmed = skl?.toString().trim();
 
-      if (
-        !trimmed || // handles empty, null, undefined
-        trimmed.toLowerCase() === "nan"
-      ) {
-        hasUnknownSkill = true;
-      } else {
-        validSkillsSet.add(trimmed);
-      }
-    }
+                            if (
+                              !trimmed || // handles empty, null, undefined
+                              trimmed.toLowerCase() === "nan"
+                            ) {
+                              hasUnknownSkill = true;
+                            } else {
+                              validSkillsSet.add(trimmed);
+                            }
+                          }
 
-    const validSkills = Array.from(validSkillsSet);
+                          const validSkills = Array.from(validSkillsSet);
 
-    return (
-      <>
-        {validSkills.map((skill, index) => (
-          <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
-            {skill}
-          </Badge>
-        ))}
-        {hasUnknownSkill && (
-          <Badge fullWidth color="gray" size="lg" radius="md">
-            Unknown Skill
-          </Badge>
-        )}
-      </>
-    );
-  })()}
-</SimpleGrid>
+                          return (
+                            <>
+                              {validSkills.map((skill, index) => (
+                                <Badge key={index} fullWidth color="cyan" size="lg" radius="md">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {hasUnknownSkill && (
+                                <Badge fullWidth color="gray" size="lg" radius="md">
+                                  Unknown Skill
+                                </Badge>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </SimpleGrid>
 
 
                       <Space h="md" />
