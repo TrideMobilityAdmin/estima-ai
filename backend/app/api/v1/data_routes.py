@@ -208,6 +208,26 @@ async def validate_tasks(
     return await task_service.validate_tasks(estimate_request,current_user)
 
 
+@router.post("/operators_list", response_model= Dict[str, str])
+async def upload_operators_list(
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get a list of operators based on the current user's role.
+    """
+    return await task_service.upload_operator_list(current_user)
+
+
+@router.get("/operators_list", response_model=List[str])
+async def get_operators_list(
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get a list of operators based on the current user's role.
+    """
+    return await task_service.get_operator_list(current_user)
 
 @router.post("/validate_tasks_checkbased",response_model=List[ValidTasks])
 async def validate_tasks_checkbased(
