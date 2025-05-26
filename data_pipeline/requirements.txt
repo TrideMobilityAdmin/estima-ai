@@ -1,3 +1,5 @@
 motor==3.6.1
 pandas=2.2.3
 openpyxl==3.1.5
+pymongo==4.12.1
+fuzzywuzzy==0.18.0
