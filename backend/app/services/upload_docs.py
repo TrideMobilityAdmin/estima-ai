@@ -48,6 +48,7 @@ class ExcelUploadService:
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
+        self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -370,6 +371,24 @@ class ExcelUploadService:
             new_version = latest_version + 1                             
             est_id = f"{base_est_id}-V{new_version:02d}"
             logger.info(f"estID is : {est_id}")
+
+            normalized_operator = estimate_request.operator.replace(" ", "").upper()
+
+            existing_operator = self.operators_master_collection.find_one({
+                "$expr": {
+                    "$eq": [
+                        {"$toUpper": {"$replaceAll": {"input": "$operator", "find": " ", "replacement": ""}}},
+                        normalized_operator
+                    ]
+                }
+            })
+            logger.info(f"Existing operator found: {existing_operator}")
+            if not existing_operator:
+                self.operators_master_collection.insert_one({"operator": estimate_request.operator.upper()})
+                logger.info(f"Inserted new operator '{estimate_request.operator}' into operators_master")
+            else:
+                logger.info(f"Operator '{estimate_request.operator}' already exists in operators_master")
+
             
             data_to_insert = {
                 **json_data,
@@ -378,6 +397,8 @@ class ExcelUploadService:
                 # "tasks": estimate_request.tasks,
                 "probability": estimate_request.probability,
                 "operator": estimate_request.operator,
+                "operatorForModel": estimate_request.operatorForModel,
+                "aircraftAgeThreshold": estimate_request.aircraftAgeThreshold,
                 "typeOfCheck": estimate_request.typeOfCheck,
                 "typeOfCheckID": estimate_request.typeOfCheckID,
                 "aircraftAge": estimate_request.aircraftAge,
@@ -395,8 +416,9 @@ class ExcelUploadService:
         
             insert_result = self.estima_collection.insert_one(data_to_insert) 
             logger.info("Length of document inserted")
-            
-            
+  
+           
+                        
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",

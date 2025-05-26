@@ -41,6 +41,7 @@ class TaskService:
         self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
         self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
         self.aircraft_details_collection=self.mongo_client.get_collection("aircraft_details")
+        self.operators_collection=self.mongo_client.get_collection("operators_master")
     
     
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
@@ -2339,7 +2340,52 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
+    async def upload_operator_list(self,current_user: dict = Depends(get_current_user)) -> Dict[str, str]:
+        try:
+            """
+            Upload operator list to the database.
+            """
+            logger.info("Uploading operator list")
+            pipeline=[
+    {
+        '$group': {
+            '_id': '$customer_name'
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'operator': '$_id'
+        }
+    }
+]
+            operator_list=list(self.aircraft_details_collection.aggregate(pipeline))
+            logger.info(f"aircraft_details fetched successfully:{operator_list}")
+            if operator_list:
+                self.operators_collection.insert_many(operator_list)
+                logger.info(f"Inserted operators: {operator_list}")
+            else:
+                logger.info("No operators to insert.")
 
+            return {"status": "success", "message": "Operator list uploaded successfully"}
+        except Exception as e:
+            logger.error(f"Error uploading operator list: {e}")
+            return {"status": "error", "message": str(e)}
+
+            
+    async def get_operator_list(self, current_user: dict = Depends(get_current_user)) -> List[str]:
+        """
+        Get the list of operators from the database.
+        """
+        try:
+            logger.info("Fetching operator list")
+            operators = list(self.operators_collection.find({}, {"_id": 0, "operator": 1}))
+            operator_list = [op["operator"] for op in operators]
+            logger.info(f"Fetched operators: {operator_list}")
+            return operator_list
+        except Exception as e:
+            logger.error(f"Error fetching operator list: {e}")
+            raise HTTPException(status_code=500, detail=f"Error fetching operator list: {str(e)}")
+           
 def replace_nan_inf(obj):
             """Helper function to recursively replace NaN and inf values with None"""
             if isinstance(obj, dict):
@@ -2376,3 +2422,4 @@ def updateLhRhTasks(LhRhTasks, task_ids):
         logger.info(f"the updated taks:{updated_tasks}")
     
     return updated_tasks
+
