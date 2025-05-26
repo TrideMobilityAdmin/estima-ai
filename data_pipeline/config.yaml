@@ -3,7 +3,7 @@ database:
   database: "data_pipeline_testing"
 
 excel_files:
-  data_path : "D:/Projects/gmr-mro/estima-ai/Data"
+  data_path : "/home/Data/Mro_historical_Data/Data"
   data_path_test : "D:/Projects/gmr-mro/test_data_pipeline"
   
 
