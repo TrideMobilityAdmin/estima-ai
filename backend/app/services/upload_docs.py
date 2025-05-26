@@ -397,6 +397,8 @@ class ExcelUploadService:
                 # "tasks": estimate_request.tasks,
                 "probability": estimate_request.probability,
                 "operator": estimate_request.operator,
+                "operatorForModel": estimate_request.operatorForModel,
+                "aircraftAgeThreshold": estimate_request.aircraftAgeThreshold,
                 "typeOfCheck": estimate_request.typeOfCheck,
                 "typeOfCheckID": estimate_request.typeOfCheckID,
                 "aircraftAge": estimate_request.aircraftAge,
