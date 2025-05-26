@@ -163,8 +163,10 @@ for i, row in task_parts_up.iterrows():
     matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
     
     if not matching_parts.empty:
+        
+        task_parts_up.at[i,"issued_unit_of_measurement"] = matching_parts.iloc[0]["issued_unit_of_measurement"]
         task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
-        task_parts_up.at[i, "total_billable_price"]=matching_parts.iloc[0]["agg_base_price_usd"]
+        task_parts_up.at[i, "total_billable_price"]=row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]+matching_parts.iloc[0]["agg_freight_cost"]+matching_parts.iloc[0]["agg_admin_charges"]
     
 sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
 # Convert to string
@@ -185,7 +187,12 @@ cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_bil
 
 for col in cols_to_convert:
     sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
-
+    
+for _, row in sub_task_parts.iterrows():
+    if row["issued_unit_of_measurement"] in ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]:
+        sub_task_parts.at[_, 'used_quantity'] = round(row['used_quantity'], 0)
+    else:
+        sub_task_parts.at[_, 'used_quantity'] = round(row['used_quantity'], 2)
 
 
 #sub_task_description_collection="sub_task_description"
@@ -195,7 +202,7 @@ task_description = pd.DataFrame(task_description)
 # Drop the MongoDB _id column if not needed
 task_description = task_description.drop(columns=["_id"], errors="ignore")
 task_description=task_description.drop_duplicates()
-age_cap=3
+
 
 LhRhTasks = db["RHLH_Tasks"]
 LhRhTasks = list(LhRhTasks.find({},))
@@ -208,7 +215,7 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 
-def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap=3):
+def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold):
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
         """
@@ -271,12 +278,22 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     if aircraft_age> 0.0:
         # Continue increasing age_cap until we get at least 5 packages or reach the maximum age limit
         while len(train_packages) < 5:  # Changed from >4 to <5 to keep looping until we have at least 5 packages
-            train_packages = aircraft_details[
-                (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
-                (aircraft_details["check_category"].isin(check_category)) & 
-                (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap,0), min(aircraft_age + age_cap,31)))
-            ]["package_number"].unique().tolist()
+            if customer_name_consideration.lower() == "yes":
+                # Filter based on customer name consideration
+                 train_packages = aircraft_details[
+                    (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                    (aircraft_details["check_category"].isin(check_category)) & 
+                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))&
+                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap,0), min(aircraft_age + age_cap,31)))    
+                ]["package_number"].unique().tolist()
+            else:
             
+                train_packages = aircraft_details[
+                    (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                    (aircraft_details["check_category"].isin(check_category)) & 
+                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap,0), min(aircraft_age + age_cap,31)))
+                ]["package_number"].unique().tolist()
+                
             # If we found at least 5 packages, we can exit the loop
             if len(train_packages) >= 5:
                 break
@@ -304,9 +321,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     # Filter task data based on packages and task numbers
     task_data =  task_description[task_description['package_number'].isin(train_packages)]
     task_description_unique_task_list = task_data["task_number"].unique().tolist()
-    mpd_task_data = mpd_task_data[mpd_task_data["TASK NUMBER"].isin(task_description_unique_task_list)]
+  
     # print(f"the shape of dataframe task data 1{task_data.shape}")
-    task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"])]
+    task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
+    task_all_data=task_description[task_description["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     
 
     print(f"the shape of dataframe task data 2{task_data.shape}")
@@ -315,14 +333,33 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     no_of_task_packages=len(sub_parts_data["package_number"].unique().tolist())
     #print(f"the shape of dataframe sub parts data 1{sub_parts_data.shape}")
     sub_parts_data = sub_parts_data[sub_parts_data["task_number"].isin(mpd_task_data["TASK NUMBER"])]
- 
+
     #print(f"the shape of dataframe sub parts data 2{sub_parts_data.shape}")
+            
+    sub_task_description_defects= sub_task_description[sub_task_description['package_number'].isin(train_packages)]
+    print(f"no of packages in sub_task_description_defects {len(sub_task_description_defects['package_number'].unique().tolist())}")
+
+    
+    #print(f"the shape of mpd_task_data{mpd_task_data.shape}")
+    
+    #print(f"the columns of mpd_task_data{mpd_task_data.columns}")
+    
+    print(f"the shape of sub_task_description_defects is {sub_task_description_defects.shape}")
+    
+    exdata=sub_task_description_defects[sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])]
+    
+    print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
+
+    print(f"The shape of {exdata.shape} ")
         
     def get_manhrs(task_number):
-        filtered_data = task_data[task_data['task_number'] == task_number]
-    
+        if task_number in task_data['task_number'].unique().tolist():
+            filtered_data = task_data[task_data['task_number'] == task_number]
+        else:
+            filtered_data = task_all_data[task_all_data['task_number'] == task_number]
         if filtered_data.empty:
             return {
+                'prob': 0,
                 'manhrs': {
                     'min': 0,
                     'max': 0,
@@ -331,7 +368,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 'skill_set': [],
                 'avg_est': 0
             }
-    
+        prob= len(sub_task_description_defects[sub_task_description_defects['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages) * 100
         min_actual = filtered_data['actual_man_hours'].min()
         max_actual = filtered_data['actual_man_hours'].max()
         avg_actual = filtered_data['actual_man_hours'].mean()
@@ -341,6 +378,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         skill_set = filtered_data['skill_number'].unique().tolist()
         
         result = {
+            'prob':prob,
             'manhrs': {
                 'min': min_actual,
                 'max': max_actual,
@@ -459,22 +497,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
 
 
     print("processing the defects")
-        
-    sub_task_description_defects= sub_task_description[sub_task_description['package_number'].isin(train_packages)]
-    print(f"no of packages in sub_task_description_defects {len(sub_task_description_defects['package_number'].unique().tolist())}")
 
-    
-    #print(f"the shape of mpd_task_data{mpd_task_data.shape}")
-    
-    #print(f"the columns of mpd_task_data{mpd_task_data.columns}")
-    
-    print(f"the shape of sub_task_description_defects is {sub_task_description_defects.shape}")
-    
-    exdata=sub_task_description_defects[sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])]
-    
-    print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
-
-    print(f"The shape of {exdata.shape} ")
     
     group_level_mh_result=pd.DataFrame()
     group_level_parts_result=pd.DataFrame()
@@ -997,12 +1020,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     
     # Create findings list
     findings = []
+    disc_pred_list = []
+
     for _, row in group_level_mh_result.iterrows():
         spare_parts = []
-    
-        # Filter task_parts where task_number matches
         spare_filtered = group_level_parts_result[group_level_parts_result["group"] == row["group"]]
-    
+                
         for _, part in spare_filtered.iterrows():
             spare_parts.append({
                 "partId": part["issued_part_number"],
@@ -1012,28 +1035,43 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 "price": float_round(part["billable_value_usd"]),
                 "prob": float_round(part["prob"])
             })
-            
-        finding = {
-            "taskId": row["source_task_discrepancy_number"],
-            "details": [{
-                "cluster": f"{row['source_task_discrepancy_number']}/{row['group']}",
-                "description": row["description"],
-                "skill": row["skill_number"],
-                "mhs": {
-                    "max": float_round(row["max_actual_man_hours"]),
-                    "min": float_round(row["min_actual_man_hours"]),
-                    "avg": float_round(row["avg_actual_man_hours"]),
-                    "est": float_round(row["max_actual_man_hours"])
-                },
-                "prob": float_round(row["prob"]),
-                "spare_parts": spare_parts
-            }]
-        }
-        
-        findings.append(finding)
 
-    # Correct DataFrame creation for final_pred
-    # Create a dictionary with the summaries
+        # Calculate probability-adjusted values for disc_pred_list
+        prob_factor = row["prob"] / 100
+        disc_pred_item = {
+            "taskId": row["source_task_discrepancy_number"],
+            "avg_mh": row["avg_actual_man_hours"] * prob_factor,
+            "min_mh": row["min_actual_man_hours"] * prob_factor,
+            "max_mh": row["max_actual_man_hours"] * prob_factor,
+            "prob": float_round(row["prob"]),  # Fixed: use row["prob"] instead of finding["details"][0]["prob"]
+            "exp_cons": spare_parts,
+            "billable_value_usd": sum(
+                part.get("price", 0) * (part.get("prob", 0) / 100) for part in spare_parts
+            )
+        }
+        disc_pred_list.append(disc_pred_item)
+        
+        # Only add to findings if probability exceeds threshold
+        if row["prob"] > probability_threshold:
+            finding = {
+                "taskId": row["source_task_discrepancy_number"],
+                "details": [{
+                    "cluster": f"{row['source_task_discrepancy_number']}/{row['group']}",
+                    "description": row["description"],
+                    "skill": row["skill_number"],
+                    "mhs": {
+                        "max": float_round(row["max_actual_man_hours"]),
+                        "min": float_round(row["min_actual_man_hours"]),
+                        "avg": float_round(row["avg_actual_man_hours"]),
+                        "est": float_round(row["max_actual_man_hours"])
+                    },
+                    "prob": float_round(row["prob"]),
+                    "spare_parts": spare_parts
+                }]
+            }
+            findings.append(finding)
+
+    # Create DataFrame for final_pred - tasks summary
     tasks_summary = {
         "avg_mh": float_round(processed_task_manhours_df["avg_actual_man_hours"].sum()),
         "min_mh": float_round(processed_task_manhours_df["min_actual_man_hours"].sum()),
@@ -1044,28 +1082,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "est_mh": 0,
         "exp_skl": []
     }
-    
+
     # Create a single-row DataFrame
     final_pred = pd.DataFrame([tasks_summary])
-    
-    # Initialize disc_pred if not defined (it wasn't defined in the original)
-    print("group level disc final is processing")
-    disc_pred = []
-    disc_pred_list = []
-    for finding in findings:
-        if finding["details"]:
-            disc_pred_list.append({
-                "taskId": finding["taskId"],
-                "avg_mh": finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100),
-                "min_mh": finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100),
-                "max_mh": finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100),
-                "prob": finding["details"][0]["prob"],
-                "exp_cons": finding["details"][0].get("spare_parts", []),
-                "billable_value_usd": sum(
-                    part.get("price", 0)*(part.get("prob", 0) / 100) for part in finding["details"][0].get("spare_parts", [])
-                )
-            })
-    
+
+    print("Group level disc final is processing")
+
     # Store the original list before converting to DataFrame
     original_disc_pred = disc_pred_list.copy()
             
@@ -1073,9 +1095,40 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     disc_pred = pd.DataFrame(disc_pred_list)
     disc_pred.to_csv(f"{filepath}/{estID}__disc_final_result.csv")
 
+    # Create probability graph
+    probability_graph = {}
+
+    for i in range(10, 101, 10):
+        key = f"prob({i})"
+
+        # Base values from tasks
+        total_mh = final_pred["avg_mh"].iloc[0] if not final_pred.empty else 0
+        total_cost = final_pred["total_cons"].iloc[0] if not final_pred.empty else 0
+
+        # Use the original list of dictionaries to avoid string conversion issues
+        for item in original_disc_pred:
+            if item.get("prob") is not None and item["prob"] > i:
+                total_mh += float(item["avg_mh"]) if pd.notna(item["avg_mh"]) else 0
+
+                # Sum costs from spare parts
+                spare_parts_cost = 0
+                exp_cons = item.get("exp_cons", [])
+                
+                if isinstance(exp_cons, list):
+                    for part in exp_cons:
+                        if isinstance(part, dict):
+                            spare_parts_cost += part.get("price", 0) * (part.get("prob", 0) / 100)
+
+                total_cost += spare_parts_cost
+
+        probability_graph[key] = {
+            "mh": float_round(total_mh),
+            "spareCost": float_round(total_cost)
+        }
+
+    print("Probability graph is generated.")
     
     print("task level disc final is processing")
-
     # Create findings list
     task_level_findings = []
     for _, row in task_level_mh_result.iterrows():
@@ -1130,38 +1183,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
 
     print("computations are completed")
     
-    # Correctly create probability graph
-    probability_graph = {}
-    
-    for i in range(10, 101, 10):
-        key = f"prob({i})"
-    
-        # Base values from tasks
-        total_mh = final_pred["avg_mh"].iloc[0] if not final_pred.empty else 0
-        total_cost = final_pred["total_cons"].iloc[0] if not final_pred.empty else 0
-    
-        # Use the original list of dictionaries to avoid string conversion issues
-        for item in original_disc_pred:
-            if item.get("prob") is not None and item["prob"] > i:
-                total_mh += float(item["avg_mh"]) if pd.notna(item["avg_mh"]) else 0
-    
-                # Sum costs from spare parts
-                spare_parts_cost = 0
-                exp_cons = item.get("exp_cons", [])
-                
-                if isinstance(exp_cons, list):
-                    for part in exp_cons:
-                        if isinstance(part, dict):
-                            spare_parts_cost += part.get("price", 0) * (part.get("prob", 0) / 100)
-    
-                total_cost += spare_parts_cost
-    
-        probability_graph[key] = {
-            "mh": float_round(total_mh),
-            "spareCost": float_round(total_cost)
-        }
-    
-    print("Probability graph is generated.")
+
     print("capping is computing")
     capping_values = {
     'cappingTypeManhrs': cappingDetails["cappingTypeManhrs"],
@@ -1343,7 +1365,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print("capping is completed ")
     # Get tasks_list from tasks if not defined
     tasks_list = tasks
-    task_level_findings
+    filtered_tasks=mpd_task_data["TASK NUMBER"].unique().tolist()
     # Properly calculate totals for JSON output
     tasks_total_mhs = sum(task["mhs"]["avg"] for task in tasks)
     tasks_total_parts_cost = sum(sum(part["price"] for part in task["spare_parts"]) for task in tasks)
@@ -1368,6 +1390,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     output_data = {
         "estID": estID,
         "description": f"Estimate for package {estID}",
+        "filtered_tasks":filtered_tasks,
         "tasks": tasks_list,
         "aggregatedTasks": {
             "totalMhs": float_round(tasks_total_mhs),
