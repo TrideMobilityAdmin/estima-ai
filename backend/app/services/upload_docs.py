@@ -1567,6 +1567,7 @@ class ExcelUploadService:
             "total_actual_manhours": total_actual_findings_manhours
         }
         new_findings_data_summary={
+            "new_findings_data":new_findings_data,
             "total_new_findings_manhours": total_new_findings_manhours,
             "total_new_findings_spares_cost": total_new_findings_spares_cost
         }
