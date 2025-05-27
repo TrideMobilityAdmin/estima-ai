@@ -90,7 +90,7 @@ def detect_header_row(df, expected_columns, max_rows_to_check=6):
     Returns:
         int or None: Best header row index or None if not found.
     """
-    best_match_score = 0
+    best_match_score = 50
     best_row_index = None
 
     # Check each of the first few rows
