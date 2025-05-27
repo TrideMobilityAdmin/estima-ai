@@ -1183,7 +1183,54 @@ class ExcelUploadService:
         logger.warning(f"No files found with sheet names: {SheetNames}")
         return pd.DataFrame() 
     
- 
+    async def get_upload_estimate_byId(self,estimate_id:str)->Dict[str,Any]:
+        
+        try:
+            file_upload_pipeline=[
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'task': 1, 
+            'description': 1, 
+            # 'upload_timestamp': 1, 
+            # 'createdAt': 1, 
+            # 'original_filename': 1, 
+            'probability': 1, 
+            'status': 1, 
+            'operator': 1, 
+            'typeOfCheck': 1, 
+            'typeOfCheckID': 1, 
+            'aircraftAge': 1, 
+            'aircraftRegNo': 1, 
+            'aircraftModel': 1,
+            'operatorForModel':1,
+            'aircraftAgeThreshold':1, 
+            'aircraftFlightHours': 1, 
+            'aircraftFlightCycles': 1, 
+            'areaOfOperations': 1, 
+            'cappingDetails': 1, 
+            'additionalTasks': 1, 
+            'miscLaborTasks': 1
+        }
+    }
+]
+            result = list(self.estima_collection.aggregate(file_upload_pipeline))
+            if not result:
+                logger.warning(f"No estimate found with ID: {estimate_id}")
+                raise HTTPException(status_code=404, detail="Estimate not found")
+            file_upload_result = result[0] if result else {}
+            logger.info(f"file_upload result fetched: {file_upload_result}")
+            return file_upload_result
+        except Exception as e:
+            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
+
+
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files

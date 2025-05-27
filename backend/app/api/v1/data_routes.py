@@ -280,3 +280,10 @@ async def get_all_capping_data(
 ):
     return await config_service.get_all_capping_data()
 
+@router.get("/file_upload_estimate/{estimate_id}")
+async def get_upload_estimate_byId(
+    estimate_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    file_upload=await excel_service.get_upload_estimate_byId(estimate_id)
+    return file_upload
