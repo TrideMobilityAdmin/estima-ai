@@ -1635,8 +1635,7 @@ class ExcelUploadService:
         }
         
         
-        # Extract eligible tasks
-        eligible_tasks = task_description["task_number"].astype(str).tolist()
+
 
         # Optional: If you want to switch data sources
         # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
