@@ -1304,7 +1304,7 @@ class ExcelUploadService:
         parts_master=parts_master.drop_duplicates()
         task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
         task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
-
+        task_parts_up=task_parts[task_parts["part_type"]!="Component"]
         task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
 
         # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
