@@ -95,7 +95,7 @@ class EstimateRequest(BaseModel):
 
 class ValidRequest(BaseModel):
     tasks: List[str]
-    decription:List[str]
+    description:List[str]
 class ValidTasks(BaseModel):
     taskid: str
     status: bool
