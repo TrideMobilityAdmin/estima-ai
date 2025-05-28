@@ -1438,14 +1438,7 @@ class ExcelUploadService:
         eligible_tasks = task_description[task_description["task_type"] == "MPD"]["task_number"].astype(str).tolist()
 
 
-        # Optional: If you want to switch data sources
-        # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
-
-        available_tasks = set(eligible_tasks).intersection(
-            pred_tasks_data_full["sourceTask"].astype(str)
-        )
-
-        not_available_tasks = set(eligible_tasks) - available_tasks
+  
 
         # Proceed to calculate actual capping values
 
@@ -1641,7 +1634,7 @@ class ExcelUploadService:
         # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
 
         available_tasks = set(eligible_tasks).intersection(
-            pred_tasks_data_full["sourceTask"].astype(str)
+            set(pred_tasks_data_full["sourceTask"].astype(str))
         )
 
         not_available_tasks = set(eligible_tasks) - available_tasks
