@@ -133,8 +133,9 @@ parts_master=parts_master.drop_duplicates()
 task_parts_collection = db["task_parts_lhrh"]
 task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1}))
 task_parts =  pd.DataFrame(task_parts)
-task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","requested_stock_status"],inplace=True)
-task_parts_up=task_parts[task_parts["requested_stock_status"]!="Owned"]
+task_parts=task_parts[task_parts["part_type"]!="Component"]
+task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
+task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
 
 task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
 
