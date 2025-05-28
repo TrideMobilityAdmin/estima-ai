@@ -124,15 +124,21 @@ class TaskService:
     async def validate_tasks(self, estimate_request: ValidRequest, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
         """
         Validate tasks by checking if they exist in the task_description collection.
+        For tasks not found (status=False), fill the description from the input description[] by index.
+        Only unique cleaned taskids will be returned.
         """
         try:
             task_ids = estimate_request.tasks
+            input_descriptions = estimate_request.description
+
+            # Map input taskid to its index
+            task_index_map = {task: idx for idx, task in enumerate(task_ids)}
 
             LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
             logger.info("LhRhTasks fetched successfully")
-        
+
             lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
-        
+
             existing_tasks_list = self.lhrh_task_description.find(
                 {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1, "description": 1}
             )
@@ -143,27 +149,49 @@ class TaskService:
                 task_number = doc["task_number"]
                 description = doc["description"]
                 if " (LH)" in task_number or " (RH)" in task_number:
-                    task_number = task_number.split(" ")[0]  
+                    task_number = task_number.split(" ")[0]
                 cleaned_task_map[task_number] = description
 
             logger.info(f"cleaned_task_map: {cleaned_task_map}")
 
-            
-            cleaned_lrhTasks = set()  
-            for task in lrhTasks:
-                if " (LH)" in task or " (RH)" in task:
-                    task = task.split(" ")[0] 
-                cleaned_lrhTasks.add(task)
-            cleaned_lrhTasks = list(cleaned_lrhTasks)
+            # Use an ordered set for unique cleaned tasks, preserving order of first occurrence
+            from collections import OrderedDict
+            unique_cleaned_lrhTasks = OrderedDict()
+            cleaned_task_original_map = {}
 
-            validated_tasks = [
-                {
-                    "taskid": task,
-                    "status": task in cleaned_task_map,
-                    "description": cleaned_task_map.get(task, " ") 
-                }
-                for task in cleaned_lrhTasks
-            ]
+            for task in lrhTasks:
+                cleaned_task = task
+                if " (LH)" in task or " (RH)" in task:
+                    cleaned_task = task.split(" ")[0]
+                if cleaned_task not in unique_cleaned_lrhTasks:
+                    unique_cleaned_lrhTasks[cleaned_task] = None
+                if cleaned_task not in cleaned_task_original_map:
+                    cleaned_task_original_map[cleaned_task] = []
+                cleaned_task_original_map[cleaned_task].append(task)
+
+            validated_tasks = []
+            for cleaned_task in unique_cleaned_lrhTasks.keys():
+                status = cleaned_task in cleaned_task_map
+                if status:
+                    description = cleaned_task_map[cleaned_task]
+                else:
+                    matched_index = None
+                    for orig_task in cleaned_task_original_map.get(cleaned_task, []):
+                        if orig_task in task_index_map:
+                            matched_index = task_index_map[orig_task]
+                            break
+                    # Fallback: try direct match
+                    if matched_index is None and cleaned_task in task_index_map:
+                        matched_index = task_index_map[cleaned_task]
+                    if matched_index is not None and matched_index < len(input_descriptions):
+                        description = input_descriptions[matched_index]
+                    else:
+                        description = ""
+                validated_tasks.append({
+                    "taskid": cleaned_task,
+                    "status": status,
+                    "description": description
+                })
             return validated_tasks
 
         except Exception as e:
@@ -172,7 +200,6 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
-        
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
