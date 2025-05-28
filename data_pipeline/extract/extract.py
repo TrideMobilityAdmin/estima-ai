@@ -90,7 +90,7 @@ def detect_header_row(df, expected_columns, max_rows_to_check=6):
     Returns:
         int or None: Best header row index or None if not found.
     """
-    best_match_score = 50
+    best_match_score = 0
     best_row_index = None
 
     # Check each of the first few rows
@@ -243,7 +243,13 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
 
                     # Apply conversions
                     for col in string_cols:
-                        df[col] = df[col].astype(str)
+                        if col in df.columns:
+                            # Replace NaN with None
+                            df[col] = df[col].where(pd.notnull(df[col]), None)
+                            
+                            # Convert non-None values to string (but keep None as None)
+                            df[col] = df[col].apply(lambda x: str(x) if x is not None else None)
+
                         
                     numeric_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_billable_price', 'billable_value_usd', 'used_quantity']
 
@@ -253,6 +259,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Reorder columns to match expected order
                     df = df[expected_output_columns]
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
                     print("Processed sub_task_parts file:", file_path)
                     
                 elif sheet_name == "HMV" or sheet_name[:2] == "20":
@@ -324,9 +331,14 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     ]
 
                     # Convert string columns, handling None values
+
                     for col in string_cols:
                         if col in df.columns:
-                            df[col] = df[col].fillna('').astype(str)
+                            # Replace NaN with None
+                            df[col] = df[col].where(pd.notnull(df[col]), None)
+                            
+                            # Convert non-None values to string (but keep None as None)
+                            df[col] = df[col].apply(lambda x: str(x) if x is not None else None)
 
 
                     # Define numeric columns
@@ -346,6 +358,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
 
                     # Add file path column
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
                     
                 elif sheet_name == 'mlttable':
                     df.columns = df.iloc[0].astype(str).str.strip()
@@ -384,7 +397,13 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     
                     # Apply conversions
                     for col in string_cols:
-                        df[col] = df[col].astype(str)
+                        if col in df.columns:
+                            # Replace NaN with None
+                            df[col] = df[col].where(pd.notnull(df[col]), None)
+                            
+                            # Convert non-None values to string (but keep None as None)
+                            df[col] = df[col].apply(lambda x: str(x) if x is not None else None)
+
                         
                     numeric_convert = ['issued_quantity', 'used_quantity', 'unit_of_measurement',
                     'pending_return_quantity', 'returned_quantity_excess','material_cost',
@@ -399,6 +418,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Finally, reorder columns to match expected order
                     df = df[expected_columns]
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
                     
                 elif sheet_name == 'mltaskmlsec1':
                     df.columns = df.iloc[0].astype(str).str.strip()
@@ -459,9 +479,12 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Convert string columns, handling None values
                     for col in string_cols:
                         if col in df.columns:
-                            df[col] = df[col].fillna('').astype(str)
-                        else:
-                            df[col] = ''
+                            # Replace NaN with None
+                            df[col] = df[col].where(pd.notnull(df[col]), None)
+                            
+                            # Convert non-None values to string (but keep None as None)
+                            df[col] = df[col].apply(lambda x: str(x) if x is not None else None)
+
 
                     # Define numeric columns
                     numeric_cols = ['estimated_man_hours','actual_man_hours']
@@ -471,7 +494,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                         if col in df.columns:
                             df[col] = pd.to_numeric(df[col], errors='coerce')
                         else:
-                            df[col] = np.nan
+                            df[col] = None
                     
                     
 
@@ -482,6 +505,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Finally, reorder columns to match expected order
                     df = df[expected_columns]
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
                 
                 elif sheet_name == 'mldpmlsec1':
                     # Ensure first row is used as column names safely
@@ -551,9 +575,11 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Convert string columns, handling None values
                     for col in string_cols:
                         if col in df.columns:
-                            df[col] = df[col].fillna('').astype(str)
-                        else:
-                            df[col] = ''
+                            # Replace NaN with None
+                            df[col] = df[col].where(pd.notnull(df[col]), None)
+                            
+                            # Convert non-None values to string (but keep None as None)
+                            df[col] = df[col].apply(lambda x: str(x) if x is not None else None)
 
                     # Define numeric columns
                     numeric_cols = ['estimated_man_hours','actual_man_hours']
@@ -563,7 +589,7 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                         if col in df.columns:
                             df[col] = pd.to_numeric(df[col], errors='coerce')
                         else:
-                            df[col] = np.nan
+                            df[col] = None
                     # Add missing columns with None values
                     for col in missing_columns:
                         df[col] = None
@@ -608,12 +634,14 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                     # Ensure correct column order
                     df = df[expected_columns]
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
                     
                 else:
                     df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
                     df = df[1:].reset_index(drop=True)
                     df["package"] = folder_name  # Add folder name as a column
                     df["file_path"] = file_path
+                    df = df.where(pd.notnull(df), None)
 
                 return df
                 

@@ -173,6 +173,8 @@ def update_lh_rh_tasks(task):
     Returns:
         String with standardized LH/RH format
     """
+    if not isinstance(task, str):
+        return task
     task = task.strip()
     if task.endswith(" LH") or task.endswith("_LH"):
         return task[:-3] + " (LH)"
@@ -268,6 +270,42 @@ def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_d
     # Return the processed dataframes
     return (task_description_processed, task_parts_processed, 
             sub_task_description_processed, sub_task_parts_processed)
+def update_part_master_data(db, parts_collection_name="sub_task_parts_lhrh"):
+    sub_task_parts = db[parts_collection_name]
+    sub_task_parts = list(sub_task_parts.find({}))
+    sub_task_parts = pd.DataFrame(sub_task_parts)
+
+    if sub_task_parts.empty:
+        print("No data found in the parts collection.")
+        if logger:
+            logger.warning("No data found in the parts collection.")
+        return
+
+    # Group and aggregate
+    parts_master = sub_task_parts.groupby("issued_part_number").agg({
+        "part_description": "first",
+        "issued_unit_of_measurement": "first",
+        "freight_cost": "max",
+        "admin_charges": "max",
+        "base_price_usd": "max"
+    })
+    parts_master.rename(columns={"freight_cost": "agg_freight_cost",
+                                 "admin_charges": "agg_admin_charges",
+                                 "base_price_usd": "agg_base_price_usd"}, inplace=True)
+
+    # Save to collection
+    parts_master_collection = db["parts_master"]
+    parts_master_collection.delete_many({})  # Clear existing data
+
+    if not parts_master.empty:
+        parts_master.reset_index(inplace=True)
+        parts_master_collection.insert_many(parts_master.to_dict("records"))
+        print(f"Updated parts master with {len(parts_master)} records")
+        if logger:
+            logger.info(f"Updated parts master with {len(parts_master)} records")
+    
+    
+    
 async def main():
     """
     Main execution function to manage the data pipeline.
@@ -307,7 +345,7 @@ async def main():
         
         # Fallback to absolute path if directory doesn't exist
         #if not os.path.exists(data_path):
-        #    data_path = r"D:\Projects\gmr-mro\estima-ai\Data"
+        #data_path = r"D:\Projects\gmr-mro\Data_Pipeline\Data"
         data_path=config["excel_files"]["data_path"] 
         #data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
         # Prepare to track files that need updating (modified since last processed)
@@ -405,7 +443,7 @@ async def main():
         
         # Only update entries for files that were successfully loaded
         update_processed_files_db(db, file_info_dict, successfully_processed_files)
-
+        update_part_master_data(db, "sub_task_parts_lhrh")
         print("Process completed")
         logger.info("Process completed")
     except Exception as e:
