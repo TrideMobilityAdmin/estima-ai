@@ -1435,7 +1435,8 @@ class ExcelUploadService:
 
         
         # Extract eligible tasks
-        eligible_tasks = task_description["task_number"].astype(str).tolist()
+        eligible_tasks = task_description[task_description["task_type"] == "MPD"]["task_number"].astype(str).tolist()
+
 
         # Optional: If you want to switch data sources
         # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
@@ -1601,12 +1602,20 @@ class ExcelUploadService:
         total_predicted_finding_spares_cost = df_findings['predicted_finding_spares_cost'].sum() if not df_findings.empty else 0
         total_predicted_finding_manhours = df_findings['predicted_finding_manhours'].sum() if not df_findings.empty else 0
         total_actual_findings_manhours = df_findings['actual_findings_manhours'].sum() if not df_findings.empty else 0
-        new_findings_data = df_findings[
-            (df_findings['actual_findings_manhours'] > 0) &
-            (df_findings['predicted_finding_manhours'] == 0)
+        # Find new findings tasks with proper null handling
+        new_findings_tasks = df_findings[
+            (df_findings['actual_findings_manhours'].fillna(0) > 0) &
+            (df_findings['predicted_finding_manhours'].fillna(0) == 0)
+        ]["task_number"].dropna().unique().tolist()
+
+        # Filter new findings data
+        new_findings_data = sub_task_description[
+            sub_task_description["source_task_discrepancy_number_updated"].isin(new_findings_tasks)
         ]
-        total_new_findings_manhours = new_findings_data['actual_findings_manhours'].sum() if not new_findings_data.empty else 0
-        total_new_findings_spares_cost = new_findings_data['actual_findings_spares_cost'].sum() if not new_findings_data.empty else 0
+
+        total_new_findings_manhours = new_findings_data['actual_man_hours'].sum() if not new_findings_data.empty else 0
+        new_findings_parts_data = sub_task_parts[sub_task_parts["task_number"].isin(new_findings_data["log_item_number"].tolist())]
+        total_new_findings_spares_cost = new_findings_parts_data["billable_value_usd"].sum() if not new_findings_data.empty else 0
         summary_findings_comparision = {
             "total_actual_spares_cost": total_actual_findings_spares_cost,
             "total_predict_spares_cost": total_predicted_finding_spares_cost,
@@ -1614,7 +1623,8 @@ class ExcelUploadService:
             "total_actual_manhours": total_actual_findings_manhours
         }
         new_findings_data_summary={
-            "new_findings_data":new_findings_data,
+            "new_findings_data": new_findings_data.to_dict('records') if not new_findings_data.empty else [],
+            "new_findings_parts_data": new_findings_parts_data.to_dict('records') if not new_findings_parts_data.empty else [],
             "total_new_findings_manhours": total_new_findings_manhours,
             "total_new_findings_spares_cost": total_new_findings_spares_cost
         }
