@@ -101,18 +101,22 @@ class TaskService:
         logger.info("Fetching all estimates")
 
         try:
-            estimates_cursor = self.estimates_collection.find()
-
-            estimates = []
-            for estimate in estimates_cursor:
-                estimates.append(Estimate(
-                    estID=str(estimate["estID"]),
-                    description=estimate.get("description", ""),
-                    createdBy=estimate.get("createdBy",""),
-                    createdAt=estimate.get("createdAt"),
-                    lastUpdated=estimate.get("lastUpdated")
-                ))
-            logger.info(f"Found {len(estimates)} estimates")
+            estimates_pipeline=[
+    {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'description': 1, 
+            'createdAt': 1, 
+            'lastUpdated': 1, 
+            'createdBy': 1
+        }
+    }
+]
+            
+            estimates = list(self.estimates_collection.aggregate(estimates_pipeline))
+            logger.info(f"Fetched {len(estimates)} estimates")
+   
             return estimates
 
         except Exception as e:
@@ -121,6 +125,7 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching estimates: {str(e)}"
             )
+    
     async def validate_tasks(self, estimate_request: ValidRequest, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
         """
         Validate tasks by checking if they exist in the task_description collection.
