@@ -334,16 +334,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
     sub_parts_data = sub_task_parts[sub_task_parts['package_number'].isin(train_packages)]
+    
     no_of_task_packages=len(sub_parts_data["package_number"].unique().tolist())
     #print(f"the shape of dataframe sub parts data 1{sub_parts_data.shape}")
     sub_parts_data = sub_parts_data[sub_parts_data["task_number"].isin(mpd_task_data["TASK NUMBER"])]
+    sub_parts_all_data= sub_task_parts[sub_task_parts["task_number"].isin(mpd_task_data["TASK NUMBER"])]
 
     #print(f"the shape of dataframe sub parts data 2{sub_parts_data.shape}")
             
     sub_task_description_defects= sub_task_description[sub_task_description['package_number'].isin(train_packages)]
     print(f"no of packages in sub_task_description_defects {len(sub_task_description_defects['package_number'].unique().tolist())}")
-
-    
+    sub_task_description_defects_all=sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])]
     #print(f"the shape of mpd_task_data{mpd_task_data.shape}")
     
     #print(f"the columns of mpd_task_data{mpd_task_data.columns}")
@@ -359,8 +360,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     def get_manhrs(task_number):
         if task_number in task_data['task_number'].unique().tolist():
             filtered_data = task_data[task_data['task_number'] == task_number]
+            prob= (len(sub_task_description_defects[sub_task_description_defects['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
         else:
             filtered_data = task_all_data[task_all_data['task_number'] == task_number]
+            prob= (len(sub_task_description_defects_all[sub_task_description_defects_all['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
         if filtered_data.empty:
             return {
                 'prob': 0,
@@ -372,7 +375,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 'skill_set': [],
                 'avg_est': 0
             }
-        prob= len(sub_task_description_defects[sub_task_description_defects['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages) * 100
+        
         min_actual = filtered_data['actual_man_hours'].min()
         max_actual = filtered_data['actual_man_hours'].max()
         avg_actual = filtered_data['actual_man_hours'].mean()
@@ -407,7 +410,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         
         for index, row in mpd_task_data.iterrows():
             task_number = row['TASK NUMBER']
-            filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number]
+            if task_number in task_data['task_number'].unique().tolist():
+                filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number]
+            else:
+                filtered_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number]
             
 
             
@@ -430,7 +436,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             # Now calculate unit price afterward
             # Replace NaNs with 0 first
             grouped_data['total_quantity'] = grouped_data['total_quantity'].fillna(0)
-            grouped_data["avg_qty_used"]= grouped_data['total_quantity']/no_of_task_packages
+            #grouped_data["avg_qty_used"]= grouped_data['total_quantity']/no_of_task_packages
             grouped_data['total_billable'] = grouped_data['total_billable'].fillna(0)
 
 
