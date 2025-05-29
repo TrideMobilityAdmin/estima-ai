@@ -52,6 +52,8 @@ def process_document(estID):
         add_tasks = bson_data.get("additionalTasks", [])  # Changed default from {} to []
         customer_name = bson_data.get("operator", " ")
         customer_name_consideration = bson_data.get("operatorForModel", False)
+        if isinstance(customer_name_consideration, str):
+            customer_name_consideration = customer_name_consideration.capitalize()
         probability_threshold = bson_data.get("probability", 10)
         aircraft_model = bson_data.get("aircraftModel", " ")
         check_category = bson_data.get("typeOfCheck", " ")
