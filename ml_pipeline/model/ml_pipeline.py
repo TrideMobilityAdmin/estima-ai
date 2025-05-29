@@ -378,10 +378,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     def get_manhrs(task_number):
         if task_number in task_description_unique_task_list:
             filtered_data = task_data[task_data['task_number'] == task_number]
-            prob= (len(sub_task_description_defects[sub_task_description_defects['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
+            prob= (len(sub_task_description_defects[sub_task_description_defects['source_task_discrepancy_number_updated'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
         else:
             filtered_data = task_all_data[task_all_data['task_number'] == task_number]
-            prob= (len(sub_task_description_defects_all[sub_task_description_defects_all['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
+            prob= (len(sub_task_description_defects_all[sub_task_description_defects_all['source_task_discrepancy_number_updated'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
         if filtered_data.empty:
             return {
                 'prob': 0,
