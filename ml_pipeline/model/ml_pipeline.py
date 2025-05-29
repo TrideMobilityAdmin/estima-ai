@@ -341,10 +341,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     
     # Filter task data based on packages and task numbers
     task_data =  task_description[task_description['package_number'].isin(train_packages)]
-    task_description_unique_task_list = task_data["task_number"].unique().tolist()
+   
   
     # print(f"the shape of dataframe task data 1{task_data.shape}")
     task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
+    task_description_unique_task_list = task_data["task_number"].unique().tolist()
     task_all_data=task_description[task_description["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     filtered_tasks=task_data["task_number"].unique().tolist()
 
@@ -375,7 +376,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print(f"The shape of {exdata.shape} ")
         
     def get_manhrs(task_number):
-        if task_number in task_data['task_number'].unique().tolist():
+        if task_number in task_description_unique_task_list:
             filtered_data = task_data[task_data['task_number'] == task_number]
             prob= (len(sub_task_description_defects[sub_task_description_defects['task_number'] == task_number]["package_number"].unique().tolist())/ len(train_packages)) * 100
         else:
@@ -415,10 +416,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         return result
 
     
-    def get_sub_task_parts(mpd_task_data,no_of_task_packages):
-        
-
-        
+    def get_sub_task_parts(mpd_task_data, no_of_task_packages):
         # Create an empty DataFrame to store all task parts
         all_task_parts_df = pd.DataFrame(columns=[
             "task_number", "issued_part_number", "part_description",
@@ -427,16 +425,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         
         for index, row in mpd_task_data.iterrows():
             task_number = row['TASK NUMBER']
-            if task_number in task_data['task_number'].unique().tolist():
+            if task_number in task_description_unique_task_list:
                 filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number]
             else:
                 filtered_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number]
             
-
-            
             if filtered_data.empty:
                 continue
-            
             
             # Group by issued_part_number
             grouped_data = filtered_data.groupby('issued_part_number', as_index=False).agg(
@@ -450,18 +445,18 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 issued_unit_of_measurement=("issued_unit_of_measurement", 'first')
             )
             
-            # Now calculate unit price afterward
             # Replace NaNs with 0 first
             grouped_data['total_quantity'] = grouped_data['total_quantity'].fillna(0)
-            #grouped_data["avg_qty_used"]= grouped_data['total_quantity']/no_of_task_packages
             grouped_data['total_billable'] = grouped_data['total_billable'].fillna(0)
 
-
-            if grouped_data["issued_unit_of_measurement"] in ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]:
-                grouped_data['avg_qty_used'] = round(grouped_data['avg_qty_used'], 0)
-            else:
-                grouped_data['avg_qty_used'] = round(grouped_data['avg_qty_used'], 3)
-
+            # Fix: Apply rounding logic row by row instead of to the entire Series
+            discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
+            
+            for idx, part_row in grouped_data.iterrows():
+                if part_row["issued_unit_of_measurement"] in discrete_units:
+                    grouped_data.at[idx, 'avg_qty_used'] = round(part_row['avg_qty_used'], 0)
+                else:
+                    grouped_data.at[idx, 'avg_qty_used'] = round(part_row['avg_qty_used'], 3)
             
             # Avoid division by zero
             grouped_data['avg_cost_per_unit'] = np.where(
@@ -472,19 +467,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
 
             grouped_data['estimated_billable_value_max'] = grouped_data['max_qty_used'] * grouped_data['avg_cost_per_unit']
             grouped_data['estimated_billable_value_min'] = grouped_data['min_qty_used'] * grouped_data['avg_cost_per_unit']
-            grouped_data['estimated_billable_value_avg'] = grouped_data['avg_qty_used'] * grouped_data['max_price']#grouped_data['avg_cost_per_unit']
-            
+            grouped_data['estimated_billable_value_avg'] = grouped_data['avg_qty_used'] * grouped_data['max_price']
             
             # Create a DataFrame for task parts
             for _, part_row in grouped_data.iterrows():
-                
                 part_df = pd.DataFrame({
                     "task_number": [task_number],
                     "issued_part_number": [part_row["issued_part_number"]],
                     "part_description": [part_row["part_description"]],
                     "issued_unit_of_measurement": [part_row["issued_unit_of_measurement"]],
                     "used_quantity": [part_row['avg_qty_used']],
-                    "max_price":[part_row["max_price"]],
+                    "max_price": [part_row["max_price"]],
                     "billable_value_usd": [part_row['estimated_billable_value_avg']]
                 })
                 all_task_parts_df = pd.concat([all_task_parts_df, part_df], ignore_index=True)
@@ -514,7 +507,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             "max_actual_man_hours": manhrs_result['manhrs']['max'],
             "min_actual_man_hours": manhrs_result['manhrs']['min'],
             "skill_number": manhrs_result['skill_set'],
-            "estimated_man_hours": manhrs_result['avg_est']
+            "estimated_man_hours": manhrs_result['avg_est'],
+            "prob": manhrs_result['prob'],
         }
         
         processed_task_manhours.append(task_row)
