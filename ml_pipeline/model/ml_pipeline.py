@@ -274,7 +274,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     if aircraft_age> 0.0:
         # Continue increasing age_cap until we get at least 5 packages or reach the maximum age limit
         while len(train_packages) < 5:  # Changed from >4 to <5 to keep looping until we have at least 5 packages
-            if customer_name_consideration.lower() == "yes":
+            if customer_name_consideration:
                 # Filter based on customer name consideration
                  train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
@@ -301,17 +301,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             if aircraft_age + age_cap > 30:
                 break 
     else:
-        if customer_name_consideration.lower() == "yes":
+        if customer_name_consideration:
                 train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
-                    (aircraft_details["check_category"].isin(check_category)) 
+                    (aircraft_details["check_category"].isin(check_category))&
+                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))  
                 ]["package_number"].unique().tolist()
             
         else:
             train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
-                    (aircraft_details["check_category"].isin(check_category))&
-                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False)) 
+                    (aircraft_details["check_category"].isin(check_category))
                 ]["package_number"].unique().tolist()
         
 
@@ -1018,6 +1018,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             "sourceTask": task_row["task_number"],
             "description": task_row["description"],
             "skill": task_row["skill_number"],
+            "prob":task_row["prob"],
             "mhs": {
                 "max": float_round(task_row["max_actual_man_hours"]),
                 "min": float_round(task_row["min_actual_man_hours"]),

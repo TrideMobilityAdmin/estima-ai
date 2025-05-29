@@ -51,12 +51,12 @@ def process_document(estID):
         descriptions = bson_data.get("description", [])
         add_tasks = bson_data.get("additionalTasks", [])  # Changed default from {} to []
         customer_name = bson_data.get("operator", " ")
-        customer_name_consideration = bson_data.get("operator_consideration", " ")
+        customer_name_consideration = bson_data.get("operatorForModel", False)
         probability_threshold = bson_data.get("probability", 10)
         aircraft_model = bson_data.get("aircraftModel", " ")
         check_category = bson_data.get("typeOfCheck", " ")
         aircraft_age = bson_data.get("aircraftAge", 0)
-        age_cap= bson_data.get("ageCap", 3)
+        age_cap= bson_data.get("aircraftAgeThreshold", 3)
         cappingDetails = bson_data.get("cappingDetails", "capping details not found")
         
         # Convert to strings
