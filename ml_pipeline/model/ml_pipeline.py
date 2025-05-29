@@ -27,9 +27,9 @@ from typing import List, Tuple
 
 
 # Initialize necessary components
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('wordnet')
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
 nlp = spacy.load("en_core_web_sm")
 le = LabelEncoder()
 q = inflect.engine()
@@ -131,7 +131,7 @@ parts_master=parts_master.drop_duplicates()
 
 
 task_parts_collection = db["task_parts_lhrh"]
-task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1,"part_type":1,"issued_stock_status":1}))
+task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1,"part_type":1,"issued_stock_status":1,"unit_of_measurement":1}))
 task_parts =  pd.DataFrame(task_parts)
 task_parts=task_parts[task_parts["part_type"]!="Component"]
 task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
