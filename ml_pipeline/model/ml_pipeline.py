@@ -389,13 +389,48 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print(f"The shape of {exdata.shape} ")
         
     def get_manhrs(task_number):
+        
         if task_number in task_description_unique_task_list:
             filtered_data = task_data[task_data['task_number'] == task_number]
-            prob = (len(sub_task_description_defects[sub_task_description_defects['source_task_discrepancy_number_updated'] == task_number]["package_number"].unique().tolist()) / len(train_packages)) * 100
+            
+            # Get unique packages for this task
+            task_packages = task_data[task_data['task_number'] == task_number]['package_number'].unique().tolist()
+            num_task_packages = len(task_packages)
+            
+            # Get unique packages with defects for this task
+            defect_packages = sub_task_description_defects[
+                sub_task_description_defects['source_task_discrepancy_number_updated'] == task_number
+            ]["package_number"].unique().tolist()
+            num_defect_packages = len(defect_packages)
+            
+            # Calculate probability (avoid division by zero)
+            if num_task_packages > 0:
+                prob = (num_defect_packages / num_task_packages) * 100
+            else:
+                prob = 0
+            
+            print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
+            
         else:
             filtered_data = task_all_data[task_all_data['task_number'] == task_number]
-            prob = (len(sub_task_description_defects_all[sub_task_description_defects_all['source_task_discrepancy_number_updated'] == task_number]["package_number"].unique().tolist()) / len(train_packages)) * 100
-        
+            
+            # Get unique packages for this task
+            task_packages = task_all_data[task_all_data['task_number'] == task_number]['package_number'].unique().tolist()
+            num_task_packages = len(task_packages)
+            
+            # Get unique packages with defects for this task
+            defect_packages = sub_task_description_defects_all[
+                sub_task_description_defects_all['source_task_discrepancy_number_updated'] == task_number
+            ]["package_number"].unique().tolist()
+            num_defect_packages = len(defect_packages)
+            
+            # Calculate probability (avoid division by zero)
+            if num_task_packages > 0:
+                prob = (num_defect_packages / num_task_packages) * 100
+            else:
+                prob = 0
+            
+            print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
         if filtered_data.empty:
             return {
                 'prob': 0,
