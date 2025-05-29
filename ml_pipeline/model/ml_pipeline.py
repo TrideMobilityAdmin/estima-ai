@@ -347,8 +347,21 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     task_description_unique_task_list = task_data["task_number"].unique().tolist()
     task_all_data=task_description[task_description["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
-    filtered_tasks=task_data["task_number"].unique().tolist()
+    # Get distinct task_number and description combinations
+    filtered_tasks = task_data[["task_number", "description"]].drop_duplicates()
 
+    # Get task numbers from filtered_tasks as a list
+    filtered_task_numbers = filtered_tasks["task_number"].unique().tolist()
+
+    # Filter mpd_task_data for tasks not in filtered_task_numbers
+    not_available_tasks = mpd_task_data[~mpd_task_data["TASK NUMBER"].isin(filtered_task_numbers)]
+
+    # Rename columns for consistency
+    not_available_tasks = not_available_tasks.rename(columns={"TASK NUMBER": "task_number", "DESCRIPTION": "description"})
+
+    # Convert to list of dicts (records)
+    filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
+    not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
     sub_parts_data = sub_task_parts[sub_task_parts['package_number'].isin(train_packages)]
@@ -1437,7 +1450,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     output_data = {
         "estID": estID,
         "description": f"Estimate for package {estID}",
-        "filtered_tasks":filtered_tasks,
+        "filtered_tasks":filtered_tasks_list,
+        "not_avialable_tasks":not_available_tasks_list,
         "tasks": tasks_list,
         "aggregatedTasks": {
             "totalMhs": float_round(tasks_total_mhs),
