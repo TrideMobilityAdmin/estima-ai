@@ -31,7 +31,8 @@ export default function SkillRequirement() {
     const [skillAnalysisData, setSkillAnalysisData] = useState<any>(null);
 const [isValidating, setIsValidating] = useState(false);
 const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
-  const [sheetInfo, setSheetInfo] = useState<
+ const [extractedDescriptions, setExtractedDescriptions] = useState<string[]>([]);  
+const [sheetInfo, setSheetInfo] = useState<
     { sheetName: string; columnName: string } | undefined
   >(undefined);
 
@@ -61,28 +62,35 @@ const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
 
     // };
     // Handle file and extracted tasks
-      const handleFileChange = async (
+    const handleFileChange = async (
         file: File | null,
         tasks: string[],
+        descriptions: string[], // ADD THIS
         fileSheetInfo?: { sheetName: string; columnName: string }
       ) => {
         setIsValidating(true);
         setSelectedFile(file);
         setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+        setExtractedDescriptions(descriptions ?? []); // ADD THIS
         setSheetInfo(fileSheetInfo);
-    
+      
         console.log("✅ Selected File:", file ? file.name : "None");
         console.log(
           "📌 Extracted Tasks:",
           tasks.length > 0 ? tasks : "No tasks found"
         );
+        console.log(
+          "📝 Extracted Descriptions:",
+          descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
+        );
         console.log("From sheet:", fileSheetInfo?.sheetName);
         console.log("From column:", fileSheetInfo?.columnName);
-        setIsLoading(true);
+      
         if (tasks.length > 0) {
-          const response = await validateTasks(tasks);
+          // Send both tasks and descriptions to validation API
+          const response = await validateTasks(tasks, descriptions); // Make sure your API accepts this!
           setValidatedTasks(response);
-          setIsLoading(false)
+      
           const invalidTasks = response.filter((task) => task.status === false);
           if (invalidTasks.length > 0) {
             showNotification({
@@ -92,12 +100,10 @@ const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
               style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
             });
           }
-
         } else {
           setValidatedTasks([]);
-          setIsLoading(false)
         }
-    
+      
         setIsValidating(false);
       };
 
@@ -106,25 +112,25 @@ const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
     };
 
     //  Extracted tasks are passed to validation API
-    const handleTasks = async (extractedTasks: string[]) => {
-        setIsLoading(true);
-        setTasks(extractedTasks);
+    // const handleTasks = async (extractedTasks: string[]) => {
+    //     setIsLoading(true);
+    //     setTasks(extractedTasks);
 
-        console.log("Extracted Tasks:", extractedTasks);
-        const response = await validateTasks(extractedTasks);
-        setValidatedTasks(response);
-        setIsLoading(false);
+    //     console.log("Extracted Tasks:", extractedTasks);
+    //     const response = await validateTasks(extractedTasks);
+    //     setValidatedTasks(response);
+    //     setIsLoading(false);
 
-        const invalidTasks = response?.filter((task) => task?.status === false);
-        if (invalidTasks.length > 0) {
-            showNotification({
-                title: "Tasks Not Available!",
-                message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
-                color: "orange",
-                style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-            });
-        }
-    };
+    //     const invalidTasks = response?.filter((task) => task?.status === false);
+    //     if (invalidTasks.length > 0) {
+    //         showNotification({
+    //             title: "Tasks Not Available!",
+    //             message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used to Skill Analysis.`,
+    //             color: "orange",
+    //             style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+    //         });
+    //     }
+    // };
 
     // Handle Submit
     const handleSubmit = async () => {
@@ -322,7 +328,18 @@ const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
                         >
                             {validatedTasks?.length > 0 ? (
                                 <SimpleGrid cols={4}>
-                                    {validatedTasks?.map((task, index) => (
+                                    {validatedTasks
+                                    ?.sort((a, b) => {
+                                        // Alphanumerical sorting function
+                                        const aTaskId = a?.taskid || '';
+                                        const bTaskId = b?.taskid || '';
+                                        
+                                        return aTaskId.localeCompare(bTaskId, undefined, {
+                                          numeric: true,
+                                          sensitivity: 'base'
+                                        });
+                                      })
+                                    ?.map((task, index) => (
                                         <Badge
                                             key={index}
                                             color={task?.status === false ? "blue" : "green"}

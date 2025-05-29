@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateReport_Url, getEstimateStatus_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -56,9 +56,11 @@ export const useApi = () => {
       tasks: data.tasks,
       probability: data.probability,
       operator: data.operator,
+      operatorForModel: data.operatorForModel,
       aircraftRegNo: data.aircraftRegNo,
       aircraftModel: data.aircraftModel, 
       aircraftAge: data.aircraftAge,
+      aircraftAgeThreshold: data.aircraftAgeThreshold,
       aircraftFlightHours: data.aircraftFlightHours,
       aircraftFlightCycles: data.aircraftFlightCycles,
       areaOfOperations: data.areaOfOperations,
@@ -174,9 +176,9 @@ export const useApi = () => {
   };
 
 
-  const validateTasks = async (tasks: string[]): Promise<TaskValidationResponse[]> => {
+  const validateTasks = async (tasks: string[], description: string[]): Promise<TaskValidationResponse[]> => {
     try {
-      const response = await axiosInstance.post(getValidateTasks_Url, { tasks });
+      const response = await axiosInstance.post(getValidateTasks_Url, { tasks, description });
       return response.data;
     } catch (error: any) {
       console.error("❌ Task Validation API Error:", error.response?.data || error.message);
@@ -227,6 +229,37 @@ export const useApi = () => {
       return null;
     }
   };
+
+  const getOperatorsList = async () => {
+    try {
+      const response = await axiosInstance.get(getOperatorsList_Url);
+      console.log("✅ API Response all operators:", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
+
+  const getEstimateDetailsByID = async (estimateId: string) => {
+    try {
+      const response = await axiosInstance.get(getEstimateDetails_Url + estimateId);
+      console.log("✅ API Response estimate details :", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
+
 
   // New function to upload a file with Estimate ID
   const compareUploadFile = async (files: File[], selectedEstID: string) => {
@@ -455,6 +488,8 @@ export const useApi = () => {
     getAllDataExpertInsights,
     getProbabilityWiseDetails,
     updateProbabilityWiseDetails,
-    updateRemarkByEstID
+    updateRemarkByEstID,
+    getOperatorsList,
+    getEstimateDetailsByID
   };
 };

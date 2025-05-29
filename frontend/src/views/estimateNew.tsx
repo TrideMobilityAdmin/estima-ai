@@ -20,7 +20,8 @@ import {
   Tooltip,
   Combobox,
   useCombobox,
-  InputBase
+  InputBase,
+  Loader
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -77,6 +78,7 @@ import {
   IconClockUp,
   IconDeselect,
   IconDownload,
+  IconEdit,
   IconError404,
   IconFile,
   IconFileCheck,
@@ -142,6 +144,8 @@ export default function EstimateNew() {
     getEstimateByID,
     downloadEstimatePdf,
     getProbabilityWiseDetails,
+    getOperatorsList,
+    getEstimateDetailsByID
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
   const { getSkillAnalysis } = useApiSkillAnalysis();
@@ -166,6 +170,7 @@ export default function EstimateNew() {
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [extractedTasks, setExtractedTasks] = useState<string[]>([]);
+  const [extractedDescriptions, setExtractedDescriptions] = useState<string[]>([]);
   const [sheetInfo, setSheetInfo] = useState<
     { sheetName: string; columnName: string } | undefined
   >(undefined);
@@ -212,38 +217,39 @@ export default function EstimateNew() {
   //     setLoading(false);
   // };
 
-  const operatorsList = ['GO AIRLINES (INDIA) LTD',
-    'ALPHA STAR AVIATION SERVICES',
-    'EZEN AVIATION PTY LTD',
-    'AERGO CAPITAL',
-    'SPICEJET',
-    'SMARTLYNX AIRLINES LTD',
-    'INDIGO',
-    'AIX Connect Private Limited',
-    'JAZEERA AIRWAYS',
-    'TURBO MEGHA AIRWAYS PVT LTD',
-    'AIRCASTLE SINGAPORE PTE. LTD',
-    'TATA SIA AIRLINES',
-    'GE CAPITAL AVIATION SERVICES',
-    'US BANGLA',
-    'DRUK AIR',
-    'OMAN AIR',
-    'BIG CHARTERS PVT LTD (FLYBIG)',
-    'FLYNAS',
-    'FLYDUBAI',
-    'ISLAND AVIATION SERVICES LTD',
-    'MANTA AIR',
-    'SNV AVIATION PRIVATE LIMITED AKASA AIR',
-    'BEOND SIMDI OPERATIONS PRIVATE LIMITED',
-    'NOVOAIR LTD',
-    'FITS AIR',
-    'CEBU AIR, INC.',
-    'AERO NOMAD AIRLINES LLC',
-    'SRILANKA AIRLINES LTD',
-    'KUWAIT AIRWAYS COMPANY',
-    'SNV AVIATION PRIVATE LIMITED',
-    'QUIKJET CARGO AIRLINES PRIVATE LIMITED',
-    'WIZZ AIR ABU DHABI LLC'];
+
+  // const operatorsList = ['GO AIRLINES (INDIA) LTD',
+  //   'ALPHA STAR AVIATION SERVICES',
+  //   'EZEN AVIATION PTY LTD',
+  //   'AERGO CAPITAL',
+  //   'SPICEJET',
+  //   'SMARTLYNX AIRLINES LTD',
+  //   'INDIGO',
+  //   'AIX Connect Private Limited',
+  //   'JAZEERA AIRWAYS',
+  //   'TURBO MEGHA AIRWAYS PVT LTD',
+  //   'AIRCASTLE SINGAPORE PTE. LTD',
+  //   'TATA SIA AIRLINES',
+  //   'GE CAPITAL AVIATION SERVICES',
+  //   'US BANGLA',
+  //   'DRUK AIR',
+  //   'OMAN AIR',
+  //   'BIG CHARTERS PVT LTD (FLYBIG)',
+  //   'FLYNAS',
+  //   'FLYDUBAI',
+  //   'ISLAND AVIATION SERVICES LTD',
+  //   'MANTA AIR',
+  //   'SNV AVIATION PRIVATE LIMITED AKASA AIR',
+  //   'BEOND SIMDI OPERATIONS PRIVATE LIMITED',
+  //   'NOVOAIR LTD',
+  //   'FITS AIR',
+  //   'CEBU AIR, INC.',
+  //   'AERO NOMAD AIRLINES LLC',
+  //   'SRILANKA AIRLINES LTD',
+  //   'KUWAIT AIRWAYS COMPANY',
+  //   'SNV AVIATION PRIVATE LIMITED',
+  //   'QUIKJET CARGO AIRLINES PRIVATE LIMITED',
+  //   'WIZZ AIR ABU DHABI LLC'];
 
   const models = ['A320',
     'ATR42',
@@ -331,49 +337,57 @@ export default function EstimateNew() {
   );
 
   // Handle file and extracted tasks
-  const handleFileChange = async (
-    file: File | null,
-    tasks: string[],
-    fileSheetInfo?: { sheetName: string; columnName: string }
-  ) => {
-    setIsValidating(true);
-    setSelectedFile(file);
-    setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
-    setSheetInfo(fileSheetInfo);
+  // Handle file and extracted tasks and descriptions
+const handleFileChange = async (
+  file: File | null,
+  tasks: string[],
+  descriptions: string[], // ADD THIS
+  fileSheetInfo?: { sheetName: string; columnName: string }
+) => {
+  setIsValidating(true);
+  setSelectedFile(file);
+  setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+  setExtractedDescriptions(descriptions ?? []); // ADD THIS
+  setSheetInfo(fileSheetInfo);
 
-    console.log("✅ Selected File:", file ? file.name : "None");
-    console.log(
-      "📌 Extracted Tasks:",
-      tasks.length > 0 ? tasks : "No tasks found"
-    );
-    console.log("From sheet:", fileSheetInfo?.sheetName);
-    console.log("From column:", fileSheetInfo?.columnName);
+  console.log("✅ Selected File:", file ? file.name : "None");
+  console.log(
+    "📌 Extracted Tasks:",
+    tasks.length > 0 ? tasks : "No tasks found"
+  );
+  console.log(
+    "📝 Extracted Descriptions:",
+    descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
+  );
+  console.log("From sheet:", fileSheetInfo?.sheetName);
+  console.log("From column:", fileSheetInfo?.columnName);
 
-    if (tasks.length > 0) {
-      const response = await validateTasks(tasks);
-      setValidatedTasks(response);
+  if (tasks.length > 0) {
+    // Send both tasks and descriptions to validation API
+    const response = await validateTasks(tasks, descriptions); // Make sure your API accepts this!
+    setValidatedTasks(response);
 
-      const invalidTasks = response.filter((task) => task.status === false);
-      if (invalidTasks.length > 0) {
-        showNotification({
-          title: "Tasks Not Available!",
-          message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
-          color: "orange",
-          style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-        });
-      }
-    } else {
-      setValidatedTasks([]);
+    const invalidTasks = response.filter((task) => task.status === false);
+    if (invalidTasks.length > 0) {
+      showNotification({
+        title: "Tasks Not Available!",
+        message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
+        color: "orange",
+        style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+      });
     }
+  } else {
+    setValidatedTasks([]);
+  }
 
-    setIsValidating(false);
-  };
+  setIsValidating(false);
+};
 
   // 🟢 Function to validate tasks & update UI
-  const handleValidateTasks = async (tasks: string[]) => {
+  const handleValidateTasks = async (tasks: string[], descriptions : string[]) => {
     setIsValidating(true);
     try {
-      const response = await validateTasks(tasks);
+      const response = await validateTasks(tasks, descriptions);
       if (response?.length > 0) {
         setValidatedTasks(response);
         setValidatedSkillsTasks(response);
@@ -385,9 +399,9 @@ export default function EstimateNew() {
   };
 
 
-  const handleValidateSkillsTasks = async (tasks: string[]) => {
+  const handleValidateSkillsTasks = async (tasks: string[], descriptions:string[]) => {
     setIsValidating2(true);
-    const response = await validateTasks(tasks);
+    const response = await validateTasks(tasks, descriptions);
 
     if (response.length > 0) {
       setValidatedSkillsTasks(response);
@@ -484,34 +498,162 @@ export default function EstimateNew() {
     );
   };
 
-  // const downloadAllValidatedTasks = async (tasks: any[]) => {
-  //   // Step 1: Get the latest validated tasks directly
-  //   const validated = await handleValidateTasks(tasks);
 
-  //   if (!validated || validated.length === 0) {
-  //     showNotification({
-  //       title: "No tasks found",
-  //       message: "Validation returned no data to download.",
-  //       color: "red",
-  //     });
-  //     return;
-  //   }
+  const [estimateDetails, setEstimateDetails] = useState<any>(null);
+  const [loadingEstDet, setLoadingEstDet] = useState(false);
+  const [selectedEstimateIdDetails, setSelectedEstimateIdDetails] = useState<any>();
 
-  //   // Step 2: Prepare Excel data
-  //   const excelData = validated.map((task: any) => ({
-  //     "TASK NUMBER": task?.taskid || "",
-  //     DESCRIPTION: task?.description || "",
-  //     "MAN HOURS": "", // Can be modified to include actual man hours
-  //   }));
+  // useEffect(() => {
+  //   const fetchEstDetails = async () => {
+  //     setLoadingEstDet(true);
+  //     const data = await getEstimateDetailsByID(selectedEstimateIdDetails);
+  //     if (data) {
+  //       setEstimateDetails(data);
+  //     }
+  //     setLoadingEstDet(false);
+  //   };
 
-  //   // Step 3: Create and download Excel
+  //   fetchEstDetails();
+  // }, [selectedEstimateIdDetails]);
+  useEffect(() => {
+    const fetchEstDetails = async () => {
+      setLoadingEstDet(true);
+      const data = await getEstimateDetailsByID(selectedEstimateIdDetails);
+      if (data) {
+        setEstimateDetails(data);
+
+        // Populate form with API response data
+        const formData = {
+          tasks: data.tasks || [],
+          probability: data.probability || 10,
+          operator: data.operator || "",
+          operatorForModel: data.operatorForModel || false,
+          aircraftRegNo: data.aircraftRegNo || "",
+          aircraftModel: data.aircraftModel || "",
+          aircraftAge: data.aircraftAge || 0,
+          aircraftAgeThreshold: data.aircraftAgeThreshold || 3,
+          aircraftFlightHours: data.aircraftFlightHours || "",
+          aircraftFlightCycles: data.aircraftFlightCycles || "",
+          areaOfOperations: data.areaOfOperations || "",
+          cappingDetails: {
+            cappingTypeManhrs: data.cappingDetails?.cappingTypeManhrs || "",
+            cappingManhrs: data.cappingDetails?.cappingManhrs || "",
+            cappingTypeSpareCost: data.cappingDetails?.cappingTypeSpareCost || "",
+            cappingSpareCost: data.cappingDetails?.cappingSpareCost || "",
+          },
+          taskID: data.taskID || "",
+          taskDescription: data.taskDescription || "",
+          typeOfCheck: data.typeOfCheck || [],
+          typeOfCheckID: data.typeOfCheckID || "",
+          miscLaborTasks: data.miscLaborTasks || [],
+          additionalTasks: data.additionalTasks || [],
+        };
+
+        // Set form values
+        form.setValues(formData);
+
+        // Update search state for operator combobox to reflect the populated value
+        setSearch(data.operator || "");
+
+        // Auto-populate selectedFields and showFields based on API data
+        const fieldsToShow = [];
+
+        // Check which optional fields have values and should be shown
+        if (data.probability && data.probability !== 10) fieldsToShow.push("probability");
+        if (data.aircraftFlightCycles) fieldsToShow.push("aircraftFlightCycles");
+        if (data.aircraftFlightHours) fieldsToShow.push("aircraftFlightHours");
+        if (data.aircraftAgeThreshold && data.aircraftAgeThreshold !== 3) fieldsToShow.push("aircraftAgeThreshold");
+        if (data.areaOfOperations) fieldsToShow.push("areaOfOperations");
+        if (data.cappingDetails?.cappingManhrs || data.cappingDetails?.cappingTypeManhrs) fieldsToShow.push("cappingManhrs");
+        if (data.cappingDetails?.cappingSpareCost || data.cappingDetails?.cappingTypeSpareCost) fieldsToShow.push("cappingSpares");
+
+        // Update selected fields and show fields
+        setSelectedFields(fieldsToShow);
+        setShowFields(fieldsToShow);
+
+        // Force re-render to update form keys
+        setFormKey(prev => prev + 1);
+
+        // Scroll to top after state updates are complete
+        setTimeout(() => {
+          // Method 1: Scroll to Required Parameters section
+          const requiredSection = document.getElementById('required-parameters-section');
+          if (requiredSection) {
+            requiredSection.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+              inline: 'nearest'
+            });
+          }
+
+          // Method 2: Scroll the ScrollArea viewport to top
+          if (scrollAreaRef.current) {
+            const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
+            if (viewport) {
+              viewport.scrollTop = 0;
+            }
+          }
+
+          // Method 3: Scroll the card into view
+          if (cardRef.current) {
+            cardRef.current.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+              inline: 'start'
+            });
+          }
+
+        }, 500);
+
+        // Immediate scroll attempt
+        if (scrollAreaRef.current) {
+          const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
+          if (viewport) {
+            viewport.scrollTop = 0;
+          }
+        }
+      }
+      setLoadingEstDet(false);
+    };
+
+    if (selectedEstimateIdDetails) {
+      fetchEstDetails();
+    }
+  }, [selectedEstimateIdDetails]);
+
+  console.log("Estimate Id Details >>>", estimateDetails);
+
+  // const downloadAllValidatedTasks = async (
+  //   tasks: string[],
+  //   descriptions: string[],
+  //   estID: string
+  // ) => {
+  //   // Check if tasks and descriptions have data
+  //   const hasData = tasks.length > 0 && descriptions.length > 0;
+
+  //   const excelData = hasData
+  //     ? tasks.map((task, index) => ({
+  //       "TASK NUMBER": task || "",
+  //       DESCRIPTION: descriptions[index] || "",
+  //       "FINAL MH": "",
+  //     }))
+  //     : [
+  //       {
+  //         "TASK NUMBER": "",
+  //         DESCRIPTION: "",
+  //         "FINAL MH": "",
+  //       },
+  //     ];
+
+  //   // Create and download Excel
   //   const ws = XLSX.utils.json_to_sheet(excelData);
   //   const wb = XLSX.utils.book_new();
   //   XLSX.utils.book_append_sheet(wb, ws, "MPD");
-
-  //   XLSX.writeFile(wb, `Estimate_${selectedEstimateId}_AllTasks.xlsx`);
+  //   XLSX.writeFile(wb, `Estimate_${estID}.xlsx`);
   // };
 
+  // Reset counter for keys to force re-render
+  
   const downloadAllValidatedTasks = async (
     tasks: string[],
     descriptions: string[],
@@ -519,39 +661,72 @@ export default function EstimateNew() {
   ) => {
     // Check if tasks and descriptions have data
     const hasData = tasks.length > 0 && descriptions.length > 0;
-
+  
     const excelData = hasData
       ? tasks.map((task, index) => ({
-        "TASK NUMBER": task || "",
-        DESCRIPTION: descriptions[index] || "",
-        "FINAL MH": "",
-      }))
-      : [
-        {
-          "TASK NUMBER": "",
-          DESCRIPTION: "",
+          "TASK NUMBER": task || "",
+          DESCRIPTION: descriptions[index] || "",
           "FINAL MH": "",
-        },
-      ];
-
-    // Create and download Excel
+        }))
+      : [
+          {
+            "TASK NUMBER": "",
+            DESCRIPTION: "",
+            "FINAL MH": "",
+          },
+        ];
+  
+    // Create Excel workbook
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "MPD");
-    XLSX.writeFile(wb, `Estimate_${estID}.xlsx`);
-  };
+    
+    // Generate Excel file as blob instead of direct download
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    // Create File object from blob
+    const fileName = `Estimate_${estID}.xlsx`;
+    const file = new File([blob], fileName, { type: blob.type });
+    
+    // Download the file (for user to have a copy)
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    // Auto-select the file in dropzone by calling handleFileChange
+    // Extract tasks from the created data for validation
+    const extractedTasks = hasData ? tasks : [];
+    const extractedDescriptions = hasData ? descriptions : [];
 
-  // Reset counter for keys to force re-render
+    // Call handleFileChange with the created file
+    await handleFileChange(file, extractedTasks,extractedDescriptions, {
+      sheetName: "MPD",
+      columnName: "TASK NUMBER"
+    });
+  };
   const [formKey, setFormKey] = useState(0);
+  // Add ref for scroll container
+  const scrollAreaRefFields = useRef<HTMLDivElement>(null);
+  // Add ref for the card container
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Add ref for scroll container
+  const scrollAreaRefContainer = useRef<HTMLDivElement>(null);
+
   // Form initialization
   const form = useForm<any>({
     initialValues: {
       tasks: [],
       probability: 10,
       operator: "",
+      operatorForModel: false,
       aircraftRegNo: "",
       aircraftModel: "",
       aircraftAge: 0,
+      aircraftAgeThreshold: 3,
       aircraftFlightHours: "",
       aircraftFlightCycles: "",
       areaOfOperations: "",
@@ -615,14 +790,55 @@ export default function EstimateNew() {
     },
   });
 
+
+
+  // API Data Fetching and State Management
+  const [operatorsListAll, setOperatorsList] = useState<any[]>([]);
+  const [loadingOperators, setLoadingOperators] = useState(false);
+
+  useEffect(() => {
+    const fetchOperators = async () => {
+      setLoadingOperators(true);
+      const data = await getOperatorsList();
+      if (data) {
+        setOperatorsList(data);
+      }
+      setLoadingOperators(false);
+    };
+
+    fetchOperators();
+  }, []);
+
+  console.log("all operatorsListAll>>>", operatorsListAll);
+
   const combobox = useCombobox({
     onDropdownClose: () => combobox.resetSelectedOption(),
   });
 
-  const [data, setData] = useState(operatorsList);
+  const [data, setData] = useState<string[]>([]);
   const [search, setSearch] = useState(form.values.operator);
 
-  const exactOptionMatch = data.some((item) => item.toLowerCase() === search.toLowerCase());
+  // Deduplicate operator list from API
+  useEffect(() => {
+    const uniqueOperators = Array.from(
+      new Set(
+        operatorsListAll.map((item: string) => item.trim().toLowerCase())
+      )
+    );
+
+    const originalCasedOperators = uniqueOperators.map((unique) =>
+      operatorsListAll.find(
+        (item: string) => item.trim().toLowerCase() === unique
+      ) || unique
+    );
+
+    setData(originalCasedOperators);
+  }, [operatorsListAll]);
+
+  const exactOptionMatch = data.some(
+    (item) => item.toLowerCase() === search.toLowerCase()
+  );
+
   const filteredOptions = exactOptionMatch
     ? data
     : data.filter((item) =>
@@ -630,7 +846,14 @@ export default function EstimateNew() {
     );
 
   const options = filteredOptions.map((item) => (
-    <Combobox.Option value={item} key={item}>
+    <Combobox.Option
+      value={item}
+      key={item}
+      style={{
+        fontSize: '13px',
+        padding: '6px 12px',
+      }}
+    >
       {item}
     </Combobox.Option>
   ));
@@ -638,8 +861,10 @@ export default function EstimateNew() {
   const clearSelection = () => {
     form.setFieldValue('operator', '');
     setSearch('');
+    form.setFieldValue('operatorForModel', false);
     form.validateField('operator');
   };
+
 
   // Handle Submit
   const handleSubmit = async () => {
@@ -700,18 +925,14 @@ export default function EstimateNew() {
       tasks: validTasks || [],
       probability: Number(form.values.probability) || 10,
       operator: form.values.operator || "",
+      operatorForModel: form.values.operatorForModel || false,
       aircraftRegNo: form.values.aircraftRegNo || "",
       aircraftModel: form.values.aircraftModel || "",
       aircraftAge: form.values.aircraftAge || 0.0,
+      aircraftAgeThreshold: form.values.aircraftAgeThreshold || 3,
       aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
       aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
       areaOfOperations: form.values.areaOfOperations || "",
-      // cappingDetails: {
-      //   cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
-      //   cappingManhrs: Number(form.values.cappingDetails.cappingManhrs) || 0,
-      //   cappingTypeSpareCost: form.values.cappingDetails.cappingTypeSpareCost || "",
-      //   cappingSpareCost: Number(form.values.cappingDetails.cappingSpareCost) || 0,
-      // },
       cappingDetails: {
         cappingTypeManhrs: form.values.cappingDetails.cappingTypeManhrs || "",
         cappingManhrs:
@@ -774,7 +995,7 @@ export default function EstimateNew() {
           additionalTasks: [],
         });
 
-        // setSelectedFile(null);
+        setSelectedFile(null);
         setValidatedTasks([]);
         setAdditionalTasks([]);
         setSelectedExpertInsightTasks([]);
@@ -834,7 +1055,7 @@ export default function EstimateNew() {
 
   const handleCloseModal = () => {
     setRfqSubModalOpened(false);
-    // setSelectedFile(null); // Clear selected file
+    setSelectedFile(null); // Clear selected file
     setExtractedTasks([]); // Clear extracted tasks
     form.reset();
     fetchEstimatesStatus();
@@ -928,20 +1149,24 @@ export default function EstimateNew() {
       const additionalTaskIds = additionalTasks
         .filter((task: any) => task.taskID.trim() !== "")
         .map((task: any) => task.taskID);
+        // Extract task IDs from the additionalTasks Descriptions array
+      const additionalTaskDescriptions = additionalTasks
+      .filter((task: any) => task.taskID.trim() !== "")
+      .map((task: any) => task.taskDescription);
 
       // Only proceed with validation if there are valid task IDs
       if (additionalTaskIds.length > 0) {
-        await validateAdditionalTasks(additionalTaskIds);
+        await validateAdditionalTasks(additionalTaskIds,additionalTaskDescriptions);
       }
     }
   };
 
 
   // Step 4: Create a function for validating additional tasks
-  const validateAdditionalTasks = async (taskIds: any) => {
+  const validateAdditionalTasks = async (taskIds: any, descriptions: any) => {
     setIsValidating(true);
     try {
-      const response = await validateTasks(taskIds);
+      const response = await validateTasks(taskIds, descriptions);
       if (response.length > 0) {
         setValidatedAdditionalTasks(response);
       }
@@ -1034,10 +1259,6 @@ export default function EstimateNew() {
         />
       ),
     },
-    // { label: "Aircraft Age", name: "aircraftAge", component: <TextInput size="xs" placeholder="Ex:50" {...form.getInputProps("aircraftAge")} /> },
-    // { label: "Operator", name: "operator", component: <TextInput size="xs" placeholder="Indigo, AirIndia" {...form.getInputProps("operator")} /> },
-    // { label: "Aircraft Reg No", name: "aircraftRegNo", component: <TextInput size="xs" placeholder="Ex:N734AB, SP-LR" {...form.getInputProps("aircraftRegNo")} /> },
-    // { label: "Check Type", name: "typeOfCheck", component: <Select size="xs" data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']} {...form.getInputProps("typeOfCheck")} /> },
     {
       label: "Flight Cycles",
       name: "aircraftFlightCycles",
@@ -1057,6 +1278,17 @@ export default function EstimateNew() {
           size="xs"
           placeholder="Ex:50"
           {...form.getInputProps("aircraftFlightHours")}
+        />
+      ),
+    },
+    {
+      label: "Aircraft Age Threshold",
+      name: "aircraftAgeThreshold",
+      component: (
+        <TextInput
+          size="xs"
+          placeholder="Ex:3"
+          {...form.getInputProps("aircraftAgeThreshold")}
         />
       ),
     },
@@ -1095,10 +1327,6 @@ export default function EstimateNew() {
         />
       ),
     },
-    // { label: "Man Hrs Capping Type", name: "cappingTypeManhrs", component: <Select data={['Type - 1', 'Type - 2', 'Type - 3']} {...form.getInputProps("cappingDetails.cappingTypeManhrs")} /> },
-    // { label: "Man Hours", name: "cappingManhrs", component: <TextInput placeholder="Ex: 40" {...form.getInputProps("cappingDetails.cappingManhrs")} /> },
-    // { label: "Spares Capping Type", name: "cappingTypeSpareCost", component: <Select data={['Type - 1', 'Type - 2', 'Type - 3']} {...form.getInputProps("cappingDetails.cappingTypeSpareCost")} /> },
-    // { label: "Cost ($)", name: "cappingSpareCost", component: <TextInput placeholder="Ex: 600$" {...form.getInputProps("cappingDetails.cappingSpareCost")} /> },
     { label: "Capping Man Hrs", name: "cappingManhrs" },
     { label: "Capping Spares", name: "cappingSpares" },
   ];
@@ -1556,12 +1784,8 @@ export default function EstimateNew() {
                         ?.length
                     }
                   </Button>
-                  {/* <ActionIcon size={25} color="green" variant="light" onClick={() => downloadCSV(true)}>
-                                        <IconDownload />
-                                    </ActionIcon> */}
                 </Tooltip>
 
-                {/* Button for Not Available Tasks */}
                 <Tooltip label="Download Not Available Tasks">
                   <Button
                     size="xs"
@@ -1575,9 +1799,7 @@ export default function EstimateNew() {
                         ?.length
                     }
                   </Button>
-                  {/* <ActionIcon size={25} color="blue" variant="light" onClick={() => downloadCSV(false)}>
-                                        <IconDownload />
-                                    </ActionIcon> */}
+
                 </Tooltip>
               </Group>
             </Group>
@@ -1595,7 +1817,10 @@ export default function EstimateNew() {
           />
         ) : (
           <SimpleGrid cols={4}>
-            {validatedTasks?.map((task, index) => {
+            {validatedTasks
+            ?.slice() // to avoid mutating the original array
+            .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+            ?.map((task, index) => {
               const badgeColor = task?.status ? "green" : "blue"; // Blue for true, Orange for false
               return task?.taskid?.length > 12 ? (
                 <Tooltip
@@ -2003,7 +2228,10 @@ export default function EstimateNew() {
               <Box mb="md">
                 <Text size="sm" fw={600} mb="xs">Original Tasks:</Text>
                 <SimpleGrid cols={5}>
-                  {validatedTasks.map((task, index) => (
+                  {validatedTasks
+                  ?.slice() // to avoid mutating the original array
+                  .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                  ?.map((task, index) => (
                     <Badge
                       fullWidth
                       key={`original-${index}`}
@@ -2024,7 +2252,10 @@ export default function EstimateNew() {
               <Box>
                 <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
                 <SimpleGrid cols={5}>
-                  {validatedAdditionalTasks.map((task, index) => (
+                  {validatedAdditionalTasks
+                  ?.slice() // to avoid mutating the original array
+                  .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                  .map((task, index) => (
                     <Badge
                       fullWidth
                       key={`additional-${index}`}
@@ -2446,9 +2677,8 @@ export default function EstimateNew() {
                             
                         </Card>
                     </Grid.Col> */}
-
           <Grid.Col span={{ base: 12, md: 4, lg: 4 }}>
-            <Card withBorder h="60vh" radius="md">
+            <Card ref={cardRef} withBorder h="60vh" radius="md">
 
               <Group justify="flex-end">
                 <Menu
@@ -2460,20 +2690,7 @@ export default function EstimateNew() {
                   withinPortal
                 >
                   <Menu.Target>
-                    {/* <Group>
-            <Text size="md" fw={500}>
-              Input Parameters
-            </Text>
-            <ActionIcon
-              variant="light"
-              color="#000480"
-              // onClick={(event) => {
-              //   event.stopPropagation();
-              //   menuOpened ? close() : open();
-              // }}
-            > <IconMenu/>
-            </ActionIcon>
-          </Group> */}
+
                     <Button
                       size="xs"
                       color="#000480"
@@ -2517,92 +2734,17 @@ export default function EstimateNew() {
                 </Menu>
               </Group>
 
-              {/* <Group
-                justify="space-between"
-                onClick={() => setExpanded(!expanded)}
-                style={{ cursor: "pointer" }}
-              >
-                <Text size="md" fw={500}>
-                  Input Parameters
-                </Text>
-                <Group>
-                  {expanded ? (
-                    <IconChevronUp color="gray" />
-                  ) : (
-                    <IconChevronDown color="gray" />
-                  )}
-                </Group>
-              </Group>
-
-              {expanded && (
-                <ScrollArea
-                  scrollbarSize={0}
-                  offsetScrollbars
-                  scrollHideDelay={1}
-                  style={{ height: "60vh" }}
-                >
-                  <SimpleGrid cols={1} spacing="xs">
-                    {fields.map((field) => (
-                      <Grid key={field.name} align="center">
-                        <Grid.Col span={8}>
-                          <Text>{field.label}</Text>
-                        </Grid.Col>
-                        <Grid.Col span={4}>
-                          <Checkbox
-                            checked={selectedFields.includes(field.name)}
-                            onChange={() => toggleFieldSelection(field.name)}
-                          />
-                        </Grid.Col>
-                      </Grid>
-                    ))}
-                  </SimpleGrid>
-                  <Group justify="center">
-                    <Button
-                      variant="light"
-                      mt="sm"
-                      onClick={() => {
-                        setShowFields([...selectedFields]);
-                        setExpanded(false); // Collapse the accordion after showing inputs
-                      }}
-                    >
-                      Show Inputs
-                    </Button>
-                  </Group>
-                </ScrollArea>
-              )} */}
-
               <ScrollArea
-                style={{ flex: 1, overflow: "auto" }}
+                ref={scrollAreaRefFields}
+                // style={{ flex: 1, overflow: "auto" }}
                 offsetScrollbars
                 scrollHideDelay={1}
+                scrollbarSize={0}
               >
                 <Text size="md" m="sm" fw={500}>
                   Required Parameters
                 </Text>
                 <SimpleGrid cols={2}>
-                  {/* <NumberInput
-                                        size="xs"
-                                        leftSection={<IconPercentage66 size={20} />}
-                                        placeholder="Ex: 0.5"
-                                        label="Select Probability"
-                                        defaultValue={50}
-                                        min={10}
-                                        max={100}
-                                        step={10}
-                                        //   precision={2}
-                                        {...form.getInputProps("probability")}
-                                    /> */}
-                  {/* <Select
-                                        size="xs"
-                                        // width='12vw' 
-                                        searchable
-                                        label='Check Type'
-                                        placeholder="Check Type"
-                                        data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
-                                        // value={task.typeOfCheck}
-                                        // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
-                                        {...form.getInputProps("typeOfCheck")}
-                                    /> */}
                   <MultiSelect
                     size="xs"
                     searchable
@@ -2650,114 +2792,22 @@ export default function EstimateNew() {
                     }}
                   />
 
-                  {/* <Select
-                    key={`operator-select-${formKey}`}
-                    size="xs"
-                    searchable
-                    clearable
-                    leftSection={<IconPlaneTilt size={20} />}
-                    placeholder="Indigo, AirIndia"
-                    label="Operator"
-                    data={operatorsList}
-                    value={form.values.operator}
-                    onChange={(value) => {
-                      form.setFieldValue("operator", value || "");
-                      form.validateField("operator");
-                    }}
-                    error={form.errors.operator}
-                    withAsterisk
-                    styles={{
-                      input: {
-                        backgroundColor: '#edf4ff',
-                      },
-                    }}
-                  /> */}
-                  <div>
-                    <label
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        marginBottom: '4px',
-                        display: 'block',
+                  {/* Show Aircraft Age Threshold in required section if selected */}
+                  {showFields.includes("aircraftAgeThreshold") && (
+
+                    <TextInput
+                      size="xs"
+                      placeholder="Ex:3"
+                      label="Aircraft Age Threshold"
+                      {...form.getInputProps("aircraftAgeThreshold")}
+                      styles={{
+                        input: {
+                          backgroundColor: '#edf4ff',
+                        },
                       }}
-                    >
-                      Operator <span style={{ color: 'red' }}>*</span>
-                    </label>
+                    />
 
-                    <Combobox
-                      store={combobox}
-                      withinPortal={false}
-                      onOptionSubmit={(val) => {
-                        if (val === '$create') {
-                          setData((current) => [...current, search]);
-                          form.setFieldValue('operator', search);
-                          setSearch(search);
-                        } else {
-                          form.setFieldValue('operator', val);
-                          setSearch(val);
-                        }
-                        // form.validateField('operator');
-                        combobox.closeDropdown();
-                      }}
-                    >
-                      <Combobox.Target>
-                        <InputBase
-                          size="xs"
-                          leftSection={<IconPlaneTilt size={20} />}
-                          rightSection={
-                            search ? (
-                              <IconX
-                                size={16}
-                                style={{ cursor: 'pointer' }}
-                                onClick={clearSelection}
-                              />
-                            ) : (
-                              <Combobox.Chevron />
-                            )
-                          }
-                          value={search}
-                          onChange={(event) => {
-                            combobox.openDropdown();
-                            combobox.updateSelectedOptionIndex();
-                            setSearch(event.currentTarget.value);
-                          }}
-                          onClick={() => combobox.openDropdown()}
-                          onFocus={() => combobox.openDropdown()}
-                          onBlur={() => {
-                            combobox.closeDropdown();
-                            setSearch(form.values.operator || '');
-                            form.validateField('operator');
-                          }}
-                          placeholder="Indigo, AirIndia"
-                          rightSectionPointerEvents="auto"
-                          error={form.errors.operator}
-                          styles={{
-                            input: {
-                              backgroundColor: '#edf4ff',
-                            },
-                          }}
-                        />
-                      </Combobox.Target>
-
-                      <Combobox.Dropdown>
-                        <Combobox.Options style={{ maxHeight: 200, overflowY: 'auto' }}>
-                          {options}
-                          {!exactOptionMatch && search.trim().length > 0 && (
-                            <Combobox.Option value="$create">
-                              + Create "{search}"
-                            </Combobox.Option>
-                          )}
-                        </Combobox.Options>
-                      </Combobox.Dropdown>
-                    </Combobox>
-
-                    {/* {form.errors.operator && (
-                      <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>
-                        {form.errors.operator}
-                      </div>
-                    )} */}
-                  </div>
-
+                  )}
                   <Select
                     key={`aircraftModel-select-${formKey}`}
                     size="xs"
@@ -2781,6 +2831,144 @@ export default function EstimateNew() {
                     }}
                   />
 
+                  <div>
+                    <label
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        marginBottom: '4px',
+                        display: 'block',
+                      }}
+                    >
+                      Operator <span style={{ color: 'red' }}>*</span>
+                    </label>
+
+                    <Combobox
+                      key={`operator-combobox-${formKey}`} // Added key for re-render
+                      store={combobox}
+                      withinPortal={true}
+                      position="bottom-start"
+                      middlewares={{ flip: false, shift: false }}
+                      onOptionSubmit={(val) => {
+                        if (val === '$create') {
+                          setData((current) => [...current, search]);
+                          form.setFieldValue('operator', search);
+                          setSearch(search);
+                        } else {
+                          form.setFieldValue('operator', val);
+                          setSearch(val);
+                        }
+                        combobox.closeDropdown();
+                      }}
+                    >
+                      <Combobox.Target>
+                        <InputBase
+                          size="xs"
+                          leftSection={<IconPlaneTilt size={20} />}
+                          rightSection={
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                paddingRight: '4px'
+                              }}
+                            >
+                              <Checkbox
+                                size="sm"
+                                checked={form.values.operatorForModel}
+                                color="#000480"
+                                onChange={(event) =>
+                                  form.setFieldValue('operatorForModel', event.currentTarget.checked)
+                                }
+                                disabled={!form.values.operator}
+                                title="Consider for Model"
+                                style={{ cursor: 'pointer' }}
+                              />
+                              {search ? (
+                                <IconX
+                                  size={14}
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={clearSelection}
+                                />
+                              ) : (
+                                <Combobox.Chevron size="xs" />
+                              )}
+                            </div>
+                          }
+                          value={search}
+                          onChange={(event) => {
+                            combobox.openDropdown();
+                            combobox.updateSelectedOptionIndex();
+                            setSearch(event.currentTarget.value);
+                          }}
+                          onClick={() => combobox.openDropdown()}
+                          onFocus={() => combobox.openDropdown()}
+                          onBlur={() => {
+                            combobox.closeDropdown();
+                            setSearch(form.values.operator || '');
+                            form.validateField('operator');
+                          }}
+                          placeholder="Indigo, AirIndia"
+                          rightSectionPointerEvents="auto"
+                          rightSectionWidth={80}
+                          error={form.errors.operator}
+                          styles={{
+                            input: {
+                              backgroundColor: form.values.operatorForModel ? '#edf4ff' : '#e6fcec',
+                              paddingRight: '80px',
+                            },
+                          }}
+                        />
+                      </Combobox.Target>
+
+                      <Combobox.Dropdown>
+                        <Combobox.Options
+                          style={{
+                            maxHeight: 200,
+                            overflowY: 'auto',
+                            fontSize: '12px',
+                            zIndex: 1000
+                          }}
+                        >
+                          {loadingOperators ? (
+                            <Center>
+                              <Loader
+                                style={{ padding: '20px' }}
+                                size="sm"
+                                color="#000480"
+                              />
+                            </Center>
+
+                          ) : data.length === 0 ? (
+                            <div
+                              style={{
+                                padding: '20px',
+                                textAlign: 'center',
+                                color: '#666',
+                                fontSize: '13px',
+                              }}
+                            >
+                              No operators found
+                            </div>
+                          ) : (
+                            <>
+                              {options}
+                              {!exactOptionMatch && search.trim().length > 0 && (
+                                <Combobox.Option value="$create">
+                                  + Create "{search}"
+                                </Combobox.Option>
+                              )}
+                            </>
+                          )}
+                        </Combobox.Options>
+                      </Combobox.Dropdown>
+                    </Combobox>
+                  </div>
+
+
+                  
+
                   <TextInput
                     ref={aircraftRegNoRef}
                     size="xs"
@@ -2790,11 +2978,13 @@ export default function EstimateNew() {
                     {...form.getInputProps("aircraftRegNo")}
                     error={form.errors.aircraftRegNo}
                     withAsterisk
-                  // styles={{
-                  //   input: {
-                  //     backgroundColor: '#ebfffe',
-                  //   },
-                  // }}
+                    styles={{
+                      input: {
+                        backgroundColor: '#e6fcec',
+                        paddingRight: '80px',
+                      },
+                    }}
+
                   />
 
                   <TextInput
@@ -2804,21 +2994,22 @@ export default function EstimateNew() {
                     {...form.getInputProps("typeOfCheckID")}
                     error={form.errors.typeOfCheckID}
                     withAsterisk
-                  // styles={{
-                  //   input: {
-                  //     backgroundColor: '#ebfffe',
-                  //   },
-                  // }}
+                    styles={{
+                      input: {
+                        backgroundColor: '#e6fcec',
+                        paddingRight: '80px',
+                      },
+                    }}
                   />
 
                 </SimpleGrid>
                 <Space h="xs" />
-                {showFields?.length > 0 ? (
+                {/* Filter out aircraftAgeThreshold from additional parameters since it's now in required */}
+                {showFields?.filter(field => field !== "aircraftAgeThreshold").length > 0 ? (
                   <>
-                    <Text size="md" m="sm" fw={500}>
+                    <Text size="md" fw={500}>
                       Additional Parameters
                     </Text>
-                    {/* <Space h='sm'/> */}
                   </>
                 ) : (
                   <></>
@@ -2828,7 +3019,7 @@ export default function EstimateNew() {
                     {showFields
                       .filter(
                         (field) =>
-                          !["cappingManhrs", "cappingSpares"].includes(field)
+                          !["cappingManhrs", "cappingSpares", "aircraftAgeThreshold"].includes(field)
                       ) // Exclude capping fields from the main display
                       .map((field) => (
                         <div key={field}>
@@ -2912,161 +3103,6 @@ export default function EstimateNew() {
                 </SimpleGrid>
               </ScrollArea>
             </Card>
-            {/* <Card withBorder h='60vh' radius='md'>
-                            <Text size="md" fw={500} >
-                                RFQ Parameters
-                            </Text>
-                            <ScrollArea
-                                style={{
-                                    flex: 1, // Take remaining space for scrollable area
-                                    overflow: "auto",
-                                }}
-                                offsetScrollbars
-                                scrollHideDelay={1}
-                            // scrollbarSize={5}
-                            >
-                                <SimpleGrid cols={1} spacing='xs'>
-                                    <SimpleGrid cols={2}>
-                                        <NumberInput
-                                            size="xs"
-                                            leftSection={<IconPercentage66 size={20} />}
-                                            placeholder="Ex: 0.5"
-                                            label="Select Probability"
-                                            defaultValue={50}
-                                            min={10}
-                                            max={100}
-                                            step={10}
-                                            //   precision={2}
-                                            {...form.getInputProps("probability")}
-                                        />
-
-                                        <TextInput
-                                            size="xs"
-                                            leftSection={<MdPin />}
-                                            placeholder="Ex:50"
-                                            label="Aircraft Age"
-                                            {...form.getInputProps("aircraftAge")}
-                                        />
-                                        <TextInput
-                                            size="xs"
-                                            leftSection={<IconPlaneTilt size='20' />}
-                                            placeholder="Indigo, AirIndia"
-                                            label="Operator"
-                                            {...form.getInputProps("operator")}
-                                        />
-                                        <TextInput
-                                            ref={aircraftRegNoRef}
-                                            size="xs"
-                                            leftSection={<IconPlaneTilt size='20' />}
-                                            placeholder="Ex:N734AB, SP-LR"
-                                            label="Aircraft Reg No"
-                                            {...form.getInputProps("aircraftRegNo")}
-                                        />
-                                        <Select
-                                            size="xs"
-                                            // width='12vw' 
-                                            searchable
-                                            label='Check Type'
-                                            placeholder="Check Type"
-                                            data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
-                                            // value={task.typeOfCheck}
-                                            // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
-                                            {...form.getInputProps("typeOfCheck")}
-                                        />
-                                        <TextInput
-                                            size="xs"
-                                            leftSection={<IconRecycle size={20} />}
-                                            placeholder="Ex:50"
-                                            label="Flight Cycles"
-                                            {...form.getInputProps("aircraftFlightCycles")}
-                                        />
-                                        <TextInput
-                                            size="xs"
-                                            leftSection={<IconHourglass size={20} />}
-                                            placeholder="Ex:50"
-                                            label="Flight Hours"
-                                            {...form.getInputProps("aircraftFlightHours")}
-                                        />
-
-                                        <TextInput
-                                            size="xs"
-                                            leftSection={<IconShadow size={20} />}
-                                            placeholder="Ex: Area"
-                                            label="Area of Operations"
-                                            {...form.getInputProps("areaOfOperations")}
-                                        />
-                                        <MultiSelect
-                                            size="xs"
-                                            label="Expert Insights"
-                                            placeholder="Select from Insights"
-                                            data={expertInsightsTasks?.map(task => ({ value: task.taskID, label: task.taskID }))}
-                                            value={selectedExpertInsightsTaskIDs}
-                                            onChange={handleExpertInsightsChange}
-                                            style={(theme) => ({
-                                                // Customize the selected badge styles
-                                                selected: {
-                                                    backgroundColor: theme.colors.green[6], // Change this to your desired color
-                                                    color: theme.white, // Change text color if needed
-                                                },
-                                            })}
-                                        />
-
-                                    </SimpleGrid>
-
-
-                                    <Text size="md" fw={500}>
-                                        Capping
-                                    </Text>
-
-                                    <Grid>
-                                        <Grid.Col span={7}>
-                                            <Select
-                                                size="xs"
-                                                label="Man Hrs Capping Type"
-                                                placeholder="Select Capping Type"
-                                                data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
-                                                defaultValue="React"
-                                                allowDeselect
-                                                {...form.getInputProps("cappingDetails.cappingTypeManhrs")}
-                                            />
-                                        </Grid.Col>
-                                        <Grid.Col span={5}>
-                                            <TextInput
-                                                size="xs"
-                                                leftSection={<IconClockHour4 size={20} />}
-                                                placeholder="Ex: 40"
-                                                label="Man Hours"
-                                                {...form.getInputProps("cappingDetails.cappingManhrs")}
-                                            />
-                                        </Grid.Col>
-                                    </Grid>
-
-                                    <Grid>
-                                        <Grid.Col span={7}>
-                                            <Select
-                                                size="xs"
-                                                label="Spares Capping Type"
-                                                placeholder="Select Capping Type"
-                                                data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
-                                                defaultValue="React"
-                                                allowDeselect
-                                                {...form.getInputProps("cappingDetails.cappingTypeSpareCost")}
-                                            />
-                                        </Grid.Col>
-                                        <Grid.Col span={5}>
-                                            <TextInput
-                                                size="xs"
-                                                leftSection={<IconSettingsDollar size={20} />}
-                                                placeholder="Ex: 600$"
-                                                label="Cost($)"
-                                                {...form.getInputProps("cappingDetails.cappingSpareCost")}
-                                            />
-                                        </Grid.Col>
-                                    </Grid>
-                                </SimpleGrid>
-
-                            </ScrollArea>
-                        </Card> */}
           </Grid.Col>
         </Grid>
 
@@ -3307,7 +3343,7 @@ border-bottom: none;
                             onClick={() => {
                               setSelectedEstimateId(val.data.estID);
                               setSelectedEstimateTasks(val.data.tasks);
-                              handleValidateTasks(val.data.tasks);
+                              handleValidateTasks(val.data.tasks, val.data.descriptions);
                               setOpened(true);
                             }}
                           >
@@ -3324,29 +3360,13 @@ border-bottom: none;
                             }
                             onClick={() => {
                               setSelectedEstimateIdReport(val.data.estID);
-                              handleValidateSkillsTasks(val.data.tasks);
+                              handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
                               // setOpened(true);
                             }}
                           >
                             <IconReport />
                           </ActionIcon>
                         </Tooltip>
-                        {/* <Tooltip label="Download Uploaded Document">
-                          <ActionIcon
-                            size={20}
-                            color="lime"
-                            variant="light"
-                            onClick={() => {
-                              downloadAllValidatedTasks(
-                                val.data.tasks,
-                                val.data.descriptions,
-                                val.data.estID // pass directly
-                              );
-                            }}
-                          >
-                            <IconFileDownload />
-                          </ActionIcon>
-                        </Tooltip> */}
 
                         {/* <Tooltip label="Probability Details">
                           <ActionIcon
@@ -3393,6 +3413,23 @@ border-bottom: none;
                             <IconMessage />
                           </ActionIcon>
                           {/* </Indicator> */}
+                        </Tooltip>
+                        <Tooltip label="Edit & Re-run Estimate">
+                          <ActionIcon
+                            size={20}
+                            color="lime"
+                            variant="light"
+                            onClick={() => {
+                              setSelectedEstimateIdDetails(val.data.estID);
+                              downloadAllValidatedTasks(
+                                val.data.tasks,
+                                val.data.descriptions,
+                                val.data.estID // pass directly
+                              );
+                            }}
+                          >
+                            <IconEdit />
+                          </ActionIcon>
                         </Tooltip>
                       </Group>
                     );
@@ -6876,3 +6913,213 @@ border-bottom: none;
     </>
   );
 };
+
+{/* <Group
+                justify="space-between"
+                onClick={() => setExpanded(!expanded)}
+                style={{ cursor: "pointer" }}
+              >
+                <Text size="md" fw={500}>
+                  Input Parameters
+                </Text>
+                <Group>
+                  {expanded ? (
+                    <IconChevronUp color="gray" />
+                  ) : (
+                    <IconChevronDown color="gray" />
+                  )}
+                </Group>
+              </Group>
+
+              {expanded && (
+                <ScrollArea
+                  scrollbarSize={0}
+                  offsetScrollbars
+                  scrollHideDelay={1}
+                  style={{ height: "60vh" }}
+                >
+                  <SimpleGrid cols={1} spacing="xs">
+                    {fields.map((field) => (
+                      <Grid key={field.name} align="center">
+                        <Grid.Col span={8}>
+                          <Text>{field.label}</Text>
+                        </Grid.Col>
+                        <Grid.Col span={4}>
+                          <Checkbox
+                            checked={selectedFields.includes(field.name)}
+                            onChange={() => toggleFieldSelection(field.name)}
+                          />
+                        </Grid.Col>
+                      </Grid>
+                    ))}
+                  </SimpleGrid>
+                  <Group justify="center">
+                    <Button
+                      variant="light"
+                      mt="sm"
+                      onClick={() => {
+                        setShowFields([...selectedFields]);
+                        setExpanded(false); // Collapse the accordion after showing inputs
+                      }}
+                    >
+                      Show Inputs
+                    </Button>
+                  </Group>
+                </ScrollArea>
+              )} */}
+
+{/* <Card withBorder h='60vh' radius='md'>
+                            <Text size="md" fw={500} >
+                                RFQ Parameters
+                            </Text>
+                            <ScrollArea
+                                style={{
+                                    flex: 1, // Take remaining space for scrollable area
+                                    overflow: "auto",
+                                }}
+                                offsetScrollbars
+                                scrollHideDelay={1}
+                            // scrollbarSize={5}
+                            >
+                                <SimpleGrid cols={1} spacing='xs'>
+                                    <SimpleGrid cols={2}>
+                                        <NumberInput
+                                            size="xs"
+                                            leftSection={<IconPercentage66 size={20} />}
+                                            placeholder="Ex: 0.5"
+                                            label="Select Probability"
+                                            defaultValue={50}
+                                            min={10}
+                                            max={100}
+                                            step={10}
+                                            //   precision={2}
+                                            {...form.getInputProps("probability")}
+                                        />
+
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<MdPin />}
+                                            placeholder="Ex:50"
+                                            label="Aircraft Age"
+                                            {...form.getInputProps("aircraftAge")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconPlaneTilt size='20' />}
+                                            placeholder="Indigo, AirIndia"
+                                            label="Operator"
+                                            {...form.getInputProps("operator")}
+                                        />
+                                        <TextInput
+                                            ref={aircraftRegNoRef}
+                                            size="xs"
+                                            leftSection={<IconPlaneTilt size='20' />}
+                                            placeholder="Ex:N734AB, SP-LR"
+                                            label="Aircraft Reg No"
+                                            {...form.getInputProps("aircraftRegNo")}
+                                        />
+                                        <Select
+                                            size="xs"
+                                            // width='12vw' 
+                                            searchable
+                                            label='Check Type'
+                                            placeholder="Check Type"
+                                            data={['EOL', 'C CHECK', 'NON C CHECK', '18Y CHECK', '12Y CHECK', '6Y CHECK']}
+                                            // value={task.typeOfCheck}
+                                            // onChange={(value) => handleTaskChange(index, 'typeOfCheck', value)}
+                                            {...form.getInputProps("typeOfCheck")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconRecycle size={20} />}
+                                            placeholder="Ex:50"
+                                            label="Flight Cycles"
+                                            {...form.getInputProps("aircraftFlightCycles")}
+                                        />
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconHourglass size={20} />}
+                                            placeholder="Ex:50"
+                                            label="Flight Hours"
+                                            {...form.getInputProps("aircraftFlightHours")}
+                                        />
+
+                                        <TextInput
+                                            size="xs"
+                                            leftSection={<IconShadow size={20} />}
+                                            placeholder="Ex: Area"
+                                            label="Area of Operations"
+                                            {...form.getInputProps("areaOfOperations")}
+                                        />
+                                        <MultiSelect
+                                            size="xs"
+                                            label="Expert Insights"
+                                            placeholder="Select from Insights"
+                                            data={expertInsightsTasks?.map(task => ({ value: task.taskID, label: task.taskID }))}
+                                            value={selectedExpertInsightsTaskIDs}
+                                            onChange={handleExpertInsightsChange}
+                                            style={(theme) => ({
+                                                // Customize the selected badge styles
+                                                selected: {
+                                                    backgroundColor: theme.colors.green[6], // Change this to your desired color
+                                                    color: theme.white, // Change text color if needed
+                                                },
+                                            })}
+                                        />
+
+                                    </SimpleGrid>
+
+
+                                    <Text size="md" fw={500}>
+                                        Capping
+                                    </Text>
+
+                                    <Grid>
+                                        <Grid.Col span={7}>
+                                            <Select
+                                                size="xs"
+                                                label="Man Hrs Capping Type"
+                                                placeholder="Select Capping Type"
+                                                data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                defaultValue="React"
+                                                allowDeselect
+                                                {...form.getInputProps("cappingDetails.cappingTypeManhrs")}
+                                            />
+                                        </Grid.Col>
+                                        <Grid.Col span={5}>
+                                            <TextInput
+                                                size="xs"
+                                                leftSection={<IconClockHour4 size={20} />}
+                                                placeholder="Ex: 40"
+                                                label="Man Hours"
+                                                {...form.getInputProps("cappingDetails.cappingManhrs")}
+                                            />
+                                        </Grid.Col>
+                                    </Grid>
+
+                                    <Grid>
+                                        <Grid.Col span={7}>
+                                            <Select
+                                                size="xs"
+                                                label="Spares Capping Type"
+                                                placeholder="Select Capping Type"
+                                                data={['Type - 1', 'Type - 2', 'Type - 3', 'Type - 4']}
+                                                defaultValue="React"
+                                                allowDeselect
+                                                {...form.getInputProps("cappingDetails.cappingTypeSpareCost")}
+                                            />
+                                        </Grid.Col>
+                                        <Grid.Col span={5}>
+                                            <TextInput
+                                                size="xs"
+                                                leftSection={<IconSettingsDollar size={20} />}
+                                                placeholder="Ex: 600$"
+                                                label="Cost($)"
+                                                {...form.getInputProps("cappingDetails.cappingSpareCost")}
+                                            />
+                                        </Grid.Col>
+                                    </Grid>
+                                </SimpleGrid>
+
+                            </ScrollArea>
+                        </Card> */}
