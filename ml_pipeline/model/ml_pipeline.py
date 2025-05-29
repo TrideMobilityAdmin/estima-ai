@@ -162,8 +162,7 @@ task_parts_up = task_parts_up[sub_task_parts_columns]
 # Step 1: Merge task_parts_up with parts_master on 'issued_part_number'
 merged_df = task_parts_up.merge(
     parts_master[[
-        "issued_part_number", 
-        "issued_unit_of_measurement", 
+        "issued_part_number",  
         "agg_base_price_usd", 
         "agg_freight_cost", 
         "agg_admin_charges"
@@ -182,7 +181,6 @@ merged_df["total_billable_price"] = (
 
 # Step 3: Update the original task_parts_up with the computed values
 task_parts_up.update(merged_df[[
-    "issued_unit_of_measurement", 
     "billable_value_usd", 
     "total_billable_price"
 ]])
