@@ -131,7 +131,7 @@ parts_master=parts_master.drop_duplicates()
 
 
 task_parts_collection = db["task_parts_lhrh"]
-task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1,"part_type":1}))
+task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1,"part_type":1,"issued_stock_status":1}))
 task_parts =  pd.DataFrame(task_parts)
 task_parts=task_parts[task_parts["part_type"]!="Component"]
 task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
@@ -159,15 +159,34 @@ for col in missing_columns:
 # Ensure column order matches `sub_task_parts`
 task_parts_up = task_parts_up[sub_task_parts_columns]
 
-for i, row in task_parts_up.iterrows():
-    # Find matching part in parts_master
-    matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
-    
-    if not matching_parts.empty:
-        
-        task_parts_up.at[i,"issued_unit_of_measurement"] = matching_parts.iloc[0]["issued_unit_of_measurement"]
-        task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
-        task_parts_up.at[i, "total_billable_price"]=row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]+matching_parts.iloc[0]["agg_freight_cost"]+matching_parts.iloc[0]["agg_admin_charges"]
+# Step 1: Merge task_parts_up with parts_master on 'issued_part_number'
+merged_df = task_parts_up.merge(
+    parts_master[[
+        "issued_part_number", 
+        "issued_unit_of_measurement", 
+        "agg_base_price_usd", 
+        "agg_freight_cost", 
+        "agg_admin_charges"
+    ]],
+    on="issued_part_number",
+    how="left"
+)
+
+# Step 2: Compute new columns using vectorized operations
+merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["agg_base_price_usd"]
+merged_df["total_billable_price"] = (
+    merged_df["billable_value_usd"] +
+    merged_df["agg_freight_cost"] +
+    merged_df["agg_admin_charges"]
+)
+
+# Step 3: Update the original task_parts_up with the computed values
+task_parts_up.update(merged_df[[
+    "issued_unit_of_measurement", 
+    "billable_value_usd", 
+    "total_billable_price"
+]])
+
     
 sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
 # Convert to string
