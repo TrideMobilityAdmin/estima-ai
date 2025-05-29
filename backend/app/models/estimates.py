@@ -75,6 +75,8 @@ class EstimateRequest(BaseModel):
      operator: str 
      aircraftRegNo:str
      aircraftModel:str  
+     aircraftAgeThreshold:Optional[int]=None
+     operatorForModel:Optional[bool] = None
      additionalTasks: List[AdditionalTasks]
      miscLaborTasks: List[MiscLaborTask]
      
@@ -93,6 +95,7 @@ class EstimateRequest(BaseModel):
 
 class ValidRequest(BaseModel):
     tasks: List[str]
+    description:List[str]
 class ValidTasks(BaseModel):
     taskid: str
     status: bool

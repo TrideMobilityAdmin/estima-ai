@@ -48,6 +48,7 @@ class ExcelUploadService:
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
+        self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -370,6 +371,24 @@ class ExcelUploadService:
             new_version = latest_version + 1                             
             est_id = f"{base_est_id}-V{new_version:02d}"
             logger.info(f"estID is : {est_id}")
+
+            normalized_operator = estimate_request.operator.replace(" ", "").upper()
+
+            existing_operator = self.operators_master_collection.find_one({
+                "$expr": {
+                    "$eq": [
+                        {"$toUpper": {"$replaceAll": {"input": "$operator", "find": " ", "replacement": ""}}},
+                        normalized_operator
+                    ]
+                }
+            })
+            logger.info(f"Existing operator found: {existing_operator}")
+            if not existing_operator:
+                self.operators_master_collection.insert_one({"operator": estimate_request.operator.upper()})
+                logger.info(f"Inserted new operator '{estimate_request.operator}' into operators_master")
+            else:
+                logger.info(f"Operator '{estimate_request.operator}' already exists in operators_master")
+
             
             data_to_insert = {
                 **json_data,
@@ -378,6 +397,8 @@ class ExcelUploadService:
                 # "tasks": estimate_request.tasks,
                 "probability": estimate_request.probability,
                 "operator": estimate_request.operator,
+                "operatorForModel": estimate_request.operatorForModel,
+                "aircraftAgeThreshold": estimate_request.aircraftAgeThreshold,
                 "typeOfCheck": estimate_request.typeOfCheck,
                 "typeOfCheckID": estimate_request.typeOfCheckID,
                 "aircraftAge": estimate_request.aircraftAge,
@@ -395,8 +416,9 @@ class ExcelUploadService:
         
             insert_result = self.estima_collection.insert_one(data_to_insert) 
             logger.info("Length of document inserted")
-            
-            
+  
+           
+                        
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",
@@ -677,7 +699,7 @@ class ExcelUploadService:
         Returns:
             int or None: Best header row index or None if not found.
         """
-        best_match_score = 0
+        best_match_score = 50
         best_row_index = None
 
         # Check each of the first few rows
@@ -698,6 +720,7 @@ class ExcelUploadService:
             if row_score > best_match_score:
                 best_match_score = row_score
                 best_row_index = i
+        logger.info(f"row score is {row_score}")
 
         return best_row_index
 
@@ -730,7 +753,7 @@ class ExcelUploadService:
         
         return dynamic_mappings
         
-    def read_excel_with_multiple_sheetnames(self, content, filename, file_extension, sheet_name, config):
+    def read_excel_with_multiple_sheetnames(self, content, filename, file_extension, sheet_names, config):
         """
         Read a specific sheet from an Excel file.
 
@@ -746,7 +769,7 @@ class ExcelUploadService:
         """
         try:
             pd.set_option('display.encoding', 'utf-8')
-            logger.info(f"Reading Excel file with sheet name: {sheet_name}")
+            logger.info(f"Reading Excel file with sheet names: {sheet_names}")
             
             # Choose appropriate engine based on file extension
             if file_extension.startswith('.'):
@@ -754,6 +777,10 @@ class ExcelUploadService:
             else:
                 extension = f".{file_extension}"
                 
+            excel_file = pd.ExcelFile(io.BytesIO(content))
+            available_sheets = excel_file.sheet_names
+            valid_sheets = [sheet for sheet in available_sheets if sheet.lower() in sheet_names]
+            sheet_name= valid_sheets[0] if valid_sheets else None    
                 
             engine = "openpyxl" if extension in [".xlsx", ".xlsm"] else "pyxlsb" if extension == ".xlsb" else "xlrd"
             try:
@@ -822,11 +849,15 @@ class ExcelUploadService:
 
         # Merge mappings
         combined_mappings = {**sub_task_parts_column_mappings, **alternative_mappings}
-        logger.info(f"Combined mappings: {combined_mappings}")
+        #logger.info(f"Combined mappings: {combined_mappings}")
         # Detect the header row
-        header_row_index = self.detect_header_row(df, list(combined_mappings.keys()))
+        header_row_index=None
+        if len(set(sub_task_parts_columns)-set(df.columns)) > 4:
+            header_row_index = self.detect_header_row(df, list(combined_mappings.keys()))
+        
         if header_row_index is not None:
-            df.columns = df.iloc[header_row_index].astype(str).values
+            df.columns = df.iloc[header_row_index].astype(str).str.strip()
+
             print("df.columns:", df.columns)
 
             logger.info(f"Detected header row at index {header_row_index} , columns: {df.columns}")
@@ -835,9 +866,13 @@ class ExcelUploadService:
             df = df.iloc[header_row_index + 1:].reset_index(drop=True)
         else:
             # If no header row is detected, use the first row as header and log a warning
+            df.columns = df.columns.map(str).str.strip()
+            df = df.reset_index(drop=True)
+            #df.columns = df.iloc[0].astype(str).str.strip()
+            #df = df[1:].reset_index(drop=True)
+            logger.info(f"Could not detect header row in {filename}")
+            logger.info(f"Could not detect header row in {filename}. Using first row as header.")
             
-            logger.warning(f"Could not detect header row in {filename}")
-            print(f"Could not detect header row in {filename}. Using first row as header.")
         logger.info(f"the shape of the DataFrame before processing {df.shape}")
         logger.info(f"The dataframe columns of {filename} are {df.columns}")
         # Rename columns using mappings
@@ -870,16 +905,35 @@ class ExcelUploadService:
     
     def _process_mlttable_sheet(self, df, filename, config):
         """Helper method to process mlttable sheets"""
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
-        logger.info(f"the shape of the DataFrame before processing {df.shape}")
 
-        df = df.loc[:, ~df.columns.duplicated()].copy()
+
+        logger.info(f"the shape of the DataFrame before processing {df.shape}")
         task_parts_columns_mappings = config["task_parts_columns_mappings"]
         task_parts_columns = config["task_parts_columns"]
-        logger.info(f"task_parts_columns_mappings :{task_parts_columns_mappings}")
+        #logger.info(f"task_parts_columns_mappings :{task_parts_columns_mappings}")
         
+        header_row_index=None
+        if len(set(task_parts_columns)-set(df.columns)) > 4:
+            header_row_index = self.detect_header_row(df, list(task_parts_columns_mappings.keys()))
+        if header_row_index is not None:
+            df.columns = df.iloc[header_row_index].astype(str).str.strip()
+
+            print("df.columns:", df.columns)
+
+            logger.info(f"Detected header row at index {header_row_index} , columns: {df.columns}")
+
+            # Extract data rows (everything after the header)
+            df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        else:
+            # If no header row is detected, use the first row as header and log a warning
+            df.columns = df.columns.map(str).str.strip()
+            df = df.reset_index(drop=True)
+            #df.columns = df.iloc[0].astype(str).str.strip()
+            #df = df[1:].reset_index(drop=True)
+            logger.info(f"Could not detect header row in {filename}")
+            logger.info(f"Could not detect header row in {filename}. Using first row as header.")
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        df = df.loc[:, ~df.columns.duplicated()].copy()
         # Check for missing and extra columns
         missing_cols = set(task_parts_columns) - set(df.columns)
         extra_cols = set(df.columns) - set(task_parts_columns)
@@ -913,15 +967,36 @@ class ExcelUploadService:
     
     def _process_mltaskmlsec1_sheet(self, df, filename, config):
         """Helper method to process mltaskmlsec1 sheets"""
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        
+
         logger.info(f"the shape of the DataFrame before processing {df.shape}")
         
         task_description_columns = config["task_description_columns"]
         task_description_columns_mappings = config["task_description_columns_mappings"]
-        logger.info(f"task_description_columns_mappings :{task_description_columns_mappings}")
+        header_row_index=None
+        if len(set(task_description_columns)-set(df.columns)) > 4:
+            header_row_index = self.detect_header_row(df, list(task_description_columns_mappings.keys()))
+        if header_row_index is not None:
+            df.columns = df.iloc[header_row_index].astype(str).str.strip()
+
+            print("df.columns:", df.columns)
+
+            logger.info(f"Detected header row at index {header_row_index} , columns: {df.columns}")
+
+            # Extract data rows (everything after the header)
+            df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        else:
+            # If no header row is detected, use the first row as header and log a warning
+            df.columns = df.columns.map(str).str.strip()
+            df = df.reset_index(drop=True)
+            #df.columns = df.iloc[0].astype(str).str.strip()
+            #df = df[1:].reset_index(drop=True)
+            
+            logger.info(f"Could not detect header row in {filename}")
+            logger.info(f"Could not detect header row in {filename}. Using first row as header.")
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+        #logger.info(f"task_description_columns_mappings :{task_description_columns_mappings}")
         missing_cols = set(task_description_columns) - set(df.columns)
         extra_cols = set(df.columns) - set(task_description_columns)
         
@@ -955,16 +1030,37 @@ class ExcelUploadService:
     def _process_mldpmlsec1_sheet(self, df, filename, config):
         """Helper method to process mldpmlsec1 sheets"""
         # Ensure first row is used as column names safely
-        df.columns = df.iloc[0].astype(str).str.strip()
-        df = df[1:].reset_index(drop=True)
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        logger.info(f"The dataframe columns of {filename} are {df.columns}")
+
+        
+
         logger.info(f"the shape of the DataFrame before processing {df.shape}")
 
         sub_task_description_columns = config["sub_task_description_columns"]
         sub_task_description_columns_mappings = config["sub_task_description_columns_mappings"]
-        logger.info(f"sub_task_description_columns_mappings :{sub_task_description_columns_mappings}")
+        header_row_index=None
+        if len(set(sub_task_description_columns)-set(df.columns)) > 4:
+            header_row_index = self.detect_header_row(df, list(sub_task_description_columns_mappings.keys()))
+        
+        if header_row_index is not None:
+            df.columns = df.iloc[header_row_index].astype(str).str.strip()
 
+            print("df.columns:", df.columns)
+
+            logger.info(f"Detected header row at index {header_row_index} , columns: {df.columns}")
+
+            # Extract data rows (everything after the header)
+            df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        else:
+            # If no header row is detected, use the first row as header and log a warning
+            
+            df.columns = df.columns.map(str).str.strip()
+            df = df.reset_index(drop=True)
+
+            logger.info(f"Could not detect header row in {filename}")
+            logger.info(f"Could not detect header row in {filename}. Using first row as header.")
+        #logger.info(f"sub_task_description_columns_mappings :{sub_task_description_columns_mappings}")
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        logger.info(f"The dataframe columns of {filename} are {df.columns}")
         # Check for missing and extra columns
         missing_cols = set(sub_task_description_columns) - set(df.columns)
         extra_cols = set(df.columns) - set(sub_task_description_columns)
@@ -1037,7 +1133,7 @@ class ExcelUploadService:
         
         return df
 
-    async def process_multiple_files(self, file: UploadFile, config, SheetName: str) -> pd.DataFrame:
+    async def process_multiple_files(self, file: UploadFile, config, SheetNames: List[str]) -> pd.DataFrame:
         """
         Read and process multiple uploaded Excel or CSV files.
 
@@ -1050,7 +1146,7 @@ class ExcelUploadService:
             pd.DataFrame: Processed records from matching file
         """
         logger.info(f"Processing the file {file.filename}")
-        logger.info(f"Looking for sheet name: {SheetName}")
+        logger.info(f"Looking for sheet names: {SheetNames}")
 
         try:
             # Read the file content
@@ -1065,7 +1161,7 @@ class ExcelUploadService:
             if file_extension:
                 try:
                     # Attempt to read the specified sheet
-                    df = self.read_excel_with_multiple_sheetnames(content, file.filename, file_extension, SheetName, config)
+                    df = self.read_excel_with_multiple_sheetnames(content, file.filename, file_extension, SheetNames, config)
                     if df is not None and not df.empty:
                         logger.info(f"Successfully processed file: {file.filename}")
                         logger.info(f"DataFrame columns: {df.columns}")
@@ -1073,7 +1169,7 @@ class ExcelUploadService:
                         
                         return df
                     else:
-                        logger.warning(f"No data found in sheet {SheetName} for file {file.filename}")
+                        logger.warning(f"No data found in sheet {SheetNames} for file {file.filename}")
                 
                 except Exception as excel_error:
                     logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
@@ -1084,10 +1180,57 @@ class ExcelUploadService:
         # Reset file pointer to beginning for potential reuse
         await file.seek(0)
         
-        logger.warning(f"No files found with sheet name: {SheetName}")
+        logger.warning(f"No files found with sheet names: {SheetNames}")
         return pd.DataFrame() 
     
- 
+    async def get_upload_estimate_byId(self,estimate_id:str)->Dict[str,Any]:
+        
+        try:
+            file_upload_pipeline=[
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'task': 1, 
+            'description': 1, 
+            # 'upload_timestamp': 1, 
+            # 'createdAt': 1, 
+            # 'original_filename': 1, 
+            'probability': 1, 
+            'status': 1, 
+            'operator': 1, 
+            'typeOfCheck': 1, 
+            'typeOfCheckID': 1, 
+            'aircraftAge': 1, 
+            'aircraftRegNo': 1, 
+            'aircraftModel': 1,
+            'operatorForModel':1,
+            'aircraftAgeThreshold':1, 
+            'aircraftFlightHours': 1, 
+            'aircraftFlightCycles': 1, 
+            'areaOfOperations': 1, 
+            'cappingDetails': 1, 
+            'additionalTasks': 1, 
+            'miscLaborTasks': 1
+        }
+    }
+]
+            result = list(self.estima_collection.aggregate(file_upload_pipeline))
+            if not result:
+                logger.warning(f"No estimate found with ID: {estimate_id}")
+                raise HTTPException(status_code=404, detail="Estimate not found")
+            file_upload_result = result[0] if result else {}
+            logger.info(f"file_upload result fetched: {file_upload_result}")
+            return file_upload_result
+        except Exception as e:
+            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
+
+
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
@@ -1120,19 +1263,19 @@ class ExcelUploadService:
         try:
             for file in files:
                 if file.filename.startswith("mltaskmlsec1"):
-                    task_description = await self.process_multiple_files(file, config, "mltaskmlsec1")
+                    task_description = await self.process_multiple_files(file, config, ["mltaskmlsec1"])
                     logger.info(f"Shape of task_description: {task_description.shape}")
                     
                 elif file.filename.startswith("mldpmlsec1"):
-                    sub_task_description = await self.process_multiple_files(file, config, "mldpmlsec1")
+                    sub_task_description = await self.process_multiple_files(file, config, ["mldpmlsec1"])
                     logger.info(f"Shape of sub_task_description: {sub_task_description.shape}")
-                    
+                   
                 elif file.filename.startswith("Material"):
-                    sub_task_parts = await self.process_multiple_files(file, config, 'PRICING')
+                    sub_task_parts = await self.process_multiple_files(file, config, ["pricing", "sheet1", "price", "page"])
                     logger.info(f"Shape of sub_task_parts: {sub_task_parts.shape}")
                     
                 elif file.filename.startswith("mlttable"):
-                    task_parts = await self.process_multiple_files(file, config, "mlttable")
+                    task_parts = await self.process_multiple_files(file, config, ["mlttable"])
                     logger.info(f"Shape of task_parts: {task_parts.shape}")
 
             # Verify all required data is available
@@ -1159,9 +1302,9 @@ class ExcelUploadService:
         parts_master= pd.DataFrame(parts_master)
         parts_master = parts_master.drop(columns=["_id"], errors="ignore")
         parts_master=parts_master.drop_duplicates()
-        task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","requested_stock_status"],inplace=True)
-        task_parts_up=task_parts[task_parts["requested_stock_status"]!="Owned"]
-
+        task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
+        task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
+        task_parts_up=task_parts[task_parts["part_type"]!="Component"]
         task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
 
         # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
@@ -1189,7 +1332,7 @@ class ExcelUploadService:
             matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
             
             if not matching_parts.empty:
-                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]
+                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]+matching_parts.iloc[0]["agg_freight_cost"]+matching_parts.iloc[0]["agg_admin_charges"]
             
         sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
         # Convert to string
@@ -1292,17 +1435,22 @@ class ExcelUploadService:
 
         
         # Extract eligible tasks
-        eligibile_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
-        
+        eligible_tasks = task_description[task_description["task_type"] == "MPD"]["task_number"].astype(str).tolist()
+
+
+  
+
+        # Proceed to calculate actual capping values
+
         # Calculate actual capping values
-        actual_capping_values = actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts)
+        actual_capping_values = actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts)
         
         # Filter task descriptions
-        eligible_task_description = task_description[task_description["task_number"].isin(eligibile_tasks)]
+        eligible_task_description = task_description[task_description["task_number"].isin(eligible_tasks)]
         
         # ----- PROCESS TASKS DATA (similar to testing function) -----
         final_mpd_data = []
-        for task in eligibile_tasks:
+        for task in eligible_tasks:
             mydict = {}
             actual_task_data = task_description[task_description["task_number"] == task]
             actual_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
@@ -1375,7 +1523,7 @@ class ExcelUploadService:
         # ----- PROCESS FINDINGS DATA (similar to original findings function but using testing2 logic) -----
         final_findings_data = []
         
-        for task in eligibile_tasks:
+        for task in eligible_tasks:
             mydict = {}
             pred_findings_task = pred_findings_data_full[pred_findings_data_full["taskId"] == task]
             sub_task_description_data = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"] == task]
@@ -1447,12 +1595,31 @@ class ExcelUploadService:
         total_predicted_finding_spares_cost = df_findings['predicted_finding_spares_cost'].sum() if not df_findings.empty else 0
         total_predicted_finding_manhours = df_findings['predicted_finding_manhours'].sum() if not df_findings.empty else 0
         total_actual_findings_manhours = df_findings['actual_findings_manhours'].sum() if not df_findings.empty else 0
-        
+        # Find new findings tasks with proper null handling
+        new_findings_tasks = df_findings[
+            (df_findings['actual_findings_manhours'].fillna(0) > 0) &
+            (df_findings['predicted_finding_manhours'].fillna(0) == 0)
+        ]["task_number"].dropna().unique().tolist()
+
+        # Filter new findings data
+        new_findings_data = sub_task_description[
+            sub_task_description["source_task_discrepancy_number_updated"].isin(new_findings_tasks)
+        ]
+
+        total_new_findings_manhours = new_findings_data['actual_man_hours'].sum() if not new_findings_data.empty else 0
+        new_findings_parts_data = sub_task_parts[sub_task_parts["task_number"].isin(new_findings_data["log_item_number"].tolist())]
+        total_new_findings_spares_cost = new_findings_parts_data["billable_value_usd"].sum() if not new_findings_data.empty else 0
         summary_findings_comparision = {
             "total_actual_spares_cost": total_actual_findings_spares_cost,
             "total_predict_spares_cost": total_predicted_finding_spares_cost,
             "total_predict_manhours": total_predicted_finding_manhours,
             "total_actual_manhours": total_actual_findings_manhours
+        }
+        new_findings_data_summary={
+            "new_findings_data": new_findings_data.to_dict('records') if not new_findings_data.empty else [],
+            "new_findings_parts_data": new_findings_parts_data.to_dict('records') if not new_findings_parts_data.empty else [],
+            "total_new_findings_manhours": total_new_findings_manhours,
+            "total_new_findings_spares_cost": total_new_findings_spares_cost
         }
         
         eligible_findings_comparision = {
@@ -1460,7 +1627,26 @@ class ExcelUploadService:
             "summary_findings": summary_findings_comparision
         }
         
+        
 
+
+        # Optional: If you want to switch data sources
+        # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
+
+        available_tasks = set(eligible_tasks).intersection(
+            set(pred_tasks_data_full["sourceTask"].astype(str))
+        )
+
+        not_available_tasks = set(eligible_tasks) - available_tasks
+        
+        task_matching=len(available_tasks)/len(eligible_tasks)
+        # Task availability summary
+        task_avialability_summary = {
+            "available_tasks": list(available_tasks),
+            "not_available_tasks": list(not_available_tasks),
+            "task_matching_percentage": task_matching * 100 if eligible_tasks else 0
+        
+        }
         
         # Create the final output structure to match testing function
         finaloutput = {
@@ -1470,16 +1656,18 @@ class ExcelUploadService:
             "cappingDetails": {
                 "actual_capping": actual_capping_values,
                 "predicted_capping": pred_capping_values
-            }
+            },
+            "new_findings_summary":new_findings_data_summary,
+            "task_avialability_summary":task_avialability_summary
         }
         finaloutput= replace_nan_inf(finaloutput)
         
         return finaloutput
     
-def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description, sub_task_parts):
+def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts):
     logger.info("Starting actual_cap_calculation")
     logger.info(f"cappingDetails: {cappingDetails}")
-    logger.info(f"Number of eligible tasks: {len(eligibile_tasks)}")
+    logger.info(f"Number of eligible tasks: {len(eligible_tasks)}")
     
     
     # Ensure cappingDetails is a dictionary
@@ -1511,7 +1699,7 @@ def actual_cap_calculation(cappingDetails, eligibile_tasks, sub_task_description
     logger.info(f"Initial capping_values: {capping_values}")
     
     # Filter sub_task_description to only include eligible tasks
-    sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligibile_tasks)]
+    sub_task_description = sub_task_description[sub_task_description["source_task_discrepancy_number_updated"].isin(eligible_tasks)]
     logger.info(f"Filtered sub_task_description shape: {sub_task_description.shape}")
     
     # Define create_group function correctly (fixed indentation)
