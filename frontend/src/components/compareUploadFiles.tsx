@@ -19,14 +19,18 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
     const validFiles: File[] = [];
     const invalidFiles: File[] = [];
 
+    // newFiles.forEach((file) => {
+    //   if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+    //     validFiles.push(file);
+    //   } else {
+    //     invalidFiles.push(file);
+    //   }
+    // });
     newFiles.forEach((file) => {
-      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+     
         validFiles.push(file);
-      } else {
-        invalidFiles.push(file);
-      }
+     
     });
-
     if (invalidFiles.length > 0) {
       showNotification({
         title: "Invalid File Format",
@@ -62,7 +66,26 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
   return (
     <div style={{ width: "500px", margin: "auto" }}> {/* Fixed width container */}
       <Dropzone
-        accept={["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]}
+        // accept={
+        //   [
+        //     "application/vnd.ms-excel", 
+        //     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        //     ".xls",
+        //     ".xlsx",
+        //     ".xlsm",
+        //   ]
+        // }
+        accept={{
+          // Excel file MIME types
+          'application/vnd.ms-excel': ['.xls'],
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+          'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm'],
+          // CSV files
+          'text/csv': ['.csv'],
+          'application/csv': ['.csv'],
+          // Additional Excel formats
+          'application/vnd.ms-excel.sheet.binary.macroEnabled.12': ['.xlsb'],
+        }}
         styles={{
           root: {
             borderColor: color || "#ced4da",
