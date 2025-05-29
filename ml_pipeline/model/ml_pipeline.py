@@ -189,11 +189,6 @@ cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_bil
 for col in cols_to_convert:
     sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
     
-for _, row in sub_task_parts.iterrows():
-    if row["issued_unit_of_measurement"] in ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]:
-        sub_task_parts.at[_, 'used_quantity'] = round(row['used_quantity'], 0)
-    else:
-        sub_task_parts.at[_, 'used_quantity'] = round(row['used_quantity'], 2)
 
 
 #sub_task_description_collection="sub_task_description"
@@ -299,17 +294,25 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             if len(train_packages) >= 5:
                 break
             
-            # Increase age_cap by 2
+            # Increase age_cap by 1
             age_cap += 1
             
             # Check if we've reached the maximum age limit
             if aircraft_age + age_cap > 30:
                 break 
     else:
-        train_packages = aircraft_details[
-                (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
-                (aircraft_details["check_category"].isin(check_category)) 
-            ]["package_number"].unique().tolist()
+        if customer_name_consideration.lower() == "yes":
+                train_packages = aircraft_details[
+                    (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
+                    (aircraft_details["check_category"].isin(check_category)) 
+                ]["package_number"].unique().tolist()
+            
+        else:
+            train_packages = aircraft_details[
+                    (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
+                    (aircraft_details["check_category"].isin(check_category))&
+                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False)) 
+                ]["package_number"].unique().tolist()
         
 
     # At this point, train_packages contains either at least 5 packages or the maximum we could find
@@ -326,7 +329,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     # print(f"the shape of dataframe task data 1{task_data.shape}")
     task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     task_all_data=task_description[task_description["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
-    
+    filtered_tasks=task_data["task_number"].unique().tolist()
 
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
@@ -429,6 +432,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             grouped_data['total_quantity'] = grouped_data['total_quantity'].fillna(0)
             grouped_data["avg_qty_used"]= grouped_data['total_quantity']/no_of_task_packages
             grouped_data['total_billable'] = grouped_data['total_billable'].fillna(0)
+
+
+            if grouped_data["issued_unit_of_measurement"] in ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]:
+                grouped_data['avg_qty_used'] = round(grouped_data['avg_qty_used'], 0)
+            else:
+                grouped_data['avg_qty_used'] = round(grouped_data['avg_qty_used'], 3)
+
             
             # Avoid division by zero
             grouped_data['avg_cost_per_unit'] = np.where(
@@ -444,6 +454,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             
             # Create a DataFrame for task parts
             for _, part_row in grouped_data.iterrows():
+                
                 part_df = pd.DataFrame({
                     "task_number": [task_number],
                     "issued_part_number": [part_row["issued_part_number"]],
@@ -917,7 +928,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
         
-        
+        mask = aggregated['issued_unit_of_measurement'].isin(["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"])
+        aggregated.loc[mask, 'avg_used_qty'] = aggregated.loc[mask, 'avg_used_qty'].round(0)
+        aggregated.loc[~mask, 'avg_used_qty'] = aggregated.loc[~mask, 'avg_used_qty'].round(3)
+
         
         # Get all unique package numbers once
         #all_package_numbers = group_level_parts["package_number"].unique()
@@ -1366,7 +1380,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print("capping is completed ")
     # Get tasks_list from tasks if not defined
     tasks_list = tasks
-    filtered_tasks=mpd_task_data["TASK NUMBER"].unique().tolist()
+
     # Properly calculate totals for JSON output
     tasks_total_mhs = sum(task["mhs"]["avg"] for task in tasks)
     tasks_total_parts_cost = sum(sum(part["price"] for part in task["spare_parts"]) for task in tasks)
