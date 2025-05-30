@@ -339,8 +339,8 @@ export default function PartUsage() {
                     />
                     <TextInput
                         size="xs"
-                        label="Enter Part ID"
-                        placeholder="Type Part ID"
+                        label="Enter Part ID's"
+                        placeholder="Ex: CN20, CFC, ABC123..."
                         value={inputPartId}
                         // onChange={(event) => setInputPartId(event.currentTarget.value)}
                         onChange={handleInputChange}

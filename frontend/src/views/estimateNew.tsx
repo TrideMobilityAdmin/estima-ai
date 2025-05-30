@@ -83,6 +83,7 @@ import {
   IconFile,
   IconFileCheck,
   IconFileDownload,
+  IconFileDownloadFilled,
   IconHourglass,
   IconListCheck,
   IconListDetails,
@@ -145,7 +146,8 @@ export default function EstimateNew() {
     downloadEstimatePdf,
     getProbabilityWiseDetails,
     getOperatorsList,
-    getEstimateDetailsByID
+    getEstimateDetailsByID,
+    getFilteredTasksByID
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
   const { getSkillAnalysis } = useApiSkillAnalysis();
@@ -338,53 +340,53 @@ export default function EstimateNew() {
 
   // Handle file and extracted tasks
   // Handle file and extracted tasks and descriptions
-const handleFileChange = async (
-  file: File | null,
-  tasks: string[],
-  descriptions: string[], // ADD THIS
-  fileSheetInfo?: { sheetName: string; columnName: string }
-) => {
-  setIsValidating(true);
-  setSelectedFile(file);
-  setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
-  setExtractedDescriptions(descriptions ?? []); // ADD THIS
-  setSheetInfo(fileSheetInfo);
+  const handleFileChange = async (
+    file: File | null,
+    tasks: string[],
+    descriptions: string[], // ADD THIS
+    fileSheetInfo?: { sheetName: string; columnName: string }
+  ) => {
+    setIsValidating(true);
+    setSelectedFile(file);
+    setExtractedTasks(tasks ?? []); // Ensure tasks is always an array
+    setExtractedDescriptions(descriptions ?? []); // ADD THIS
+    setSheetInfo(fileSheetInfo);
 
-  console.log("✅ Selected File:", file ? file.name : "None");
-  console.log(
-    "📌 Extracted Tasks:",
-    tasks.length > 0 ? tasks : "No tasks found"
-  );
-  console.log(
-    "📝 Extracted Descriptions:",
-    descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
-  );
-  console.log("From sheet:", fileSheetInfo?.sheetName);
-  console.log("From column:", fileSheetInfo?.columnName);
+    console.log("✅ Selected File:", file ? file.name : "None");
+    console.log(
+      "📌 Extracted Tasks:",
+      tasks.length > 0 ? tasks : "No tasks found"
+    );
+    console.log(
+      "📝 Extracted Descriptions:",
+      descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
+    );
+    console.log("From sheet:", fileSheetInfo?.sheetName);
+    console.log("From column:", fileSheetInfo?.columnName);
 
-  if (tasks.length > 0) {
-    // Send both tasks and descriptions to validation API
-    const response = await validateTasks(tasks, descriptions); // Make sure your API accepts this!
-    setValidatedTasks(response);
+    if (tasks.length > 0) {
+      // Send both tasks and descriptions to validation API
+      const response = await validateTasks(tasks, descriptions); // Make sure your API accepts this!
+      setValidatedTasks(response);
 
-    const invalidTasks = response.filter((task) => task.status === false);
-    if (invalidTasks.length > 0) {
-      showNotification({
-        title: "Tasks Not Available!",
-        message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
-        color: "orange",
-        style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
-      });
+      const invalidTasks = response.filter((task) => task.status === false);
+      if (invalidTasks.length > 0) {
+        showNotification({
+          title: "Tasks Not Available!",
+          message: `${invalidTasks.length} tasks are not available. Only valid tasks will be used for Skill Analysis.`,
+          color: "orange",
+          style: { position: "fixed", top: 100, right: 20, zIndex: 1000 },
+        });
+      }
+    } else {
+      setValidatedTasks([]);
     }
-  } else {
-    setValidatedTasks([]);
-  }
 
-  setIsValidating(false);
-};
+    setIsValidating(false);
+  };
 
   // 🟢 Function to validate tasks & update UI
-  const handleValidateTasks = async (tasks: string[], descriptions : string[]) => {
+  const handleValidateTasks = async (tasks: string[], descriptions: string[]) => {
     setIsValidating(true);
     try {
       const response = await validateTasks(tasks, descriptions);
@@ -399,7 +401,7 @@ const handleFileChange = async (
   };
 
 
-  const handleValidateSkillsTasks = async (tasks: string[], descriptions:string[]) => {
+  const handleValidateSkillsTasks = async (tasks: string[], descriptions: string[]) => {
     setIsValidating2(true);
     const response = await validateTasks(tasks, descriptions);
 
@@ -498,6 +500,58 @@ const handleFileChange = async (
     );
   };
 
+  const downloadExcelFilteredTasks = (status: boolean) => {
+    const filteredTasks = combinedFilteredTasksList?.filter((task) => task?.status === status) || [];
+
+    let excelData: Record<string, any>[] = [];
+
+    if (status) {
+      // Status === true: Only include TASK NUMBER, ESTIMATE ID, STATUS
+      excelData =
+        filteredTasks.length > 0
+          ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.task_number || "",
+            "DESCRIPTION": task?.description || "",
+            // STATUS: "Available",
+          }))
+          : [
+            {
+              "TASK NUMBER": "",
+              "DESCRIPTION": "",
+              // STATUS: "",
+            },
+          ];
+    } else {
+      // Status === false: Include MAN HOURS and DESCRIPTION as empty
+      excelData =
+        filteredTasks.length > 0
+          ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.task_number || "",
+            DESCRIPTION: task?.description || "",
+            // "MAN HOURS": "",
+            // STATUS: "Not Available",
+          }))
+          : [
+            {
+              "TASK NUMBER": "",
+              DESCRIPTION: "",
+              // "MAN HOURS": "",
+              // STATUS: "",
+            },
+          ];
+    }
+
+    // Create Excel sheet and download
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+    XLSX.writeFile(
+      wb,
+      `Estimate_${selectedEstimateId}_${status ? "Filtered_Available" : "Filtered_NotAvailable"
+      }.xlsx`
+    );
+  };
 
   const [estimateDetails, setEstimateDetails] = useState<any>(null);
   const [loadingEstDet, setLoadingEstDet] = useState(false);
@@ -623,6 +677,41 @@ const handleFileChange = async (
 
   console.log("Estimate Id Details >>>", estimateDetails);
 
+  const [filteredTasksList, setFilteredTasksList] = useState<any>(null);
+  const [loadingFiltTasks, setLoadingFiltTasks] = useState(false);
+  useEffect(() => {
+    const fetchFilteredTasks = async () => {
+      setLoadingFiltTasks(true);
+      const data = await getFilteredTasksByID(selectedEstimateId);
+      if (data) {
+        setFilteredTasksList(data);
+      }
+      setLoadingFiltTasks(false);
+    };
+
+    fetchFilteredTasks();
+  }, [selectedEstimateId]);
+
+  // Combine both arrays and add a status field to distinguish between available/not available
+  const combinedFilteredTasksList = [
+    ...(filteredTasksList?.available_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: true
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== ''),
+    
+    ...(filteredTasksList?.not_avialable_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: false
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== '')
+  ];
+
+  console.log("Filtered Tasks List >>>", filteredTasksList);
+  console.log("Filtered combined List >>>", combinedFilteredTasksList);
+
   // const downloadAllValidatedTasks = async (
   //   tasks: string[],
   //   descriptions: string[],
@@ -653,7 +742,7 @@ const handleFileChange = async (
   // };
 
   // Reset counter for keys to force re-render
-  
+
   const downloadAllValidatedTasks = async (
     tasks: string[],
     descriptions: string[],
@@ -661,34 +750,34 @@ const handleFileChange = async (
   ) => {
     // Check if tasks and descriptions have data
     const hasData = tasks.length > 0 && descriptions.length > 0;
-  
+
     const excelData = hasData
       ? tasks.map((task, index) => ({
-          "TASK NUMBER": task || "",
-          DESCRIPTION: descriptions[index] || "",
-          "FINAL MH": "",
-        }))
+        "TASK NUMBER": task || "",
+        DESCRIPTION: descriptions[index] || "",
+        "FINAL MH": "",
+      }))
       : [
-          {
-            "TASK NUMBER": "",
-            DESCRIPTION: "",
-            "FINAL MH": "",
-          },
-        ];
-  
+        {
+          "TASK NUMBER": "",
+          DESCRIPTION: "",
+          "FINAL MH": "",
+        },
+      ];
+
     // Create Excel workbook
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "MPD");
-    
+
     // Generate Excel file as blob instead of direct download
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    
+
     // Create File object from blob
     const fileName = `Estimate_${estID}.xlsx`;
     const file = new File([blob], fileName, { type: blob.type });
-    
+
     // Download the file (for user to have a copy)
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -696,18 +785,121 @@ const handleFileChange = async (
     link.download = fileName;
     link.click();
     window.URL.revokeObjectURL(url);
-    
+
     // Auto-select the file in dropzone by calling handleFileChange
     // Extract tasks from the created data for validation
     const extractedTasks = hasData ? tasks : [];
     const extractedDescriptions = hasData ? descriptions : [];
 
     // Call handleFileChange with the created file
-    await handleFileChange(file, extractedTasks,extractedDescriptions, {
+    await handleFileChange(file, extractedTasks, extractedDescriptions, {
       sheetName: "MPD",
       columnName: "TASK NUMBER"
     });
   };
+  // Modified function to create Excel and auto-select without download
+  const createAndSelectExcelFile = async (
+    tasks: string[],
+    descriptions: string[],
+    estID: string
+  ) => {
+    try {
+      // Check if tasks and descriptions have data
+      const hasData = tasks.length > 0 && descriptions.length > 0;
+
+      const excelData = hasData
+        ? tasks.map((task, index) => ({
+          "TASK NUMBER": task || "",
+          DESCRIPTION: descriptions[index] || "",
+          "FINAL MH": "",
+        }))
+        : [
+          {
+            "TASK NUMBER": "",
+            DESCRIPTION: "",
+            "FINAL MH": "",
+          },
+        ];
+
+      // Create Excel workbook
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+      // Generate Excel file as blob (without download)
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      // Create File object from blob
+      const fileName = `Estimate_${estID}.xlsx`;
+      const file = new File([blob], fileName, { type: blob.type });
+
+      // Extract tasks from the created data for validation
+      const extractedTasks = hasData ? tasks : [];
+      const extractedDescriptions = hasData ? descriptions : [];
+
+      // Auto-select the file in dropzone by calling handleFileChange
+      await handleFileChange(file, extractedTasks, extractedDescriptions, {
+        sheetName: "MPD",
+        columnName: "TASK NUMBER"
+      });
+
+      console.log(`Excel file ${fileName} created and auto-selected successfully`);
+
+    } catch (error) {
+      console.error('Error creating and selecting Excel file:', error);
+      // Optional: Show user-friendly error message
+      // toast.error('Failed to create and select Excel file');
+    }
+  };
+
+  const downloadAllValidatedTasksOnly = async (
+    tasks: string[],
+    descriptions: string[],
+    estID: string
+  ) => {
+    // Check if tasks and descriptions have data
+    const hasData = tasks.length > 0 && descriptions.length > 0;
+
+    const excelData = hasData
+      ? tasks.map((task, index) => ({
+        "TASK NUMBER": task || "",
+        DESCRIPTION: descriptions[index] || "",
+        "FINAL MH": "",
+      }))
+      : [
+        {
+          "TASK NUMBER": "",
+          DESCRIPTION: "",
+          "FINAL MH": "",
+        },
+      ];
+
+    // Create Excel workbook
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+    // Generate Excel file as blob instead of direct download
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    // Create File object from blob
+    const fileName = `Estimate_${estID}.xlsx`;
+    const file = new File([blob], fileName, { type: blob.type });
+
+    // Download the file (for user to have a copy)
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+
   const [formKey, setFormKey] = useState(0);
   // Add ref for scroll container
   const scrollAreaRefFields = useRef<HTMLDivElement>(null);
@@ -1149,14 +1341,14 @@ const handleFileChange = async (
       const additionalTaskIds = additionalTasks
         .filter((task: any) => task.taskID.trim() !== "")
         .map((task: any) => task.taskID);
-        // Extract task IDs from the additionalTasks Descriptions array
+      // Extract task IDs from the additionalTasks Descriptions array
       const additionalTaskDescriptions = additionalTasks
-      .filter((task: any) => task.taskID.trim() !== "")
-      .map((task: any) => task.taskDescription);
+        .filter((task: any) => task.taskID.trim() !== "")
+        .map((task: any) => task.taskDescription);
 
       // Only proceed with validation if there are valid task IDs
       if (additionalTaskIds.length > 0) {
-        await validateAdditionalTasks(additionalTaskIds,additionalTaskDescriptions);
+        await validateAdditionalTasks(additionalTaskIds, additionalTaskDescriptions);
       }
     }
   };
@@ -1756,51 +1948,15 @@ const handleFileChange = async (
           setOpened(false);
           //   form.reset();
         }}
-        size={600}
+        size={1200}
         title={
           <>
             <Group justify="space-between">
               <Group>
-                <Badge variant="filled" color="teal" radius="sm" size="lg">
-                  {selectedEstimateTasks?.length}
-                </Badge>
                 <Text c="gray" fw={600}>
                   Tasks for :
                 </Text>
                 <Text fw={600}>{selectedEstimateId}</Text>
-              </Group>
-
-              <Group>
-                <Tooltip label="Download Available Tasks">
-                  <Button
-                    size="xs"
-                    color="green"
-                    variant="light"
-                    rightSection={<IconDownload size="18" />}
-                    onClick={() => downloadExcel(true)}
-                  >
-                    {
-                      validatedTasks?.filter((ele) => ele?.status === true)
-                        ?.length
-                    }
-                  </Button>
-                </Tooltip>
-
-                <Tooltip label="Download Not Available Tasks">
-                  <Button
-                    size="xs"
-                    color="blue"
-                    variant="light"
-                    rightSection={<IconDownload size="18" />}
-                    onClick={() => downloadExcel(false)}
-                  >
-                    {
-                      validatedTasks?.filter((ele) => ele?.status === false)
-                        ?.length
-                    }
-                  </Button>
-
-                </Tooltip>
               </Group>
             </Group>
             <Space h="sm" />
@@ -1816,43 +1972,240 @@ const handleFileChange = async (
             loaderProps={{ color: "indigo", type: "bars" }}
           />
         ) : (
-          <SimpleGrid cols={4}>
-            {validatedTasks
-            ?.slice() // to avoid mutating the original array
-            .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-            ?.map((task, index) => {
-              const badgeColor = task?.status ? "green" : "blue"; // Blue for true, Orange for false
-              return task?.taskid?.length > 12 ? (
-                <Tooltip
-                  key={index}
-                  label={task?.taskid}
-                  withArrow
-                  position="top"
-                >
-                  <Badge
-                    fullWidth
-                    key={index}
-                    color={badgeColor}
-                    variant="light"
-                    radius="sm"
-                    style={{ margin: "0.25em" }}
-                  >
-                    {task?.taskid}
-                  </Badge>
-                </Tooltip>
-              ) : (
-                <Badge
-                  fullWidth
-                  key={index}
-                  color={badgeColor}
-                  variant="light"
-                  radius="sm"
-                  style={{ margin: "0.25em" }}
-                >
-                  {task?.taskid}
+          <SimpleGrid cols={2} spacing="md">
+            {/* Left side Before filtered */}
+            <Box 
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '480px',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '12px'
+              }}
+            >
+              {/* Fixed Header */}
+              <Group mb="md" style={{ flexShrink: 0 }}>
+                <Badge variant="filled" color="orange" radius="sm" size="lg">
+                  {validatedTasks?.length}
                 </Badge>
-              );
-            })}
+                {/* <Text fw={600} size="md">Before Filtered</Text> */}
+                <Group>
+                  <Tooltip label="Download Available Tasks">
+                    <Button
+                      size="xs"
+                      color="green"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcel(true)}
+                    >
+                      {
+                        validatedTasks?.filter((ele) => ele?.status === true)
+                          ?.length
+                      }
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Download Not Available Tasks">
+                    <Button
+                      size="xs"
+                      color="blue"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcel(false)}
+                    >
+                      {
+                        validatedTasks?.filter((ele) => ele?.status === false)
+                          ?.length
+                      }
+                    </Button>
+                  </Tooltip>
+                </Group>
+              </Group>
+              
+              {/* Scrollable Content */}
+              <ScrollArea 
+                style={{ 
+                  flex: 1,
+                  width: '100%'
+                }}
+                scrollbars="y"
+                offsetScrollbars={false}
+              >
+                <Box style={{ width: '100%', paddingRight: '8px' }}>
+                  <SimpleGrid 
+                    cols={4} 
+                    spacing="xs"
+                    style={{ 
+                      width: '100%',
+                      minWidth: 0 // Allows grid to shrink below content size
+                    }}
+                  >
+                    {validatedTasks
+                      ?.slice() // to avoid mutating the original array
+                      .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                      ?.map((task, index) => {
+                        const badgeColor = task?.status ? "green" : "blue";
+                        return task?.taskid?.length > 12 ? (
+                          <Tooltip
+                            key={index}
+                            label={task?.taskid}
+                            withArrow
+                            position="top"
+                          >
+                            <Badge
+                              fullWidth
+                              color={badgeColor}
+                              variant="light"
+                              radius="sm"
+                              size="md"
+                              style={{ 
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {task?.taskid}
+                            </Badge>
+                          </Tooltip>
+                        ) : (
+                          <Badge
+                            fullWidth
+                            key={index}
+                            color={badgeColor}
+                            variant="light"
+                            radius="sm"
+                            size="sm"
+                            style={{ 
+                              minWidth: 0,
+                              overflow: 'hidden'
+                            }}
+                          >
+                            {task?.taskid}
+                          </Badge>
+                        );
+                      })}
+                  </SimpleGrid>
+                </Box>
+              </ScrollArea>
+            </Box>
+
+            {/* Right side After filtered */}
+            <Box 
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '480px',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '12px'
+              }}
+            >
+              {/* Fixed Header */}
+              <Group mb="md" style={{ flexShrink: 0 }}>
+                <Badge variant="filled" color="teal" radius="sm" size="lg">
+                  {combinedFilteredTasksList?.length}
+                </Badge>
+                <Text fw={600} size="md">After Filter</Text>
+                <Group>
+                  <Tooltip label="Download Available Tasks">
+                    <Button
+                      size="xs"
+                      color="cyan"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcelFilteredTasks(true)}
+                    >
+                      {
+                        combinedFilteredTasksList?.filter((ele) => ele?.status === true)
+                          ?.length
+                      }
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Download Not Available Tasks">
+                    <Button
+                      size="xs"
+                      color="violet"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcelFilteredTasks(false)}
+                    >
+                      {
+                        combinedFilteredTasksList?.filter((ele) => ele?.status === false)
+                          ?.length
+                      }
+                    </Button>
+                  </Tooltip>
+                </Group>
+              </Group>
+              
+              {/* Scrollable Content */}
+              <ScrollArea 
+                style={{ 
+                  flex: 1,
+                  width: '100%'
+                }}
+                scrollbars="y"
+                offsetScrollbars={false}
+              >
+                <Box style={{ width: '100%', paddingRight: '8px' }}>
+                  <SimpleGrid 
+                    cols={4} 
+                    spacing="xs"
+                    style={{ 
+                      width: '100%',
+                      minWidth: 0 // Allows grid to shrink below content size
+                    }}
+                  >
+                    {
+                      combinedFilteredTasksList
+                        ?.slice() // to avoid mutating the original array
+                        ?.sort((a, b) => (a?.task_number || '').localeCompare(b?.task_number || ''))
+                        ?.map((task, index) => {
+                          const badgeColor = task?.status ? "cyan" : "violet";
+                          return task?.task_number?.length > 12 ? (
+                            <Tooltip
+                              key={index}
+                              label={task?.task_number}
+                              withArrow
+                              position="top"
+                            >
+                              <Badge
+                                fullWidth
+                                color={badgeColor}
+                                variant="light"
+                                radius="sm"
+                                size="md"
+                                style={{ 
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
+                                {task?.task_number}
+                              </Badge>
+                            </Tooltip>
+                          ) : (
+                            <Badge
+                              fullWidth
+                              key={index}
+                              color={badgeColor}
+                              variant="light"
+                              radius="sm"
+                              size="sm"
+                              style={{ 
+                                minWidth: 0,
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {task?.task_number}
+                            </Badge>
+                          );
+                        })
+                    }
+                  </SimpleGrid>
+                </Box>
+              </ScrollArea>
+            </Box>
           </SimpleGrid>
         )}
       </Modal>
@@ -2229,20 +2582,20 @@ const handleFileChange = async (
                 <Text size="sm" fw={600} mb="xs">Original Tasks:</Text>
                 <SimpleGrid cols={5}>
                   {validatedTasks
-                  ?.slice() // to avoid mutating the original array
-                  .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-                  ?.map((task, index) => (
-                    <Badge
-                      fullWidth
-                      key={`original-${index}`}
-                      color={task?.status === false ? "blue" : "green"}
-                      variant="light"
-                      radius="sm"
-                      style={{ margin: "0.25em" }}
-                    >
-                      {task?.taskid}
-                    </Badge>
-                  ))}
+                    ?.slice() // to avoid mutating the original array
+                    .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                    ?.map((task, index) => (
+                      <Badge
+                        fullWidth
+                        key={`original-${index}`}
+                        color={task?.status === false ? "blue" : "green"}
+                        variant="light"
+                        radius="sm"
+                        style={{ margin: "0.25em" }}
+                      >
+                        {task?.taskid}
+                      </Badge>
+                    ))}
                 </SimpleGrid>
               </Box>
             )}
@@ -2253,20 +2606,20 @@ const handleFileChange = async (
                 <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
                 <SimpleGrid cols={5}>
                   {validatedAdditionalTasks
-                  ?.slice() // to avoid mutating the original array
-                  .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-                  .map((task, index) => (
-                    <Badge
-                      fullWidth
-                      key={`additional-${index}`}
-                      color={task?.status === false ? "blue" : "green"}
-                      variant="light"
-                      radius="sm"
-                      style={{ margin: "0.25em" }}
-                    >
-                      {task?.taskid}
-                    </Badge>
-                  ))}
+                    ?.slice() // to avoid mutating the original array
+                    .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                    .map((task, index) => (
+                      <Badge
+                        fullWidth
+                        key={`additional-${index}`}
+                        color={task?.status === false ? "blue" : "green"}
+                        variant="light"
+                        radius="sm"
+                        style={{ margin: "0.25em" }}
+                      >
+                        {task?.taskid}
+                      </Badge>
+                    ))}
                 </SimpleGrid>
               </Box>
             )}
@@ -2967,7 +3320,7 @@ const handleFileChange = async (
                   </div>
 
 
-                  
+
 
                   <TextInput
                     ref={aircraftRegNoRef}
@@ -3414,6 +3767,23 @@ border-bottom: none;
                           </ActionIcon>
                           {/* </Indicator> */}
                         </Tooltip>
+                        <Tooltip label="Download Uploaded File">
+                          <ActionIcon
+                            size={20}
+                            color="lime"
+                            variant="light"
+                            onClick={() => {
+                              // setSelectedEstimateIdDetails(val.data.estID);
+                              downloadAllValidatedTasksOnly(
+                                val.data.tasks,
+                                val.data.descriptions,
+                                val.data.estID
+                              );
+                            }}
+                          >
+                            <IconFileDownload />
+                          </ActionIcon>
+                        </Tooltip>
                         <Tooltip label="Edit & Re-run Estimate">
                           <ActionIcon
                             size={20}
@@ -3421,7 +3791,12 @@ border-bottom: none;
                             variant="light"
                             onClick={() => {
                               setSelectedEstimateIdDetails(val.data.estID);
-                              downloadAllValidatedTasks(
+                              // downloadAllValidatedTasks(
+                              //   val.data.tasks,
+                              //   val.data.descriptions,
+                              //   val.data.estID // pass directly
+                              // );
+                              createAndSelectExcelFile(
                                 val.data.tasks,
                                 val.data.descriptions,
                                 val.data.estID // pass directly
@@ -3811,6 +4186,7 @@ interface FindingDetail {
   spare_parts?: any[]; // Alternative name based on your data
   skill: string[];
   cluster: string;
+  task_defect_probability: number;
 }
 
 interface Finding {
@@ -5068,6 +5444,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               description: detail.description,
               cluster_id: detail.cluster,
               probability: detail.prob,
+              taskDefectProbability: detail?.task_defect_probability,
               mhsMin: Math.round(detail.mhs.min),
               mhsMax: Math.round(detail.mhs.max),
               mhsAvg: Math.round(detail.mhs.avg),
@@ -5086,6 +5463,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             description: detail.description,
             cluster_id: detail.cluster,
             probability: detail.prob,
+            taskDefectProbability: detail?.task_defect_probability,
             mhsMin: Math.round(detail.mhs.min),
             mhsMax: Math.round(detail.mhs.max),
             mhsAvg: Math.round(detail.mhs.avg),
@@ -5134,13 +5512,26 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       width: 280,
     },
     {
-      headerName: "Probability",
+      headerName: "Probability (%)",
       field: "probability",
       filter: true,
       sortable: true,
       floatingFilter: true,
       resizable: true,
       width: 150,
+    },
+    // taskDefectProbability :detail?.task_defect_probability,
+    {
+      headerName: "Task Defect Probability (%)",
+      field: "taskDefectProbability",
+      filter: true,
+      sortable: true,
+      floatingFilter: true,
+      resizable: true,
+      width: 150,
+      cellRenderer: (val: any) => {
+        return <Text>{(val?.data?.taskDefectProbability || 0).toFixed(2)}</Text>;
+      },
     },
     {
       headerName: "Man Hours",
@@ -5348,6 +5739,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Description": task.description || "-",
         "Cluster ID": task.cluster_id || "-",
         "Probability": task.probability || 0,
+        "Task Defect Probability": task.taskDefectProbability?.toFixed(2) || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
         // "MHS Avg": task.mhsAvg || 0,
@@ -5711,7 +6103,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                 </Grid>
 
                 <Space h="lg" />
-                <Card shadow="0" bg="#f5f5f5">
+                {/* <Card shadow="0" bg="#f5f5f5">
                   <Grid grow justify="left" align="center">
                     <Grid.Col span={2}>
                       <Text size="md" fw={500} c="dimmed">
@@ -5731,6 +6123,53 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
                       <Text size="sm" fw={600} c="#E07B39">
                         {selectedFindingDetail?.prob || 0} %
                       </Text>
+                    </Grid.Col>
+                  </Grid>
+                </Card> */}
+
+                <Card key={selectedFindingDetail?.task_defect_probability} shadow="0" p="sm" radius='md' mt="xs" bg='#fcfafa'>
+                  <Text size="sm" fw={500}>Probability</Text>
+
+                  <Grid mt="xs">
+
+                    <Grid.Col span={6}>
+                      <Stack gap="xs">
+                        <Group>
+                          <Text fz="xs" fw={500}>
+                            Task Defect Prob :
+                          </Text>
+                          <Text fz="xs" c="blue" fw={700}>
+                            {selectedFindingDetail?.task_defect_probability?.toFixed(2)} %
+                          </Text>
+                        </Group>
+
+                        <Progress
+                          value={selectedFindingDetail?.task_defect_probability || 0}
+                          color="blue"
+                          radius="md"
+                          size="lg"
+                        />
+                      </Stack>
+                    </Grid.Col>
+                    <Grid.Col span={6}>
+                      <Stack gap="xs">
+                        <Group>
+                          <Text fz="xs" fw={500}>
+                            Defect Prob :
+                          </Text>
+                          <Text fz="xs" c="#E07B39" fw={700}>
+                            {selectedFindingDetail?.prob?.toFixed(2) || 0} %
+                          </Text>
+                        </Group>
+
+
+                        <Progress
+                          value={selectedFindingDetail?.prob || 0}
+                          color="#E07B39"
+                          radius="md"
+                          size="lg"
+                        />
+                      </Stack>
                     </Grid.Col>
                   </Grid>
                 </Card>

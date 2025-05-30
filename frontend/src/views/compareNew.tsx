@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider, Grid, Tooltip, Modal, Badge, ScrollArea, Box } from '@mantine/core';
+import { Card, Text, Flex, SimpleGrid, Group, Select, Space, Button, ThemeIcon, Divider, Grid, Tooltip, Modal, Badge, ScrollArea, Box, Loader } from '@mantine/core';
 import { IconAlertTriangle, IconClock, IconCurrencyDollar, IconDownload, IconListCheck, IconSettingsDollar } from '@tabler/icons-react';
 import { useApi } from '../api/services/estimateSrvice';
 import StatsCard from '../components/statsCardCompareEst';
@@ -23,19 +23,20 @@ export default function CompareNew() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchEstimates = async () => {
-      setLoading(true);
-      const data = await getAllEstimates();
-      if (data) {
-        setEstimates(data);
-        setSelectedEstID(data[0]?.estID);
-      }
-      setLoading(false);
-    };
+  const fetchEstimates = async () => {
+    setLoading(true);
+    const data = await getAllEstimates();
+    if (data) {
+      setEstimates(data);
+      setSelectedEstID(data[0]?.estID);
+    }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchEstimates();
   }, []);
+
   console.log("all estimates>>>", estimates);
 
 
@@ -365,6 +366,9 @@ const downloadFindingsPartsData = () => {
                   }
                 }}
                 allowDeselect
+                disabled={loading} // Disable dropdown while loading
+                rightSection={loading ? <Loader size="xs" /> : null} // Show loader icon
+                nothingFoundMessage={loading ? "Loading..." : "No estimates found"}
               />
             </Group>
 
@@ -384,7 +388,8 @@ const downloadFindingsPartsData = () => {
                   Please select the following actual data files :
                 </Text>
                 <Text c='gray' size='xs'>
-                  (Material consumption pricing, Mldpmlsec1,Mltaskmlsec1)
+                  {/* (Material consumption pricing, Mldpmlsec1,Mltaskmlsec1) */}
+                  (Material consumption pricing, Mlttable, Mldpmlsec1,Mltaskmlsec1)
                 </Text>
               </Grid.Col>
             </Grid>
@@ -401,8 +406,9 @@ const downloadFindingsPartsData = () => {
             </Flex>
           </Card>
         </SimpleGrid>
+        {/* Alternative: If you want exactly 3 or 4 files */}
         <Group justify='center'>
-          {(selectedFiles.length !== 4 || !selectedEstID) ? (
+          {((selectedFiles.length !== 3 && selectedFiles.length !== 4) || !selectedEstID) ? (
             <Tooltip label="Please Select EstimateId & Actual Files">
               <Button
                 onClick={handleUpload}
@@ -430,7 +436,6 @@ const downloadFindingsPartsData = () => {
               Compare
             </Button>
           )}
-
         </Group>
 
         <Group justify='end'>
@@ -461,7 +466,7 @@ const downloadFindingsPartsData = () => {
             rightSection={<IconDownload size={20} />}
             onClick={downloadFindingsData}
           >
-            Findings Data
+            New Findings
           </Button>
           <Button
             size="xs"
@@ -475,7 +480,7 @@ const downloadFindingsPartsData = () => {
             rightSection={<IconDownload size={20} />}
             onClick={downloadFindingsPartsData}
           >
-            Findings Parts Data
+            New Findings Parts
           </Button>
 
 
