@@ -11,10 +11,24 @@ import "ag-grid-community/styles/ag-theme-alpine.css";
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import MainRoutes from './routes/routes';
-import { useNavigate } from './constants/GlobalImports';
 
 
 function App() {
+
+  useEffect(() => {
+    // Prevent the browser from handling drag/drop events on the window
+    const preventDefault = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("dragover", preventDefault, false);
+    window.addEventListener("drop", preventDefault, false);
+
+    return () => {
+      window.removeEventListener("dragover", preventDefault, false);
+      window.removeEventListener("drop", preventDefault, false);
+    };
+  }, []);
 
   return (
     <MantineProvider
