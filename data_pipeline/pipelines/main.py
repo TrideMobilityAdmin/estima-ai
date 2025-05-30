@@ -28,7 +28,7 @@ def load_config(config_path=None):
         
         # If not found, try alternate location
         if not os.path.exists(config_path):
-            config_path = '/home/CNLT7197/estima-ai/data_pipeline/config.yaml'
+            config_path = '/home/estimaai/estima-ai/data_pipeline/config.yaml'
             
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
@@ -449,6 +449,9 @@ async def main():
     except Exception as e:
         print(f"Unexpected error in main: {e}")
         logger.error(f"Unexpected error in main: {e}")
+
+
+
 
 if __name__ == "__main__":
     asyncio.run(main())
