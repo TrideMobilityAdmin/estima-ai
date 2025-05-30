@@ -1120,6 +1120,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     for _, row in group_level_mh_result.iterrows():
         spare_parts = []
         spare_filtered = group_level_parts_result[group_level_parts_result["group"] == row["group"]]
+        task_filtered=processed_task_manhours_df[processed_task_manhours_df["task__number"] == row["source_task_discrepancy_number"]]
                 
         for _, part in spare_filtered.iterrows():
             spare_parts.append({
@@ -1160,6 +1161,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                         "avg": float_round(row["avg_actual_man_hours"]),
                         "est": float_round(row["max_actual_man_hours"])
                     },
+                    "task_defect_probability": task_filtered["prob"].iloc[0] if not task_filtered.empty else 0,
                     "prob": float_round(row["prob"]),
                     "spare_parts": spare_parts
                 }]
