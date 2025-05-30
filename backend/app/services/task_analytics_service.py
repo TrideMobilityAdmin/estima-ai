@@ -25,15 +25,23 @@ class TaskService:
         # self.collection = self.mongo_client.get_collection("spares-costing")
         self.estimates_collection = self.mongo_client.get_collection("estima_output")
         self.task_spareparts_collection=self.mongo_client.get_collection("task_parts")
+    
         # self.tasks_collection = self.mongo_client.get_collection("tasks")
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
         self.taskparts_collection=self.mongo_client.get_collection("task_parts")
+        self.taskpartslhrh_collection=self.mongo_client.get_collection("task_parts_lhrh")
+
         self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
+        self.subtaskpartslhrh_collection=self.mongo_client.get_collection("sub_task_parts_lhrh")
         # self.tasks_collection = self.mongo_client.get_collection("tasks")
         # self.tasks_collection=self.mongo_client.get_collection("task_description")
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
+        self.taskdescriptionlhrh_collection=self.mongo_client.get_collection("task_description_max500mh_lhrh")
+
         self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
+        self.subtaskdescriptionlhrh_collection=self.mongo_client.get_collection("sub_task_description_max500mh_lhrh")
+
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.capping_data_collection=self.mongo_client.get_collection("capping_data")
@@ -270,7 +278,7 @@ class TaskService:
         }
     },  {
         '$lookup': {
-            'from': 'task_description', 
+            'from': 'task_description_max500mh_lhrh', 
             'let': {
                 'package_number': '$package_number', 
                 'task_number': '$task_number'
@@ -481,7 +489,7 @@ class TaskService:
                     }
                 }, {
                     '$lookup': {
-                        'from': 'sub_task_description', 
+                        'from': 'sub_task_description_max500mh_lhrh', 
                         'localField': 'task_number', 
                         'foreignField': 'log_item_number', 
                         'as': 'task_info', 
@@ -542,7 +550,7 @@ class TaskService:
                     }
                 }, {
                     '$lookup': {
-                        'from': 'task_description', 
+                        'from': 'task_description_max500mh_lhrh', 
                         'let': {
                             'source_task': '$task_info.source_task_discrepancy_number', 
                             'pkg_num': '$package_number'
@@ -608,7 +616,7 @@ class TaskService:
                     }
                 }, {
                     '$lookup': {
-                        'from': 'task_description', 
+                        'from': 'task_description_max500mh_lhrh', 
                         'let': {
                             'task_num': '$task_number', 
                             'pkg_num': '$package_number'
@@ -813,8 +821,8 @@ class TaskService:
     }
 ]
          
-            task_parts_result = list(self.taskparts_collection.aggregate(task_parts_pipeline))
-            sub_task_parts_result = list(self.subtaskparts_collection.aggregate(sub_task_parts_pipeline))
+            task_parts_result = list(self.taskpartslhrh_collection.aggregate(task_parts_pipeline))
+            sub_task_parts_result = list(self.subtaskpartslhrh_collection.aggregate(sub_task_parts_pipeline))
 
             logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
             logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
@@ -1095,8 +1103,8 @@ class TaskService:
             ]
 
             # Execute MongoDB queries
-            task_skill_results = list(self.taskdescription_collection.aggregate(task_skill_pipeline))
-            sub_task_skill_results = list(self.sub_task_collection.aggregate(sub_tasks_skill_pipeline))
+            task_skill_results = list(self.taskdescriptionlhrh_collection.aggregate(task_skill_pipeline))
+            sub_task_skill_results = list(self.subtaskdescriptionlhrh_collection.aggregate(sub_tasks_skill_pipeline))
             
             logger.info(f"Retrieved skill analysis for tasks: len={len(task_skill_results)}")
             logger.info(f"Retrieved skill analysis for sub-tasks: len={len(sub_task_skill_results)}")
@@ -2021,7 +2029,7 @@ class TaskService:
         }
     },  {
         '$lookup': {
-            'from': 'task_description', 
+            'from': 'task_description_max500mh_lhrh', 
             'let': {
                 'package_number': '$package_number', 
                 'task_number': '$task_number'
@@ -2134,7 +2142,7 @@ class TaskService:
     },
       {
         '$lookup': {
-            'from': 'sub_task_description', 
+            'from': 'sub_task_description_max500mh_lhrh', 
             'localField': 'task_number', 
             'foreignField': 'log_item_number', 
             'as': 'task_info', 
@@ -2237,7 +2245,7 @@ class TaskService:
         }
     },{
         '$lookup': {
-            'from': 'task_description', 
+            'from': 'task_description_max500mh_lhrh', 
             'let': {
                 'task_num': '$task_number', 
                 'pkg_num': '$package_number'
@@ -2322,11 +2330,11 @@ class TaskService:
         }
     }
 ]
-        task_parts_results = list(self.taskparts_collection.aggregate(task_parts_pipeline))
+        task_parts_results = list(self.taskpartslhrh_collection.aggregate(task_parts_pipeline))
         logger.info(f"task_parts_results: {len(task_parts_results)}")
-        findings_HMV_results = list(self.subtaskparts_collection.aggregate(findings_HMV_parts_pipeline))
+        findings_HMV_results = list(self.subtaskpartslhrh_collection.aggregate(findings_HMV_parts_pipeline))
         logger.info(f"findings_HMV_results: {len(findings_HMV_results)}")
-        findings_nonHMV_results = (self.subtaskparts_collection.aggregate(findings_nonHMV_parts_pipeline))
+        findings_nonHMV_results = (self.subtaskpartslhrh_collection.aggregate(findings_nonHMV_parts_pipeline))
         logger.info(f"findings_nonHMV_results fetched")
         
         combined_results = {

@@ -1,6 +1,6 @@
 database:
   uri: "mongodb://admin:admin123@10.100.3.13:27017/"
-  database: "data_pipeline_testing"
+  database: "gmr-mro-staging-5y"
 
 excel_files:
   data_path : "/home/Data/Mro_historical_Data/Data"
