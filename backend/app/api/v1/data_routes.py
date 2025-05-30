@@ -229,6 +229,16 @@ async def get_operators_list(
     """
     return await task_service.get_operator_list(current_user)
 
+@router.get("/filtered_tasks/{estID}", response_model=Dict)
+async def get_filtered_tasks(
+    estID: str,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    """
+    Get filtered tasks based on the estimate ID.
+    """
+    return await task_service.get_filtered_tasks(estID, current_user)
 @router.post("/validate_tasks_checkbased",response_model=List[ValidTasks])
 async def validate_tasks_checkbased(
     estimate_request: ValidRequestCheckCategory,
