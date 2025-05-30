@@ -229,6 +229,10 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold):
+    def float_round(value):
+        if pd.notna(value):  # Better check for non-null values
+            return round(float(value), 2)
+        return 0
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
         """
@@ -657,7 +661,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         
         # Assuming df_unpivot is your original DataFrame
         # Splitting the DataFrame into three chunks
-        chunk_size = len(df_unpivot) // 3
+        chunk_size = min(len(df_unpivot) // 3,1)
         chunks = [df_unpivot[i:i+chunk_size] for i in range(0, len(df_unpivot), chunk_size)]
         
         # Define the custom function to update the 'Value' column based on conditions
@@ -900,11 +904,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             packages_by_group = task_level_parts.groupby(["source_task_discrepancy_number","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_parts_result["packages_list"] = task_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
             task_level_parts_result["prob"] =task_level_parts_result.apply(prob, axis=1)
-        
-        def float_round(value):
-            if pd.notna(value):  # Better check for non-null values
-                return round(float(value), 2)
-            return 0
+
         
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
@@ -964,12 +964,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             packages_by_group = parts_line_items.groupby(["issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             parts_line_items_result["packages_list"] = parts_line_items_result.index.map(lambda idx: packages_by_group.get(idx, []))
             parts_line_items_result["prob"] =parts_line_items_result.apply(prob, axis=1)
-        
-        def float_round(value):
-            if pd.notna(value):  # Better check for non-null values
-                return round(float(value), 2)
-            return 0
-        
+
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
@@ -1038,10 +1033,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             group_level_parts_result["packages_list"] = group_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
             group_level_parts_result["prob"] =group_level_parts_result.apply(prob, axis=1)
         
-        def float_round(value):
-            if pd.notna(value):  # Better check for non-null values
-                return round(float(value), 2)
-            return 0
+
         
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
