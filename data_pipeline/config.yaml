@@ -3,7 +3,7 @@ database:
   database: "gmr-mro-staging-5y"
 
 excel_files:
-  data_path : "/home/Data/Mro_historical_Data/Data"
+  data_path : "/home/jupyter_workspace/Data/Data"
 
   
 
