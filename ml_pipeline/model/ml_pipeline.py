@@ -430,7 +430,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             else:
                 prob = 0
             
-            print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
+            #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
         if filtered_data.empty:
             return {
                 'prob': 0,
@@ -1120,7 +1120,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     for _, row in group_level_mh_result.iterrows():
         spare_parts = []
         spare_filtered = group_level_parts_result[group_level_parts_result["group"] == row["group"]]
-        task_filtered=processed_task_manhours_df[processed_task_manhours_df["task__number"] == row["source_task_discrepancy_number"]]
+        task_filtered=processed_task_manhours_df[processed_task_manhours_df["task_number"] == row["source_task_discrepancy_number"]]
                 
         for _, part in spare_filtered.iterrows():
             spare_parts.append({
