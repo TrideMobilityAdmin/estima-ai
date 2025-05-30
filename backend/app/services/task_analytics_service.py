@@ -101,18 +101,22 @@ class TaskService:
         logger.info("Fetching all estimates")
 
         try:
-            estimates_cursor = self.estimates_collection.find()
-
-            estimates = []
-            for estimate in estimates_cursor:
-                estimates.append(Estimate(
-                    estID=str(estimate["estID"]),
-                    description=estimate.get("description", ""),
-                    createdBy=estimate.get("createdBy",""),
-                    createdAt=estimate.get("createdAt"),
-                    lastUpdated=estimate.get("lastUpdated")
-                ))
-            logger.info(f"Found {len(estimates)} estimates")
+            estimates_pipeline=[
+    {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'description': 1, 
+            'createdAt': 1, 
+            'lastUpdated': 1, 
+            'createdBy': 1
+        }
+    }
+]
+            
+            estimates = list(self.estimates_collection.aggregate(estimates_pipeline))
+            logger.info(f"Fetched {len(estimates)} estimates")
+   
             return estimates
 
         except Exception as e:
@@ -121,6 +125,46 @@ class TaskService:
                 status_code=500,
                 detail=f"Error fetching estimates: {str(e)}"
             )
+        
+    async def get_filtered_tasks(self,estID:str,current_user: dict = Depends(get_current_user)) -> Dict:
+        """
+        Get filtered tasks based on the provided estimate ID.
+        """
+        logger.info(f"Fetching filtered tasks for estID: {estID}")
+
+        try:
+            if not estID:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Estimate ID is required"
+                )
+            filtered_pipeline=[
+    {
+        '$match': {
+            'estID': 'ES-SAW-CCHECK-OMANAIR-29052025-V10'
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'available_tasks': '$filtered_tasks', 
+            'not_avialable_tasks': 1
+        }
+    }
+]
+            
+            filtered_tasks = list(self.estimates_collection.aggregate(filtered_pipeline))
+            logger.info(f"Filtered tasks fetched successfully: {len(filtered_tasks)} tasks found")
+            if not filtered_tasks:
+                logger.warning(f"No filtered tasks found for estID: {estID}")
+                return {"data": {}, "response": {"statusCode": 404, "message": "No tasks found for the given estimate ID"}}
+            return filtered_tasks[0]
+        except Exception as e:
+            logger.error(f"Error fetching filtered tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching filtered tasks: {str(e)}"
+            )
+    
     async def validate_tasks(self, estimate_request: ValidRequest, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
         """
         Validate tasks by checking if they exist in the task_description collection.
