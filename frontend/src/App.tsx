@@ -3,6 +3,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import '@mantine/core/styles.css';
+import '@mantine/dropzone/styles.css';
 import '@mantine/charts/styles.css';
 import '@mantine/dates/styles.css';
 import "ag-grid-community/styles/ag-grid.css";
@@ -10,10 +11,23 @@ import "ag-grid-community/styles/ag-theme-alpine.css";
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import MainRoutes from './routes/routes';
-import { useNavigate } from './constants/GlobalImports';
 
 
 function App() {
+
+  useEffect(() => {
+    // Prevent default browser behaviour for drag events
+    const preventDefault = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("dragover", preventDefault, false);
+    window.addEventListener("drop", preventDefault, false);
+    return () => {
+      window.removeEventListener("dragover", preventDefault, false);
+      window.removeEventListener("drop", preventDefault, false);
+    };
+  }, []);
 
   return (
     <MantineProvider
