@@ -694,14 +694,19 @@ export default function EstimateNew() {
 
   // Combine both arrays and add a status field to distinguish between available/not available
   const combinedFilteredTasksList = [
-    ...(filteredTasksList?.available_tasks || []).map((task: any) => ({
-      ...task,
-      status: true
-    })),
-    ...(filteredTasksList?.not_avialable_tasks || []).map((task: any) => ({
-      ...task,
-      status: false
-    }))
+    ...(filteredTasksList?.available_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: true
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== ''),
+    
+    ...(filteredTasksList?.not_avialable_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: false
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
 
   console.log("Filtered Tasks List >>>", filteredTasksList);
@@ -1967,9 +1972,18 @@ export default function EstimateNew() {
             loaderProps={{ color: "indigo", type: "bars" }}
           />
         ) : (
-          <SimpleGrid cols={2}>
+          <SimpleGrid cols={2} spacing="md">
             {/* Left side Before filtered */}
-            <Box style={{ display: 'flex', flexDirection: 'column', height: '500px' }}>
+            <Box 
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '480px',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '12px'
+              }}
+            >
               {/* Fixed Header */}
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="orange" radius="sm" size="lg">
@@ -1991,7 +2005,6 @@ export default function EstimateNew() {
                       }
                     </Button>
                   </Tooltip>
-
                   <Tooltip label="Download Not Available Tasks">
                     <Button
                       size="xs"
@@ -2008,52 +2021,85 @@ export default function EstimateNew() {
                   </Tooltip>
                 </Group>
               </Group>
-
+              
               {/* Scrollable Content */}
-              <ScrollArea style={{ flex: 1 }}>
-                <SimpleGrid cols={4}>
-                  {validatedTasks
-                    ?.slice() // to avoid mutating the original array
-                    .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-                    ?.map((task, index) => {
-                      const badgeColor = task?.status ? "green" : "blue"; // Blue for true, Orange for false
-                      return task?.taskid?.length > 12 ? (
-                        <Tooltip
-                          key={index}
-                          label={task?.taskid}
-                          withArrow
-                          position="top"
-                        >
+              <ScrollArea 
+                style={{ 
+                  flex: 1,
+                  width: '100%'
+                }}
+                scrollbars="y"
+                offsetScrollbars={false}
+              >
+                <Box style={{ width: '100%', paddingRight: '8px' }}>
+                  <SimpleGrid 
+                    cols={4} 
+                    spacing="xs"
+                    style={{ 
+                      width: '100%',
+                      minWidth: 0 // Allows grid to shrink below content size
+                    }}
+                  >
+                    {validatedTasks
+                      ?.slice() // to avoid mutating the original array
+                      .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                      ?.map((task, index) => {
+                        const badgeColor = task?.status ? "green" : "blue";
+                        return task?.taskid?.length > 12 ? (
+                          <Tooltip
+                            key={index}
+                            label={task?.taskid}
+                            withArrow
+                            position="top"
+                          >
+                            <Badge
+                              fullWidth
+                              color={badgeColor}
+                              variant="light"
+                              radius="sm"
+                              size="md"
+                              style={{ 
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {task?.taskid}
+                            </Badge>
+                          </Tooltip>
+                        ) : (
                           <Badge
                             fullWidth
                             key={index}
                             color={badgeColor}
                             variant="light"
                             radius="sm"
-                            style={{ margin: "0.25em" }}
+                            size="sm"
+                            style={{ 
+                              minWidth: 0,
+                              overflow: 'hidden'
+                            }}
                           >
                             {task?.taskid}
                           </Badge>
-                        </Tooltip>
-                      ) : (
-                        <Badge
-                          fullWidth
-                          key={index}
-                          color={badgeColor}
-                          variant="light"
-                          radius="sm"
-                          style={{ margin: "0.25em" }}
-                        >
-                          {task?.taskid}
-                        </Badge>
-                      );
-                    })}
-                </SimpleGrid>
+                        );
+                      })}
+                  </SimpleGrid>
+                </Box>
               </ScrollArea>
             </Box>
 
             {/* Right side After filtered */}
-            <Box style={{ display: 'flex', flexDirection: 'column', height: '500px' }}>
+            <Box 
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '480px',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '12px'
+              }}
+            >
               {/* Fixed Header */}
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="teal" radius="sm" size="lg">
@@ -2075,7 +2121,6 @@ export default function EstimateNew() {
                       }
                     </Button>
                   </Tooltip>
-
                   <Tooltip label="Download Not Available Tasks">
                     <Button
                       size="xs"
@@ -2092,49 +2137,73 @@ export default function EstimateNew() {
                   </Tooltip>
                 </Group>
               </Group>
-
+              
               {/* Scrollable Content */}
-              <ScrollArea style={{ flex: 1 }}>
-                <SimpleGrid cols={4}>
-                  {
-                    combinedFilteredTasksList
-                      ?.slice() // to avoid mutating the original array
-                      ?.sort((a, b) => (a?.task_number || '').localeCompare(b?.task_number || ''))
-                      ?.map((task, index) => {
-                        const badgeColor = task?.status ? "cyan" : "violet";
-                        return task?.task_number?.length > 12 ? (
-                          <Tooltip
-                            key={index}
-                            label={task?.task_number}
-                            withArrow
-                            position="top"
-                          >
+              <ScrollArea 
+                style={{ 
+                  flex: 1,
+                  width: '100%'
+                }}
+                scrollbars="y"
+                offsetScrollbars={false}
+              >
+                <Box style={{ width: '100%', paddingRight: '8px' }}>
+                  <SimpleGrid 
+                    cols={4} 
+                    spacing="xs"
+                    style={{ 
+                      width: '100%',
+                      minWidth: 0 // Allows grid to shrink below content size
+                    }}
+                  >
+                    {
+                      combinedFilteredTasksList
+                        ?.slice() // to avoid mutating the original array
+                        ?.sort((a, b) => (a?.task_number || '').localeCompare(b?.task_number || ''))
+                        ?.map((task, index) => {
+                          const badgeColor = task?.status ? "cyan" : "violet";
+                          return task?.task_number?.length > 12 ? (
+                            <Tooltip
+                              key={index}
+                              label={task?.task_number}
+                              withArrow
+                              position="top"
+                            >
+                              <Badge
+                                fullWidth
+                                color={badgeColor}
+                                variant="light"
+                                radius="sm"
+                                size="md"
+                                style={{ 
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
+                                {task?.task_number}
+                              </Badge>
+                            </Tooltip>
+                          ) : (
                             <Badge
                               fullWidth
                               key={index}
                               color={badgeColor}
                               variant="light"
                               radius="sm"
-                              style={{ margin: "0.25em" }}
+                              size="sm"
+                              style={{ 
+                                minWidth: 0,
+                                overflow: 'hidden'
+                              }}
                             >
                               {task?.task_number}
                             </Badge>
-                          </Tooltip>
-                        ) : (
-                          <Badge
-                            fullWidth
-                            key={index}
-                            color={badgeColor}
-                            variant="light"
-                            radius="sm"
-                            style={{ margin: "0.25em" }}
-                          >
-                            {task?.task_number}
-                          </Badge>
-                        );
-                      })
-                  }
-                </SimpleGrid>
+                          );
+                        })
+                    }
+                  </SimpleGrid>
+                </Box>
               </ScrollArea>
             </Box>
           </SimpleGrid>

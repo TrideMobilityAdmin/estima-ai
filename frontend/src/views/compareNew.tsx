@@ -466,7 +466,7 @@ const downloadFindingsPartsData = () => {
             rightSection={<IconDownload size={20} />}
             onClick={downloadFindingsData}
           >
-            Findings Data
+            New Findings
           </Button>
           <Button
             size="xs"
@@ -480,7 +480,7 @@ const downloadFindingsPartsData = () => {
             rightSection={<IconDownload size={20} />}
             onClick={downloadFindingsPartsData}
           >
-            Findings Parts Data
+            New Findings Parts
           </Button>
 
 
