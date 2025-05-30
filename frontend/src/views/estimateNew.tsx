@@ -131,7 +131,6 @@ import { saveAs } from "file-saver";
 import ExcelJS from "exceljs";
 import aircraftMOdelsData from "../assets/aircraftModels.json";
 import aircraftOperators from "../assets/aircraftOperators.json";
-import TestDropzone from "../components/testDropzone";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -2847,14 +2846,13 @@ export default function EstimateNew() {
                 scrollHideDelay={1}
                 scrollbarSize={5}
               >
-                {/* <RFQUploadDropZoneExcel
+                <RFQUploadDropZoneExcel
                   name="Excel or CSV file"
                   changeHandler={handleFileChange}
                   selectedFile={selectedFile}
                   setSelectedFile={setSelectedFile}
                   color="green"
-                /> */}
-                <TestDropzone/>
+                />
                 <Space h="sm" />
                 <Group justify="space-between" pb="sm">
                   <Text size="md" fw={500}>
