@@ -82,8 +82,8 @@ def threshold_transform(data: np.ndarray, threshold: float = 0.5, above_value: i
     return np.where(np.array(data) > threshold, above_value, below_value)
 
 
-client = MongoClient("mongodb://admin:Tride%401234@telematics-mongo1.evrides.in:22022,telematics-mongo2.evrides.in:22022,telematics-mongo3.evrides.in:22022/?authSource=admin&replicaSet=trideRepl")
-db = client["gmr-mro-test-5y"]
+client = MongoClient("mongodb://admin:admin%40123@10.100.12.82:27017/")
+db = client["gmr-mro-staging-5y"]
 
 
 test_packages = []
