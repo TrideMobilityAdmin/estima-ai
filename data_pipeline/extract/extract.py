@@ -11,7 +11,7 @@ import numpy as np
 logger = setup_logging()
 
 # Load config.yaml
-def load_config(config_path='/home/CNLT7197/estima-ai/data_pipeline/config.yaml'):
+def load_config(config_path='/home/estimaai/estima-ai/data_pipeline/config.yaml'):
     """Load configuration from YAML file."""
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
