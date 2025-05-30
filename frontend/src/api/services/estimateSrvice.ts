@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -260,6 +260,21 @@ export const useApi = () => {
     }
   };
 
+  const getFilteredTasksByID = async (estimateId: string) => {
+    try {
+      const response = await axiosInstance.get(getFilteredTasks_Url + estimateId);
+      console.log("✅ API Response filtered tasks :", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
+
 
   // New function to upload a file with Estimate ID
   const compareUploadFile = async (files: File[], selectedEstID: string) => {
@@ -490,6 +505,7 @@ export const useApi = () => {
     updateProbabilityWiseDetails,
     updateRemarkByEstID,
     getOperatorsList,
-    getEstimateDetailsByID
+    getEstimateDetailsByID,
+    getFilteredTasksByID
   };
 };

@@ -17,3 +17,4 @@ export const getProbabilityWise_Url = "/probability_wise_manhrs_sparecost/";
 export const getChangepassword_Url = "/auth/change_password";
 export const getOperatorsList_Url = "/operators_list";
 export const getEstimateDetails_Url = "/file_upload_estimate/";
+export const getFilteredTasks_Url = "/filtered_tasks/";
