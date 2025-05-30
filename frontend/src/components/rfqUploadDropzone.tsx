@@ -473,6 +473,8 @@ const RFQUploadDropZoneExcel = ({
               justifyContent: "center",
               alignItems: "center",
               flexDirection: "column",
+              zIndex: 10, // <-- add this line
+              pointerEvents: "auto", // <-- add this line
             },
           }}
           onDrop={files => { handleDrop(files).catch(() => {}); }}
