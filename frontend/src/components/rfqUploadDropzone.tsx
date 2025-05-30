@@ -10,11 +10,8 @@ interface UploadDropZoneExcelProps {
   changeHandler: (
     file: File | null, 
     tasks: string[], 
-    descriptions: string[], 
-    sheetInfo?: { 
-      sheetName: string, 
-      columnName: string 
-    }
+    descriptions: string[],
+    sheetInfo?: { sheetName: string; columnName: string }
   ) => void;
   color?: string;
   selectedFile?: File | null;
@@ -30,6 +27,9 @@ interface SheetInfo {
 interface RowData {
   [key: string]: any;
 }
+
+// SAFETY: Lowered to 5MB to prevent browser/production crash
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const RFQUploadDropZoneExcel = ({
   name,
@@ -178,6 +178,7 @@ const RFQUploadDropZoneExcel = ({
     }
   }, [findMatchingColumnName, findMatchingColumnNameInData]);
 
+  // MODIFIED: Now also extracts descriptions array
   const extractTasksAndDescriptionsFromSheet = useCallback(async (
     workbook: XLSX.WorkBook, 
     sheetName: string, 
@@ -250,6 +251,14 @@ const RFQUploadDropZoneExcel = ({
     setIsAnalyzing(true);
     setFileError(null);
     setProcessingPercentage(10);
+
+    // --- Safety: browser crash prevention ---
+    if (fileToAnalyze.size > MAX_FILE_SIZE) {
+      setFileError(`File too large. Maximum allowed is ${MAX_FILE_SIZE / (1024*1024)}MB.`);
+      setIsAnalyzing(false);
+      return;
+    }
+
     try {
       const fileType = fileToAnalyze.name.split(".").pop()?.toLowerCase();
       if (fileType === "csv") {
@@ -267,15 +276,26 @@ const RFQUploadDropZoneExcel = ({
                 setProcessingPercentage(40);
                 const buffer = e.target?.result as ArrayBuffer;
                 if (!buffer) throw new Error("Failed to read file buffer");
-                const workbook = XLSX.read(new Uint8Array(buffer), { 
-                  type: "array",
-                  cellStyles: false,
-                  cellHTML: false,
-                  cellFormula: false
-                });
+                let workbook: XLSX.WorkBook;
+                try {
+                  workbook = XLSX.read(new Uint8Array(buffer), { 
+                    type: "array",
+                    cellStyles: false,
+                    cellHTML: false,
+                    cellFormula: false
+                  });
+                } catch (err: any) {
+                  setFileError(`Could not parse Excel file. The file may be corrupted or in an unsupported format. ${err?.message ? " (" + err.message + ")" : ""}`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
+                }
                 setProcessingPercentage(60);
                 if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-                  throw new Error("Invalid Excel file format or empty workbook");
+                  setFileError("Invalid Excel file format or empty workbook");
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 const sheets: SheetInfo[] = [];
                 for (const sheetName of workbook.SheetNames) {
@@ -305,7 +325,10 @@ const RFQUploadDropZoneExcel = ({
                 }
                 setProcessingPercentage(80);
                 if (sheets.length === 0) {
-                  throw new Error("No valid sheets found in the Excel file");
+                  setFileError("No valid sheets found in the Excel file");
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 const isValid = validateFileRequirements(sheets, workbook);
                 if (!isValid) {
@@ -315,7 +338,12 @@ const RFQUploadDropZoneExcel = ({
                 }
                 setAvailableSheets(sheets);
                 const mpdSheet = sheets.find(sheet => sheet.name === REQUIRED_SHEET_NAME);
-                if (!mpdSheet) throw new Error(`Required sheet "${REQUIRED_SHEET_NAME}" not found`);
+                if (!mpdSheet) {
+                  setFileError(`Required sheet "${REQUIRED_SHEET_NAME}" not found`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
+                }
                 setSelectedSheet(REQUIRED_SHEET_NAME);
                 setTaskColumns(mpdSheet.columns);
                 setRawTaskColumns(mpdSheet.rawColumns);
@@ -324,31 +352,35 @@ const RFQUploadDropZoneExcel = ({
                   setSelectedTaskColumn(taskNumberColumn);
                   await extractTasksAndDescriptionsFromSheet(workbook, REQUIRED_SHEET_NAME, taskNumberColumn, fileToAnalyze);
                 } else {
-                  throw new Error(`Task column "${REQUIRED_TASK_COLUMN_NAME}" not found in sheet "${REQUIRED_SHEET_NAME}"`);
+                  setFileError(`Task column "${REQUIRED_TASK_COLUMN_NAME}" not found in sheet "${REQUIRED_SHEET_NAME}"`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 setProcessingPercentage(100);
                 resolve();
-              } catch (error) {
+              } catch (error: any) {
                 setFileError(`Error processing file: ${error instanceof Error ? error.message : "Unknown error"}. Please try again with a valid file.`);
+                setIsAnalyzing(false);
                 reject(error);
               } finally {
                 setIsAnalyzing(false);
               }
             };
-            reader.onerror = (error) => {
-              setFileError("Error reading file. Please try again.");
+            reader.onerror = () => {
+              setFileError("Error reading file. Please try again or use a different file.");
               setIsAnalyzing(false);
-              reject(error);
+              reject();
             };
             reader.readAsArrayBuffer(fileToAnalyze);
-          } catch (outsideError) {
+          } catch (outsideError: any) {
             setFileError(`An unexpected error occurred: ${outsideError instanceof Error ? outsideError.message : "Unknown error"}`);
             setIsAnalyzing(false);
             reject(outsideError);
           }
         }, 100);
       });
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error analyzing file: ${error instanceof Error ? error.message : "Unknown error"}. Please try again with a valid Excel file.`);
       setIsAnalyzing(false);
     }
@@ -359,7 +391,6 @@ const RFQUploadDropZoneExcel = ({
     extractTasksAndDescriptionsFromSheet
   ]);
 
-  // FIXED: Enhanced drag and drop handler with proper error handling and production compatibility
   const handleDrop = useCallback(async (newFiles: File[]) => {
     try {
       if (!newFiles || newFiles.length === 0) {
@@ -367,53 +398,23 @@ const RFQUploadDropZoneExcel = ({
         return;
       }
       const droppedFile = newFiles[0];
-      
-      // Validate file type before processing
-      const fileExtension = droppedFile.name.split('.').pop()?.toLowerCase();
-      const validExtensions = ['xls', 'xlsx', 'xlsm'];
-      
-      if (!fileExtension || !validExtensions.includes(fileExtension)) {
-        setFileError("Invalid file format. Please upload an Excel file (.xls, .xlsx, .xlsm).");
-        return;
-      }
 
-      // Validate file size (50MB limit)
-      if (droppedFile.size > 50 * 1024 * 1024) {
-        setFileError("File size exceeds 50MB limit. Please select a smaller file.");
+      // --- Safety: browser crash prevention ---
+      if (droppedFile.size > MAX_FILE_SIZE) {
+        setFileError(`File too large. Maximum allowed is ${MAX_FILE_SIZE / (1024*1024)}MB.`);
         return;
       }
 
       setFile(droppedFile);
       resetAnalysisState();
       setIsAnalyzing(true);
-      
-      if (setSelectedFile) {
-        setSelectedFile(droppedFile);
-      }
-      
+      if (setSelectedFile) setSelectedFile(droppedFile);
       await analyzeFile(droppedFile);
     } catch (error: any) {
-      console.error('Drop handler error:', error);
       setFileError(`Error processing file: ${error?.message || "Unknown error"}. Please try again.`);
       setIsAnalyzing(false);
     }
   }, [resetAnalysisState, setSelectedFile, analyzeFile]);
-
-  // FIXED: Enhanced drag event handlers for better production compatibility
-  const handleDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
-
-  const handleDragEnter = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
-
-  const handleDragLeave = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
 
   const handleSheetChange = useCallback(async (sheetName: string) => {
     if (!file || !sheetName) return;
@@ -428,7 +429,7 @@ const RFQUploadDropZoneExcel = ({
         setRawTaskColumns(sheet.rawColumns);
       }
       changeHandler(file, [], [], undefined);
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error changing sheet: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }, [file, availableSheets, changeHandler]);
@@ -453,7 +454,7 @@ const RFQUploadDropZoneExcel = ({
             cellFormula: false
           });
           await extractTasksAndDescriptionsFromSheet(workbook, selectedSheet, columnName, file);
-        } catch (error) {
+        } catch (error: any) {
           setFileError(`Error extracting tasks: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
         } finally {
           setIsAnalyzing(false);
@@ -464,7 +465,7 @@ const RFQUploadDropZoneExcel = ({
         setIsAnalyzing(false);
       };
       reader.readAsArrayBuffer(file);
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error processing column change: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
       setIsAnalyzing(false);
     }
@@ -481,11 +482,14 @@ const RFQUploadDropZoneExcel = ({
     <div className="w-full">
       {!file ? (
         <Dropzone
-          accept={{
-            'application/vnd.ms-excel': ['.xls'],
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-            'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm']
-          }}
+          accept={[
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel.sheet.macroEnabled.12",
+            ".xls",
+            ".xlsx",
+            ".xlsm",
+          ]}
           styles={{
             root: {
               height: "12vh",
@@ -504,15 +508,9 @@ const RFQUploadDropZoneExcel = ({
               flexDirection: "column",
             },
           }}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
+          onDrop={files => { handleDrop(files).catch(() => {}); }}
           multiple={false}
-          maxSize={50 * 1024 * 1024}
-          activateOnClick={true}
-          activateOnDrag={true}
-          activateOnKeyboard={true}
+          maxSize={MAX_FILE_SIZE}
         >
           <Flex direction='row' align='center' gap="xl">
             <MdUploadFile size={50} color={color || "#1a73e8"} />
@@ -595,6 +593,7 @@ const RFQUploadDropZoneExcel = ({
                           {tasks.slice(0, 5).join(", ")}
                           {tasks.length > 5 ? ` and ${tasks.length - 5} more...` : ""}
                         </Text>
+                        {/* Show first few descriptions if MPD and descriptions extracted */}
                         {selectedSheet === REQUIRED_SHEET_NAME && descriptions.length > 0 && (
                           <>
                             <Text size="xs" fw={500} mt="xs">
