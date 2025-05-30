@@ -1,5 +1,5 @@
 database:
-  uri: "mongodb://admin:admin123@10.100.3.13:27017/"
+  uri: "mongodb://admin:admin%40123@10.100.12.82:27017/"
   database: "gmr-mro-staging-5y"
 
 excel_files:
