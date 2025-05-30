@@ -413,7 +413,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             else:
                 prob = 0
             
-            print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
+            #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
             
         else:
             filtered_data = task_all_data[task_all_data['task_number'] == task_number]
@@ -661,7 +661,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         
         # Assuming df_unpivot is your original DataFrame
         # Splitting the DataFrame into three chunks
-        chunk_size = min(len(df_unpivot) // 3,1)
+        chunk_size = max(len(df_unpivot) // 3,1)
         chunks = [df_unpivot[i:i+chunk_size] for i in range(0, len(df_unpivot), chunk_size)]
         
         # Define the custom function to update the 'Value' column based on conditions
