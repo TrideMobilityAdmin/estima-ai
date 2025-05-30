@@ -10,7 +10,7 @@ interface UploadDropZoneExcelProps {
   changeHandler: (
     file: File | null, 
     tasks: string[], 
-    descriptions: string[], // ADDED: descriptions array
+    descriptions: string[], 
     sheetInfo?: { 
       sheetName: string, 
       columnName: string 
@@ -40,7 +40,7 @@ const RFQUploadDropZoneExcel = ({
 }: UploadDropZoneExcelProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [tasks, setTasks] = useState<string[]>([]);
-  const [descriptions, setDescriptions] = useState<string[]>([]); // ADDED: state for descriptions
+  const [descriptions, setDescriptions] = useState<string[]>([]);
   const [availableSheets, setAvailableSheets] = useState<SheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const [taskColumns, setTaskColumns] = useState<string[]>([]);
@@ -63,7 +63,7 @@ const RFQUploadDropZoneExcel = ({
 
   const resetAnalysisState = useCallback(() => {
     setTasks([]);
-    setDescriptions([]); // reset desc
+    setDescriptions([]);
     setSelectedSheet(null);
     setSelectedTaskColumn(null);
     setAvailableSheets([]);
@@ -178,7 +178,6 @@ const RFQUploadDropZoneExcel = ({
     }
   }, [findMatchingColumnName, findMatchingColumnNameInData]);
 
-  // MODIFIED: Now also extracts descriptions array
   const extractTasksAndDescriptionsFromSheet = useCallback(async (
     workbook: XLSX.WorkBook, 
     sheetName: string, 
@@ -197,7 +196,6 @@ const RFQUploadDropZoneExcel = ({
       let descriptionKey: string | undefined;
 
       if (sheetName === REQUIRED_SHEET_NAME) {
-        // Find the actual matched DESCRIPTION column name in data
         descriptionKey = jsonData.length > 0 
           ? Object.keys(jsonData[0] as Record<string, unknown>).find(key => isMatchingColumnName(key, REQUIRED_DESCRIPTION_COLUMN_NAME))
           : undefined;
@@ -212,20 +210,16 @@ const RFQUploadDropZoneExcel = ({
             taskCell = row[matchingKey];
           }
         }
-        // Always extract tasks
         processTaskCell(taskCell).forEach(task => extractedTasks.add(task));
-        // If MPD and description column found, extract the description
         if (sheetName === REQUIRED_SHEET_NAME && descriptionKey) {
           let descVal = row[descriptionKey];
           if (descVal === undefined) {
-            // Try to match by normalizing
             const rowKeys = Object.keys(row);
             const matchingDescKey = rowKeys.find(key => isMatchingColumnName(key, descriptionKey!));
             if (matchingDescKey) {
               descVal = row[matchingDescKey];
             }
           }
-          // Store empty string if not present to keep alignment with tasks
           extractedDescriptions.push(descVal !== undefined && descVal !== null ? String(descVal) : "");
         }
       });
@@ -316,7 +310,7 @@ const RFQUploadDropZoneExcel = ({
                 const isValid = validateFileRequirements(sheets, workbook);
                 if (!isValid) {
                   setIsAnalyzing(false);
-                  resolve(undefined);
+                  resolve();
                   return;
                 }
                 setAvailableSheets(sheets);
@@ -365,6 +359,7 @@ const RFQUploadDropZoneExcel = ({
     extractTasksAndDescriptionsFromSheet
   ]);
 
+  // FIXED: Enhanced drag and drop handler with proper error handling and production compatibility
   const handleDrop = useCallback(async (newFiles: File[]) => {
     try {
       if (!newFiles || newFiles.length === 0) {
@@ -372,16 +367,53 @@ const RFQUploadDropZoneExcel = ({
         return;
       }
       const droppedFile = newFiles[0];
+      
+      // Validate file type before processing
+      const fileExtension = droppedFile.name.split('.').pop()?.toLowerCase();
+      const validExtensions = ['xls', 'xlsx', 'xlsm'];
+      
+      if (!fileExtension || !validExtensions.includes(fileExtension)) {
+        setFileError("Invalid file format. Please upload an Excel file (.xls, .xlsx, .xlsm).");
+        return;
+      }
+
+      // Validate file size (50MB limit)
+      if (droppedFile.size > 50 * 1024 * 1024) {
+        setFileError("File size exceeds 50MB limit. Please select a smaller file.");
+        return;
+      }
+
       setFile(droppedFile);
       resetAnalysisState();
       setIsAnalyzing(true);
-      if (setSelectedFile) setSelectedFile(droppedFile);
+      
+      if (setSelectedFile) {
+        setSelectedFile(droppedFile);
+      }
+      
       await analyzeFile(droppedFile);
     } catch (error: any) {
+      console.error('Drop handler error:', error);
       setFileError(`Error processing file: ${error?.message || "Unknown error"}. Please try again.`);
       setIsAnalyzing(false);
     }
   }, [resetAnalysisState, setSelectedFile, analyzeFile]);
+
+  // FIXED: Enhanced drag event handlers for better production compatibility
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const handleDragEnter = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const handleDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   const handleSheetChange = useCallback(async (sheetName: string) => {
     if (!file || !sheetName) return;
@@ -449,14 +481,11 @@ const RFQUploadDropZoneExcel = ({
     <div className="w-full">
       {!file ? (
         <Dropzone
-          accept={[
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-excel.sheet.macroEnabled.12",
-            ".xls",
-            ".xlsx",
-            ".xlsm",
-          ]}
+          accept={{
+            'application/vnd.ms-excel': ['.xls'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+            'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm']
+          }}
           styles={{
             root: {
               height: "12vh",
@@ -475,9 +504,15 @@ const RFQUploadDropZoneExcel = ({
               flexDirection: "column",
             },
           }}
-          onDrop={files => { handleDrop(files).catch(() => {}); }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
           multiple={false}
           maxSize={50 * 1024 * 1024}
+          activateOnClick={true}
+          activateOnDrag={true}
+          activateOnKeyboard={true}
         >
           <Flex direction='row' align='center' gap="xl">
             <MdUploadFile size={50} color={color || "#1a73e8"} />
@@ -560,7 +595,6 @@ const RFQUploadDropZoneExcel = ({
                           {tasks.slice(0, 5).join(", ")}
                           {tasks.length > 5 ? ` and ${tasks.length - 5} more...` : ""}
                         </Text>
-                        {/* Show first few descriptions if MPD and descriptions extracted */}
                         {selectedSheet === REQUIRED_SHEET_NAME && descriptions.length > 0 && (
                           <>
                             <Text size="xs" fw={500} mt="xs">

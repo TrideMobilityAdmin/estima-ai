@@ -3,6 +3,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import '@mantine/core/styles.css';
+import '@mantine/dropzone/styles.css';
 import '@mantine/charts/styles.css';
 import '@mantine/dates/styles.css';
 import "ag-grid-community/styles/ag-grid.css";
