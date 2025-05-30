@@ -10,11 +10,8 @@ interface UploadDropZoneExcelProps {
   changeHandler: (
     file: File | null, 
     tasks: string[], 
-    descriptions: string[], // ADDED: descriptions array
-    sheetInfo?: { 
-      sheetName: string, 
-      columnName: string 
-    }
+    descriptions: string[],
+    sheetInfo?: { sheetName: string; columnName: string }
   ) => void;
   color?: string;
   selectedFile?: File | null;
@@ -31,6 +28,9 @@ interface RowData {
   [key: string]: any;
 }
 
+// Lowered to 5MB for browser safety!
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
 const RFQUploadDropZoneExcel = ({
   name,
   changeHandler,
@@ -40,7 +40,7 @@ const RFQUploadDropZoneExcel = ({
 }: UploadDropZoneExcelProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [tasks, setTasks] = useState<string[]>([]);
-  const [descriptions, setDescriptions] = useState<string[]>([]); // ADDED: state for descriptions
+  const [descriptions, setDescriptions] = useState<string[]>([]);
   const [availableSheets, setAvailableSheets] = useState<SheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const [taskColumns, setTaskColumns] = useState<string[]>([]);
@@ -50,7 +50,6 @@ const RFQUploadDropZoneExcel = ({
   const [fileError, setFileError] = useState<string | null>(null);
   const [processingPercentage, setProcessingPercentage] = useState<number>(0);
 
-  // Required for your business logic
   const REQUIRED_SHEET_NAME = "MPD";
   const REQUIRED_TASK_COLUMN_NAME = "TASK NUMBER";
   const REQUIRED_DESCRIPTION_COLUMN_NAME = "DESCRIPTION";
@@ -63,7 +62,7 @@ const RFQUploadDropZoneExcel = ({
 
   const resetAnalysisState = useCallback(() => {
     setTasks([]);
-    setDescriptions([]); // reset desc
+    setDescriptions([]);
     setSelectedSheet(null);
     setSelectedTaskColumn(null);
     setAvailableSheets([]);
@@ -178,7 +177,6 @@ const RFQUploadDropZoneExcel = ({
     }
   }, [findMatchingColumnName, findMatchingColumnNameInData]);
 
-  // MODIFIED: Now also extracts descriptions array
   const extractTasksAndDescriptionsFromSheet = useCallback(async (
     workbook: XLSX.WorkBook, 
     sheetName: string, 
@@ -197,7 +195,6 @@ const RFQUploadDropZoneExcel = ({
       let descriptionKey: string | undefined;
 
       if (sheetName === REQUIRED_SHEET_NAME) {
-        // Find the actual matched DESCRIPTION column name in data
         descriptionKey = jsonData.length > 0 
           ? Object.keys(jsonData[0] as Record<string, unknown>).find(key => isMatchingColumnName(key, REQUIRED_DESCRIPTION_COLUMN_NAME))
           : undefined;
@@ -212,20 +209,16 @@ const RFQUploadDropZoneExcel = ({
             taskCell = row[matchingKey];
           }
         }
-        // Always extract tasks
         processTaskCell(taskCell).forEach(task => extractedTasks.add(task));
-        // If MPD and description column found, extract the description
         if (sheetName === REQUIRED_SHEET_NAME && descriptionKey) {
           let descVal = row[descriptionKey];
           if (descVal === undefined) {
-            // Try to match by normalizing
             const rowKeys = Object.keys(row);
             const matchingDescKey = rowKeys.find(key => isMatchingColumnName(key, descriptionKey!));
             if (matchingDescKey) {
               descVal = row[matchingDescKey];
             }
           }
-          // Store empty string if not present to keep alignment with tasks
           extractedDescriptions.push(descVal !== undefined && descVal !== null ? String(descVal) : "");
         }
       });
@@ -256,6 +249,14 @@ const RFQUploadDropZoneExcel = ({
     setIsAnalyzing(true);
     setFileError(null);
     setProcessingPercentage(10);
+
+    // Error if too large
+    if (fileToAnalyze.size > MAX_FILE_SIZE) {
+      setFileError(`File too large. Maximum allowed is ${MAX_FILE_SIZE / (1024*1024)}MB.`);
+      setIsAnalyzing(false);
+      return;
+    }
+
     try {
       const fileType = fileToAnalyze.name.split(".").pop()?.toLowerCase();
       if (fileType === "csv") {
@@ -264,6 +265,7 @@ const RFQUploadDropZoneExcel = ({
         return;
       }
       setProcessingPercentage(20);
+
       await new Promise<void>((resolve, reject) => {
         setTimeout(() => {
           try {
@@ -273,15 +275,26 @@ const RFQUploadDropZoneExcel = ({
                 setProcessingPercentage(40);
                 const buffer = e.target?.result as ArrayBuffer;
                 if (!buffer) throw new Error("Failed to read file buffer");
-                const workbook = XLSX.read(new Uint8Array(buffer), { 
-                  type: "array",
-                  cellStyles: false,
-                  cellHTML: false,
-                  cellFormula: false
-                });
+                let workbook: XLSX.WorkBook;
+                try {
+                  workbook = XLSX.read(new Uint8Array(buffer), { 
+                    type: "array",
+                    cellStyles: false,
+                    cellHTML: false,
+                    cellFormula: false
+                  });
+                } catch (err: any) {
+                  setFileError(`Could not parse Excel file. The file may be corrupted or in an unsupported format. ${err?.message ? " (" + err.message + ")" : ""}`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
+                }
                 setProcessingPercentage(60);
                 if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-                  throw new Error("Invalid Excel file format or empty workbook");
+                  setFileError("Invalid Excel file format or empty workbook");
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 const sheets: SheetInfo[] = [];
                 for (const sheetName of workbook.SheetNames) {
@@ -311,17 +324,25 @@ const RFQUploadDropZoneExcel = ({
                 }
                 setProcessingPercentage(80);
                 if (sheets.length === 0) {
-                  throw new Error("No valid sheets found in the Excel file");
+                  setFileError("No valid sheets found in the Excel file");
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 const isValid = validateFileRequirements(sheets, workbook);
                 if (!isValid) {
                   setIsAnalyzing(false);
-                  resolve(undefined);
+                  resolve();
                   return;
                 }
                 setAvailableSheets(sheets);
                 const mpdSheet = sheets.find(sheet => sheet.name === REQUIRED_SHEET_NAME);
-                if (!mpdSheet) throw new Error(`Required sheet "${REQUIRED_SHEET_NAME}" not found`);
+                if (!mpdSheet) {
+                  setFileError(`Required sheet "${REQUIRED_SHEET_NAME}" not found`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
+                }
                 setSelectedSheet(REQUIRED_SHEET_NAME);
                 setTaskColumns(mpdSheet.columns);
                 setRawTaskColumns(mpdSheet.rawColumns);
@@ -330,31 +351,35 @@ const RFQUploadDropZoneExcel = ({
                   setSelectedTaskColumn(taskNumberColumn);
                   await extractTasksAndDescriptionsFromSheet(workbook, REQUIRED_SHEET_NAME, taskNumberColumn, fileToAnalyze);
                 } else {
-                  throw new Error(`Task column "${REQUIRED_TASK_COLUMN_NAME}" not found in sheet "${REQUIRED_SHEET_NAME}"`);
+                  setFileError(`Task column "${REQUIRED_TASK_COLUMN_NAME}" not found in sheet "${REQUIRED_SHEET_NAME}"`);
+                  setIsAnalyzing(false);
+                  resolve();
+                  return;
                 }
                 setProcessingPercentage(100);
                 resolve();
-              } catch (error) {
+              } catch (error: any) {
                 setFileError(`Error processing file: ${error instanceof Error ? error.message : "Unknown error"}. Please try again with a valid file.`);
+                setIsAnalyzing(false);
                 reject(error);
               } finally {
                 setIsAnalyzing(false);
               }
             };
             reader.onerror = (error) => {
-              setFileError("Error reading file. Please try again.");
+              setFileError("Error reading file. Please try again or use a different file.");
               setIsAnalyzing(false);
               reject(error);
             };
             reader.readAsArrayBuffer(fileToAnalyze);
-          } catch (outsideError) {
+          } catch (outsideError: any) {
             setFileError(`An unexpected error occurred: ${outsideError instanceof Error ? outsideError.message : "Unknown error"}`);
             setIsAnalyzing(false);
             reject(outsideError);
           }
         }, 100);
       });
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error analyzing file: ${error instanceof Error ? error.message : "Unknown error"}. Please try again with a valid Excel file.`);
       setIsAnalyzing(false);
     }
@@ -372,6 +397,13 @@ const RFQUploadDropZoneExcel = ({
         return;
       }
       const droppedFile = newFiles[0];
+
+      // Check file size before anything else
+      if (droppedFile.size > MAX_FILE_SIZE) {
+        setFileError(`File too large. Maximum allowed is ${MAX_FILE_SIZE / (1024*1024)}MB.`);
+        return;
+      }
+
       setFile(droppedFile);
       resetAnalysisState();
       setIsAnalyzing(true);
@@ -396,7 +428,7 @@ const RFQUploadDropZoneExcel = ({
         setRawTaskColumns(sheet.rawColumns);
       }
       changeHandler(file, [], [], undefined);
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error changing sheet: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }, [file, availableSheets, changeHandler]);
@@ -421,7 +453,7 @@ const RFQUploadDropZoneExcel = ({
             cellFormula: false
           });
           await extractTasksAndDescriptionsFromSheet(workbook, selectedSheet, columnName, file);
-        } catch (error) {
+        } catch (error: any) {
           setFileError(`Error extracting tasks: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
         } finally {
           setIsAnalyzing(false);
@@ -432,7 +464,7 @@ const RFQUploadDropZoneExcel = ({
         setIsAnalyzing(false);
       };
       reader.readAsArrayBuffer(file);
-    } catch (error) {
+    } catch (error: any) {
       setFileError(`Error processing column change: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
       setIsAnalyzing(false);
     }
@@ -473,13 +505,13 @@ const RFQUploadDropZoneExcel = ({
               justifyContent: "center",
               alignItems: "center",
               flexDirection: "column",
-              zIndex: 10, // <-- add this line
-              pointerEvents: "auto", // <-- add this line
+              zIndex: 10,
+              pointerEvents: "auto",
             },
           }}
           onDrop={files => { handleDrop(files).catch(() => {}); }}
           multiple={false}
-          maxSize={50 * 1024 * 1024}
+          maxSize={MAX_FILE_SIZE}
         >
           <Flex direction='row' align='center' gap="xl">
             <MdUploadFile size={50} color={color || "#1a73e8"} />
@@ -562,7 +594,6 @@ const RFQUploadDropZoneExcel = ({
                           {tasks.slice(0, 5).join(", ")}
                           {tasks.length > 5 ? ` and ${tasks.length - 5} more...` : ""}
                         </Text>
-                        {/* Show first few descriptions if MPD and descriptions extracted */}
                         {selectedSheet === REQUIRED_SHEET_NAME && descriptions.length > 0 && (
                           <>
                             <Text size="xs" fw={500} mt="xs">
