@@ -407,6 +407,7 @@ class ExcelUploadService:
                 "aircraftFlightHours": estimate_request.aircraftFlightHours,
                 "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
                 "areaOfOperations": estimate_request.areaOfOperations,
+                "considerDeltaUnAvTasks": estimate_request.considerDeltaUnAvTasks,
                 "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
                 "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
                 "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]          

@@ -79,6 +79,7 @@ class EstimateRequest(BaseModel):
      operatorForModel:Optional[bool] = None
      additionalTasks: List[AdditionalTasks]
      miscLaborTasks: List[MiscLaborTask]
+     considerDeltaUnAvTasks:Optional[bool] = False
      
      
      
