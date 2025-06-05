@@ -297,3 +297,9 @@ async def get_upload_estimate_byId(
 ):
     file_upload=await excel_service.get_upload_estimate_byId(estimate_id)
     return file_upload
+
+@router.get("/historical_estimate_file_status",response_model=List[EstimateStatusResponse])
+async def get_historical_estimate_status(
+    current_user: dict = Depends(get_current_user)
+):
+    return await excel_service.historical_estimate_status()
