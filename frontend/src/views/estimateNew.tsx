@@ -653,7 +653,7 @@ useEffect(() => {
         // Populate form with API response data
         const formData = {
           tasks: data.tasks || [],
-          probability: data.probability || 10,
+          probability: data.probability || 0,
           operator: data.operator || "",
           operatorForModel: data.operatorForModel || false,
           aircraftRegNo: data.aircraftRegNo || "",
