@@ -91,7 +91,7 @@ test_packages = []
 aircraft_details_collection = db["aircraft_details"]
 aircraft_cursor = aircraft_details_collection.find({})
 aircraft_details = pd.DataFrame(list(aircraft_cursor))
-
+print(aircraft_details.shape)
 # Drop the MongoDB _id column if present
 aircraft_details.drop(columns=["_id"], errors="ignore", inplace=True)
 
@@ -229,10 +229,7 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold):
-    def float_round(value):
-        if pd.notna(value):  # Better check for non-null values
-            return round(float(value), 2)
-        return 0
+
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
         """
@@ -342,6 +339,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print("Training packages are extracted")
     print("Processing the tasks")
     #no_of_task_packages=len(train_packages)
+    def float_round(value):
+        if pd.notna(value):  # Better check for non-null values
+            return round(float(value), 2)
+        return 0
     
     # Filter task data based on packages and task numbers
     task_data =  task_description[task_description['package_number'].isin(train_packages)]
