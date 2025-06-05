@@ -1216,6 +1216,7 @@ class ExcelUploadService:
             'areaOfOperations': 1, 
             'cappingDetails': 1, 
             'additionalTasks': 1, 
+            'considerDeltaUnAvTasks': 1,
             'miscLaborTasks': 1
         }
     }
