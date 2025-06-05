@@ -149,7 +149,7 @@ class TaskService:
             filtered_pipeline=[
     {
         '$match': {
-            'estID': 'ES-SAW-CCHECK-OMANAIR-29052025-V10'
+            'estID': estID
         }
     }, {
         '$project': {
