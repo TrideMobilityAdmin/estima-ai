@@ -1287,7 +1287,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
         # Create copies for processing
         task_level_mh_cap = task_level_mh_result.copy()
+        task_level_mh_cap=task_level_mh_cap[task_level_mh_cap["prob"]>probability_threshold]
         task_level_parts_cap = task_level_parts_result.copy()
+        task_level_parts_cap = task_level_parts_result[task_level_parts_result["prob"]>probability_threshold]
         
         # Aggregate task level parts
         task_level_parts_cap = task_level_parts_cap.groupby(["source_task_discrepancy_number"]).agg(
@@ -1304,7 +1306,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         # Copy group level data
         group_level_mh_cap = group_level_mh_result.copy()
         group_level_parts_cap = group_level_parts_result.copy()
-        
+        group_level_mh_cap=group_level_mh_cap[group_level_mh_cap["prob"]>probability_threshold]
+        group_level_parts_cap=group_level_parts_cap[group_level_parts_cap["prob"]>probability_threshold]
+        parts_line_items_result=parts_line_items_result[parts_line_items_result["prob"]>probability_threshold]
         # Aggregate group level parts
         group_level_parts_cap = group_level_parts_cap.groupby(["source_task_discrepancy_number", "group"]).agg(
             billable_value_usd=("billable_value_usd", sum)
@@ -1482,7 +1486,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "description": f"Estimate for package {estID}",
         "filtered_tasks":filtered_tasks_list,
         "not_avialable_tasks":not_available_tasks_list,
-        "tasks": tasks_list,
+            "tasks": tasks_list,
         "aggregatedTasks": {
             "totalMhs": float_round(tasks_total_mhs),
             "totalPartsCost": float_round(tasks_total_parts_cost),
