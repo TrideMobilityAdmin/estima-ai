@@ -912,7 +912,7 @@ export default function EstimateNew() {
   const form = useForm<any>({
     initialValues: {
       tasks: [],
-      probability: 10,
+      probability: 0,
       operator: "",
       operatorForModel: false,
       aircraftRegNo: "",
@@ -1115,7 +1115,7 @@ export default function EstimateNew() {
 
     const requestData = {
       tasks: validTasks || [],
-      probability: Number(form.values.probability) || 10,
+      probability: Number(form.values.probability) || 0,
       operator: form.values.operator || "",
       operatorForModel: form.values.operatorForModel || false,
       aircraftRegNo: form.values.aircraftRegNo || "",
@@ -1165,7 +1165,7 @@ export default function EstimateNew() {
         form.reset();
         form.setValues({
           tasks: [],
-          probability: 10,
+          probability: 0,
           operator: "",
           aircraftRegNo: "",
           aircraftModel: "",
