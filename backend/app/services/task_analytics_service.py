@@ -155,7 +155,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'available_tasks': '$filtered_tasks', 
-            'not_avialable_tasks': 1
+            'not_avialable_tasks': 1,
+            'filtered_tasks_count': 1
         }
     }
 ]
