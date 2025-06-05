@@ -366,6 +366,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     # Convert to list of dicts (records)
     filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
     not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
+    filtered_tasks_count={
+        "total_count": len(mpd_task_data),
+        "not_available_tasks_count": len(not_available_tasks_list),
+        "available_tasks_count": len(filtered_tasks_list),
+    }
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
     sub_parts_data = sub_task_parts[sub_task_parts['package_number'].isin(train_packages)]
@@ -1481,6 +1486,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "description": f"Estimate for package {estID}",
         "filtered_tasks":filtered_tasks_list,
         "not_avialable_tasks":not_available_tasks_list,
+        "filtered_tasks_count":filtered_tasks_count,
         "tasks": tasks_list,
         "aggregatedTasks": {
             "totalMhs": float_round(tasks_total_mhs),
