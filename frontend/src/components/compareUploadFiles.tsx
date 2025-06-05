@@ -100,12 +100,14 @@ const CompareUploadDropZoneExcel = ({ name, changeHandler, color }: UploadDropZo
           },
         }}
         onDrop={handleDrop}
+        activateOnDrag={false}
         multiple
       >
         <div>
           <IconFiles size={30} color={color || "#1a73e8"} />
           <Text c="dimmed" size="md">
-            Drag and drop your {name} here, or click to select files
+            {/* Drag and drop your {name} here, or click to select files */}
+             Please Select your Excel file here
           </Text>
         </div>
       </Dropzone>

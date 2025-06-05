@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -68,7 +68,8 @@ export const useApi = () => {
       additionalTasks: data.additionalTasks,
       typeOfCheck: data.typeOfCheck, 
       typeOfCheckID : data.typeOfCheckID,
-      miscLaborTasks: data.miscLaborTasks
+      miscLaborTasks: data.miscLaborTasks,
+      considerDeltaUnAvTasks: data.considerDeltaUnAvTasks,
     };
 
     // Create FormData
@@ -120,6 +121,21 @@ export const useApi = () => {
     try {
       const response = await axiosInstance.get(getEstimateStatus_Url);
       console.log("✅ API Response all estimates status :", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
+
+  const getAllHistoryEstimatesStatus = async () => {
+    try {
+      const response = await axiosInstance.get(getHistoryEstimateStatus_Url);
+      console.log("✅ API Response all history estimates status :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -498,6 +514,7 @@ export const useApi = () => {
     postEstimateReport, 
     validateTasks, 
     getAllEstimates, 
+    getAllHistoryEstimatesStatus,
     compareUploadFile, 
     downloadEstimatePdf,
     getAllDataExpertInsights,
