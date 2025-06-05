@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { MdClose, MdFilePresent, MdUploadFile, MdError } from "react-icons/md";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import { IconBookUpload, IconFile, IconFile3d, IconFileExcel, IconFileUpload } from "@tabler/icons-react";
 
 interface UploadDropZoneExcelProps {
   name: string;
@@ -478,11 +479,14 @@ const RFQUploadDropZoneExcel = ({
           onDrop={files => { handleDrop(files).catch(() => {}); }}
           multiple={false}
           maxSize={50 * 1024 * 1024}
+          activateOnDrag={false}
+          activateOnClick={true}
         >
           <Flex direction='row' align='center' gap="xl">
-            <MdUploadFile size={50} color={color || "#1a73e8"} />
+            <IconFileUpload size={40} color={color || "#1a73e8"} />
             <Text c="dimmed" size="sm">
-              Drag and drop your {name} here, or click to select a file
+              {/* Drag and drop your {name} here, or click to select a file */}
+              Please Select your Excel file here
             </Text>
           </Flex>
         </Dropzone>

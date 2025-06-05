@@ -407,6 +407,7 @@ class ExcelUploadService:
                 "aircraftFlightHours": estimate_request.aircraftFlightHours,
                 "aircraftFlightCycles": estimate_request.aircraftFlightCycles,
                 "areaOfOperations": estimate_request.areaOfOperations,
+                "considerDeltaUnAvTasks": estimate_request.considerDeltaUnAvTasks,
                 "cappingDetails": estimate_request.cappingDetails.dict() if estimate_request.cappingDetails else None,
                 "additionalTasks": [task.dict() for task in estimate_request.additionalTasks],
                 "miscLaborTasks": [task.dict() for task in estimate_request.miscLaborTasks]          
@@ -604,6 +605,7 @@ class ExcelUploadService:
         response = [EstimateStatusResponse(**result) for result in results]
 
         return response
+   
     async def update_estimate_status_remarks(self, estID: str, remark: str,current_user:dict=Depends(get_current_user)) -> Dict[str, Any]:
         """
         Update remarks for a specific estimate
@@ -1215,6 +1217,7 @@ class ExcelUploadService:
             'areaOfOperations': 1, 
             'cappingDetails': 1, 
             'additionalTasks': 1, 
+            'considerDeltaUnAvTasks': 1,
             'miscLaborTasks': 1
         }
     }
@@ -1230,7 +1233,176 @@ class ExcelUploadService:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
 
+    async def historical_estimate_status(self) -> List[EstimateStatusResponse]:
+        """
+        Get all estimate status documents from the estimates_file_upload collection
+        """
+        logger.info("Fetching all estimates")
+        # configurations = self.configurations_collection.find_one()
+        # man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
+        # five_days_ago = datetime.utcnow() - timedelta(days=5)
+        pipeline=[
+    #          {
+    #     '$match': {
+    #         'createdAt': {
+    #             '$gte': five_days_ago
+    #         }
+    #     }
+    # },
+    {
+        '$lookup': {
+            'from': 'estima_output', 
+            'let': {
+                'estId': '$estID'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$eq': [
+                                '$estID', '$$estId'
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        '_id': 0, 
+                        'aggregatedTasks': 1, 
+                        'aggregatedFindings': 1
+                    }
+                }
+            ], 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_status_remarks', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'remarks_doc'
+        }
+    }, {
+        '$unwind': {
+            'path': '$remarks_doc', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$addFields': {
+            'totalMhs': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalMhs', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalMhs', 0
+                        ]
+                    }
+                ]
+            }, 
+            'totalPartsCost': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalPartsCost', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalPartsCost', 0
+                        ]
+                    }
+                ]
+            }, 
+            # 'tatTime': {
+            #     '$divide': [
+            #         {
+            #             '$add': [
+            #                 {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedTasks.totalMhs', 0
+            #                     ]
+            #                 }, {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedFindings.totalMhs', 0
+            #                     ]
+            #                 }
+            #             ]
+            #         }, man_hours_threshold
+            #     ]
+            # }, 
+            'remarks': {
+                '$ifNull': [
+                    '$remarks_doc.remarks', ''
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'tasks': '$task', 
+            'descriptions': '$description', 
+            'aircraftRegNo': '$aircraftRegNo', 
+            # 'probability': 1, 
+            # 'operator': 1, 
+            # 'aircraftAge': 1, 
+            # 'typeOfCheck': {
+            #     '$ifNull': [
+            #         '$typeOfCheck', []
+            #     ]
+            # },
+            # 'aircraftModel': 1, 
+            # 'aircraftFlightHours': 1, 
+            # 'aircraftFlightCycles': 1, 
+            # 'areaOfOperations': 1, 
+            # 'typeOfCheckID': {
+            #     '$ifNull': [
+            #         '$typeOfCheckID', ''
+            #     ]
+            # }, 
+            'status': '$status', 
+            'totalMhs': 1, 
+            # 'cappingDetails': 1, 
+            # 'additionalTasks': 1, 
+            # 'miscLaborTasks': 1, 
+            'totalPartsCost': 1, 
+            'createdAt': '$createdAt', 
+            'remarks': 1
+        }
+    }
+]
+        
+        results = list(self.estima_collection.aggregate(pipeline))
+        for result in results:
+          
+            existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
+            
+            # If it doesn't exist, create one with empty remarks
+   
+            if not existing_remarks:
+                self.remarks_collection.insert_one({
+                    "estID": result["estID"],
+                    "remarks": [{
+                        "remark": "",
+                        "updatedAt": datetime.utcnow(),
+                        "updatedBy": "",
+                        "createdAt": datetime.utcnow(),
+                        "active": True
+                    }],
+                    
+                })
+        
 
+        response = [EstimateStatusResponse(**result) for result in results]
+
+        return response
+   
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
