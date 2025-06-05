@@ -513,7 +513,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             numeric_agg_columns = ['avg_qty_used', 'max_qty_used', 'min_qty_used', 'total_billable', 'max_price', 'total_quantity']
             for col in numeric_agg_columns:
                 grouped_data[col] = pd.to_numeric(grouped_data[col], errors='coerce').fillna(0)
-            
+            """
             # Apply rounding logic row by row
             discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
             
@@ -523,7 +523,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
                 else:
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
-            
+            """
             # Calculate cost per unit (avoid division by zero)
             grouped_data['avg_cost_per_unit'] = np.where(
                 grouped_data['total_quantity'] != 0,
@@ -1002,12 +1002,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             part_description=('part_description', "first"),
             issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
-        
+        """
         mask = aggregated['issued_unit_of_measurement'].isin(["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"])
         aggregated.loc[mask, 'avg_used_qty'] = aggregated.loc[mask, 'avg_used_qty'].round(0)
         aggregated.loc[~mask, 'avg_used_qty'] = aggregated.loc[~mask, 'avg_used_qty'].round(3)
 
-        
+        """
         # Get all unique package numbers once
         #all_package_numbers = group_level_parts["package_number"].unique()
         
