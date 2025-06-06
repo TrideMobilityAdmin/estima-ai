@@ -1242,8 +1242,12 @@ class ExcelUploadService:
         if status is not None:
             match_stage['status'] = status
         if estID is not None:
-            normestID = estID.upper()    
-            match_stage['estID'] = normestID
+            normestID = estID.upper().strip()
+            # Use regex for partial matching - case insensitive
+            match_stage['estID'] = {
+                '$regex': f'.*{re.escape(normestID)}.*',
+                '$options': 'i'  # case insensitive
+            }
        
         if date is not None:
             date_only = date.date()  # Extract date: 2025-04-07
@@ -1262,29 +1266,30 @@ class ExcelUploadService:
         if aircraftRegNo is not None:
             norm_aircraftRegNo = aircraftRegNo.replace(" ", "").replace("-", "").upper()
             pipeline.append({
-                '$match': {
-                    '$expr': {
-                        '$eq': [
-                            {
-                                '$toUpper': {
-                                    '$replaceAll': {
-                                        'input': {
-                                            '$replaceAll': {
-                                                'input': '$aircraftRegNo',
-                                                'find': ' ',
-                                                'replacement': ''
-                                            }
-                                        },
-                                        'find': '-',
-                                        'replacement': ''
-                                    }
+            '$match': {
+                '$expr': {
+                    '$regexMatch': {
+                        'input': {
+                            '$toUpper': {
+                                '$replaceAll': {
+                                    'input': {
+                                        '$replaceAll': {
+                                            'input': '$aircraftRegNo',
+                                            'find': ' ',
+                                            'replacement': ''
+                                        }
+                                    },
+                                    'find': '-',
+                                    'replacement': ''
                                 }
-                            },
-                            norm_aircraftRegNo
-                        ]
+                            }
+                        },
+                        'regex': f'.*{re.escape(norm_aircraftRegNo)}.*',
+                        'options': 'i'
                     }
                 }
-            })
+            }
+        })
         pipeline.extend([
    
     {
@@ -1451,6 +1456,7 @@ class ExcelUploadService:
             "count": total_count,
         }
         # return response
+    
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
