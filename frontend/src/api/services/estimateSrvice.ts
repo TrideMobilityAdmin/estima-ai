@@ -132,20 +132,36 @@ export const useApi = () => {
     }
   };
 
-  const getAllHistoryEstimatesStatus = async () => {
-    try {
-      const response = await axiosInstance.get(getHistoryEstimateStatus_Url);
-      console.log("✅ API Response all history estimates status :", response);
-      return response.data;
-    } catch (error: any) {
-      console.error("❌ API Error:", error.response?.data || error.message);
-      // Check if authentication has expired
-      if (error.response?.data?.detail === "Invalid authentication credentials") {
-        handleSessionExpired();
-      }
-      return null;
+  const getAllHistoryEstimatesStatus = async (params: {
+  page: number;
+  pageSize: number;
+  date?: string;
+  estID?: string;
+  aircraftRegNo?: string;
+  status?: string;
+}) => {
+  try {
+    const query = new URLSearchParams({
+      page: params.page.toString(),
+      page_size: params.pageSize.toString(),
+      ...(params.date ? { date: params.date } : {}),
+      ...(params.estID ? { estID: params.estID } : {}),
+      ...(params.aircraftRegNo ? { aircraftRegNo: params.aircraftRegNo } : {}),
+      ...(params.status ? { status: params.status } : {}),
+    });
+
+    const response = await axiosInstance.get(`${getHistoryEstimateStatus_Url}?${query.toString()}`);
+    console.log("✅ API Response all history estimates status:", response);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ API Error:", error.response?.data || error.message);
+    if (error.response?.data?.detail === "Invalid authentication credentials") {
+      handleSessionExpired();
     }
-  };
+    return null;
+  }
+};
+
 
 
   const getEstimateByID = async (estimateId:any) => {

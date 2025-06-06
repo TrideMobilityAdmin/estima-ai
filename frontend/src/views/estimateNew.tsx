@@ -22,7 +22,8 @@ import {
   useCombobox,
   InputBase,
   Loader,
-  Tabs
+  Tabs,
+  Pagination
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -214,7 +215,7 @@ export default function EstimateNew() {
   // const [estimateId, setEstimateId] = useState<string>("");
   const [generatedEstimateId, setGeneratedEstimateId] = useState<string>("");
   const [loading, setLoading] = useState(false); // Add loading state
-  const [loadingHistoryEstimates, setLoadingHistoryEstimates] = useState(false); 
+  
   // const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
   // const [isLoading, setIsLoading] = useState(false);
   console.log("selected remarks >>>>", selectedEstRemarksData);
@@ -302,17 +303,16 @@ export default function EstimateNew() {
   // console.log("selected estimate tasks >>>>", selectedEstimateTasks);
 
   const [historyEstimatesStatusData, setHistoryEstimatesStatusData] = useState<any[]>([]);
+  const [historyEstimatesCount, setHistoryEstimatesCount] = useState<any>();
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date | null>(null);
-  const [selectedHistoryEstId, setSelectedHistoryEstId] = useState<any>();
-  const [selectedHistoryAircrRegNo, setSelectedHistoryAircrRegNo] = useState<any>();
-  const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<any>();
+  const [selectedHistoryEstId, setSelectedHistoryEstId] = useState<string>("");
+  const [selectedHistoryAircrRegNo, setSelectedHistoryAircrRegNo] = useState<string>("");
+  const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<string | null>(null);
+  const [loadingHistoryEstimates, setLoadingHistoryEstimates] = useState(false); 
 
-
-  // Pagination states
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(0); // 0-based
-  const [totalRows, setTotalRows] = useState(0);
-
+  
   const [gridApi, setGridApi] = useState<any>(null);
   const onGridReady = (params: any) => {
     setGridApi(params.api);
@@ -320,22 +320,35 @@ export default function EstimateNew() {
 
   const fetchHistoryEstimatesStatus = async () => {
     setLoadingHistoryEstimates(true);
+
+    const dateISO = selectedHistoryDate
+    ? `${selectedHistoryDate.getFullYear()}-${String(selectedHistoryDate.getMonth() + 1).padStart(2, '0')}-${String(selectedHistoryDate.getDate()).padStart(2, '0')}T00:00:00`
+    : undefined;
+
+
     const params = {
-      page: currentPage + 1, // If your backend uses 1-based indexing
+      page: currentPage + 1, // convert to 1-based index
       pageSize,
-      date: selectedHistoryDate ? selectedHistoryDate.toISOString() : undefined,
-      estID: selectedHistoryEstId || undefined,
-      aircraftRegNo: selectedHistoryAircrRegNo || undefined,
+      date: dateISO,
+      estID: selectedHistoryEstId?.trim() || undefined,
+      aircraftRegNo: selectedHistoryAircrRegNo?.trim() || undefined,
       status: selectedHistoryStatus || undefined,
     };
 
-    const data = await getAllHistoryEstimatesStatus();
-    if (data) {
-      const sortedData = data.sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const data = await getAllHistoryEstimatesStatus(params);
+
+    const historyData = data?.data;
+    const count = data?.count;
+
+    if (historyData && Array.isArray(historyData)) {
+      const sortedData = historyData?.sort(
+        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setHistoryEstimatesStatusData(sortedData);
+      setHistoryEstimatesCount(count);
+
+    } else {
+      setHistoryEstimatesStatusData([]);
     }
     setLoadingHistoryEstimates(false);
   };
@@ -344,27 +357,24 @@ export default function EstimateNew() {
   useEffect(() => {
     fetchHistoryEstimatesStatus();
   }, [
-    selectedHistoryDate, 
-    selectedHistoryEstId, 
-    selectedHistoryAircrRegNo, 
-    selectedHistoryStatus, 
-    pageSize, 
-    currentPage
+    selectedHistoryDate,
+    selectedHistoryEstId,
+    selectedHistoryAircrRegNo,
+    selectedHistoryStatus,
+    pageSize,
+    currentPage,
   ]);
-  
-  // Updated useEffect for loading management
-useEffect(() => {
-  // The custom Mantine loader will handle the loading state
-  // No need to manipulate gridApi loading states anymore
-  if (!loadingHistoryEstimates && historyEstimatesStatusData.length === 0) {
-    gridApi?.showNoRowsOverlay();
-  } else if (!loadingHistoryEstimates) {
-    gridApi?.hideOverlay();
-  }
-}, [loadingHistoryEstimates, historyEstimatesStatusData, gridApi]);
+
+  useEffect(() => {
+    if (!loadingHistoryEstimates && historyEstimatesStatusData.length === 0) {
+      gridApi?.showNoRowsOverlay();
+    } else if (!loadingHistoryEstimates) {
+      gridApi?.hideOverlay();
+    }
+  }, [loadingHistoryEstimates, historyEstimatesStatusData, gridApi]);
 
   console.log("all history estimates status>>>", historyEstimatesStatusData);
-  console.log("selected history estimate tasks >>>>", selectedEstimateTasks);
+  console.log("history cout  >>>>", historyEstimatesCount);
 
 
   useEffect(() => {
@@ -3915,19 +3925,33 @@ border-bottom: none;
                 />
               </div>
             </Tabs.Panel>
-            {/* <Group p={15}>
+            
+            <Tabs.Panel value="history">
+              <>
+              <Group p={15}>
                 <DatePickerInput
                   value={selectedHistoryDate}
-                  onChange={setSelectedHistoryDate}
+                  onChange={(date) => {
+                    setSelectedHistoryDate(date);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
                   placeholder="Select date"
                   label="Select Date"
                   size="xs"
                   clearable
+                  minDate={new Date(2025, 2, 1)} // March is month 2 (0-indexed)
+                  maxDate={new Date()} // today's date
                   styles={{ input: { width: '15vw' } }}
                 />
+
                 <TextInput
                   value={selectedHistoryEstId}
-                  onChange={(e) => setSelectedHistoryEstId(e.currentTarget.value)}
+                  onChange={(e) => {
+                    setSelectedHistoryEstId(e.currentTarget.value.toUpperCase());
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
                   placeholder="Estimate ID"
                   label="Estimate ID"
                   size="xs"
@@ -3935,7 +3959,11 @@ border-bottom: none;
                 />
                 <TextInput
                   value={selectedHistoryAircrRegNo}
-                  onChange={(e) => setSelectedHistoryAircrRegNo(e.currentTarget.value)}
+                  onChange={(e) => {
+                    setSelectedHistoryAircrRegNo(e.currentTarget.value);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
                   placeholder="Aircraft Reg No"
                   label="Aircraft Reg No"
                   size="xs"
@@ -3943,337 +3971,390 @@ border-bottom: none;
                 />
                 <Select
                   value={selectedHistoryStatus}
-                  onChange={setSelectedHistoryStatus}
-                  data={["COMPLETED", "PROGRESS", "INITIATED", "FAILED"]}
+                  onChange={(value) => {
+                    setSelectedHistoryStatus(value);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
+                  data={["Completed", "Progress", "Initiated", "Failed"]}
                   placeholder="Select Status"
                   label="Status"
                   size="xs"
                   clearable
                   styles={{ input: { width: '100%' } }}
                 />
-              </Group> */}
-            <Tabs.Panel value="history">
-  <>
-    <div   
-      className="ag-theme-alpine"
-      style={{
-        width: "100%",
-        border: "none",
-        height: "400px",
-        position: "relative",
-      }}
-    >
-      <style>
-        {`
-          /* Remove the borders and grid lines */
-          .ag-theme-alpine .ag-root-wrapper, 
-          .ag-theme-alpine .ag-root-wrapper-body,
-          .ag-theme-alpine .ag-header,
-          .ag-theme-alpine .ag-header-cell,
-          .ag-theme-alpine .ag-body-viewport {
-            border: none;
-          }
-
-          /* Remove the cell highlight (border) on cell click */
-          .ag-theme-alpine .ag-cell-focus {
-            outline: none !important; /* Remove focus border */
-            box-shadow: none !important; /* Remove any box shadow */
-          }
-
-          /* Remove row border */
-          .ag-theme-alpine .ag-row {
-            border-bottom: none;
-          }
-
-          /* Custom loading overlay styles */
-          .custom-loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            pointer-events: none;
-          }
-
-          /* Hide default ag-grid loading overlay */
-          .ag-overlay-loading-wrapper {
-            display: none !important;
-          }
-
-          /* Ensure header and pagination stay visible during loading */
-          .ag-theme-alpine .ag-header {
-            position: relative;
-            z-index: 1001;
-          }
-
-          .ag-theme-alpine .ag-paging-panel {
-            position: relative;
-            z-index: 1001;
-          }
-        `}
-      </style>
-
-      {/* Custom Mantine Loading Overlay */}
-      {loadingHistoryEstimates && (
-        <div className="custom-loading-overlay">
-          <Loader size="sm" color="#000480" />
-        </div>
-      )}
-
-      <AgGridReact
-        pagination={true}
-        paginationPageSize={pageSize}
-        domLayout="normal"
-        suppressDragLeaveHidesColumns={true}
-        suppressColumnMoveAnimation={true}
-        // onPaginationChanged={(params) => {
-        //   if (params.api) {
-        //     const newPage = params.api.paginationGetCurrentPage();
-        //     setCurrentPage(newPage);
-        //   }
-        // }}
-        // onGridReady={(params) => {
-        //   setGridApi(params.api); 
-        // }}
-        // Remove default overlay templates to prevent conflicts
-        overlayLoadingTemplate=""
-        // overlayNoRowsTemplate={`<span class="ag-overlay-loading-center">No data found</span>`}
-        rowData={loadingHistoryEstimates ? [] : (historyEstimatesStatusData || [])}
-        columnDefs={[
-          {
-            field: "createdAt",
-            headerName: "Date",
-            resizable: true,
-            sortable: false,
-            flex: 1.8,
-            suppressMovable: false,
-            suppressMenu: true,
-            lockPosition: false,
-            filter: true,
-            floatingFilter: true,
-            valueGetter: (params: any) => {
-              const value = params.data?.createdAt;
-              if (!value) return "";
-
-              const date = new Date(value);
-              const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-              date.setTime(date.getTime() + istOffsetInMilliseconds);
-
-              const day = date.getDate().toString().padStart(2, "0");
-              const month = date.toLocaleString("default", { month: "short" });
-              const year = date.getFullYear();
-              const hours = date.getHours().toString().padStart(2, "0");
-              const minutes = date.getMinutes().toString().padStart(2, "0");
-              const seconds = date.getSeconds().toString().padStart(2, "0");
-
-              const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
-              return `${formatted} ${value}`;
-            },
-            cellRenderer: (params: any) => {
-              if (!params.value) return null;
-              const parts = params.value.split(" ");
-              const formattedPart = parts.slice(0, 2).join(" ");
-              return <Text mt="xs">{formattedPart}</Text>;
-            },
-          },
-          {
-            field: "estID",
-            headerName: "Estimate ID",
-            resizable: true,
-            sortable: false,
-            filter: true,
-            floatingFilter: true,
-            flex: 2,
-            suppressMovable: false,
-            suppressMenu: true,
-          },
-          {
-            field: "aircraftRegNo",
-            headerName: "Aircraft Reg No",
-            resizable: true,
-            sortable: false,
-            filter: true,
-            floatingFilter: true,
-            flex: 1,
-            suppressMovable: false,
-            suppressMenu: true,
-          },
-          {
-            field: "totalMhs",
-            headerName: "Total ManHrs (Hr)",
-            resizable: true,
-            flex: 1,
-            suppressMovable: false,
-            sortable:false,
-            suppressMenu: true,
-            cellRenderer: (params: any) => (
-              <Text mt="xs">{Math.round(params.value)}</Text>
-            ),
-          },
-          {
-            field: "totalPartsCost",
-            headerName: "Total Cost ($)",
-            resizable: true,
-            sortable: false,
-            flex: 1,
-            suppressMovable: false,
-            suppressMenu: true,
-            cellRenderer: (params: any) => (
-              <Text mt="xs">{Math.round(params.value)}</Text>
-            ),
-          },
-          {
-            field: "status",
-            headerName: "Status",
-            resizable: true,
-            sortable: false,
-            filter: true,
-            floatingFilter: true,
-            flex: 1.5,
-            suppressMovable: false,
-            suppressMenu: true,
-            cellRenderer: (val: any) => {
-              let badgeColor: string;
-              let badgeIcon: JSX.Element;
-
-              switch (val.data.status.toLowerCase()) {
-                case "completed":
-                  badgeColor = "#10b981";
-                  badgeIcon = <IconCircleCheck size={15} />;
-                  break;
-                case "progress":
-                  badgeColor = "#f59e0b";
-                  badgeIcon = <IconLoader size={15} />;
-                  break;
-                case "initiated":
-                  badgeColor = "#3b82f6";
-                  badgeIcon = <IconClockUp size={15} />;
-                  break;
-                case "csv generated":
-                  badgeColor = "#9333ea";
-                  badgeIcon = <IconFileCheck size={15} />;
-                  break;
-                default:
-                  badgeColor = "gray";
-                  badgeIcon = <IconFileCheck size={15} />;
-              }
-
-              return (
-                <Badge
-                  mt="xs"
-                  variant="light"
-                  fullWidth
-                  color={badgeColor}
-                  rightSection={badgeIcon}
+              </Group>
+                <div   
+                  className="ag-theme-alpine"
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    height: "350px",
+                    position: "relative",
+                  }}
                 >
-                  {val.data.status}
-                </Badge>
-              );
-            },
-          },
-          {
-            headerName: "Actions",
-            flex: 2,
-            resizable: true,
-            sortable: false,
-            // filter: true,
-            // floatingFilter: true,
-            suppressMovable: false,
-            suppressMenu: true,
-            cellRenderer: (val: any) => {
-              return (
-                <Group mt="xs" align="center" justify="center">
-                  <Tooltip label="Show Tasks">
-                    <ActionIcon
-                      size={20}
-                      color="indigo"
-                      variant="light"
-                      onClick={() => {
-                        setSelectedEstimateId(val.data.estID);
-                        setSelectedEstimateTasks(val.data.tasks);
-                        handleValidateTasks(val.data.tasks, val.data.descriptions);
-                        setOpened(true);
-                      }}
-                    >
-                      <IconListCheck />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Get Estimate">
-                    <ActionIcon
-                      size={20}
-                      color="teal"
-                      variant="light"
-                      disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                      onClick={() => {
-                        setSelectedEstimateIdReport(val.data.estID);
-                        handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
-                      }}
-                    >
-                      <IconReport />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Remarks!">
-                    <ActionIcon
-                      size={20}
-                      color="blue"
-                      variant="light"
-                      disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                      onClick={() => {
-                        setRemarksOpened(true);
-                        setSelectedEstimateIdRemarks(val?.data?.estID);
-                        setSelectedEstRemarksData(val?.data?.remarks);
-                      }}
-                    >
-                      <IconMessage />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Download Uploaded File">
-                    <ActionIcon
-                      size={20}
-                      color="lime"
-                      variant="light"
-                      onClick={() => {
-                        downloadAllValidatedTasksOnly(
-                          val.data.tasks,
-                          val.data.descriptions,
-                          val.data.estID
-                        );
-                      }}
-                    >
-                      <IconFileDownload />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Edit & Re-run Estimate">
-                    <ActionIcon
-                      size={20}
-                      color="lime"
-                      variant="light"
-                      onClick={() => {
-                        setSelectedEstimateIdDetails(val.data.estID);
-                        createAndSelectExcelFile(
-                          val.data.tasks,
-                          val.data.descriptions,
-                          val.data.estID
-                        );
-                      }}
-                    >
-                      <IconEdit />
-                    </ActionIcon>
-                  </Tooltip>
+                  <style>
+                    {`
+                      /* Remove the borders and grid lines */
+                      .ag-theme-alpine .ag-root-wrapper, 
+                      .ag-theme-alpine .ag-root-wrapper-body,
+                      .ag-theme-alpine .ag-header,
+                      .ag-theme-alpine .ag-header-cell,
+                      .ag-theme-alpine .ag-body-viewport {
+                        border: none;
+                      }
+
+                      /* Remove the cell highlight (border) on cell click */
+                      .ag-theme-alpine .ag-cell-focus {
+                        outline: none !important; /* Remove focus border */
+                        box-shadow: none !important; /* Remove any box shadow */
+                      }
+
+                      /* Remove row border */
+                      .ag-theme-alpine .ag-row {
+                        border-bottom: none;
+                      }
+
+                      /* Custom loading overlay styles */
+                      .custom-loading-overlay {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(255, 255, 255, 0.8);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                        pointer-events: none;
+                      }
+
+                      /* Hide default ag-grid loading overlay */
+                      .ag-overlay-loading-wrapper {
+                        display: none !important;
+                      }
+
+                      /* Ensure header and pagination stay visible during loading */
+                      .ag-theme-alpine .ag-header {
+                        position: relative;
+                        z-index: 1001;
+                      }
+
+                      .ag-theme-alpine .ag-paging-panel {
+                        position: relative;
+                        z-index: 1001;
+                      }
+                    `}
+                  </style>
+
+                  {/* Custom Mantine Loading Overlay */}
+                  {loadingHistoryEstimates && (
+                    <div className="custom-loading-overlay">
+                      <Loader size="sm" color="#000480" />
+                    </div>
+                  )}
+
+                  <AgGridReact
+                    onGridReady={onGridReady}
+                    rowData={loadingHistoryEstimates ? [] : historyEstimatesStatusData}
+                    pagination={false}
+                    // paginationPageSize={pageSize}
+                    // onPaginationChanged={(params) => {
+                    //   if (params.api) {
+                    //     const newPage = params.api.paginationGetCurrentPage();
+                    //     setCurrentPage(newPage);
+                    //   }
+                    // }}
+                    onFirstDataRendered={(params) => {
+                      // This ensures AG Grid initializes properly and pagination works
+                      params.api.paginationGoToPage(currentPage);
+                    }}
+                    // onPageSizeChanged={(params : any) => {
+                    //   if (params.api) {
+                    //     const newSize = params.api.paginationGetPageSize();
+                    //     setPageSize(newSize);
+                    //     setCurrentPage(0); // reset to first page
+                    //   }
+                    // }}
+                    overlayLoadingTemplate=""
+                    domLayout="normal"
+                    columnDefs={[
+                      {
+                        field: "createdAt",
+                        headerName: "Date",
+                        resizable: true,
+                        sortable: false,
+                        flex: 1.8,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        lockPosition: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        valueGetter: (params: any) => {
+                          const value = params.data?.createdAt;
+                          if (!value) return "";
+
+                          const date = new Date(value);
+                          const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
+                          date.setTime(date.getTime() + istOffsetInMilliseconds);
+
+                          const day = date.getDate().toString().padStart(2, "0");
+                          const month = date.toLocaleString("default", { month: "short" });
+                          const year = date.getFullYear();
+                          const hours = date.getHours().toString().padStart(2, "0");
+                          const minutes = date.getMinutes().toString().padStart(2, "0");
+                          const seconds = date.getSeconds().toString().padStart(2, "0");
+
+                          const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                          return `${formatted} ${value}`;
+                        },
+                        cellRenderer: (params: any) => {
+                          if (!params.value) return null;
+                          const parts = params.value.split(" ");
+                          const formattedPart = parts.slice(0, 2).join(" ");
+                          return <Text mt="xs">{formattedPart}</Text>;
+                        },
+                      },
+                      {
+                        field: "estID",
+                        headerName: "Estimate ID",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 2,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                      },
+                      {
+                        field: "aircraftRegNo",
+                        headerName: "Aircraft Reg No",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 1,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                      },
+                      {
+                        field: "totalMhs",
+                        headerName: "Total ManHrs (Hr)",
+                        resizable: true,
+                        flex: 1,
+                        suppressMovable: false,
+                        sortable:false,
+                        suppressMenu: true,
+                        cellRenderer: (params: any) => (
+                          <Text mt="xs">{Math.round(params.value)}</Text>
+                        ),
+                      },
+                      {
+                        field: "totalPartsCost",
+                        headerName: "Total Cost ($)",
+                        resizable: true,
+                        sortable: false,
+                        flex: 1,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (params: any) => (
+                          <Text mt="xs">{Math.round(params.value)}</Text>
+                        ),
+                      },
+                      {
+                        field: "status",
+                        headerName: "Status",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 1.5,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (val: any) => {
+                          let badgeColor: string;
+                          let badgeIcon: JSX.Element;
+
+                          switch (val.data.status.toLowerCase()) {
+                            case "completed":
+                              badgeColor = "#10b981";
+                              badgeIcon = <IconCircleCheck size={15} />;
+                              break;
+                            case "progress":
+                              badgeColor = "#f59e0b";
+                              badgeIcon = <IconLoader size={15} />;
+                              break;
+                            case "initiated":
+                              badgeColor = "#3b82f6";
+                              badgeIcon = <IconClockUp size={15} />;
+                              break;
+                            case "csv generated":
+                              badgeColor = "#9333ea";
+                              badgeIcon = <IconFileCheck size={15} />;
+                              break;
+                            default:
+                              badgeColor = "gray";
+                              badgeIcon = <IconFileCheck size={15} />;
+                          }
+
+                          return (
+                            <Badge
+                              mt="xs"
+                              variant="light"
+                              fullWidth
+                              color={badgeColor}
+                              rightSection={badgeIcon}
+                            >
+                              {val.data.status}
+                            </Badge>
+                          );
+                        },
+                      },
+                      {
+                        headerName: "Actions",
+                        flex: 2,
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (val: any) => {
+                          return (
+                            <Group mt="xs" align="center" justify="center">
+                              <Tooltip label="Show Tasks">
+                                <ActionIcon
+                                  size={20}
+                                  color="indigo"
+                                  variant="light"
+                                  onClick={() => {
+                                    setSelectedEstimateId(val.data.estID);
+                                    setSelectedEstimateTasks(val.data.tasks);
+                                    handleValidateTasks(val.data.tasks, val.data.descriptions);
+                                    setOpened(true);
+                                  }}
+                                >
+                                  <IconListCheck />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Get Estimate">
+                                <ActionIcon
+                                  size={20}
+                                  color="teal"
+                                  variant="light"
+                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                  onClick={() => {
+                                    setSelectedEstimateIdReport(val.data.estID);
+                                    handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
+                                  }}
+                                >
+                                  <IconReport />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Remarks!">
+                                <ActionIcon
+                                  size={20}
+                                  color="blue"
+                                  variant="light"
+                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                  onClick={() => {
+                                    setRemarksOpened(true);
+                                    setSelectedEstimateIdRemarks(val?.data?.estID);
+                                    setSelectedEstRemarksData(val?.data?.remarks);
+                                  }}
+                                >
+                                  <IconMessage />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Download Uploaded File">
+                                <ActionIcon
+                                  size={20}
+                                  color="lime"
+                                  variant="light"
+                                  onClick={() => {
+                                    downloadAllValidatedTasksOnly(
+                                      val.data.tasks,
+                                      val.data.descriptions,
+                                      val.data.estID
+                                    );
+                                  }}
+                                >
+                                  <IconFileDownload />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Edit & Re-run Estimate">
+                                <ActionIcon
+                                  size={20}
+                                  color="lime"
+                                  variant="light"
+                                  onClick={() => {
+                                    setSelectedEstimateIdDetails(val.data.estID);
+                                    createAndSelectExcelFile(
+                                      val.data.tasks,
+                                      val.data.descriptions,
+                                      val.data.estID
+                                    );
+                                  }}
+                                >
+                                  <IconEdit />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          );
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+                <Divider my="sm" />
+              {/* Custom footer for pagination */}
+              <Group justify="right" mt="sm" px="md">
+                <Text size="sm">
+                  <Text span c="black" fw={600}>
+                    {currentPage * pageSize + 1}
+                  </Text>{" "}
+                  <Text span fw={100}>to</Text>{" "}
+                  <Text span c="black" fw={600}>
+                    {Math.min((currentPage + 1) * pageSize, historyEstimatesCount || 0)}
+                  </Text>{" "}
+                  <Text span fw={100}>of</Text>{" "}
+                  <Text span c="black" fw={600}>
+                    {historyEstimatesCount || 0}
+                  </Text>{" "}
+                </Text>
+
+
+                <Group gap="xs">
+                  <Text size="xs">Page Size:</Text>
+                  <Select
+                  color="black"
+                    size="xs"
+                    radius='sm'
+                    data={["10", "20", "30", "50"]}
+                    value={String(pageSize)}
+                    styles={{ input: { width: '5vw',borderColor:"gray"} }}
+                    onChange={(value) => {
+                      if (value) {
+                        setPageSize(parseInt(value, 10));
+                        setCurrentPage(0); // Reset to first page
+                      }
+                    }}
+                  />
+                  <Space w='lg'/>
+                  <Pagination
+                  color="black"
+                    withEdges 
+                    total={Math.ceil((historyEstimatesCount || 0) / pageSize)}
+                    value={currentPage + 1}
+                    onChange={(page) => setCurrentPage(page - 1)} // convert to 0-based
+                    size="xs"
+                  />
                 </Group>
-              );
-            },
-          },
-        ]}
-      />
-    </div>
-  </>
-</Tabs.Panel>
+              </Group>
+
+              </>
+            </Tabs.Panel>
           </Tabs>
 
         </Card>
