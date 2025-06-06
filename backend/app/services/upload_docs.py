@@ -1242,9 +1242,9 @@ class ExcelUploadService:
         if status is not None:
             match_stage['status'] = status
         if estID is not None:
-            match_stage['estID'] = estID
-        if aircraftRegNo is not None:
-            match_stage['aircraftRegNo'] = aircraftRegNo
+            normestID = estID.upper()    
+            match_stage['estID'] = normestID
+       
         if date is not None:
             date_only = date.date()  # Extract date: 2025-04-07
             start_of_day = datetime.combine(date_only, datetime.min.time())  # 2025-04-07 00:00:00
@@ -1258,8 +1258,33 @@ class ExcelUploadService:
         pipeline = []
         if match_stage:
             pipeline.append({'$match': match_stage})
-
         
+        if aircraftRegNo is not None:
+            norm_aircraftRegNo = aircraftRegNo.replace(" ", "").replace("-", "").upper()
+            pipeline.append({
+                '$match': {
+                    '$expr': {
+                        '$eq': [
+                            {
+                                '$toUpper': {
+                                    '$replaceAll': {
+                                        'input': {
+                                            '$replaceAll': {
+                                                'input': '$aircraftRegNo',
+                                                'find': ' ',
+                                                'replacement': ''
+                                            }
+                                        },
+                                        'find': '-',
+                                        'replacement': ''
+                                    }
+                                }
+                            },
+                            norm_aircraftRegNo
+                        ]
+                    }
+                }
+            })
         pipeline.extend([
    
     {
