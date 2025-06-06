@@ -1233,22 +1233,35 @@ class ExcelUploadService:
             logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
 
-    async def historical_estimate_status(self) -> List[EstimateStatusResponse]:
-        """
-        Get all estimate status documents from the estimates_file_upload collection
-        """
-        logger.info("Fetching all estimates")
-        # configurations = self.configurations_collection.find_one()
-        # man_hours_threshold = configurations.get('thresholds', {}).get('manHoursThreshold', 0)
-        # five_days_ago = datetime.utcnow() - timedelta(days=5)
-        pipeline=[
-    #          {
-    #     '$match': {
-    #         'createdAt': {
-    #             '$gte': five_days_ago
-    #         }
-    #     }
-    # },
+    async def historical_estimate_status(self, status: str=None, estID:str=None,aircraftRegNo:str=None,date:datetime=None,page: int = 1, page_size: int = 5) -> dict:
+        logger.info(f"Fetching estimates (Page: {page}, Page Size: {page_size})")
+        logger.info(f"Status: {status}, estID: {estID}, aircraftRegNo: {aircraftRegNo}, date: {date}")
+        
+        skip = (page - 1) * page_size
+        match_stage = {}
+        if status is not None:
+            match_stage['status'] = status
+        if estID is not None:
+            match_stage['estID'] = estID
+        if aircraftRegNo is not None:
+            match_stage['aircraftRegNo'] = aircraftRegNo
+        if date is not None:
+            date_only = date.date()  # Extract date: 2025-04-07
+            start_of_day = datetime.combine(date_only, datetime.min.time())  # 2025-04-07 00:00:00
+            end_of_day = datetime.combine(date_only, datetime.max.time())    # 2025-04-07 23:59:59.999999
+            
+            match_stage['createdAt'] = {
+                '$gte': start_of_day,
+                '$lte': end_of_day
+            }
+            
+        pipeline = []
+        if match_stage:
+            pipeline.append({'$match': match_stage})
+
+        
+        pipeline.extend([
+   
     {
         '$lookup': {
             'from': 'estima_output', 
@@ -1278,6 +1291,11 @@ class ExcelUploadService:
         '$unwind': {
             'path': '$estimate', 
             'preserveNullAndEmptyArrays': True
+        }
+    }, 
+     {
+        '$sort': {
+            'createdAt': -1
         }
     }, {
         '$lookup': {
@@ -1348,37 +1366,38 @@ class ExcelUploadService:
             'estID': 1, 
             'tasks': '$task', 
             'descriptions': '$description', 
-            'aircraftRegNo': '$aircraftRegNo', 
-            # 'probability': 1, 
-            # 'operator': 1, 
-            # 'aircraftAge': 1, 
-            # 'typeOfCheck': {
-            #     '$ifNull': [
-            #         '$typeOfCheck', []
-            #     ]
-            # },
-            # 'aircraftModel': 1, 
-            # 'aircraftFlightHours': 1, 
-            # 'aircraftFlightCycles': 1, 
-            # 'areaOfOperations': 1, 
-            # 'typeOfCheckID': {
-            #     '$ifNull': [
-            #         '$typeOfCheckID', ''
-            #     ]
-            # }, 
+            'aircraftRegNo': '$aircraftRegNo',          
             'status': '$status', 
             'totalMhs': 1, 
-            # 'cappingDetails': 1, 
-            # 'additionalTasks': 1, 
-            # 'miscLaborTasks': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
         }
-    }
-]
+    },
+     {
+                '$facet': {
+                    'data': [
+                        { '$skip': skip },
+                        { '$limit': page_size }
+                    ],
+                    'totalCount': [
+                        { '$count': 'total' }
+                    ]
+                }
+            } 
+
+])
         
-        results = list(self.estima_collection.aggregate(pipeline))
+       
+        
+        facet_results = list(self.estima_collection.aggregate(pipeline))
+        results = facet_results[0]['data'] if facet_results else []
+        total_count = facet_results[0]['totalCount'][0]['total'] if facet_results and facet_results[0]['totalCount'] else 0
+        
+        logger.info(f"Total documents matching filters: {total_count}")
+        logger.info(f"Number of estimates Fetched for current page: {len(results)}")
+        
+       
         for result in results:
           
             existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
@@ -1400,9 +1419,13 @@ class ExcelUploadService:
         
 
         response = [EstimateStatusResponse(**result) for result in results]
+        
 
-        return response
-   
+        return {
+            "data": response,
+            "count": total_count,
+        }
+        # return response
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
         """
         Compare estimates for multiple uploaded files
