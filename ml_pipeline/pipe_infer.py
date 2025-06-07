@@ -59,6 +59,7 @@ def process_document(estID):
         check_category = bson_data.get("typeOfCheck", " ")
         aircraft_age = bson_data.get("aircraftAge", 0)
         age_cap= bson_data.get("aircraftAgeThreshold", 3)
+        delta_tasks=bson_data.get("considerDeltaUnAvTasks",False)
         cappingDetails = bson_data.get("cappingDetails", "capping details not found")
         
         # Convert to strings
@@ -82,7 +83,7 @@ def process_document(estID):
         print(f"Processed document with estID: {estID}")
         
         # Call defects_prediction function with correct parameters
-        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold)
+        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold,delta_tasks)
         
         print("Output JSON is generated")
         sys.stdout.flush()
