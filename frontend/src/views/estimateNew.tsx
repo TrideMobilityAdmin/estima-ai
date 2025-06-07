@@ -21,7 +21,9 @@ import {
   Combobox,
   useCombobox,
   InputBase,
-  Loader
+  Loader,
+  Tabs,
+  Pagination
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -61,6 +63,7 @@ import {
 import { AreaChart, getFilteredChartTooltipPayload } from "@mantine/charts";
 import "../App.css";
 import {
+  IconArrowBackUpDouble,
   IconChartArcs3,
   IconCheck,
   IconChecklist,
@@ -69,6 +72,7 @@ import {
   IconCircleCheck,
   IconClipboard,
   IconClipboardCheck,
+  IconClipboardText,
   IconClock,
   IconClockCheck,
   IconClockCode,
@@ -84,6 +88,8 @@ import {
   IconFileCheck,
   IconFileDownload,
   IconFileDownloadFilled,
+  IconFileTime,
+  IconHistory,
   IconHourglass,
   IconListCheck,
   IconListDetails,
@@ -99,6 +105,7 @@ import {
   IconPlaneTilt,
   IconPlus,
   IconRecycle,
+  IconRefresh,
   IconReport,
   IconRowRemove,
   IconSettingsDollar,
@@ -131,6 +138,8 @@ import { saveAs } from "file-saver";
 import ExcelJS from "exceljs";
 import aircraftMOdelsData from "../assets/aircraftModels.json";
 import aircraftOperators from "../assets/aircraftOperators.json";
+import { DatePickerInput } from "@mantine/dates";
+// import mountMantineLoaderToGrid from "../components/LoadingCellRenderer";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -147,7 +156,8 @@ export default function EstimateNew() {
     getProbabilityWiseDetails,
     getOperatorsList,
     getEstimateDetailsByID,
-    getFilteredTasksByID
+    getFilteredTasksByID,
+    getAllHistoryEstimatesStatus
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
   const { getSkillAnalysis } = useApiSkillAnalysis();
@@ -205,6 +215,7 @@ export default function EstimateNew() {
   // const [estimateId, setEstimateId] = useState<string>("");
   const [generatedEstimateId, setGeneratedEstimateId] = useState<string>("");
   const [loading, setLoading] = useState(false); // Add loading state
+  
   // const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
   // const [isLoading, setIsLoading] = useState(false);
   console.log("selected remarks >>>>", selectedEstRemarksData);
@@ -277,10 +288,8 @@ export default function EstimateNew() {
         (a: any, b: any) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-
-      setEstimatesStatusData(sortedData);
-
-      // setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      // setEstimatesStatusData(sortedData);
+      setEstimatesStatusData(data?.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }
     setLoading(false);
   };
@@ -290,8 +299,83 @@ export default function EstimateNew() {
     return () => clearInterval(intervalId);
   }, []);
 
-  console.log("all estimates status>>>", estimatesStatusData);
-  console.log("selected estimate tasks >>>>", selectedEstimateTasks);
+  // console.log("all estimates status>>>", estimatesStatusData);
+  // console.log("selected estimate tasks >>>>", selectedEstimateTasks);
+
+  const [historyEstimatesStatusData, setHistoryEstimatesStatusData] = useState<any[]>([]);
+  const [historyEstimatesCount, setHistoryEstimatesCount] = useState<any>();
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date | null>(null);
+  const [selectedHistoryEstId, setSelectedHistoryEstId] = useState<string>("");
+  const [selectedHistoryAircrRegNo, setSelectedHistoryAircrRegNo] = useState<string>("");
+  const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<string | null>(null);
+  const [loadingHistoryEstimates, setLoadingHistoryEstimates] = useState(false); 
+
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0); // 0-based
+  
+  const [gridApi, setGridApi] = useState<any>(null);
+  const onGridReady = (params: any) => {
+    setGridApi(params.api);
+  };
+
+  const fetchHistoryEstimatesStatus = async () => {
+    setLoadingHistoryEstimates(true);
+
+    const dateISO = selectedHistoryDate
+    ? `${selectedHistoryDate.getFullYear()}-${String(selectedHistoryDate.getMonth() + 1).padStart(2, '0')}-${String(selectedHistoryDate.getDate()).padStart(2, '0')}T00:00:00`
+    : undefined;
+
+
+    const params = {
+      page: currentPage + 1, // convert to 1-based index
+      pageSize,
+      date: dateISO,
+      estID: selectedHistoryEstId?.trim() || undefined,
+      aircraftRegNo: selectedHistoryAircrRegNo?.trim() || undefined,
+      status: selectedHistoryStatus || undefined,
+    };
+
+    const data = await getAllHistoryEstimatesStatus(params);
+
+    const historyData = data?.data;
+    const count = data?.count;
+
+    if (historyData && Array.isArray(historyData)) {
+      const sortedData = historyData?.sort(
+        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setHistoryEstimatesStatusData(sortedData);
+      setHistoryEstimatesCount(count);
+
+    } else {
+      setHistoryEstimatesStatusData([]);
+    }
+    setLoadingHistoryEstimates(false);
+  };
+
+  // Re-fetch on filters or pagination change
+  useEffect(() => {
+    fetchHistoryEstimatesStatus();
+  }, [
+    selectedHistoryDate,
+    selectedHistoryEstId,
+    selectedHistoryAircrRegNo,
+    selectedHistoryStatus,
+    pageSize,
+    currentPage,
+  ]);
+
+  useEffect(() => {
+    if (!loadingHistoryEstimates && historyEstimatesStatusData.length === 0) {
+      gridApi?.showNoRowsOverlay();
+    } else if (!loadingHistoryEstimates) {
+      gridApi?.hideOverlay();
+    }
+  }, [loadingHistoryEstimates, historyEstimatesStatusData, gridApi]);
+
+  console.log("all history estimates status>>>", historyEstimatesStatusData);
+  console.log("history cout  >>>>", historyEstimatesCount);
+
 
   useEffect(() => {
     fetchExpertInsights();
@@ -579,7 +663,7 @@ export default function EstimateNew() {
         // Populate form with API response data
         const formData = {
           tasks: data.tasks || [],
-          probability: data.probability || 10,
+          probability: data.probability || 0,
           operator: data.operator || "",
           operatorForModel: data.operatorForModel || false,
           aircraftRegNo: data.aircraftRegNo || "",
@@ -601,6 +685,7 @@ export default function EstimateNew() {
           typeOfCheckID: data.typeOfCheckID || "",
           miscLaborTasks: data.miscLaborTasks || [],
           additionalTasks: data.additionalTasks || [],
+          considerDeltaUnAvTasks: data.considerDeltaUnAvTasks || false,
         };
 
         // Set form values
@@ -613,7 +698,7 @@ export default function EstimateNew() {
         const fieldsToShow = [];
 
         // Check which optional fields have values and should be shown
-        if (data.probability && data.probability !== 10) fieldsToShow.push("probability");
+        if (data.probability) fieldsToShow.push("probability");
         if (data.aircraftFlightCycles) fieldsToShow.push("aircraftFlightCycles");
         if (data.aircraftFlightHours) fieldsToShow.push("aircraftFlightHours");
         if (data.aircraftAgeThreshold && data.aircraftAgeThreshold !== 3) fieldsToShow.push("aircraftAgeThreshold");
@@ -700,7 +785,7 @@ export default function EstimateNew() {
         status: true
       }))
       .filter((task: any) => task.task_number && task.task_number.trim() !== ''),
-    
+
     ...(filteredTasksList?.not_avialable_tasks || [])
       .map((task: any) => ({
         ...task,
@@ -709,8 +794,8 @@ export default function EstimateNew() {
       .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
 
-  console.log("Filtered Tasks List >>>", filteredTasksList);
-  console.log("Filtered combined List >>>", combinedFilteredTasksList);
+  // console.log("Filtered Tasks List >>>", filteredTasksList);
+  // console.log("Filtered combined List >>>", combinedFilteredTasksList);
 
   // const downloadAllValidatedTasks = async (
   //   tasks: string[],
@@ -930,10 +1015,11 @@ export default function EstimateNew() {
       },
       taskID: "",
       taskDescription: "",
-      typeOfCheck: [], // Changed from string to array for MultiSelect
-      typeOfCheckID: "", // Added new field for typeOfCheckID
+      typeOfCheck: [],
+      typeOfCheckID: "",
       miscLaborTasks: [],
       additionalTasks: [],
+      considerDeltaUnAvTasks: false,
     },
     validateInputOnChange: true,
 
@@ -1141,6 +1227,7 @@ export default function EstimateNew() {
       typeOfCheck: form.values.typeOfCheck || [],
       typeOfCheckID: form.values.typeOfCheckID || "",
       miscLaborTasks: defaultMiscLaborTasks,
+      considerDeltaUnAvTasks: form.values.considerDeltaUnAvTasks || false,
     };
     // console.log("request data >>>>",requestData);
     try {
@@ -1170,6 +1257,7 @@ export default function EstimateNew() {
           aircraftRegNo: "",
           aircraftModel: "",
           aircraftAge: 0,
+          operatorForModel: false,
           aircraftFlightHours: "",
           aircraftFlightCycles: "",
           areaOfOperations: "",
@@ -1185,6 +1273,7 @@ export default function EstimateNew() {
           typeOfCheckID: "",
           miscLaborTasks: [],
           additionalTasks: [],
+          considerDeltaUnAvTasks: false,
         });
 
         setSelectedFile(null);
@@ -1974,10 +2063,10 @@ export default function EstimateNew() {
         ) : (
           <SimpleGrid cols={2} spacing="md">
             {/* Left side Before filtered */}
-            <Box 
-              style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+            <Box
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
                 height: '480px',
                 border: '1px solid #e9ecef',
                 borderRadius: '8px',
@@ -2021,10 +2110,10 @@ export default function EstimateNew() {
                   </Tooltip>
                 </Group>
               </Group>
-              
+
               {/* Scrollable Content */}
-              <ScrollArea 
-                style={{ 
+              <ScrollArea
+                style={{
                   flex: 1,
                   width: '100%'
                 }}
@@ -2032,10 +2121,10 @@ export default function EstimateNew() {
                 offsetScrollbars={false}
               >
                 <Box style={{ width: '100%', paddingRight: '8px' }}>
-                  <SimpleGrid 
-                    cols={4} 
+                  <SimpleGrid
+                    cols={4}
                     spacing="xs"
-                    style={{ 
+                    style={{
                       width: '100%',
                       minWidth: 0 // Allows grid to shrink below content size
                     }}
@@ -2058,7 +2147,7 @@ export default function EstimateNew() {
                               variant="light"
                               radius="sm"
                               size="md"
-                              style={{ 
+                              style={{
                                 minWidth: 0,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis'
@@ -2075,7 +2164,7 @@ export default function EstimateNew() {
                             variant="light"
                             radius="sm"
                             size="sm"
-                            style={{ 
+                            style={{
                               minWidth: 0,
                               overflow: 'hidden'
                             }}
@@ -2090,10 +2179,10 @@ export default function EstimateNew() {
             </Box>
 
             {/* Right side After filtered */}
-            <Box 
-              style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+            <Box
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
                 height: '480px',
                 border: '1px solid #e9ecef',
                 borderRadius: '8px',
@@ -2103,7 +2192,8 @@ export default function EstimateNew() {
               {/* Fixed Header */}
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="teal" radius="sm" size="lg">
-                  {combinedFilteredTasksList?.length}
+                   {/* {combinedFilteredTasksList?.length} */}
+                  {filteredTasksList?.filtered_tasks_count?.total_count || 0}
                 </Badge>
                 <Text fw={600} size="md">After Filter</Text>
                 <Group>
@@ -2114,11 +2204,13 @@ export default function EstimateNew() {
                       variant="light"
                       rightSection={<IconDownload size="18" />}
                       onClick={() => downloadExcelFilteredTasks(true)}
+                      // disabled={filteredTasksList?.filtered_tasks_count?.available_tasks_count > 0 ? false : true}
                     >
-                      {
+                      {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === true)
                           ?.length
-                      }
+                      } */}
+                      {filteredTasksList?.filtered_tasks_count?.available_tasks_count || 0}
                     </Button>
                   </Tooltip>
                   <Tooltip label="Download Not Available Tasks">
@@ -2128,19 +2220,21 @@ export default function EstimateNew() {
                       variant="light"
                       rightSection={<IconDownload size="18" />}
                       onClick={() => downloadExcelFilteredTasks(false)}
+                      // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
                     >
-                      {
+                      {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === false)
                           ?.length
-                      }
+                      } */}
+                      {filteredTasksList?.filtered_tasks_count?.not_available_tasks_count || 0}
                     </Button>
                   </Tooltip>
                 </Group>
               </Group>
-              
+
               {/* Scrollable Content */}
-              <ScrollArea 
-                style={{ 
+              <ScrollArea
+                style={{
                   flex: 1,
                   width: '100%'
                 }}
@@ -2148,10 +2242,10 @@ export default function EstimateNew() {
                 offsetScrollbars={false}
               >
                 <Box style={{ width: '100%', paddingRight: '8px' }}>
-                  <SimpleGrid 
-                    cols={4} 
+                  <SimpleGrid
+                    cols={4}
                     spacing="xs"
-                    style={{ 
+                    style={{
                       width: '100%',
                       minWidth: 0 // Allows grid to shrink below content size
                     }}
@@ -2175,7 +2269,7 @@ export default function EstimateNew() {
                                 variant="light"
                                 radius="sm"
                                 size="md"
-                                style={{ 
+                                style={{
                                   minWidth: 0,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis'
@@ -2192,7 +2286,7 @@ export default function EstimateNew() {
                               variant="light"
                               radius="sm"
                               size="sm"
-                              style={{ 
+                              style={{
                                 minWidth: 0,
                                 overflow: 'hidden'
                               }}
@@ -3094,9 +3188,10 @@ export default function EstimateNew() {
                 scrollHideDelay={1}
                 scrollbarSize={0}
               >
-                <Text size="md" m="sm" fw={500}>
+                {/* <Text size="md" m="sm" fw={500}>
                   Required Parameters
-                </Text>
+                </Text> */}
+                <Divider my="xs" label="Required Parameters" labelPosition="center" />
                 <SimpleGrid cols={2}>
                   <MultiSelect
                     size="xs"
@@ -3268,7 +3363,7 @@ export default function EstimateNew() {
                           error={form.errors.operator}
                           styles={{
                             input: {
-                              backgroundColor: form.values.operatorForModel ? '#edf4ff' : '#e6fcec',
+                              backgroundColor: form.values.operatorForModel ? '#edf4ff' : '#f5f5f5',
                               paddingRight: '80px',
                             },
                           }}
@@ -3333,7 +3428,8 @@ export default function EstimateNew() {
                     withAsterisk
                     styles={{
                       input: {
-                        backgroundColor: '#e6fcec',
+                        // backgroundColor: '#e6fcec',
+                        backgroundColor: '#f5f5f5',
                         paddingRight: '80px',
                       },
                     }}
@@ -3349,20 +3445,41 @@ export default function EstimateNew() {
                     withAsterisk
                     styles={{
                       input: {
-                        backgroundColor: '#e6fcec',
+                        // backgroundColor: '#e6fcec',
+                        backgroundColor: '#f5f5f5',
                         paddingRight: '80px',
                       },
                     }}
                   />
 
                 </SimpleGrid>
+                <Space h="md" />
+                <SimpleGrid cols={2} spacing="xs">
+                  <Card 
+                  // bg='#f5f5f5' 
+                  p='5' 
+                  withBorder
+                  >
+                     <Checkbox
+                    checked={form.values.considerDeltaUnAvTasks}
+                    onChange={(event) =>
+                    form.setFieldValue('considerDeltaUnAvTasks', event.currentTarget.checked)}
+                    label="Consider Delta Un-Available Tasks"
+                    color="#000480"
+                    size="sm"
+                  />
+                  </Card>
+                 
+                </SimpleGrid>
                 <Space h="xs" />
+
                 {/* Filter out aircraftAgeThreshold from additional parameters since it's now in required */}
                 {showFields?.filter(field => field !== "aircraftAgeThreshold").length > 0 ? (
                   <>
-                    <Text size="md" fw={500}>
+                    {/* <Text size="md" fw={500}>
                       Additional Parameters
-                    </Text>
+                    </Text> */}
+                    <Divider my="xs" label="Additional Parameters" labelPosition="center" />
                   </>
                 ) : (
                   <></>
@@ -3433,6 +3550,7 @@ export default function EstimateNew() {
                             { value: "per_source_card", label: "Per Source Card" },
                             { value: "per_IRC", label: "Per Defect" },
                             { value: "per_line_item", label: "Per Line Item" },
+                            { value: "per_line_item_per_source_card", label: "Per Line Item Per Source Card" },
                           ]}
                           allowDeselect
                           {...form.getInputProps(
@@ -3487,16 +3605,27 @@ export default function EstimateNew() {
             <Title order={5}>Estimations</Title>
           </Group>
           <Space h="sm" />
-          <div
-            className="ag-theme-alpine"
-            style={{
-              width: "100%",
-              border: "none",
-              height: "100%",
-            }}
-          >
-            <style>
-              {`
+          <Tabs color="violet" variant="outline" radius="md" defaultValue="recent">
+            <Tabs.List>
+              <Tabs.Tab value="recent" leftSection={<IconClipboardText size={20} />}>
+                Recent
+              </Tabs.Tab>
+              <Tabs.Tab value="history" leftSection={<IconHistory size={20} />}>
+                History
+              </Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="recent">
+              <div
+                className="ag-theme-alpine"
+                style={{
+                  width: "100%",
+                  border: "none",
+                  height: "400px",
+                }}
+              >
+                <style>
+                            {`
 /* Remove the borders and grid lines */
 .ag-theme-alpine .ag-root-wrapper, 
 .ag-theme-alpine .ag-root-wrapper-body,
@@ -3517,211 +3646,203 @@ box-shadow: none !important; /* Remove any box shadow */
 border-bottom: none;
 }
 `}
-            </style>
+                        </style>
 
-            <AgGridReact
-              pagination
-              paginationPageSize={5}
-              domLayout="autoHeight" // Ensures height adjusts dynamically
-              rowData={estimatesStatusData || []}
-              columnDefs={[
-                {
-                  field: "createdAt",
-                  headerName: "Date",
-                  sortable: true,
-                  filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 1.8,
-                  cellRenderer: (params: any) => {
-                    if (!params.value) return null; // Handle empty values
+                <AgGridReact
+                  pagination={true}
+                  paginationPageSize={10} // Changed to 10
+                  domLayout="normal" // Changed from autoHeight to normal for fixed height
+                  suppressDragLeaveHidesColumns={true} // Prevents column removal when dragging outside
+                  suppressColumnMoveAnimation={true} // Optional: prevents animation issues
+                  rowData={estimatesStatusData || []}
+                  columnDefs={[
+                    {
+                    field: "createdAt",
+                    headerName: "Date",
+                    resizable: true,
+                    sortable: false,
+                    filter: true,
+                    floatingFilter: true,
+                    flex: 1.8,
+                    suppressMovable: false,
+                    suppressMenu: true,
+                    lockPosition: false,
+                    valueGetter: (params: any) => {
+                      const value = params.data?.createdAt;
+                      if (!value) return "";
 
-                    // Parse the provided timestamp string to a Date object
-                    const date = new Date(params.value);
+                      const date = new Date(value);
+                      const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
+                      date.setTime(date.getTime() + istOffsetInMilliseconds);
 
-                    // Manually add +5 hours and 30 minutes to the date for IST
-                    const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
-                    date.setTime(date.getTime() + istOffsetInMilliseconds); // Adjust time
+                      const day = date.getDate().toString().padStart(2, "0");
+                      const month = date.toLocaleString("default", { month: "short" });
+                      const year = date.getFullYear();
+                      const hours = date.getHours().toString().padStart(2, "0");
+                      const minutes = date.getMinutes().toString().padStart(2, "0");
+                      const seconds = date.getSeconds().toString().padStart(2, "0");
 
-                    // Format the adjusted date to the desired format
-                    const day = date.getDate().toString().padStart(2, "0");
-                    const month = date.toLocaleString("default", {
-                      month: "short",
-                    });
-                    const year = date.getFullYear();
-                    const hours = date.getHours().toString().padStart(2, "0");
-                    const minutes = date
-                      .getMinutes()
-                      .toString()
-                      .padStart(2, "0");
-                    const seconds = date
-                      .getSeconds()
-                      .toString()
-                      .padStart(2, "0");
-
-                    // Combine all parts into the formatted string
-                    const formattedDate = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
-
-                    return <Text mt="xs">{formattedDate}</Text>;
+                      const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                      return `${formatted} ${value}`;
+                    },
+                    cellRenderer: (params: any) => {
+                      if (!params.value) return null;
+                      const parts = params.value.split(" ");
+                      const formattedPart = parts.slice(0, 2).join(" ");
+                      return <Text mt="xs">{formattedPart}</Text>;
+                    },
                   },
-                },
-                {
-                  field: "estID",
-                  headerName: "Estimate ID",
-                  sortable: true,
-                  filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 2,
-                  // cellRenderer: (params: any) => (
-                  //     <Text
-                  //         mt='xs'
-                  //         style={{
-                  //             cursor: "pointer",
-                  //             color: "blue",
-                  //             textDecoration: "underline",
-                  //         }}
-                  //         onClick={() => {
-                  //             setSelectedEstimateId(params.data.estID);
-                  //             setSelectedEstimateTasks(params.data.tasks);
-                  //             handleValidateTasks(params.data.tasks);
-                  //             setOpened(true);
-                  //         }}
-                  //     >
-                  //         {params.value}
-                  //     </Text>
-                  // ),
-                },
-                {
-                  field: "aircraftRegNo",
-                  headerName: "Aircraft Reg No",
-                  sortable: true,
-                  filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 1,
-                },
-                {
-                  field: "totalMhs",
-                  headerName: "Total ManHrs (Hr)",
-                  sortable: true,
-                  // filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 1,
-                  cellRenderer: (params: any) => (
-                    <Text mt="xs">
-                      {Math.round(params.value)}{" "}
-                      {/* Use Math.round to round to the nearest whole number */}
-                    </Text>
-                  ),
-                },
-                {
-                  field: "totalPartsCost",
-                  headerName: "Total Cost ($)",
-                  sortable: true,
-                  // filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 1,
-                  cellRenderer: (params: any) => (
-                    <Text mt="xs">{Math.round(params.value)}</Text>
-                  ),
-                },
-                {
-                  field: "status",
-                  headerName: "Status",
-                  sortable: true,
-                  filter: true,
-                  floatingFilter: true,
-                  resizable: true,
-                  flex: 1.5,
-                  cellRenderer: (val: any) => {
-                    let badgeColor: string;
-                    let badgeIcon: JSX.Element;
+                    {
+                      field: "estID",
+                      headerName: "Estimate ID",
+                      sortable: false,
+                      filter: true,
+                      floatingFilter: true,
+                      resizable: true,
+                      flex: 2,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                    },
+                    {
+                      field: "aircraftRegNo",
+                      headerName: "Aircraft Reg No",
+                      sortable: false,
+                      filter: true,
+                      floatingFilter: true,
+                      resizable: true,
+                      flex: 1,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                    },
+                    {
+                      field: "totalMhs",
+                      headerName: "Total ManHrs (Hr)",
+                      sortable: false,
+                      // filter: true,
+                      floatingFilter: true,
+                      resizable: true,
+                      flex: 1,
+                      cellRenderer: (params: any) => (
+                        <Text mt="xs">
+                          {Math.round(params.value)}{" "}
+                          {/* Use Math.round to round to the nearest whole number */}
+                        </Text>
+                      ),
+                      suppressMovable: false,
+                      suppressMenu: true,
+                    },
+                    {
+                      field: "totalPartsCost",
+                      headerName: "Total Cost ($)",
+                      sortable: false,
+                      // filter: true,
+                      floatingFilter: true,
+                      resizable: true,
+                      flex: 1,
+                      cellRenderer: (params: any) => (
+                        <Text mt="xs">{Math.round(params.value)}</Text>
+                      ),
+                      suppressMovable: false,
+                      suppressMenu: true,
+                    },
+                    {
+                      field: "status",
+                      headerName: "Status",
+                      sortable: false,
+                      filter: true,
+                      floatingFilter: true,
+                      resizable: true,
+                      flex: 1.5,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                      cellRenderer: (val: any) => {
+                        let badgeColor: string;
+                        let badgeIcon: JSX.Element;
 
-                    // Using switch case for status color and icon mapping
-                    switch (val.data.status.toLowerCase()) {
-                      case "completed":
-                        badgeColor = "#10b981"; // Green
-                        badgeIcon = <IconCircleCheck size={15} />; // Check circle badgeIcon
-                        break;
-                      case "progress":
-                        badgeColor = "#f59e0b"; // Amber/Orange
-                        badgeIcon = <IconLoader size={15} />; // Spinner badgeIcon (you can add CSS for the spinning effect)
-                        break;
-                      case "initiated":
-                        badgeColor = "#3b82f6"; // Light Blue
-                        badgeIcon = <IconClockUp size={15} />; // Play badgeIcon
-                        break;
-                      case "csv generated":
-                        badgeColor = "#9333ea"; // Purple
-                        badgeIcon = <IconFileCheck size={15} />; // File CSV badgeIcon
-                        break;
-                      default:
-                        badgeColor = "gray"; // Default color if status is not found
-                        badgeIcon = <IconFileCheck size={15} />; // Default badgeIcon (optional)
-                    }
+                        // Using switch case for status color and icon mapping
+                        switch (val.data.status.toLowerCase()) {
+                          case "completed":
+                            badgeColor = "#10b981"; // Green
+                            badgeIcon = <IconCircleCheck size={15} />; // Check circle badgeIcon
+                            break;
+                          case "progress":
+                            badgeColor = "#f59e0b"; // Amber/Orange
+                            badgeIcon = <IconLoader size={15} />; // Spinner badgeIcon (you can add CSS for the spinning effect)
+                            break;
+                          case "initiated":
+                            badgeColor = "#3b82f6"; // Light Blue
+                            badgeIcon = <IconClockUp size={15} />; // Play badgeIcon
+                            break;
+                          case "csv generated":
+                            badgeColor = "#9333ea"; // Purple
+                            badgeIcon = <IconFileCheck size={15} />; // File CSV badgeIcon
+                            break;
+                          default:
+                            badgeColor = "gray"; // Default color if status is not found
+                            badgeIcon = <IconFileCheck size={15} />; // Default badgeIcon (optional)
+                        }
 
-                    return (
-                      <Badge
-                        mt="xs"
-                        variant="light"
-                        fullWidth
-                        color={badgeColor}
-                        rightSection={badgeIcon}
-                      >
-                        {val.data.status}
-                      </Badge>
-                    );
-                  },
-                },
-                {
-                  // field: "actions",
-                  headerName: "Actions",
-                  // sortable: true,
-                  // filter: true,
-                  // floatingFilter: true,
-                  flex: 2,
-                  resizable: true,
-                  // editable: true,
-                  cellRenderer: (val: any) => {
-                    return (
-                      <Group mt="xs" align="center" justify="center">
-                        <Tooltip label="Show Tasks">
-                          <ActionIcon
-                            size={20}
-                            color="indigo"
+                        return (
+                          <Badge
+                            mt="xs"
                             variant="light"
-                            onClick={() => {
-                              setSelectedEstimateId(val.data.estID);
-                              setSelectedEstimateTasks(val.data.tasks);
-                              handleValidateTasks(val.data.tasks, val.data.descriptions);
-                              setOpened(true);
-                            }}
+                            fullWidth
+                            color={badgeColor}
+                            rightSection={badgeIcon}
                           >
-                            <IconListCheck />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Get Estimate">
-                          <ActionIcon
-                            size={20}
-                            color="teal"
-                            variant="light"
-                            disabled={
-                              val?.data?.status?.toLowerCase() !== "completed"
-                            }
-                            onClick={() => {
-                              setSelectedEstimateIdReport(val.data.estID);
-                              handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
-                              // setOpened(true);
-                            }}
-                          >
-                            <IconReport />
-                          </ActionIcon>
-                        </Tooltip>
+                            {val.data.status}
+                          </Badge>
+                        );
+                      },
+                    },
+                    {
+                      // field: "actions",
+                      headerName: "Actions",
+                      sortable: false,
+                      // filter: true,
+                      // floatingFilter: true,
+                      flex: 2,
+                      resizable: true,
+                      // editable: true,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                      cellRenderer: (val: any) => {
+                        return (
+                          <Group mt="xs" align="center" justify="center">
+                            <Tooltip label="Show Tasks">
+                              <ActionIcon
+                                size={20}
+                                color="indigo"
+                                variant="light"
+                                onClick={() => {
+                                  setSelectedEstimateId(val.data.estID);
+                                  setSelectedEstimateTasks(val.data.tasks);
+                                  handleValidateTasks(val.data.tasks, val.data.descriptions);
+                                  setOpened(true);
+                                }}
+                              >
+                                <IconListCheck />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Get Estimate">
+                              <ActionIcon
+                                size={20}
+                                color="teal"
+                                variant="light"
+                                disabled={
+                                  val?.data?.status?.toLowerCase() !== "completed"
+                                }
+                                onClick={() => {
+                                  setSelectedEstimateIdReport(val.data.estID);
+                                  handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
+                                  // setOpened(true);
+                                }}
+                              >
+                                <IconReport />
+                              </ActionIcon>
+                            </Tooltip>
 
-                        {/* <Tooltip label="Probability Details">
+                            {/* <Tooltip label="Probability Details">
                           <ActionIcon
                             size={20}
                             color="rgba(156, 104, 0, 1)"
@@ -3739,80 +3860,503 @@ border-bottom: none;
                             <IconChartArcs3 />
                           </ActionIcon>
                         </Tooltip> */}
-                        <Tooltip label="Remarks!">
-                          {/* <Indicator 
-                                                label={val?.data?.remarks?.length || 0} 
-                                                disabled={val?.data?.remarks?.length === 0} 
-                                                color="red" 
-                                                size={12}
-                                                // withBorder
-                                                inline
-                                                 position="middle-end" 
-                                                //  radius="xs"
-                                                > */}
-                          <ActionIcon
-                            size={20}
-                            color="blue"
-                            variant="light"
-                            disabled={
-                              val?.data?.status?.toLowerCase() !== "completed"
-                            }
-                            onClick={(values: any) => {
-                              setRemarksOpened(true);
-                              setSelectedEstimateIdRemarks(val?.data?.estID);
-                              setSelectedEstRemarksData(val?.data?.remarks);
-                            }}
-                          >
-                            <IconMessage />
-                          </ActionIcon>
-                          {/* </Indicator> */}
-                        </Tooltip>
-                        <Tooltip label="Download Uploaded File">
-                          <ActionIcon
-                            size={20}
-                            color="lime"
-                            variant="light"
-                            onClick={() => {
-                              // setSelectedEstimateIdDetails(val.data.estID);
-                              downloadAllValidatedTasksOnly(
-                                val.data.tasks,
-                                val.data.descriptions,
-                                val.data.estID
-                              );
-                            }}
-                          >
-                            <IconFileDownload />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Edit & Re-run Estimate">
-                          <ActionIcon
-                            size={20}
-                            color="lime"
-                            variant="light"
-                            onClick={() => {
-                              setSelectedEstimateIdDetails(val.data.estID);
-                              // downloadAllValidatedTasks(
-                              //   val.data.tasks,
-                              //   val.data.descriptions,
-                              //   val.data.estID // pass directly
-                              // );
-                              createAndSelectExcelFile(
-                                val.data.tasks,
-                                val.data.descriptions,
-                                val.data.estID // pass directly
-                              );
-                            }}
-                          >
-                            <IconEdit />
-                          </ActionIcon>
-                        </Tooltip>
-                      </Group>
-                    );
-                  },
-                },
-              ]}
-            />
-          </div>
+                            <Tooltip label="Remarks!"> 
+                              <ActionIcon
+                                size={20}
+                                color="blue"
+                                variant="light"
+                                disabled={
+                                  val?.data?.status?.toLowerCase() !== "completed"
+                                }
+                                onClick={(values: any) => {
+                                  setRemarksOpened(true);
+                                  setSelectedEstimateIdRemarks(val?.data?.estID);
+                                  setSelectedEstRemarksData(val?.data?.remarks);
+                                }}
+                              >
+                                <IconMessage />
+                              </ActionIcon>
+                              {/* </Indicator> */}
+                            </Tooltip>
+                            <Tooltip label="Download Uploaded File">
+                              <ActionIcon
+                                size={20}
+                                color="lime"
+                                variant="light"
+                                onClick={() => {
+                                  // setSelectedEstimateIdDetails(val.data.estID);
+                                  downloadAllValidatedTasksOnly(
+                                    val.data.tasks,
+                                    val.data.descriptions,
+                                    val.data.estID
+                                  );
+                                }}
+                              >
+                                <IconFileDownload />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Edit & Re-run Estimate">
+                              <ActionIcon
+                                size={20}
+                                color="lime"
+                                variant="light"
+                                onClick={() => {
+                                  setSelectedEstimateIdDetails(val.data.estID);
+                                  // downloadAllValidatedTasks(
+                                  //   val.data.tasks,
+                                  //   val.data.descriptions,
+                                  //   val.data.estID // pass directly
+                                  // );
+                                  createAndSelectExcelFile(
+                                    val.data.tasks,
+                                    val.data.descriptions,
+                                    val.data.estID // pass directly
+                                  );
+                                }}
+                              >
+                                <IconEdit />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
+                        );
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            </Tabs.Panel>
+            
+            <Tabs.Panel value="history">
+              <>
+              <Group p={15}>
+                <DatePickerInput
+                  value={selectedHistoryDate}
+                  onChange={(date) => {
+                    setSelectedHistoryDate(date);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
+                  placeholder="Select date"
+                  label="Select Date"
+                  size="xs"
+                  clearable
+                  minDate={new Date(2025, 2, 1)} // March is month 2 (0-indexed)
+                  maxDate={new Date()} // today's date
+                  styles={{ input: { width: '15vw' } }}
+                />
+
+                <TextInput
+                  value={selectedHistoryEstId}
+                  onChange={(e) => {
+                    setSelectedHistoryEstId(e.currentTarget.value.toUpperCase());
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
+                  placeholder="Estimate ID"
+                  label="Estimate ID"
+                  size="xs"
+                  styles={{ input: { width: '16vw' } }}
+                />
+                <TextInput
+                  value={selectedHistoryAircrRegNo}
+                  onChange={(e) => {
+                    setSelectedHistoryAircrRegNo(e.currentTarget.value);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
+                  placeholder="Aircraft Reg No"
+                  label="Aircraft Reg No"
+                  size="xs"
+                  styles={{ input: { width: '100%' } }}
+                />
+                <Select
+                  value={selectedHistoryStatus}
+                  onChange={(value) => {
+                    setSelectedHistoryStatus(value);
+                    setCurrentPage(0); // reset page number
+                    setPageSize(10);   // reset page size
+                  }}
+                  data={["Completed", "Progress", "Initiated", "Failed"]}
+                  placeholder="Select Status"
+                  label="Status"
+                  size="xs"
+                  clearable
+                  styles={{ input: { width: '100%' } }}
+                />
+              </Group>
+                <div   
+                  className="ag-theme-alpine"
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    height: "350px",
+                    position: "relative",
+                  }}
+                >
+                  <style>
+                    {`
+                      /* Remove the borders and grid lines */
+                      .ag-theme-alpine .ag-root-wrapper, 
+                      .ag-theme-alpine .ag-root-wrapper-body,
+                      .ag-theme-alpine .ag-header,
+                      .ag-theme-alpine .ag-header-cell,
+                      .ag-theme-alpine .ag-body-viewport {
+                        border: none;
+                      }
+
+                      /* Remove the cell highlight (border) on cell click */
+                      .ag-theme-alpine .ag-cell-focus {
+                        outline: none !important; /* Remove focus border */
+                        box-shadow: none !important; /* Remove any box shadow */
+                      }
+
+                      /* Remove row border */
+                      .ag-theme-alpine .ag-row {
+                        border-bottom: none;
+                      }
+
+                      /* Custom loading overlay styles */
+                      .custom-loading-overlay {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(255, 255, 255, 0.8);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                        pointer-events: none;
+                      }
+
+                      /* Hide default ag-grid loading overlay */
+                      .ag-overlay-loading-wrapper {
+                        display: none !important;
+                      }
+
+                      /* Ensure header and pagination stay visible during loading */
+                      .ag-theme-alpine .ag-header {
+                        position: relative;
+                        z-index: 1001;
+                      }
+
+                      .ag-theme-alpine .ag-paging-panel {
+                        position: relative;
+                        z-index: 1001;
+                      }
+                    `}
+                  </style>
+
+                  {/* Custom Mantine Loading Overlay */}
+                  {loadingHistoryEstimates && (
+                    <div className="custom-loading-overlay">
+                      <Loader size="sm" color="#000480" />
+                    </div>
+                  )}
+
+                  <AgGridReact
+                    onGridReady={onGridReady}
+                    rowData={loadingHistoryEstimates ? [] : historyEstimatesStatusData}
+                    pagination={false}
+                    // paginationPageSize={pageSize}
+                    // onPaginationChanged={(params) => {
+                    //   if (params.api) {
+                    //     const newPage = params.api.paginationGetCurrentPage();
+                    //     setCurrentPage(newPage);
+                    //   }
+                    // }}
+                    onFirstDataRendered={(params) => {
+                      // This ensures AG Grid initializes properly and pagination works
+                      params.api.paginationGoToPage(currentPage);
+                    }}
+                    // onPageSizeChanged={(params : any) => {
+                    //   if (params.api) {
+                    //     const newSize = params.api.paginationGetPageSize();
+                    //     setPageSize(newSize);
+                    //     setCurrentPage(0); // reset to first page
+                    //   }
+                    // }}
+                    overlayLoadingTemplate=""
+                    domLayout="normal"
+                    columnDefs={[
+                      {
+                        field: "createdAt",
+                        headerName: "Date",
+                        resizable: true,
+                        sortable: false,
+                        flex: 1.8,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        lockPosition: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        valueGetter: (params: any) => {
+                          const value = params.data?.createdAt;
+                          if (!value) return "";
+
+                          const date = new Date(value);
+                          const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
+                          date.setTime(date.getTime() + istOffsetInMilliseconds);
+
+                          const day = date.getDate().toString().padStart(2, "0");
+                          const month = date.toLocaleString("default", { month: "short" });
+                          const year = date.getFullYear();
+                          const hours = date.getHours().toString().padStart(2, "0");
+                          const minutes = date.getMinutes().toString().padStart(2, "0");
+                          const seconds = date.getSeconds().toString().padStart(2, "0");
+
+                          const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                          return `${formatted} ${value}`;
+                        },
+                        cellRenderer: (params: any) => {
+                          if (!params.value) return null;
+                          const parts = params.value.split(" ");
+                          const formattedPart = parts.slice(0, 2).join(" ");
+                          return <Text mt="xs">{formattedPart}</Text>;
+                        },
+                      },
+                      {
+                        field: "estID",
+                        headerName: "Estimate ID",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 2,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                      },
+                      {
+                        field: "aircraftRegNo",
+                        headerName: "Aircraft Reg No",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 1,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                      },
+                      {
+                        field: "totalMhs",
+                        headerName: "Total ManHrs (Hr)",
+                        resizable: true,
+                        flex: 1,
+                        suppressMovable: false,
+                        sortable:false,
+                        suppressMenu: true,
+                        cellRenderer: (params: any) => (
+                          <Text mt="xs">{Math.round(params.value)}</Text>
+                        ),
+                      },
+                      {
+                        field: "totalPartsCost",
+                        headerName: "Total Cost ($)",
+                        resizable: true,
+                        sortable: false,
+                        flex: 1,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (params: any) => (
+                          <Text mt="xs">{Math.round(params.value)}</Text>
+                        ),
+                      },
+                      {
+                        field: "status",
+                        headerName: "Status",
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        flex: 1.5,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (val: any) => {
+                          let badgeColor: string;
+                          let badgeIcon: JSX.Element;
+
+                          switch (val.data.status.toLowerCase()) {
+                            case "completed":
+                              badgeColor = "#10b981";
+                              badgeIcon = <IconCircleCheck size={15} />;
+                              break;
+                            case "progress":
+                              badgeColor = "#f59e0b";
+                              badgeIcon = <IconLoader size={15} />;
+                              break;
+                            case "initiated":
+                              badgeColor = "#3b82f6";
+                              badgeIcon = <IconClockUp size={15} />;
+                              break;
+                            case "csv generated":
+                              badgeColor = "#9333ea";
+                              badgeIcon = <IconFileCheck size={15} />;
+                              break;
+                            default:
+                              badgeColor = "gray";
+                              badgeIcon = <IconFileCheck size={15} />;
+                          }
+
+                          return (
+                            <Badge
+                              mt="xs"
+                              variant="light"
+                              fullWidth
+                              color={badgeColor}
+                              rightSection={badgeIcon}
+                            >
+                              {val.data.status}
+                            </Badge>
+                          );
+                        },
+                      },
+                      {
+                        headerName: "Actions",
+                        flex: 2,
+                        resizable: true,
+                        sortable: false,
+                        // filter: true,
+                        // floatingFilter: true,
+                        suppressMovable: false,
+                        suppressMenu: true,
+                        cellRenderer: (val: any) => {
+                          return (
+                            <Group mt="xs" align="center" justify="center">
+                              <Tooltip label="Show Tasks">
+                                <ActionIcon
+                                  size={20}
+                                  color="indigo"
+                                  variant="light"
+                                  onClick={() => {
+                                    setSelectedEstimateId(val.data.estID);
+                                    setSelectedEstimateTasks(val.data.tasks);
+                                    handleValidateTasks(val.data.tasks, val.data.descriptions);
+                                    setOpened(true);
+                                  }}
+                                >
+                                  <IconListCheck />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Get Estimate">
+                                <ActionIcon
+                                  size={20}
+                                  color="teal"
+                                  variant="light"
+                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                  onClick={() => {
+                                    setSelectedEstimateIdReport(val.data.estID);
+                                    handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
+                                  }}
+                                >
+                                  <IconReport />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Remarks!">
+                                <ActionIcon
+                                  size={20}
+                                  color="blue"
+                                  variant="light"
+                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                  onClick={() => {
+                                    setRemarksOpened(true);
+                                    setSelectedEstimateIdRemarks(val?.data?.estID);
+                                    setSelectedEstRemarksData(val?.data?.remarks);
+                                  }}
+                                >
+                                  <IconMessage />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Download Uploaded File">
+                                <ActionIcon
+                                  size={20}
+                                  color="lime"
+                                  variant="light"
+                                  onClick={() => {
+                                    downloadAllValidatedTasksOnly(
+                                      val.data.tasks,
+                                      val.data.descriptions,
+                                      val.data.estID
+                                    );
+                                  }}
+                                >
+                                  <IconFileDownload />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Edit & Re-run Estimate">
+                                <ActionIcon
+                                  size={20}
+                                  color="lime"
+                                  variant="light"
+                                  onClick={() => {
+                                    setSelectedEstimateIdDetails(val.data.estID);
+                                    createAndSelectExcelFile(
+                                      val.data.tasks,
+                                      val.data.descriptions,
+                                      val.data.estID
+                                    );
+                                  }}
+                                >
+                                  <IconEdit />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          );
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+                <Divider my="sm" />
+              {/* Custom footer for pagination */}
+              <Group justify="right" mt="sm" px="md">
+                <Text size="sm">
+                  <Text span c="black" fw={600}>
+                    {currentPage * pageSize + 1}
+                  </Text>{" "}
+                  <Text span fw={100}>to</Text>{" "}
+                  <Text span c="black" fw={600}>
+                    {Math.min((currentPage + 1) * pageSize, historyEstimatesCount || 0)}
+                  </Text>{" "}
+                  <Text span fw={100}>of</Text>{" "}
+                  <Text span c="black" fw={600}>
+                    {historyEstimatesCount || 0}
+                  </Text>{" "}
+                </Text>
+
+
+                <Group gap="xs">
+                  <Text size="xs">Page Size:</Text>
+                  <Select
+                  color="black"
+                    size="xs"
+                    radius='sm'
+                    data={["10", "20", "30", "50"]}
+                    value={String(pageSize)}
+                    styles={{ input: { width: '5vw',borderColor:"gray"} }}
+                    onChange={(value) => {
+                      if (value) {
+                        setPageSize(parseInt(value, 10));
+                        setCurrentPage(0); // Reset to first page
+                      }
+                    }}
+                  />
+                  <Space w='lg'/>
+                  <Pagination
+                  color="black"
+                    withEdges 
+                    total={Math.ceil((historyEstimatesCount || 0) / pageSize)}
+                    value={currentPage + 1}
+                    onChange={(page) => setCurrentPage(page - 1)} // convert to 0-based
+                    size="xs"
+                  />
+                </Group>
+              </Group>
+
+              </>
+            </Tabs.Panel>
+          </Tabs>
+
         </Card>
         <Space h="sm" />
 
@@ -4436,7 +4980,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   rowData={parts || []}
                   domLayout="normal"
                   // defaultColDef={{
-                  //   sortable: true,
+                  //   sortable: false,
                   //   resizable: true,
                   //   filter: true,
                   //   floatingFilter: true,

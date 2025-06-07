@@ -298,8 +298,16 @@ async def get_upload_estimate_byId(
     file_upload=await excel_service.get_upload_estimate_byId(estimate_id)
     return file_upload
 
-@router.get("/historical_estimate_file_status",response_model=List[EstimateStatusResponse])
+@router.get("/historical_estimate_file_status",response_model=dict)
 async def get_historical_estimate_status(
+    status: Optional[str] = None,
+    estID: Optional[str] = None,
+    aircraftRegNo: Optional[str] = None,
+    date: Optional[datetime] = None,
+    page: int = Query(1, ge=1),  # Default page = 1
+    page_size: int = Query(5, ge=1), # Default page size = 5
+      
     current_user: dict = Depends(get_current_user)
 ):
-    return await excel_service.historical_estimate_status()
+    return await excel_service.historical_estimate_status(status,estID,aircraftRegNo,date,page, page_size)
+
