@@ -54,7 +54,7 @@ def process_document(estID):
         customer_name_consideration = bson_data.get("operatorForModel", False)
         if isinstance(customer_name_consideration, str):
             customer_name_consideration = customer_name_consideration.capitalize()
-        probability_threshold = bson_data.get("probability", 10)
+        probability_threshold = bson_data.get("probability", 0)
         aircraft_model = bson_data.get("aircraftModel", " ")
         check_category = bson_data.get("typeOfCheck", " ")
         aircraft_age = bson_data.get("aircraftAge", 0)
