@@ -865,7 +865,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         
         # Aggregate man-hour statistics
         # Get all unique package numbers once
-        all_package_numbers =  task_level_mh["package_number"].unique().to_list()
+        all_package_numbers =  task_level_mh["package_number"].unique().tolist()
         
         # Aggregate man-hour statistics
         # Aggregate man-hour statistics
