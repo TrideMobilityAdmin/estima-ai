@@ -767,6 +767,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         
         # Apply function to the 'group' column
         exdata["group"] = exdata.apply(fillnull, axis=1)
+        exdata["group"] = exdata["group"].astype(str)  # Convert to string
         print("clustering is computed")
         exdata=exdata[[ 'log_item_number',
             'task_description', 'corrective_action',
