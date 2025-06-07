@@ -1035,7 +1035,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = task_level_parts.groupby(["source_task_discrepancy_number","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_parts_result["packages_list"] = task_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            task_level_parts_result["prob"] =task_level_parts_result.apply(prob, axis=1)
+            task_level_parts_result["prob"] =task_level_parts_result.apply(
+            lambda row: prob(row, all_package_numbers), axis=1
+            )
 
         
         def parts_price(row):
@@ -1092,8 +1094,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = parts_line_items.groupby(["issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             parts_line_items_result["packages_list"] = parts_line_items_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            parts_line_items_result["prob"] =parts_line_items_result.apply(prob, axis=1)
-
+            parts_line_items_result["prob"] =parts_line_items_result.apply(
+            lambda row: prob(row, all_package_numbers), axis=1
+            )
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
