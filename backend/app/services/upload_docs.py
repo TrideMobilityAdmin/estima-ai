@@ -1907,7 +1907,7 @@ class ExcelUploadService:
                 "predicted_capping": pred_capping_values
             },
             "new_findings_summary":new_findings_data_summary,
-            "task_avialability_summary":task_avialability_summary
+            "task_avialability_summary":task_availability_summary
         }
         finaloutput= replace_nan_inf(finaloutput)
         
