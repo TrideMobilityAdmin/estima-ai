@@ -215,6 +215,8 @@ task_description = pd.DataFrame(task_description)
 # Drop the MongoDB _id column if not needed
 task_description = task_description.drop(columns=["_id"], errors="ignore")
 task_description=task_description.drop_duplicates()
+task_description["task_number"] = task_description["task_number"].apply(lambda x: x.strip() if isinstance(x, str) else x)
+
 
 
 LhRhTasks = db["RHLH_Tasks"]
@@ -228,11 +230,7 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 
-def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold):
-    def float_round(value):
-        if pd.notna(value):  # Better check for non-null values
-            return round(float(value), 2)
-        return 0
+def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_TASKS,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold,delta_tasks):
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
         """
@@ -266,7 +264,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         return mpdLhRhTasks
 
         
-    mpd_task_data=updateLhRhTasks(LhRhTasks,mpd_task_data)
+    mpd_task_data=updateLhRhTasks(LhRhTasks,MPD_TASKS)
 
     print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
     # Convert aircraft_age to float
@@ -342,11 +340,14 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     print("Training packages are extracted")
     print("Processing the tasks")
     #no_of_task_packages=len(train_packages)
+    def float_round(value):
+        if pd.notna(value):  # Better check for non-null values
+            return round(float(value), 2)
+        return 0
     
     # Filter task data based on packages and task numbers
     task_data =  task_description[task_description['package_number'].isin(train_packages)]
    
-  
     # print(f"the shape of dataframe task data 1{task_data.shape}")
     task_data = task_data[task_data["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     task_description_unique_task_list = task_data["task_number"].unique().tolist()
@@ -357,19 +358,41 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     # Get task numbers from filtered_tasks as a list
     filtered_task_numbers = filtered_tasks["task_number"].unique().tolist()
 
+    def lrrh_removal(task_numbers):
+        """
+        Remove ' (LH)' and ' (RH)' suffixes from task numbers.
+        """
+        return list({task_number.replace(" (LH)", "").replace(" (RH)", "") for task_number in task_numbers})
+
+
+    # Apply the cleaning function
+    filtered_task_numbers = lrrh_removal(filtered_task_numbers)
+        
     # Filter mpd_task_data for tasks not in filtered_task_numbers
-    not_available_tasks = mpd_task_data[~mpd_task_data["TASK NUMBER"].isin(filtered_task_numbers)]
+    not_available_tasks = MPD_TASKS[~MPD_TASKS["TASK NUMBER"].isin(filtered_task_numbers)]
 
     # Rename columns for consistency
     not_available_tasks = not_available_tasks.rename(columns={"TASK NUMBER": "task_number", "DESCRIPTION": "description"})
+    def get_check_category(task_number):
+        """
+        Get the check category for a given task number.
+        """
+        if task_number in task_all_data["task_number"].values:
+            task_packages = task_all_data.loc[task_all_data["task_number"] == task_number, "package_number"].unique().tolist()
+            check_categories = aircraft_details[aircraft_details["package_number"].isin(task_packages)]["check_category"].unique().tolist()
+            return check_categories if check_categories else ["Not Available"]
+        else:
+            return ["Not Available"]
+
+    not_available_tasks["check_category"] = not_available_tasks["task_number"].apply(get_check_category)
 
     # Convert to list of dicts (records)
     filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
     not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
     filtered_tasks_count={
-        "total_count": len(mpd_task_data),
+        "total_count": len(MPD_TASKS),
         "not_available_tasks_count": len(not_available_tasks_list),
-        "available_tasks_count": len(filtered_tasks_list),
+        "available_tasks_count": len(filtered_task_numbers),
     }
     print(f"the shape of dataframe task data 2{task_data.shape}")
     # Filter sub parts data based on packages and task numbers
@@ -421,25 +444,27 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
             
         else:
-            filtered_data = task_all_data[task_all_data['task_number'] == task_number]
+            if delta_tasks:
+                
+                filtered_data = task_all_data[task_all_data['task_number'] == task_number]
+                
+                # Get unique packages for this task
+                task_packages = task_all_data[task_all_data['task_number'] == task_number]['package_number'].unique().tolist()
+                num_task_packages = len(task_packages)
+                
+                # Get unique packages with defects for this task
+                defect_packages = sub_task_description_defects_all[
+                    sub_task_description_defects_all['source_task_discrepancy_number_updated'] == task_number
+                ]["package_number"].unique().tolist()
+                num_defect_packages = len(defect_packages)
+                
+                # Calculate probability (avoid division by zero)
+                if num_task_packages > 0:
+                    prob = (num_defect_packages / num_task_packages) * 100
+                else:
+                    prob = 0
             
-            # Get unique packages for this task
-            task_packages = task_all_data[task_all_data['task_number'] == task_number]['package_number'].unique().tolist()
-            num_task_packages = len(task_packages)
-            
-            # Get unique packages with defects for this task
-            defect_packages = sub_task_description_defects_all[
-                sub_task_description_defects_all['source_task_discrepancy_number_updated'] == task_number
-            ]["package_number"].unique().tolist()
-            num_defect_packages = len(defect_packages)
-            
-            # Calculate probability (avoid division by zero)
-            if num_task_packages > 0:
-                prob = (num_defect_packages / num_task_packages) * 100
-            else:
-                prob = 0
-            
-            #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
+        #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
         if filtered_data.empty:
             return {
                 'prob': 0,
@@ -490,7 +515,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             if task_number in task_description_unique_task_list:
                 filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
             else:
-                filtered_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
+                if delta_tasks:
+                    # If task_number is not in task_description_unique_task_list, use all data
+                    filtered_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
             
             if filtered_data.empty:
                 continue
@@ -517,7 +544,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             numeric_agg_columns = ['avg_qty_used', 'max_qty_used', 'min_qty_used', 'total_billable', 'max_price', 'total_quantity']
             for col in numeric_agg_columns:
                 grouped_data[col] = pd.to_numeric(grouped_data[col], errors='coerce').fillna(0)
-            
+            """
             # Apply rounding logic row by row
             discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
             
@@ -527,7 +554,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
                 else:
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
-            
+            """
             # Calculate cost per unit (avoid division by zero)
             grouped_data['avg_cost_per_unit'] = np.where(
                 grouped_data['total_quantity'] != 0,
@@ -754,9 +781,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             how="left"
         ).drop(columns=["task_number"])  # Drop duplicate column
         exdata_parts_updated.to_csv(f"{filepath}/{estID}_clustering.csv")
-                
-        def prob(row):
-            prob = (len(row["packages_list"]) / len(all_package_numbers))*100
+        
+        def prob(row,package_numbers):
+            prob = (len(row["packages_list"]) / len(package_numbers))*100
             
             return prob
         # Select required columns
@@ -768,54 +795,6 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         "package_number"
         ]]
         group_level_mh.drop_duplicates(inplace=True)
-        task_level_mh= group_level_mh.copy()
-        #task_level
-        task_level_mh=task_level_mh.groupby(
-            ["source_task_discrepancy_number","package_number"]
-        ).agg(
-            avg_actual_man_hours=("actual_man_hours", "sum"),
-            max_actual_man_hours=("actual_man_hours", "sum"),
-            min_actual_man_hours=("actual_man_hours", "sum")
-        
-        ).reset_index()
-        
-        # Aggregate man-hour statistics
-        # Get all unique package numbers once
-        all_package_numbers =  task_level_mh["package_number"].unique()
-        
-        # Aggregate man-hour statistics
-        # Aggregate man-hour statistics
-        aggregated = task_level_mh.groupby(
-            ["source_task_discrepancy_number"]
-        ).agg(
-            avg_actual_man_hours=("avg_actual_man_hours", "mean"),
-            max_actual_man_hours=("max_actual_man_hours", "max"),
-            min_actual_man_hours=("min_actual_man_hours", "min")
-        ).reset_index()
-        
-        # Create a crosstab for package indicators (much faster than iterating)
-        package_indicators = pd.crosstab(
-            index=[task_level_mh["source_task_discrepancy_number"]],
-            columns= task_level_mh["package_number"]
-        ).clip(upper=1)  # Convert counts to binary indicators
-        
-        # Merge the aggregated data with package indicators
-        task_level_mh_result = pd.merge(
-            aggregated,
-            package_indicators,
-            on=["source_task_discrepancy_number"]
-        )
-        
-        
-        # If you still need the packages_list column
-        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
-            packages_by_group = task_level_mh.groupby(["source_task_discrepancy_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
-            task_level_mh_result["packages_list"] = task_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            
-        
-        # Apply the function row-wise
-        task_level_mh_result["prob"] =task_level_mh_result.apply(prob, axis=1)
-        
         # Get all unique package numbers once
         all_package_numbers = group_level_mh["package_number"].unique()
         # First level aggregation
@@ -860,14 +839,159 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
             group_level_mh_result["packages_list"] = group_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
             
         
+
+        # Apply the function row-wise using lambda
+        group_level_mh_result["prob"] = group_level_mh_result.apply(
+            lambda row: prob(row, all_package_numbers), axis=1
+        )
+        group_level_mh = group_level_mh.merge(
+        group_level_mh_result[["source_task_discrepancy_number", "group","prob"]],
+        on=["source_task_discrepancy_number", "group"],
+        how="left"
+        )
+
+        task_level_mh= group_level_mh[group_level_mh["prob"]>probability_threshold]
+        #task_level
+        task_level_mh=task_level_mh.groupby(
+            ["source_task_discrepancy_number","package_number"]
+        ).agg(
+            avg_actual_man_hours=("actual_man_hours", "sum"),
+            max_actual_man_hours=("actual_man_hours", "sum"),
+            min_actual_man_hours=("actual_man_hours", "sum")
+        
+        ).reset_index()
+        
+        # Aggregate man-hour statistics
+        # Get all unique package numbers once
+        all_package_numbers =  task_level_mh["package_number"].unique().to_list()
+        
+        # Aggregate man-hour statistics
+        # Aggregate man-hour statistics
+        aggregated = task_level_mh.groupby(
+            ["source_task_discrepancy_number"]
+        ).agg(
+            avg_actual_man_hours=("avg_actual_man_hours", "mean"),
+            max_actual_man_hours=("max_actual_man_hours", "max"),
+            min_actual_man_hours=("min_actual_man_hours", "min")
+        ).reset_index()
+        
+        # Create a crosstab for package indicators (much faster than iterating)
+        package_indicators = pd.crosstab(
+            index=[task_level_mh["source_task_discrepancy_number"]],
+            columns= task_level_mh["package_number"]
+        ).clip(upper=1)  # Convert counts to binary indicators
+        
+        # Merge the aggregated data with package indicators
+        task_level_mh_result = pd.merge(
+            aggregated,
+            package_indicators,
+            on=["source_task_discrepancy_number"]
+        )
+        
+        
+        # If you still need the packages_list column
+        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
+            packages_by_group = task_level_mh.groupby(["source_task_discrepancy_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
+            task_level_mh_result["packages_list"] = task_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
+            
+        
         # Apply the function row-wise
-        group_level_mh_result["prob"] =group_level_mh_result.apply(prob, axis=1)
+        task_level_mh_result["prob"] =task_level_mh_result.apply(
+            lambda row: prob(row, all_package_numbers), axis=1
+        )
+
         #print(exdata_parts_updated.columns)
-        group_level_parts=exdata_parts_updated[["log_item_number","source_task_discrepancy_number","group","package_number",
-        "issued_part_number",'part_description','issued_unit_of_measurement',"used_quantity","billable_value_usd"]]
+        
+        group_level_parts = exdata_parts_updated[[
+            "log_item_number", "source_task_discrepancy_number", "group", "package_number",
+            "issued_part_number", "part_description", "issued_unit_of_measurement",
+            "used_quantity", "billable_value_usd"
+        ]]
+        group_level_parts = group_level_parts.merge(
+        group_level_mh[["source_task_discrepancy_number", "group", "prob"]],
+        on=["source_task_discrepancy_number", "group"],
+        how="left"
+        )
+        group_level_parts=group_level_parts[group_level_parts["prob"]>probability_threshold]
+
+        # Get all unique package numbers
+        all_package_numbers = group_level_parts["package_number"].unique()
+
+        # Group and aggregate
+        group_level_parts = group_level_parts.groupby(
+            ["source_task_discrepancy_number", "group", "issued_part_number", "package_number"]
+        ).agg(
+            billable_value_usd=("billable_value_usd", "sum"),
+            used_quantity=("used_quantity", "sum"),
+            part_description=('part_description', "first"),
+            issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+
+        # Higher-level aggregation
+        aggregated = group_level_parts.groupby(
+            ["source_task_discrepancy_number", "group", "issued_part_number"]
+        ).agg(
+            avg_used_qty=("used_quantity", 'mean'),
+            max_used_qty=("used_quantity", "max"),
+            min_used_qty=("used_quantity", "min"),
+            total_billable_value_usd=("billable_value_usd", "sum"),
+            total_used_qty=("used_quantity", "sum"),
+            part_description=('part_description', "first"),
+            issued_unit_of_measurement=('issued_unit_of_measurement', "first")
+        ).reset_index()
+
+        # Ensure data types are strings for joining
+        group_level_parts["source_task_discrepancy_number"] = group_level_parts["source_task_discrepancy_number"].astype(str)
+        group_level_parts["issued_part_number"] = group_level_parts["issued_part_number"].astype(str)
+
+        # Create binary package indicators (pivot-style)
+        package_indicators = pd.crosstab(
+            index=[
+                group_level_parts["source_task_discrepancy_number"],
+                group_level_parts["group"],
+                group_level_parts["issued_part_number"]
+            ],
+            columns=group_level_parts["package_number"]
+        ).clip(upper=1).reset_index()
+
+        # Merge aggregated with package indicators
+        group_level_parts_result = pd.merge(
+            aggregated,
+            package_indicators,
+            on=["source_task_discrepancy_number", "group", "issued_part_number"]
+        )
+
+        # Create a packages_list mapping
+        packages_by_group = group_level_parts.groupby(
+            ["source_task_discrepancy_number", "group", "issued_part_number"]
+        )["package_number"].apply(lambda x: list(pd.unique(x))).reset_index(name="packages_list")
+
+        # Merge packages list to final result
+        group_level_parts_result = pd.merge(
+            group_level_parts_result,
+            packages_by_group,
+            on=["source_task_discrepancy_number", "group", "issued_part_number"],
+            how="left"
+        )
+
+        # Apply probability
+        group_level_parts_result["prob"] = group_level_parts_result.apply(
+            lambda row: prob(row, all_package_numbers), axis=1
+        )
+
+        # Define parts price calculation
+        def parts_price(row):
+            if row["total_used_qty"] and row["total_used_qty"] > 0:
+                return row["avg_used_qty"] * (row["total_billable_value_usd"] / row["total_used_qty"])
+            else:
+                return 0
+
+        # Apply parts price calculation
+        group_level_parts_result["billable_value_usd"] = group_level_parts_result.apply(parts_price, axis=1)
+        
         #task_level_parts
         task_level_parts=group_level_parts.copy()
-        all_package_numbers =  task_level_mh["package_number"].unique()
+        all_package_numbers =  task_level_parts["package_number"].unique()
         task_level_parts= task_level_parts.groupby(["source_task_discrepancy_number", "issued_part_number","package_number"]).agg(
         billable_value_usd=("billable_value_usd","sum"),
         used_quantity=("used_quantity", "sum"),
@@ -921,14 +1045,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         task_level_parts_result["billable_value_usd"] = task_level_parts_result.apply(parts_price, axis=1)
         
         
-        
-        
         ##line item calculation
-        
         
         #parts_line_items
         parts_line_items=group_level_parts.copy()
-        all_package_numbers =  group_level_mh["package_number"].unique()
+        all_package_numbers =  group_level_parts["package_number"].unique()
         parts_line_items= parts_line_items.groupby(["issued_part_number","package_number"]).agg(
         billable_value_usd=("billable_value_usd","sum"),
         used_quantity=("used_quantity", "sum"),
@@ -987,69 +1108,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         
         
         
-        #group_level_parts
-        all_package_numbers =  group_level_mh["package_number"].unique()
-        
-        group_level_parts= group_level_parts.groupby(["source_task_discrepancy_number", "group","issued_part_number","package_number"]).agg(
-        billable_value_usd=("billable_value_usd","sum"),
-        used_quantity=("used_quantity", "sum"),
-        part_description=('part_description', "first"),
-        issued_unit_of_measurement=('issued_unit_of_measurement', "first")
-        ).reset_index()
-        
-        aggregated = group_level_parts.groupby(["source_task_discrepancy_number", "group", "issued_part_number"]).agg(
-            avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
-            max_used_qty=("used_quantity", "max"),
-            min_used_qty=("used_quantity", "min"),
-            total_billable_value_usd=("billable_value_usd", "sum"),
-            total_used_qty=("used_quantity", "sum"),
-            part_description=('part_description', "first"),
-            issued_unit_of_measurement=('issued_unit_of_measurement', "first")
-        ).reset_index()
-        
-        mask = aggregated['issued_unit_of_measurement'].isin(["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"])
-        aggregated.loc[mask, 'avg_used_qty'] = aggregated.loc[mask, 'avg_used_qty'].round(0)
-        aggregated.loc[~mask, 'avg_used_qty'] = aggregated.loc[~mask, 'avg_used_qty'].round(3)
 
-        
-        # Get all unique package numbers once
-        #all_package_numbers = group_level_parts["package_number"].unique()
-        
-        group_level_parts["source_task_discrepancy_number"] = group_level_parts["source_task_discrepancy_number"].astype(str)
-        group_level_parts["issued_part_number"] = group_level_parts["issued_part_number"].astype(str)
-        
-        
-        # Create a crosstab for package indicators (much faster than iterating)
-        package_indicators = pd.crosstab(
-        index=[group_level_parts["source_task_discrepancy_number"], group_level_parts["group"],group_level_parts["issued_part_number"]],
-        columns=group_level_parts["package_number"]
-        ).clip(upper=1)  # Convert counts to binary indicators
-        
-        # Merge the aggregated data with package indicators
-        group_level_parts_result = pd.merge(
-        aggregated,
-        package_indicators,
-        on=["source_task_discrepancy_number", "group","issued_part_number"]
-        )
-        
-        # If you still need the packages_list column
-        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
-            packages_by_group = group_level_parts.groupby(["source_task_discrepancy_number", "group","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
-            group_level_parts_result["packages_list"] = group_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            group_level_parts_result["prob"] =group_level_parts_result.apply(prob, axis=1)
-        
-
-        
-        def parts_price(row):
-            if row["total_used_qty"] and row["total_used_qty"] > 0:
-                return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
-        
-            else:
-                return 0  # Better to return 0 than None
-        
-        # Apply the function row-wise
-        group_level_parts_result["billable_value_usd"] = group_level_parts_result.apply(parts_price, axis=1)
-        
         
         
         
@@ -1291,8 +1350,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
         # Create copies for processing
         task_level_mh_cap = task_level_mh_result.copy()
+        #task_level_mh_cap=task_level_mh_cap[(task_level_mh_cap["prob"]/100)>probability_threshold]
         task_level_parts_cap = task_level_parts_result.copy()
-        
+        #task_level_parts_cap = task_level_parts_result[(task_level_parts_result["prob"]/100)>probability_threshold]
+        task_level_line_items_cap = task_level_parts_cap.copy()
         # Aggregate task level parts
         task_level_parts_cap = task_level_parts_cap.groupby(["source_task_discrepancy_number"]).agg(
             billable_value_usd=("billable_value_usd", sum)
@@ -1308,7 +1369,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
         # Copy group level data
         group_level_mh_cap = group_level_mh_result.copy()
         group_level_parts_cap = group_level_parts_result.copy()
-        
+        #group_level_mh_cap=group_level_mh_cap[(group_level_mh_cap["prob"]/100)>probability_threshold]
+        #group_level_parts_cap=group_level_parts_cap[(group_level_parts_cap["prob"]/100)>probability_threshold]
+        #parts_line_items_result=parts_line_items_result[(parts_line_items_result["prob"]/100)>probability_threshold]
         # Aggregate group level parts
         group_level_parts_cap = group_level_parts_cap.groupby(["source_task_discrepancy_number", "group"]).agg(
             billable_value_usd=("billable_value_usd", sum)
@@ -1441,6 +1504,28 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
                 parts_line_items_result.to_csv(f"{filepath}/{estID}_line_item_parts_cap_final.csv", index=False)
                 
                 return parts_line_items_result["unbillable_spares"].sum(), parts_line_items_result["billable_spares"].sum()
+            elif spares_cap_type == "per_line_item_per_source_card":
+                            # Calculate intermediate values (before applying probability)
+                task_level_line_items_cap["unbillable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                    lambda x: min(x, spares_cap_amt)
+                )
+                task_level_line_items_cap["billable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                    lambda x: max(0, x - spares_cap_amt)
+                )
+                task_level_line_items_cap["spares_cap_amt"]=spares_cap_amt
+                
+                # Save intermediate results to CSV
+                task_level_line_items_cap.to_csv(f"{filepath}/{estID}_task_level_line_items_cap_intermediate.csv", index=False)
+                
+                # Apply probability to get final values
+                task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
+                task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
+                
+                # Save final results to CSV
+                task_level_line_items_cap.to_csv(f"{filepath}/{estID}_task_level_line_items_cap_final.csv", index=False)
+                
+                return task_level_line_items_cap["unbillable_spares"].sum(), task_level_line_items_cap["billable_spares"].sum()
+                
     
         # Calculate and set spare costs capping values
         if cappingDetails["cappingTypeSpareCost"] != "":
@@ -1542,5 +1627,6 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_t
     #aggregatedTasks=json.dumps(output_data["aggregatedTasks"])
     #print(aggregatedTasks)
     return output_data
+
 
 

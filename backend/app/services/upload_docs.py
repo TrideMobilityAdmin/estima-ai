@@ -44,6 +44,7 @@ class ExcelUploadService:
         self.estima_collection=self.mongo_client.get_collection("estimate_file_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_output=self.mongo_client.get_collection("estima_output")
+        self.estimate_file_upload=self.mongo_client.get_collection("estimate_file_upload")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
@@ -1541,6 +1542,9 @@ class ExcelUploadService:
 
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
+        est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
+        mpd_tasks=est_upload[0].get("tasks", [])
+        
         if not pred_data:
             logger.info("None EstID Pred Data -->" + estID)
             return {}
@@ -1607,7 +1611,7 @@ class ExcelUploadService:
 
         
         # Extract eligible tasks
-        eligible_tasks = task_description[task_description["task_type"] == "MPD"]["task_number"].astype(str).tolist()
+        eligible_tasks = mpd_tasks
 
 
   
@@ -2005,7 +2009,7 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
     # Create copies for processing
     task_level_mh_cap = task_level_mh.copy()
     task_level_parts_cap = task_level_parts.copy()
-    
+    task_level_line_items_cap=task_level_parts_cap.copy()
     # Aggregate task level parts for capping
     task_level_parts_cap_agg = task_level_parts_cap.groupby(["source_task_discrepancy_number_updated"]).agg(
         billable_value_usd=("billable_value_usd", "sum")
@@ -2128,6 +2132,28 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
             billable_sum = task_level_parts_cap["billable_spares"].sum()
             logger.info(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
+        
+        
+        elif spares_cap_type == "per_line_item_per_source_card":
+            # Calculate intermediate values (before applying probability)
+            task_level_line_items_cap["unbillable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            task_level_line_items_cap["billable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            task_level_line_items_cap["spares_cap_amt"]=spares_cap_amt
+            
+
+            # Apply probability to get final values
+            task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
+            task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
+
+            
+            unbillable_sum, billable_sum =task_level_line_items_cap["unbillable_spares"].sum(), task_level_line_items_cap["billable_spares"].sum()
+            return unbillable_sum, billable_sum
+            
+        
             
         elif spares_cap_type == "per_IRC":
             # Use the aggregated DataFrame for calculations
@@ -2180,6 +2206,7 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
             billable_sum = parts_line_items_result["billable_spares"].sum()
             logger.info(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
+        
             
         else:  # No capping
             total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0
