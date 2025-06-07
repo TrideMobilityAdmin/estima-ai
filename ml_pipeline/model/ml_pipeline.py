@@ -857,9 +857,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         task_level_mh=task_level_mh.groupby(
             ["source_task_discrepancy_number","package_number"]
         ).agg(
-            avg_actual_man_hours=("actual_man_hours", "sum"),
-            max_actual_man_hours=("actual_man_hours", "sum"),
-            min_actual_man_hours=("actual_man_hours", "sum")
+            avg_actual_man_hours=("avg_actual_man_hours", "sum"),
+            max_actual_man_hours=("avg_actual_man_hours", "sum"),
+            min_actual_man_hours=("avg_actual_man_hours", "sum")
         
         ).reset_index()
         
@@ -915,6 +915,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         how="left"
         )
         group_level_parts=group_level_parts[group_level_parts["prob"]>probability_threshold]
+        group_level_parts = group_level_parts.drop(columns=["prob"], errors='ignore')
 
         # Get all unique package numbers
         all_package_numbers = group_level_parts["package_number"].unique()
