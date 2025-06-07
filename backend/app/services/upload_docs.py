@@ -2219,9 +2219,8 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
             
 
             # Apply probability to get final values
-            task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
-            task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
-
+            task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"]
+            task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] 
             
             unbillable_sum, billable_sum =task_level_line_items_cap["unbillable_spares"].sum(), task_level_line_items_cap["billable_spares"].sum()
             return unbillable_sum, billable_sum
