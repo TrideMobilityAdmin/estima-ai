@@ -358,7 +358,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     # Get task numbers from filtered_tasks as a list
     filtered_task_numbers = filtered_tasks["task_number"].unique().tolist()
 
-    def lrrh_removal(task_numbers):
+    def lhrh_removal(task_numbers):
         """
         Remove ' (LH)' and ' (RH)' suffixes from task numbers.
         """
@@ -366,10 +366,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
 
     # Apply the cleaning function
-    filtered_task_numbers = lrrh_removal(filtered_task_numbers)
+    filtered_task_numbers = lhrh_removal(filtered_task_numbers)
         
     # Filter mpd_task_data for tasks not in filtered_task_numbers
-    not_available_tasks = MPD_TASKS[~MPD_TASKS["TASK NUMBER"].isin(filtered_task_numbers)]
+    not_available_tasks = mpd_task_data[~mpd_task_data["TASK NUMBER"].isin(filtered_task_numbers)]
 
     # Rename columns for consistency
     not_available_tasks = not_available_tasks.rename(columns={"TASK NUMBER": "task_number", "DESCRIPTION": "description"})
@@ -385,13 +385,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             return ["Not Available"]
 
     not_available_tasks["check_category"] = not_available_tasks["task_number"].apply(get_check_category)
-
+    not_available_task_numbers= lhrh_removal(not_available_tasks["task_number"].unique().tolist())
     # Convert to list of dicts (records)
     filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
     not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
     filtered_tasks_count={
         "total_count": len(MPD_TASKS),
-        "not_available_tasks_count": len(not_available_tasks_list),
+        "not_available_tasks_count": len(not_available_task_numbers),
         "available_tasks_count": len(filtered_task_numbers),
     }
     print(f"the shape of dataframe task data 2{task_data.shape}")
@@ -413,9 +413,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #print(f"the columns of mpd_task_data{mpd_task_data.columns}")
     
     print(f"the shape of sub_task_description_defects is {sub_task_description_defects.shape}")
-    
+    delta_tasks_list=not_available_tasks["task_number"].unique().tolist() if delta_tasks else []
     exdata=sub_task_description_defects[sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])]
-    
+    if delta_tasks:
+        exdata_delta_tasks = sub_task_description_defects_all[sub_task_description_defects_all["source_task_discrepancy_number_updated"].isin(delta_tasks_list)]
+    exdata = pd.concat([exdata, exdata_delta_tasks], ignore_index=True) if delta_tasks else exdata
     print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
 
     print(f"The shape of {exdata.shape} ")

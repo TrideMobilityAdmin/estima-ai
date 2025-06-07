@@ -1863,21 +1863,39 @@ class ExcelUploadService:
 
         # Optional: If you want to switch data sources
         # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
+        def lrrh_removal(task_numbers):
+            """
+            Remove ' (LH)' and ' (RH)' suffixes from task numbers.
+            """
+            return list({task_number.strip().replace(" (LH)", "").replace(" (RH)", "") for task_number in task_numbers if isinstance(task_number, str)})
 
+        # Remove LH/RH from eligible tasks and task_description
+        eligible_tasks_list = lrrh_removal(eligible_tasks)
+        actual_tasks_list = lrrh_removal(task_description["task_number"].unique().tolist())
+
+        # Original available tasks (exact match)
         available_tasks = set(eligible_tasks).intersection(
-            set(pred_tasks_data_full["sourceTask"].astype(str))
+            set(task_description["task_number"].unique().tolist())
         )
 
+        # Cleaned available tasks (after LH/RH removal)
+        available_tasks_list = set(eligible_tasks_list).intersection(
+            set(actual_tasks_list)
+        )
+
+        # Tasks in eligible list but not found in original task_description
         not_available_tasks = set(eligible_tasks) - available_tasks
-        
-        task_matching=len(available_tasks)/len(eligible_tasks)
+
+        # Task matching percentage — avoid division by zero
+        task_matching = len(available_tasks_list) / len(eligible_tasks_list) if eligible_tasks_list else 0
+
         # Task availability summary
-        task_avialability_summary = {
+        task_availability_summary = {
             "available_tasks": list(available_tasks),
             "not_available_tasks": list(not_available_tasks),
-            "task_matching_percentage": task_matching * 100 if eligible_tasks else 0
-        
+            "task_matching_percentage": task_matching * 100
         }
+
         
         # Create the final output structure to match testing function
         finaloutput = {
