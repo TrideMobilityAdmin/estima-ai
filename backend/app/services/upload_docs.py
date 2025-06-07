@@ -1597,8 +1597,9 @@ class ExcelUploadService:
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
         est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
-        mpd_tasks=est_upload[0].get("tasks", [])
-        
+        mpd_tasks = list(est_upload[0].get("task", [])) if est_upload else []
+
+
         if not pred_data:
             logger.info("None EstID Pred Data -->" + estID)
             return {}
