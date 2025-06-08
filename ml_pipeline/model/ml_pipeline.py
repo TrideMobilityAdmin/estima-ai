@@ -423,7 +423,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print(f"The shape of {exdata.shape} ")
         
     def get_manhrs(task_number):
-        
+        filtered_data=pd.DataFrame()
         if task_number in task_description_unique_task_list:
             filtered_data = task_data[task_data['task_number'] == task_number]
             
@@ -465,7 +465,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     prob = (num_defect_packages / num_task_packages) * 100
                 else:
                     prob = 0
-            
+    
         #print(f"the task number is {task_number} and the prob is {prob} and the no of packages is {num_task_packages} and the no of defects is {num_defect_packages}")
         if filtered_data.empty:
             return {
