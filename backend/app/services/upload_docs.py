@@ -50,6 +50,7 @@ class ExcelUploadService:
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
+        self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -1598,6 +1599,8 @@ class ExcelUploadService:
         pred_data = list(self.estimate_output.find({"estID": estID}))
         est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
         mpd_tasks = list(est_upload[0].get("task", [])) if est_upload else []
+        LhRhTasks = list(self.LhRhTasks_collection.find({},))
+        LhRhTasks = pd.DataFrame(LhRhTasks)
 
 
         if not pred_data:
@@ -1662,12 +1665,34 @@ class ExcelUploadService:
         # Assign resolved values back to DataFrame
         sub_task_description["source_task_discrepancy_number_updated"] = sub_task_description["log_item_number"].map(task_findings_dict)
 
+        def updateLhRhTasks(LhRhTasks, MPD_TASKS):
+            """
+            Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
 
+            Parameters:
+            - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+            - MPD_TASKS: List of task numbers (strings or integers)
 
-        
-        # Extract eligible tasks
-        eligible_tasks = mpd_tasks
+            Returns:
+            - List of task numbers, with '(LH)' and '(RH)' suffixes added for LHRH tasks
+            """
+            # Get list of task numbers where LHRH is 1
+            LhRhTasks_list = LhRhTasks[LhRhTasks["LHRH"] == 1]["TASK_CLEANED"].tolist()
+            
+            # List to collect updated task entries
+            data = []
 
+            for task_number in MPD_TASKS:
+                if task_number in LhRhTasks_list:
+                    data.append(f"{task_number} (LH)")
+                    data.append(f"{task_number} (RH)")
+                else:
+                    data.append(task_number)
+
+            return data
+
+        # Example usage
+        eligible_tasks = updateLhRhTasks(LhRhTasks, mpd_tasks)
 
   
 
@@ -1879,7 +1904,7 @@ class ExcelUploadService:
         )
 
         # Cleaned available tasks (after LH/RH removal)
-        available_tasks_list = set(eligible_tasks_list).intersection(
+        available_tasks_list = set(mpd_tasks).intersection(
             set(actual_tasks_list)
         )
 
@@ -1887,13 +1912,16 @@ class ExcelUploadService:
         not_available_tasks = set(eligible_tasks) - available_tasks
 
         # Task matching percentage — avoid division by zero
-        task_matching = len(available_tasks_list) / len(eligible_tasks_list) if eligible_tasks_list else 0
+        task_matching = len(available_tasks_list) / len(mpd_tasks) if eligible_tasks_list else 0
 
         # Task availability summary
         task_availability_summary = {
             "available_tasks": list(available_tasks),
             "not_available_tasks": list(not_available_tasks),
-            "task_matching_percentage": task_matching * 100
+            "task_matching_percentage": task_matching * 100,
+            "total_eligible_tasks": len(mpd_tasks),
+            "total_available_tasks": len(available_tasks_list),
+            "total_not_available_tasks":len(mpd_tasks) - len(available_tasks_list)  
         }
 
         

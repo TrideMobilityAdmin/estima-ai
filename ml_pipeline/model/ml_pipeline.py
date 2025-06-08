@@ -1557,16 +1557,16 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     tasks_total_parts_cost = sum(sum(part["price"] for part in task["spare_parts"]) for task in tasks)
     tasks_min_mhs = sum(task["mhs"]["min"] for task in tasks)
     tasks_max_mhs = sum(task["mhs"]["max"] for task in tasks)
-    findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
+    #findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
     findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in findings if finding["details"]) if findings else 0
-    findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
-    findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
+    #findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
+    #findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
 
     
-    task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    findings_total_mhs=task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
     task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
-    task_findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
-    task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    findings_min_mhs=task_findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    findings_max_mhs=task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
 
 
     
