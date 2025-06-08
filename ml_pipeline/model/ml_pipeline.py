@@ -263,7 +263,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         mpdLhRhTasks = pd.DataFrame(data)
         return mpdLhRhTasks
 
-        
+  
     mpd_task_data=updateLhRhTasks(LhRhTasks,MPD_TASKS)
 
     print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
@@ -390,8 +390,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
     not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
     filtered_tasks_count={
-        "total_count": len(MPD_TASKS),
-        "not_available_tasks_count": len(not_available_task_numbers),
+        "total_count":len(MPD_TASKS["task_number"].astype(str).str.strip().unique().tolist()),
+        "not_available_tasks_count": len(MPD_TASKS["task_number"].astype(str).str.strip().unique().tolist())
+        - len(filtered_task_numbers),
         "available_tasks_count": len(filtered_task_numbers),
     }
     print(f"the shape of dataframe task data 2{task_data.shape}")
@@ -911,7 +912,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             "used_quantity", "billable_value_usd"
         ]]
         group_level_parts = group_level_parts.merge(
-        group_level_mh[["source_task_discrepancy_number", "group", "prob"]],
+        group_level_mh_result[["source_task_discrepancy_number", "group", "prob"]],
         on=["source_task_discrepancy_number", "group"],
         how="left"
         )
