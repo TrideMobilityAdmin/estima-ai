@@ -391,7 +391,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
     filtered_tasks_count={
         "total_count":len(MPD_TASKS["task_number"].astype(str).str.strip().unique().tolist()),
-        "not_available_tasks_count": len(MPD_TASKS["task_number"].astype(str).str.strip().unique().tolist())
+        "not_available_tasks_count": len(MPD_TASKS["TASK NUMBER"].astype(str).str.strip().unique().tolist())
         - len(filtered_task_numbers),
         "available_tasks_count": len(filtered_task_numbers),
     }
