@@ -1118,7 +1118,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
         
         
-        
+        group_level_mh_result=group_level_mh_result[group_level_mh_result["prob"]>probability_threshold]
         group_level_mh_result.to_csv(f"{filepath}/{estID}group_level_mh_result.csv")
         group_level_parts_result.to_csv(f"{filepath}/{estID}group_level_parts_result.csv")
         task_level_mh_result.to_csv(f"{filepath}/{estID}_task_level_mh_result.csv")
