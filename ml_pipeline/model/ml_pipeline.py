@@ -420,7 +420,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     exdata = sub_task_description_defects[
         sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])
     ]
-
+    non_delta_packages_numbers= exdata["package_number"].unique().tolist()
     # If delta_tasks is True, filter and concatenate the additional tasks
     if delta_tasks:
         exdata_delta_tasks = sub_task_description_defects_all[
@@ -795,8 +795,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         ).drop(columns=["task_number"])  # Drop duplicate column
         exdata_parts_updated.to_csv(f"{filepath}/{estID}_clustering.csv")
         
-        def prob(row,package_numbers):
-            prob = (len(row["packages_list"]) / len(package_numbers))*100
+        def prob(row):
+            """
+            if delta_tasks:
+                if row["source_task_discrepancy_number"] in not_available_tasks["task_number"].values:
+                    prob=len(row["packages_list"])/len(package_numbers)*100
+            else:"""
+            prob = (len(row["packages_list"]) / len(row["package_numbers"]))*100
             
             return prob
         # Select required columns
@@ -820,6 +825,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             description=("full_description", "first"),
             skill_number=("skill_number", lambda x: list(set(x)))
         ).reset_index()
+        
+        group_level_mh["package_numbers"]=group_level_mh["source_task_discrepancy_number"].apply(
+            lambda x: group_level_mh[group_level_mh["source_task_discrepancy_number"] == x]["package_number"].unique().tolist()
+        )
         
         # Second level aggregation
         aggregated = group_level_mh.groupby(
@@ -852,10 +861,16 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             group_level_mh_result["packages_list"] = group_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
             
         
+        group_level_mh_result = group_level_mh_result.merge(
+        group_level_mh[["source_task_discrepancy_number",  "package_numbers"]].drop_duplicates(),
+        on=["source_task_discrepancy_number"],
+        how="left"
+        )
+
 
         # Apply the function row-wise using lambda
         group_level_mh_result["prob"] = group_level_mh_result.apply(
-            lambda row: prob(row, all_package_numbers), axis=1
+            lambda row: prob(row), axis=1
         )
         group_level_mh = group_level_mh.merge(
         group_level_mh_result[["source_task_discrepancy_number", "group","prob"]],
@@ -877,7 +892,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         # Aggregate man-hour statistics
         # Get all unique package numbers once
         all_package_numbers =  task_level_mh["package_number"].unique().tolist()
-        
+        task_level_mh["package_numbers"]= task_level_mh["source_task_discrepancy_number"].apply(
+            lambda x:  task_level_mh[ task_level_mh["source_task_discrepancy_number"] == x]["package_number"].unique().tolist()
+        )
         # Aggregate man-hour statistics
         # Aggregate man-hour statistics
         aggregated = task_level_mh.groupby(
@@ -907,10 +924,14 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             packages_by_group = task_level_mh.groupby(["source_task_discrepancy_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_mh_result["packages_list"] = task_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
             
-        
+        task_level_mh_result = task_level_mh_result.merge(
+        task_level_mh[["source_task_discrepancy_number","package_numbers"]].drop_duplicates(),
+        on=["source_task_discrepancy_number"],
+        how="left"
+        )
         # Apply the function row-wise
         task_level_mh_result["prob"] =task_level_mh_result.apply(
-            lambda row: prob(row, all_package_numbers), axis=1
+            lambda row: prob(row), axis=1
         )
 
         #print(exdata_parts_updated.columns)
@@ -931,6 +952,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         # Get all unique package numbers
         all_package_numbers = group_level_parts["package_number"].unique()
 
+
         # Group and aggregate
         group_level_parts = group_level_parts.groupby(
             ["source_task_discrepancy_number", "group", "issued_part_number", "package_number"]
@@ -940,7 +962,14 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             part_description=('part_description', "first"),
             issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
-
+        
+        group_level_parts["package_numbers"] = group_level_parts.apply(
+            lambda row: group_level_parts[
+                (group_level_parts["source_task_discrepancy_number"] == row["source_task_discrepancy_number"]) &
+                (group_level_parts["group"] == row["group"])
+            ]["package_number"].unique().tolist(),
+            axis=1
+        )
         # Higher-level aggregation
         aggregated = group_level_parts.groupby(
             ["source_task_discrepancy_number", "group", "issued_part_number"]
@@ -987,10 +1016,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             on=["source_task_discrepancy_number", "group", "issued_part_number"],
             how="left"
         )
+        group_level_parts_result = group_level_parts_result.merge(
+            group_level_mh[["source_task_discrepancy_number", "group", "package_numbers"]].drop_duplicates(),
+            on=["source_task_discrepancy_number", "group"],
+            how="left"
+        )
 
         # Apply probability
         group_level_parts_result["prob"] = group_level_parts_result.apply(
-            lambda row: prob(row, all_package_numbers), axis=1
+            lambda row: prob(row), axis=1
         )
 
         # Define parts price calculation
@@ -1012,6 +1046,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         part_description=('part_description', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
+                
+        task_level_parts["package_numbers"] = task_level_parts.groupby("source_task_discrepancy_number")["package_number"]\
+            .transform(lambda x: x.unique().tolist())
+
         
         aggregated = task_level_parts.groupby(["source_task_discrepancy_number", "issued_part_number"]).agg(
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
@@ -1046,8 +1084,14 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = task_level_parts.groupby(["source_task_discrepancy_number","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_parts_result["packages_list"] = task_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            task_level_parts_result["prob"] =task_level_parts_result.apply(
-            lambda row: prob(row, all_package_numbers), axis=1
+        
+        task_level_parts_result = task_level_parts_result.merge(
+            group_level_mh[["source_task_discrepancy_number", "package_numbers"]].drop_duplicates(),
+            on=["source_task_discrepancy_number"],
+            how="left"
+        )
+        task_level_parts_result["prob"] =task_level_parts_result.apply(
+            lambda row: prob(row), axis=1
             )
 
         
@@ -1072,6 +1116,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         part_description=('part_description', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
+        parts_line_items["package_numbers"] =  parts_line_items.groupby("issued_part_number")["package_number"]\
+        .transform(lambda x: x.unique().tolist())
         
         aggregated = parts_line_items.groupby(["issued_part_number"]).agg(
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
@@ -1105,9 +1151,16 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = parts_line_items.groupby(["issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             parts_line_items_result["packages_list"] = parts_line_items_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            parts_line_items_result["prob"] =parts_line_items_result.apply(
-            lambda row: prob(row, all_package_numbers), axis=1
-            )
+            
+        parts_line_items_result = parts_line_items_result.merge(
+            parts_line_items[["issued_part_number", "package_numbers"]].drop_duplicates(),
+            on=["issued_part_number"],
+            how="left"
+        )   
+            
+        parts_line_items_result["prob"] =parts_line_items_result.apply(
+        lambda row: prob(row), axis=1
+        )
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
@@ -1116,11 +1169,6 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 return 0  # Better to return 0 than None
         # Apply the function row-wise
         parts_line_items_result["billable_value_usd"] =  parts_line_items_result.apply(parts_price, axis=1)
-        
-        
-        
-        
-        
         
         
         
