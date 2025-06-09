@@ -69,10 +69,12 @@ def process_document(estID):
         # Extract data from additional tasks
         add_task_numbers = [str(task["taskID"]) for task in add_tasks]
         add_descriptions = [str(task["taskDescription"]) for task in add_tasks]  
-        
-        # Combine lists
-        task_numbers_combined = task_numbers + add_task_numbers  # Fixed: extend() modifies in-place and returns None
-        descriptions_combined = descriptions + add_descriptions   # Fixed: use + operator instead
+        if len(add_task_numbers)>1:
+            task_numbers_combined = task_numbers + add_task_numbers[1:]  # Fixed: extend() modifies in-place and returns None
+            descriptions_combined = descriptions + add_descriptions[1:]   # Fixed: use + operator instead
+        else:
+            task_numbers_combined = task_numbers
+            descriptions_combined = descriptions
         
         # Create DataFrame for mpd_task_data
         mpd_task_data = pd.DataFrame({
