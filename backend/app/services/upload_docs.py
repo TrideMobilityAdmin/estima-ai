@@ -44,11 +44,13 @@ class ExcelUploadService:
         self.estima_collection=self.mongo_client.get_collection("estimate_file_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_output=self.mongo_client.get_collection("estima_output")
+        self.estimate_file_upload=self.mongo_client.get_collection("estimate_file_upload")
         self.estimate=self.mongo_client.get_collection("create_estimate")
         self.configurations_collection=self.mongo_client.get_collection("configurations")
         self.remarks_collection=self.mongo_client.get_collection("estimate_status_remarks")
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
+        self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -1595,6 +1597,12 @@ class ExcelUploadService:
 
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
+        est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
+        mpd_tasks = list(est_upload[0].get("task", [])) if est_upload else []
+        LhRhTasks = list(self.LhRhTasks_collection.find({},))
+        LhRhTasks = pd.DataFrame(LhRhTasks)
+
+
         if not pred_data:
             logger.info("None EstID Pred Data -->" + estID)
             return {}
@@ -1657,12 +1665,34 @@ class ExcelUploadService:
         # Assign resolved values back to DataFrame
         sub_task_description["source_task_discrepancy_number_updated"] = sub_task_description["log_item_number"].map(task_findings_dict)
 
+        def updateLhRhTasks(LhRhTasks, MPD_TASKS):
+            """
+            Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
 
+            Parameters:
+            - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+            - MPD_TASKS: List of task numbers (strings or integers)
 
-        
-        # Extract eligible tasks
-        eligible_tasks = task_description[task_description["task_type"] == "MPD"]["task_number"].astype(str).tolist()
+            Returns:
+            - List of task numbers, with '(LH)' and '(RH)' suffixes added for LHRH tasks
+            """
+            # Get list of task numbers where LHRH is 1
+            LhRhTasks_list = LhRhTasks[LhRhTasks["LHRH"] == 1]["TASK_CLEANED"].tolist()
+            
+            # List to collect updated task entries
+            data = []
 
+            for task_number in MPD_TASKS:
+                if task_number in LhRhTasks_list:
+                    data.append(f"{task_number} (LH)")
+                    data.append(f"{task_number} (RH)")
+                else:
+                    data.append(task_number)
+
+            return data
+
+        # Example usage
+        eligible_tasks = updateLhRhTasks(LhRhTasks, mpd_tasks)
 
   
 
@@ -1858,21 +1888,42 @@ class ExcelUploadService:
 
         # Optional: If you want to switch data sources
         # eligible_tasks = pred_tasks_data_full["sourceTask"].astype(str).tolist()
+        def lrrh_removal(task_numbers):
+            """
+            Remove ' (LH)' and ' (RH)' suffixes from task numbers.
+            """
+            return list({task_number.strip().replace(" (LH)", "").replace(" (RH)", "") for task_number in task_numbers if isinstance(task_number, str)})
 
+        # Remove LH/RH from eligible tasks and task_description
+        eligible_tasks_list = lrrh_removal(eligible_tasks)
+        actual_tasks_list = lrrh_removal(task_description["task_number"].unique().tolist())
+
+        # Original available tasks (exact match)
         available_tasks = set(eligible_tasks).intersection(
-            set(pred_tasks_data_full["sourceTask"].astype(str))
+            set(task_description["task_number"].unique().tolist())
         )
 
+        # Cleaned available tasks (after LH/RH removal)
+        available_tasks_list = set(mpd_tasks).intersection(
+            set(actual_tasks_list)
+        )
+
+        # Tasks in eligible list but not found in original task_description
         not_available_tasks = set(eligible_tasks) - available_tasks
-        
-        task_matching=len(available_tasks)/len(eligible_tasks)
+
+        # Task matching percentage — avoid division by zero
+        task_matching = len(available_tasks_list) / len(mpd_tasks) if eligible_tasks_list else 0
+
         # Task availability summary
-        task_avialability_summary = {
+        task_availability_summary = {
             "available_tasks": list(available_tasks),
             "not_available_tasks": list(not_available_tasks),
-            "task_matching_percentage": task_matching * 100 if eligible_tasks else 0
-        
+            "task_matching_percentage": task_matching * 100,
+            "total_eligible_tasks": len(mpd_tasks),
+            "total_available_tasks": len(available_tasks_list),
+            "total_not_available_tasks":len(mpd_tasks) - len(available_tasks_list)  
         }
+
         
         # Create the final output structure to match testing function
         finaloutput = {
@@ -1884,7 +1935,7 @@ class ExcelUploadService:
                 "predicted_capping": pred_capping_values
             },
             "new_findings_summary":new_findings_data_summary,
-            "task_avialability_summary":task_avialability_summary
+            "task_avialability_summary":task_availability_summary
         }
         finaloutput= replace_nan_inf(finaloutput)
         
@@ -2059,7 +2110,7 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
     # Create copies for processing
     task_level_mh_cap = task_level_mh.copy()
     task_level_parts_cap = task_level_parts.copy()
-    
+    task_level_line_items_cap=task_level_parts_cap.copy()
     # Aggregate task level parts for capping
     task_level_parts_cap_agg = task_level_parts_cap.groupby(["source_task_discrepancy_number_updated"]).agg(
         billable_value_usd=("billable_value_usd", "sum")
@@ -2182,6 +2233,27 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
             billable_sum = task_level_parts_cap["billable_spares"].sum()
             logger.info(f"Per source card spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
+        
+        
+        elif spares_cap_type == "per_line_item_per_source_card":
+            # Calculate intermediate values (before applying probability)
+            task_level_line_items_cap["unbillable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                lambda x: min(x, spares_cap_amt)
+            )
+            task_level_line_items_cap["billable_spares_raw"] = task_level_line_items_cap["billable_value_usd"].apply(
+                lambda x: max(0, x - spares_cap_amt)
+            )
+            task_level_line_items_cap["spares_cap_amt"]=spares_cap_amt
+            
+
+            # Apply probability to get final values
+            task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"]
+            task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] 
+            
+            unbillable_sum, billable_sum =task_level_line_items_cap["unbillable_spares"].sum(), task_level_line_items_cap["billable_spares"].sum()
+            return unbillable_sum, billable_sum
+            
+        
             
         elif spares_cap_type == "per_IRC":
             # Use the aggregated DataFrame for calculations
@@ -2234,6 +2306,7 @@ def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description,
             billable_sum = parts_line_items_result["billable_spares"].sum()
             logger.info(f"Per line item spares result: unbillable={unbillable_sum}, billable={billable_sum}")
             return unbillable_sum, billable_sum
+        
             
         else:  # No capping
             total_sum = task_level_parts_cap_agg["billable_value_usd"].sum() if not task_level_parts_cap_agg.empty else 0

@@ -54,11 +54,12 @@ def process_document(estID):
         customer_name_consideration = bson_data.get("operatorForModel", False)
         if isinstance(customer_name_consideration, str):
             customer_name_consideration = customer_name_consideration.capitalize()
-        probability_threshold = bson_data.get("probability", 10)
+        probability_threshold = bson_data.get("probability", 0)
         aircraft_model = bson_data.get("aircraftModel", " ")
         check_category = bson_data.get("typeOfCheck", " ")
         aircraft_age = bson_data.get("aircraftAge", 0)
         age_cap= bson_data.get("aircraftAgeThreshold", 3)
+        delta_tasks=bson_data.get("considerDeltaUnAvTasks",False)
         cappingDetails = bson_data.get("cappingDetails", "capping details not found")
         
         # Convert to strings
@@ -68,10 +69,12 @@ def process_document(estID):
         # Extract data from additional tasks
         add_task_numbers = [str(task["taskID"]) for task in add_tasks]
         add_descriptions = [str(task["taskDescription"]) for task in add_tasks]  
-        
-        # Combine lists
-        task_numbers_combined = task_numbers + add_task_numbers  # Fixed: extend() modifies in-place and returns None
-        descriptions_combined = descriptions + add_descriptions   # Fixed: use + operator instead
+        if len(add_task_numbers)>1:
+            task_numbers_combined = task_numbers + add_task_numbers[1:]  # Fixed: extend() modifies in-place and returns None
+            descriptions_combined = descriptions + add_descriptions[1:]   # Fixed: use + operator instead
+        else:
+            task_numbers_combined = task_numbers
+            descriptions_combined = descriptions
         
         # Create DataFrame for mpd_task_data
         mpd_task_data = pd.DataFrame({
@@ -82,7 +85,7 @@ def process_document(estID):
         print(f"Processed document with estID: {estID}")
         
         # Call defects_prediction function with correct parameters
-        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold)
+        output_data = defects_prediction(estID,aircraft_model, check_category, aircraft_age, mpd_task_data,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold,delta_tasks)
         
         print("Output JSON is generated")
         sys.stdout.flush()
