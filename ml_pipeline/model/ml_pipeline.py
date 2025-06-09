@@ -413,11 +413,21 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #print(f"the columns of mpd_task_data{mpd_task_data.columns}")
     
     print(f"the shape of sub_task_description_defects is {sub_task_description_defects.shape}")
-    delta_tasks_list=not_available_tasks["task_number"].unique().tolist() if delta_tasks else []
-    exdata=sub_task_description_defects[sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])]
+    # Get the list of task numbers from not_available_tasks if delta_tasks is True, else an empty list
+    delta_tasks_list = not_available_tasks["task_number"].unique().tolist() if delta_tasks else []
+
+    # Filter for tasks present in mpd_task_data
+    exdata = sub_task_description_defects[
+        sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])
+    ]
+
+    # If delta_tasks is True, filter and concatenate the additional tasks
     if delta_tasks:
-        exdata_delta_tasks = sub_task_description_defects_all[sub_task_description_defects_all["source_task_discrepancy_number_updated"].isin(delta_tasks_list)]
-    exdata = pd.concat([exdata, exdata_delta_tasks], ignore_index=True) if delta_tasks else exdata
+        exdata_delta_tasks = sub_task_description_defects_all[
+            sub_task_description_defects_all["source_task_discrepancy_number_updated"].isin(delta_tasks_list)
+        ]
+        exdata = pd.concat([exdata, exdata_delta_tasks], ignore_index=True)
+
     print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
 
     print(f"The shape of {exdata.shape} ")
