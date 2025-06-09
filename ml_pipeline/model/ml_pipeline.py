@@ -25,7 +25,7 @@ from nltk.stem import WordNetLemmatizer
 from collections import Counter
 from typing import List, Tuple
 
-
+print("data import  started...")
 # Initialize necessary components
 #nltk.download('punkt')
 #nltk.download('stopwords')
@@ -416,16 +416,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     # Get the list of task numbers from not_available_tasks if delta_tasks is True, else an empty list
     delta_tasks_list = not_available_tasks["task_number"].unique().tolist() if delta_tasks else []
 
+
     # Filter for tasks present in mpd_task_data
     exdata = sub_task_description_defects[
         sub_task_description_defects["source_task_discrepancy_number_updated"].isin(mpd_task_data["TASK NUMBER"])
     ]
-    non_delta_packages_numbers= exdata["package_number"].unique().tolist()
+    non_delta_task_numbers= exdata["source_task_discrepancy_number_updated"].unique().tolist()
     # If delta_tasks is True, filter and concatenate the additional tasks
     if delta_tasks:
         exdata_delta_tasks = sub_task_description_defects_all[
             sub_task_description_defects_all["source_task_discrepancy_number_updated"].isin(delta_tasks_list)
         ]
+        exdata_delta_tasks= exdata_delta_tasks[~exdata_delta_tasks["package_number"].isin(train_packages)]
+        exdata_delta_tasks = exdata_delta_tasks[~exdata_delta_tasks["source_task_discrepancy_number_updated"].isin(non_delta_task_numbers)]
         exdata = pd.concat([exdata, exdata_delta_tasks], ignore_index=True)
 
     print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
@@ -841,7 +844,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             skill_number=("skill_number", lambda x: list(set(sum(x, []))))  # Flatten list of lists and remove duplicates
         ).reset_index()
         
-        
+
         # Create a crosstab for package indicators (much faster than iterating)
         package_indicators = pd.crosstab(
             index=[group_level_mh["source_task_discrepancy_number"], group_level_mh["group"]],
@@ -854,41 +857,60 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             package_indicators,
             on=["source_task_discrepancy_number", "group"]
         )
+        # Step 1: Group and aggregate unique packages
+        packages_by_group = (
+            group_level_mh
+            .groupby(["source_task_discrepancy_number", "group"])["package_number"]
+            .apply(lambda x: list(pd.unique(x)))
+            .reset_index()
+            .rename(columns={"package_number": "packages_list"})
+        )
         
-        # If you still need the packages_list column
-        if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
-            packages_by_group = group_level_mh.groupby(["source_task_discrepancy_number", "group"])["package_number"].apply(lambda x: list(pd.unique(x)))
-            group_level_mh_result["packages_list"] = group_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            
-        
+
+        # Step 2: Merge with the result DataFrame
+        group_level_mh_result = group_level_mh_result.merge(
+            packages_by_group,
+            on=["source_task_discrepancy_number", "group"],
+            how="left"
+        )
+
+        print("package_numbers  is computed")
+        group_level_mh["package_numbers"] = group_level_mh["package_numbers"].apply(lambda x: tuple(x) if isinstance(x, list) else x)
+
         group_level_mh_result = group_level_mh_result.merge(
         group_level_mh[["source_task_discrepancy_number",  "package_numbers"]].drop_duplicates(),
         on=["source_task_discrepancy_number"],
         how="left"
         )
-
+        print("prob being computed")
 
         # Apply the function row-wise using lambda
         group_level_mh_result["prob"] = group_level_mh_result.apply(
             lambda row: prob(row), axis=1
         )
+        print("prob is being merged")
         group_level_mh = group_level_mh.merge(
         group_level_mh_result[["source_task_discrepancy_number", "group","prob"]],
         on=["source_task_discrepancy_number", "group"],
         how="left"
         )
-
-        task_level_mh= group_level_mh[group_level_mh["prob"]>probability_threshold]
+        print("prob is being merged is completed")
+        print("group_level_mh is being computed")
+        task_level_mh= group_level_mh_result[group_level_mh_result["prob"]>probability_threshold]
         #task_level
+        task_level_mh["avg_actual_man_hours"]=task_level_mh["avg_actual_man_hours"]* task_level_mh["prob"]/100
+        task_level_mh["max_actual_man_hours"]=task_level_mh["max_actual_man_hours"]* task_level_mh["prob"]/100
+        task_level_mh["min_actual_man_hours"]=task_level_mh["min_actual_man_hours"]* task_level_mh["prob"]/100
         task_level_mh=task_level_mh.groupby(
-            ["source_task_discrepancy_number","package_number"]
+            ["source_task_discrepancy_number"]
         ).agg(
             avg_actual_man_hours=("avg_actual_man_hours", "sum"),
-            max_actual_man_hours=("avg_actual_man_hours", "sum"),
-            min_actual_man_hours=("avg_actual_man_hours", "sum")
+            max_actual_man_hours=("max_actual_man_hours", "sum"),
+            min_actual_man_hours=("min_actual_man_hours", "sum")
         
         ).reset_index()
-        
+        task_level_mh_result=task_level_mh.copy()
+        """
         # Aggregate man-hour statistics
         # Get all unique package numbers once
         all_package_numbers =  task_level_mh["package_number"].unique().tolist()
@@ -923,7 +945,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = task_level_mh.groupby(["source_task_discrepancy_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_mh_result["packages_list"] = task_level_mh_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            
+        task_level_mh["package_numbers"] = task_level_mh["package_numbers"].apply(lambda x: tuple(x) if isinstance(x, list) else x)
+
         task_level_mh_result = task_level_mh_result.merge(
         task_level_mh[["source_task_discrepancy_number","package_numbers"]].drop_duplicates(),
         on=["source_task_discrepancy_number"],
@@ -933,9 +956,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         task_level_mh_result["prob"] =task_level_mh_result.apply(
             lambda row: prob(row), axis=1
         )
-
+        """
         #print(exdata_parts_updated.columns)
-        
+        print("task manhours are  computed and part are being computed")
         group_level_parts = exdata_parts_updated[[
             "log_item_number", "source_task_discrepancy_number", "group", "package_number",
             "issued_part_number", "part_description", "issued_unit_of_measurement",
@@ -1016,8 +1039,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             on=["source_task_discrepancy_number", "group", "issued_part_number"],
             how="left"
         )
+        group_level_parts["package_numbers"] = group_level_parts["package_numbers"].apply(lambda x: tuple(x) if isinstance(x, list) else x)
         group_level_parts_result = group_level_parts_result.merge(
-            group_level_mh[["source_task_discrepancy_number", "group", "package_numbers"]].drop_duplicates(),
+            group_level_parts[["source_task_discrepancy_number", "group", "package_numbers"]].drop_duplicates(),
             on=["source_task_discrepancy_number", "group"],
             how="left"
         )
@@ -1036,7 +1060,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
         # Apply parts price calculation
         group_level_parts_result["billable_value_usd"] = group_level_parts_result.apply(parts_price, axis=1)
-        
+        print("group level parts are computed")
         #task_level_parts
         task_level_parts=group_level_parts.copy()
         all_package_numbers =  task_level_parts["package_number"].unique()
@@ -1047,8 +1071,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
                 
-        task_level_parts["package_numbers"] = task_level_parts.groupby("source_task_discrepancy_number")["package_number"]\
-            .transform(lambda x: x.unique().tolist())
+        task_level_parts["package_numbers"] = task_level_parts["source_task_discrepancy_number"].apply(
+            lambda x:  task_level_parts[ task_level_parts["source_task_discrepancy_number"] == x]["package_number"].unique().tolist()
+        )
 
         
         aggregated = task_level_parts.groupby(["source_task_discrepancy_number", "issued_part_number"]).agg(
@@ -1084,9 +1109,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = task_level_parts.groupby(["source_task_discrepancy_number","issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             task_level_parts_result["packages_list"] = task_level_parts_result.index.map(lambda idx: packages_by_group.get(idx, []))
-        
+        task_level_parts["package_numbers"] = task_level_parts["package_numbers"].apply(lambda x: tuple(x) if isinstance(x, list) else x)        
         task_level_parts_result = task_level_parts_result.merge(
-            group_level_mh[["source_task_discrepancy_number", "package_numbers"]].drop_duplicates(),
+             task_level_parts[["source_task_discrepancy_number", "package_numbers"]].drop_duplicates(),
             on=["source_task_discrepancy_number"],
             how="left"
         )
@@ -1104,7 +1129,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         # Apply the function row-wise
         task_level_parts_result["billable_value_usd"] = task_level_parts_result.apply(parts_price, axis=1)
         
-        
+        print("task level parts are computed")
         ##line item calculation
         
         #parts_line_items
@@ -1116,8 +1141,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         part_description=('part_description', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
-        parts_line_items["package_numbers"] =  parts_line_items.groupby("issued_part_number")["package_number"]\
-        .transform(lambda x: x.unique().tolist())
+        parts_line_items["package_numbers"]  = parts_line_items["issued_unit_of_measurement"].apply(
+            lambda x:  task_level_parts[ task_level_parts["issued_unit_of_measurement"] == x]["package_number"].unique().tolist()
+        )
+
         
         aggregated = parts_line_items.groupby(["issued_part_number"]).agg(
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
@@ -1151,7 +1178,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         if "packages_list" in aggregated.columns or True:  # Set to True if you need this column
             packages_by_group = parts_line_items.groupby(["issued_part_number"])["package_number"].apply(lambda x: list(pd.unique(x)))
             parts_line_items_result["packages_list"] = parts_line_items_result.index.map(lambda idx: packages_by_group.get(idx, []))
-            
+        parts_line_items["package_numbers"] = parts_line_items["package_numbers"].apply(lambda x: tuple(x) if isinstance(x, list) else x)                    
         parts_line_items_result = parts_line_items_result.merge(
             parts_line_items[["issued_part_number", "package_numbers"]].drop_duplicates(),
             on=["issued_part_number"],
@@ -1169,7 +1196,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 return 0  # Better to return 0 than None
         # Apply the function row-wise
         parts_line_items_result["billable_value_usd"] =  parts_line_items_result.apply(parts_price, axis=1)
-        
+        print("parts line items are computed")
         
         
         
@@ -1183,7 +1210,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         task_level_parts_result.to_csv(f"{filepath}/{estID}_task_level_parts_result.csv")
         parts_line_items_result.to_csv(f"{filepath}/{estID}_parts_line_items_result.csv")
         group_level_mh_result = group_level_mh_result.drop(["packages_list"], axis=1)
-        task_level_mh_result =task_level_mh_result.drop(["packages_list"], axis=1)
+        #task_level_mh_result =task_level_mh_result.drop(["packages_list"], axis=1)
 
     print("tasks and defects json processing ")
     # Initialize variables
@@ -1349,6 +1376,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print("task level disc final is processing")
     # Create findings list
     task_level_findings = []
+    task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
     for _, row in task_level_mh_result.iterrows():
         spare_parts = []
     
@@ -1374,7 +1402,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     "avg": float_round(row["avg_actual_man_hours"]),
                     "est": float_round(row["max_actual_man_hours"])
                 },
-                "prob": float_round(row["prob"]),
+                "prob": float_round(task_prob_map.get(row["source_task_discrepancy_number"],0)),
                 "spare_parts": spare_parts
             }]
         }
@@ -1425,12 +1453,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         ).reset_index()
         
         # Merge with probability data
-        task_level_parts_cap = task_level_parts_cap.merge(
-            task_level_mh_result[["source_task_discrepancy_number", "prob"]],
-            on="source_task_discrepancy_number",
-            how="left"
-        )
         
+        task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
+        
+        task_level_parts_cap["prob"] =task_level_parts_cap.apply(
+            lambda row: task_prob_map.get(row["source_task_discrepancy_number"], 100),
+            axis=1
+        )
+
+
         # Copy group level data
         group_level_mh_cap = group_level_mh_result.copy()
         group_level_parts_cap = group_level_parts_result.copy()
@@ -1470,8 +1501,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_intermediate.csv", index=False)
                 
                 # Apply probability to get final values
+                task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
+                task_level_mh_cap["unbillable_mh"] = task_level_mh_cap.apply(
+                    lambda row: row["unbillable_mh_raw"] * (task_prob_map.get(row["source_task_discrepancy_number"], 100) / 100),
+                    axis=1
+                )
+                task_level_mh_cap["billable_mh"] = task_level_mh_cap.apply(
+                    lambda row: row["billable_mh_raw"]  * (task_prob_map.get(row["source_task_discrepancy_number"], 100) / 100),
+                    axis=1
+                )
+
+                """
                 task_level_mh_cap["unbillable_mh"] = task_level_mh_cap["unbillable_mh_raw"] * (task_level_mh_cap["prob"]/100)
-                task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] * (task_level_mh_cap["prob"]/100)
+                task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] * (task_level_mh_cap["prob"]/100)"""
                 
                 # Save final results to CSV
                 task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
@@ -1492,8 +1534,22 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 group_level_mh_cap.to_csv(f"{filepath}/{estID}_group_level_mh_cap_intermediate.csv", index=False)
                 
                 # Apply probability to get final values
-                group_level_mh_cap["unbillable_mh"] = group_level_mh_cap["unbillable_mh_raw"] * (group_level_mh_cap["prob"]/100)
-                group_level_mh_cap["billable_mh"] = group_level_mh_cap["billable_mh_raw"] * (group_level_mh_cap["prob"]/100)
+                # Assuming processed_task_manhours_df is a DataFrame and task_number is a column in it
+                # and group_level_mh_cap is also a DataFrame.  Also assuming row is accessible within the context.
+
+                # Get the probability mapping for tasks
+                task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
+
+                # Corrected calculations
+                group_level_mh_cap["unbillable_mh"] = group_level_mh_cap.apply(
+                    lambda row: row["unbillable_mh_raw"] * (row["prob"] / 100) * (task_prob_map.get(row["source_task_discrepancy_number"], 100) / 100),
+                    axis=1
+                )
+                group_level_mh_cap["billable_mh"] = group_level_mh_cap.apply(
+                    lambda row: row["billable_mh_raw"] * (row["prob"] / 100) * (task_prob_map.get(row["source_task_discrepancy_number"], 100) / 100),
+                    axis=1
+                )
+
                 
                 # Save final results to CSV
                 group_level_mh_cap.to_csv(f"{filepath}/{estID}_group_level_mh_cap_final.csv", index=False)
@@ -1615,16 +1671,31 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     tasks_total_parts_cost = sum(sum(part["price"] for part in task["spare_parts"]) for task in tasks)
     tasks_min_mhs = sum(task["mhs"]["min"] for task in tasks)
     tasks_max_mhs = sum(task["mhs"]["max"] for task in tasks)
-    #findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
-    findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in findings if finding["details"]) if findings else 0
-    #findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
-    #findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in findings if finding["details"]) if findings else 0
+    findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
+    findings_total_parts_cost = 0
+
+    if findings:
+        for finding in findings:
+            if finding["details"]:
+                detail = finding["details"][0]
+                detail_prob = detail.get('prob', 100) / 100
+                task_defect_prob = detail.get("task_defect_probability", 100) / 100
+                for part in detail.get("spare_parts", []):
+                    part_prob = part.get('prob', 100) / 100
+                    price = part.get("price", 0)
+                    findings_total_parts_cost += price * part_prob * detail_prob * task_defect_prob
+
+    findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
+    findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
 
     
-    findings_total_mhs=task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    #findings_total_mhs=
+    task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
     task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
-    findings_min_mhs=task_findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
-    findings_max_mhs=task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    #findings_min_mhs=
+    task_findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
+    #findings_max_mhs=
+    task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
 
 
     
