@@ -1660,6 +1660,7 @@ class ExcelUploadService:
                 iteration += 1
             
             # Update with the resolved reference
+            
             task_findings_dict[finding] = current
 
         # Assign resolved values back to DataFrame
