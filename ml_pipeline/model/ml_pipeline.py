@@ -628,7 +628,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     
     # Convert to DataFrame for easier processing
     processed_task_manhours_df = pd.DataFrame(processed_task_manhours)
-    
+    processed_task_manhours_df["prob"] = processed_task_manhours_df["prob"].fillna(0)
     processed_task_manhours_df.to_csv(f"{filepath}/{estID}_MPD_level_mh_result.csv")
     task_parts.to_csv(f"{filepath}/{estID}_MPD_level_parts_result.csv")
     
@@ -1376,7 +1376,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print("task level disc final is processing")
 
     # Ensure task_prob_map is a dictionary for safe .get()
-    task_prob_map = processed_task_manhours_df.drop_duplicates(subset="task_number").set_index("task_number")["prob"].to_dict()
+    # Handle duplicates by taking the first non-null prob value per task_number
+    task_prob_map = (
+        processed_task_manhours_df
+        .dropna(subset=["prob"])
+        .drop_duplicates(subset="task_number")
+        .set_index("task_number")["prob"]
+        .to_dict()
+    )
+
 
     task_level_findings = []
     for _, row in task_level_mh_result.iterrows():
