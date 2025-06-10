@@ -1526,10 +1526,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] * (task_level_mh_cap["prob"]/100)"""
                 
                 # Save final results to CSV
-                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
-                task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
                 
-                return  task_level_mh_cap_df["unbillable_mh"].sum(), task_level_mh_cap_df["billable_mh"].sum()
+                #task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
+                # Convert columns to numeric, coercing errors to NaN
+                task_level_mh_cap["unbillable_mh"] = pd.to_numeric(task_level_mh_cap["unbillable_mh"], errors='coerce')
+                task_level_mh_cap["billable_mh"] = pd.to_numeric(task_level_mh_cap["billable_mh"], errors='coerce')
+                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
+
+                task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
+                # Fill NaNs with 0 to ensure the sum does not return NaN
+                unbillable_sum = task_level_mh_cap_df["unbillable_mh"].fillna(0).sum()
+                billable_sum = task_level_mh_cap_df["billable_mh"].fillna(0).sum()
+                return unbillable_sum, billable_sum
+
 
             
             elif mhs_cap_type == "per_IRC":
