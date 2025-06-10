@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 import sys
 from model.ml_pipeline import defects_prediction
-
+print("Pipe Infer script started...")
 # Connect to MongoDB
 client = MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]

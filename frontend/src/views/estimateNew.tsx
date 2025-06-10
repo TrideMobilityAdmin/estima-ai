@@ -997,6 +997,7 @@ export default function EstimateNew() {
   const form = useForm<any>({
     initialValues: {
       tasks: [],
+      // probability: 0,
       probability: 0,
       operator: "",
       operatorForModel: false,
