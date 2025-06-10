@@ -974,7 +974,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
         # Get all unique package numbers
         all_package_numbers = group_level_parts["package_number"].unique()
-
+        def part_prob(row,package_numbers):
+            """
+            if delta_tasks:
+                if row["source_task_discrepancy_number"] in not_available_tasks["task_number"].values:
+                    prob=len(row["packages_list"])/len(package_numbers)*100
+            else:"""
+            prob = (len(row["packages_list"]) / len(package_numbers))*100
 
         # Group and aggregate
         group_level_parts = group_level_parts.groupby(
@@ -1704,7 +1710,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 for part in detail.get("spare_parts", []):
                     part_prob = part.get('prob', 100) / 100
                     price = part.get("price", 0)
-                    findings_total_parts_cost += price * part_prob * detail_prob * task_defect_prob
+                    findings_total_parts_cost += price * part_prob * detail_prob #* task_defect_prob
 
     findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
     findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
