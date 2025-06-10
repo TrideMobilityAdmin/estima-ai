@@ -1499,7 +1499,6 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             if mhs_cap_type == "per_source_card":
                 # Calculate intermediate values (before applying probability)
                 task_level_mh_cap = task_level_mh_result.copy()
-                task_level_mh_cap = pd.DataFrame(task_level_mh_cap)
                 task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
                     lambda x: min(x, mhs_cap_amt)
                 )
@@ -1528,9 +1527,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 
                 # Save final results to CSV
                 task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
-                #task_level_mh_cap=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
+                task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
                 
-                return  task_level_mh_cap["unbillable_mh"].sum(), task_level_mh_cap["billable_mh"].sum()
+                return  task_level_mh_cap_df["unbillable_mh"].sum(), task_level_mh_cap_df["billable_mh"].sum()
 
             
             elif mhs_cap_type == "per_IRC":
