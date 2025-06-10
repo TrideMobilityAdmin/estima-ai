@@ -1374,15 +1374,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print("Probability graph is generated.")
     
     print("task level disc final is processing")
-    # Create findings list
+
+    # Ensure task_prob_map is a dictionary for safe .get()
+    task_prob_map = processed_task_manhours_df.drop_duplicates(subset="task_number").set_index("task_number")["prob"].to_dict()
+
     task_level_findings = []
-    task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
     for _, row in task_level_mh_result.iterrows():
         spare_parts = []
-    
-        # Filter task_parts where task_number matches
         spare_filtered = task_level_parts_result[task_level_parts_result["source_task_discrepancy_number"] == row["source_task_discrepancy_number"]]
-    
+        
         for _, part in spare_filtered.iterrows():
             spare_parts.append({
                 "partId": part["issued_part_number"],
@@ -1392,7 +1392,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 "price": float_round(part["billable_value_usd"]),
                 "prob": float_round(part["prob"])
             })
-            
+
         finding = {
             "taskId": row["source_task_discrepancy_number"],
             "details": [{
@@ -1402,32 +1402,33 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     "avg": float_round(row["avg_actual_man_hours"]),
                     "est": float_round(row["max_actual_man_hours"])
                 },
-                "prob": float_round(task_prob_map.get(row["source_task_discrepancy_number"],0)),
+                "prob": float_round(task_prob_map.get(row["source_task_discrepancy_number"], 0)),
                 "spare_parts": spare_parts
             }]
         }
-        
         task_level_findings.append(finding)
-        # Initialize disc_pred if not defined (it wasn't defined in the original)
+
     task_level_disc_pred = []
     for finding in task_level_findings:
         if finding["details"]:
+            detail = finding["details"][0]
             task_level_disc_pred.append({
                 "taskId": finding["taskId"],
-                "avg_mh": finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100),
-                "min_mh": finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100),
-                "max_mh": finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100),
-                "prob": finding["details"][0]["prob"],
-                "exp_cons": finding["details"][0].get("spare_parts", []),
+                "avg_mh": detail["mhs"]["avg"] * (detail["prob"] / 100),
+                "min_mh": detail["mhs"]["min"] * (detail["prob"] / 100),
+                "max_mh": detail["mhs"]["max"] * (detail["prob"] / 100),
+                "prob": detail["prob"],
+                "exp_cons": detail.get("spare_parts", []),
                 "billable_value_usd": sum(
-                    part.get("price", 0)*(part.get("prob", 0) / 100) for part in finding["details"][0].get("spare_parts", [])
+                    part.get("price", 0) * (part.get("prob", 0) / 100) for part in detail.get("spare_parts", [])
                 )
             })
-            
-    task_level_disc_pred=pd.DataFrame(task_level_disc_pred)
+
+    task_level_disc_pred = pd.DataFrame(task_level_disc_pred)
     task_level_disc_pred.to_csv(f"{filepath}/{estID}__task_disc_final_result.csv")
 
     print("computations are completed")
+
     
 
     print("capping is computing")
