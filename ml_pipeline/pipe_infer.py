@@ -35,7 +35,8 @@ def process_document(estID):
     
     # Create a directory path
     folder_name = str(estID)
-    filepath = f"/home/Data/python_infer/results/{folder_name}/"
+    filepath = f"/home/jupyter_workspace/ml_pipeline/results/{folder_name}/"
+    
     
     try:
         os.makedirs(filepath, exist_ok=True)
