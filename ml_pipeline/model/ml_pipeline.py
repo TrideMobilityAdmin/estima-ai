@@ -974,13 +974,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
         # Get all unique package numbers
         all_package_numbers = group_level_parts["package_number"].unique()
-        def part_prob(row,package_numbers):
-            """
+        """def part_prob(row,package_numbers):
+
             if delta_tasks:
                 if row["source_task_discrepancy_number"] in not_available_tasks["task_number"].values:
                     prob=len(row["packages_list"])/len(package_numbers)*100
-            else:"""
-            prob = (len(row["packages_list"]) / len(package_numbers))*100
+            else:
+            prob = (len(row["packages_list"]) / len(package_numbers))*100"""
 
         # Group and aggregate
         group_level_parts = group_level_parts.groupby(
