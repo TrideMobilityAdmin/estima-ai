@@ -628,7 +628,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     
     # Convert to DataFrame for easier processing
     processed_task_manhours_df = pd.DataFrame(processed_task_manhours)
-    
+    processed_task_manhours_df["prob"] = processed_task_manhours_df["prob"].fillna(0)
     processed_task_manhours_df.to_csv(f"{filepath}/{estID}_MPD_level_mh_result.csv")
     task_parts.to_csv(f"{filepath}/{estID}_MPD_level_parts_result.csv")
     
@@ -1374,15 +1374,23 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print("Probability graph is generated.")
     
     print("task level disc final is processing")
-    # Create findings list
+
+    # Ensure task_prob_map is a dictionary for safe .get()
+    # Handle duplicates by taking the first non-null prob value per task_number
+    task_prob_map = (
+        processed_task_manhours_df
+        .dropna(subset=["prob"])
+        .drop_duplicates(subset="task_number")
+        .set_index("task_number")["prob"]
+        .to_dict()
+    )
+
+
     task_level_findings = []
-    task_prob_map = processed_task_manhours_df.set_index("task_number")["prob"]
     for _, row in task_level_mh_result.iterrows():
         spare_parts = []
-    
-        # Filter task_parts where task_number matches
         spare_filtered = task_level_parts_result[task_level_parts_result["source_task_discrepancy_number"] == row["source_task_discrepancy_number"]]
-    
+        
         for _, part in spare_filtered.iterrows():
             spare_parts.append({
                 "partId": part["issued_part_number"],
@@ -1392,7 +1400,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 "price": float_round(part["billable_value_usd"]),
                 "prob": float_round(part["prob"])
             })
-            
+
         finding = {
             "taskId": row["source_task_discrepancy_number"],
             "details": [{
@@ -1402,32 +1410,33 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     "avg": float_round(row["avg_actual_man_hours"]),
                     "est": float_round(row["max_actual_man_hours"])
                 },
-                "prob": float_round(task_prob_map.get(row["source_task_discrepancy_number"],0)),
+                "prob": float_round(task_prob_map.get(row["source_task_discrepancy_number"], 0)),
                 "spare_parts": spare_parts
             }]
         }
-        
         task_level_findings.append(finding)
-        # Initialize disc_pred if not defined (it wasn't defined in the original)
+
     task_level_disc_pred = []
     for finding in task_level_findings:
         if finding["details"]:
+            detail = finding["details"][0]
             task_level_disc_pred.append({
                 "taskId": finding["taskId"],
-                "avg_mh": finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100),
-                "min_mh": finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100),
-                "max_mh": finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100),
-                "prob": finding["details"][0]["prob"],
-                "exp_cons": finding["details"][0].get("spare_parts", []),
+                "avg_mh": detail["mhs"]["avg"] * (detail["prob"] / 100),
+                "min_mh": detail["mhs"]["min"] * (detail["prob"] / 100),
+                "max_mh": detail["mhs"]["max"] * (detail["prob"] / 100),
+                "prob": detail["prob"],
+                "exp_cons": detail.get("spare_parts", []),
                 "billable_value_usd": sum(
-                    part.get("price", 0)*(part.get("prob", 0) / 100) for part in finding["details"][0].get("spare_parts", [])
+                    part.get("price", 0) * (part.get("prob", 0) / 100) for part in detail.get("spare_parts", [])
                 )
             })
-            
-    task_level_disc_pred=pd.DataFrame(task_level_disc_pred)
+
+    task_level_disc_pred = pd.DataFrame(task_level_disc_pred)
     task_level_disc_pred.to_csv(f"{filepath}/{estID}__task_disc_final_result.csv")
 
     print("computations are completed")
+
     
 
     print("capping is computing")
@@ -1442,7 +1451,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
     if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
         # Create copies for processing
-        task_level_mh_cap = task_level_mh_result.copy()
+
         #task_level_mh_cap=task_level_mh_cap[(task_level_mh_cap["prob"]/100)>probability_threshold]
         task_level_parts_cap = task_level_parts_result.copy()
         #task_level_parts_cap = task_level_parts_result[(task_level_parts_result["prob"]/100)>probability_threshold]
@@ -1489,6 +1498,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         def mhs_cap(mhs_cap_type, mhs_cap_amt):
             if mhs_cap_type == "per_source_card":
                 # Calculate intermediate values (before applying probability)
+                task_level_mh_cap = task_level_mh_result.copy()
                 task_level_mh_cap["unbillable_mh_raw"] = task_level_mh_cap["avg_actual_man_hours"].apply(
                     lambda x: min(x, mhs_cap_amt)
                 )
@@ -1516,9 +1526,20 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 task_level_mh_cap["billable_mh"] = task_level_mh_cap["billable_mh_raw"] * (task_level_mh_cap["prob"]/100)"""
                 
                 # Save final results to CSV
-                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
                 
-                return task_level_mh_cap["unbillable_mh"].sum(), task_level_mh_cap["billable_mh"].sum()
+                #task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
+                # Convert columns to numeric, coercing errors to NaN
+                task_level_mh_cap["unbillable_mh"] = pd.to_numeric(task_level_mh_cap["unbillable_mh"], errors='coerce')
+                task_level_mh_cap["billable_mh"] = pd.to_numeric(task_level_mh_cap["billable_mh"], errors='coerce')
+                task_level_mh_cap.to_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv", index=False)
+
+                task_level_mh_cap_df=pd.read_csv(f"{filepath}/{estID}_task_level_mh_cap_final.csv")
+                # Fill NaNs with 0 to ensure the sum does not return NaN
+                unbillable_sum = task_level_mh_cap_df["unbillable_mh"].fillna(0).sum()
+                billable_sum = task_level_mh_cap_df["billable_mh"].fillna(0).sum()
+                return unbillable_sum, billable_sum
+
+
             
             elif mhs_cap_type == "per_IRC":
                 # Calculate intermediate values (before applying probability)
@@ -1763,6 +1784,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #aggregatedTasks=json.dumps(output_data["aggregatedTasks"])
     #print(aggregatedTasks)
     return output_data
+
+
+
 
 
 
