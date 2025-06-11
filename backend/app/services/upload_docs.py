@@ -1836,7 +1836,7 @@ class ExcelUploadService:
                         
                         spsum = 0
                         for s in spare_parts:
-                            spsum += s.get("price", 0) * (s.get("prob", 100) / 100)* (k.get("prob", 100) / 100)#*(k.get("task_defect_probability", 100) / 100)
+                            spsum += s.get("price", 0) * (s.get("prob", 100) / 100)* (k.get("prob", 100) / 100)*(k.get("task_defect_probability", 100) / 100)
                         predicted_finding_spares_cost += spsum
             
             mydict["predicted_finding_spares_cost"] = predicted_finding_spares_cost
