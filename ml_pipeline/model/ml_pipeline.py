@@ -433,7 +433,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
     print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
 
-    print(f"The shape of {exdata.shape} ")
+    print(f"The shape of exdata{exdata.shape} ")
         
     def get_manhrs(task_number):
         filtered_data=pd.DataFrame()
@@ -527,24 +527,25 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         
         for index, row in mpd_task_data.iterrows():
             task_number = row['TASK NUMBER']
+            filtered_parts_data=pd.DataFrame()
             if task_number in task_description_unique_task_list:
-                filtered_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
+                filtered_parts_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
             else:
                 if delta_tasks:
                     # If task_number is not in task_description_unique_task_list, use all data
-                    filtered_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
+                    filtered_parts_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
             
-            if filtered_data.empty:
+            if filtered_parts_data.empty:
                 continue
             
             # Convert numeric columns to proper data types
             numeric_columns = ['used_quantity', 'billable_value_usd', 'total_billable_price']
             for col in numeric_columns:
-                if col in filtered_data.columns:
-                    filtered_data[col] = pd.to_numeric(filtered_data[col], errors='coerce').fillna(0)
+                if col in filtered_parts_data.columns:
+                    filtered_parts_data[col] = pd.to_numeric(filtered_parts_data[col], errors='coerce').fillna(0)
             
             # Group by issued_part_number
-            grouped_data = filtered_data.groupby('issued_part_number', as_index=False).agg(
+            grouped_data = filtered_parts_data.groupby('issued_part_number', as_index=False).agg(
                 avg_qty_used=('used_quantity', 'mean'),
                 max_qty_used=('used_quantity', 'max'),
                 min_qty_used=('used_quantity', 'min'),
