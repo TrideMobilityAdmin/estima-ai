@@ -7,7 +7,8 @@ from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
 from app.log.logs import logger
-from bson import ObjectId   
+from bson import ObjectId  
+from pymongo import MongoClient 
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -188,3 +189,12 @@ async def change_password(
         "status": "success",
         "message": "Password updated successfully"
     }
+
+@router.get("/ping")
+async def ping_mongo():
+    try:
+        client=MongoClient(settings.DATABASE_URL,serverSelectionTimeoutMS=5000)
+        client.admin.command('ping')
+        return {"status":"MongoDB is up"}
+    except Exception as e:
+        return {"status":"MongoDB is down","error":str(e)}

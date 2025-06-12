@@ -230,10 +230,11 @@ const downloadFindingsPartsData = () => {
         <Tooltip label="Total Tasks">
           <Badge variant="filled" color="teal" radius="sm" size="lg">
             {
-             compareEstimatedData?.task_avialability_summary?.available_tasks?.length 
-             + 
-             compareEstimatedData?.task_avialability_summary?.not_available_tasks
-             ?.length || 0
+             compareEstimatedData?.task_avialability_summary?.total_eligible_tasks || 0
+            //  ?.length 
+            //  + 
+            //  compareEstimatedData?.task_avialability_summary?.not_available_tasks
+            //  ?.length || 0
             }
           </Badge>
           </Tooltip>
@@ -248,7 +249,9 @@ const downloadFindingsPartsData = () => {
               onClick={handleAvailableTasksDownload}
             >
               {
-                compareEstimatedData?.task_avialability_summary?.available_tasks?.length || 0
+                compareEstimatedData?.task_avialability_summary?.total_available_tasks
+                // ?.length
+                 || 0
               }
             </Badge>
           </Tooltip>
@@ -263,8 +266,9 @@ const downloadFindingsPartsData = () => {
               onClick={handleNotAvailableTasksDownload}
             >
               {
-                compareEstimatedData?.task_avialability_summary?.not_available_tasks
-                ?.length || 0
+                compareEstimatedData?.task_avialability_summary?.total_not_available_tasks
+                // ?.length 
+                || 0
               }
             </Badge>
           </Tooltip>
@@ -389,7 +393,7 @@ const downloadFindingsPartsData = () => {
                 </Text>
                 <Text c='gray' size='xs'>
                   {/* (Material consumption pricing, Mldpmlsec1,Mltaskmlsec1) */}
-                  (Material consumption pricing, Mlttable, Mldpmlsec1,Mltaskmlsec1)
+                  (Material consumption pricing, Mldpmlsec1, Mltaskmlsec1, Mlttable(optional))
                 </Text>
               </Grid.Col>
             </Grid>
