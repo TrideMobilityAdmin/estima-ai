@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from fastapi.responses import ORJSONResponse
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import pandas as pd
 import numpy as np
 import os
@@ -34,9 +34,16 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
+class FileProcessingError(Exception):
+    """Custom exception for file processing errors"""
+    def __init__(self, message: str, details: Dict[str, Any] = None):
+        self.message = message
+        self.details = details or {}
+        super().__init__(self.message)
 
 
-class ExcelUploadService:
+
+class ExcelUploadService():
     def __init__(self):
         self.mongo_client = MongoDBClient()
         # self.collection = self.mongo_client.get_collection("estima_input_upload")
@@ -51,6 +58,8 @@ class ExcelUploadService:
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
+
+
         
        
     def clean_field_name(self, field_name: str) -> str:
@@ -668,6 +677,280 @@ class ExcelUploadService:
         else:
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
+    
+        
+    async def get_upload_estimate_byId(self,estimate_id:str)->Dict[str,Any]:
+        
+        try:
+            file_upload_pipeline=[
+    {
+        '$match': {
+            'estID': estimate_id
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'task': 1, 
+            'description': 1, 
+            # 'upload_timestamp': 1, 
+            # 'createdAt': 1, 
+            # 'original_filename': 1, 
+            'probability': 1, 
+            'status': 1, 
+            'operator': 1, 
+            'typeOfCheck': 1, 
+            'typeOfCheckID': 1, 
+            'aircraftAge': 1, 
+            'aircraftRegNo': 1, 
+            'aircraftModel': 1,
+            'operatorForModel':1,
+            'aircraftAgeThreshold':1, 
+            'aircraftFlightHours': 1, 
+            'aircraftFlightCycles': 1, 
+            'areaOfOperations': 1, 
+            'cappingDetails': 1, 
+            'additionalTasks': 1, 
+            'considerDeltaUnAvTasks': 1,
+            'miscLaborTasks': 1
+        }
+    }
+]
+            result = list(self.estima_collection.aggregate(file_upload_pipeline))
+            if not result:
+                logger.warning(f"No estimate found with ID: {estimate_id}")
+                raise HTTPException(status_code=404, detail="Estimate not found")
+            file_upload_result = result[0] if result else {}
+            logger.info(f"file_upload result fetched: {file_upload_result}")
+            return file_upload_result
+        except Exception as e:
+            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
+
+    async def historical_estimate_status(self, status: str=None, estID:str=None,aircraftRegNo:str=None,date:datetime=None,page: int = 1, page_size: int = 5) -> dict:
+        logger.info(f"Fetching estimates (Page: {page}, Page Size: {page_size})")
+        logger.info(f"Status: {status}, estID: {estID}, aircraftRegNo: {aircraftRegNo}, date: {date}")
+        
+        skip = (page - 1) * page_size
+        match_stage = {}
+        if status is not None:
+            match_stage['status'] = status
+        if estID is not None:
+            normestID = estID.upper().strip()
+            # Use regex for partial matching - case insensitive
+            match_stage['estID'] = {
+                '$regex': f'.*{re.escape(normestID)}.*',
+                '$options': 'i'  # case insensitive
+            }
+       
+        if date is not None:
+            date_only = date.date()  # Extract date: 2025-04-07
+            start_of_day = datetime.combine(date_only, datetime.min.time())  # 2025-04-07 00:00:00
+            end_of_day = datetime.combine(date_only, datetime.max.time())    # 2025-04-07 23:59:59.999999
+            
+            match_stage['createdAt'] = {
+                '$gte': start_of_day,
+                '$lte': end_of_day
+            }
+            
+        pipeline = []
+        if match_stage:
+            pipeline.append({'$match': match_stage})
+        
+        if aircraftRegNo is not None:
+            norm_aircraftRegNo = aircraftRegNo.replace(" ", "").replace("-", "").upper()
+            pipeline.append({
+            '$match': {
+                '$expr': {
+                    '$regexMatch': {
+                        'input': {
+                            '$toUpper': {
+                                '$replaceAll': {
+                                    'input': {
+                                        '$replaceAll': {
+                                            'input': '$aircraftRegNo',
+                                            'find': ' ',
+                                            'replacement': ''
+                                        }
+                                    },
+                                    'find': '-',
+                                    'replacement': ''
+                                }
+                            }
+                        },
+                        'regex': f'.*{re.escape(norm_aircraftRegNo)}.*',
+                        'options': 'i'
+                    }
+                }
+            }
+        })
+        pipeline.extend([
+   
+    {
+        '$lookup': {
+            'from': 'estima_output', 
+            'let': {
+                'estId': '$estID'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$eq': [
+                                '$estID', '$$estId'
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        '_id': 0, 
+                        'aggregatedTasks': 1, 
+                        'aggregatedFindings': 1
+                    }
+                }
+            ], 
+            'as': 'estimate'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estimate', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, 
+     {
+        '$sort': {
+            'createdAt': -1
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_status_remarks', 
+            'localField': 'estID', 
+            'foreignField': 'estID', 
+            'as': 'remarks_doc'
+        }
+    }, {
+        '$unwind': {
+            'path': '$remarks_doc', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$addFields': {
+            'totalMhs': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalMhs', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalMhs', 0
+                        ]
+                    }
+                ]
+            }, 
+            'totalPartsCost': {
+                '$add': [
+                    {
+                        '$ifNull': [
+                            '$estimate.aggregatedTasks.totalPartsCost', 0
+                        ]
+                    }, {
+                        '$ifNull': [
+                            '$estimate.aggregatedFindings.totalPartsCost', 0
+                        ]
+                    }
+                ]
+            }, 
+            # 'tatTime': {
+            #     '$divide': [
+            #         {
+            #             '$add': [
+            #                 {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedTasks.totalMhs', 0
+            #                     ]
+            #                 }, {
+            #                     '$ifNull': [
+            #                         '$estimate.aggregatedFindings.totalMhs', 0
+            #                     ]
+            #                 }
+            #             ]
+            #         }, man_hours_threshold
+            #     ]
+            # }, 
+            'remarks': {
+                '$ifNull': [
+                    '$remarks_doc.remarks', ''
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0, 
+            'estID': 1, 
+            'tasks': '$task', 
+            'descriptions': '$description', 
+            'aircraftRegNo': '$aircraftRegNo',          
+            'status': '$status', 
+            'totalMhs': 1, 
+            'totalPartsCost': 1, 
+            'createdAt': '$createdAt', 
+            'remarks': 1
+        }
+    },
+     {
+                '$facet': {
+                    'data': [
+                        { '$skip': skip },
+                        { '$limit': page_size }
+                    ],
+                    'totalCount': [
+                        { '$count': 'total' }
+                    ]
+                }
+            } 
+
+])
+        
+       
+        
+        facet_results = list(self.estima_collection.aggregate(pipeline))
+        results = facet_results[0]['data'] if facet_results else []
+        total_count = facet_results[0]['totalCount'][0]['total'] if facet_results and facet_results[0]['totalCount'] else 0
+        
+        logger.info(f"Total documents matching filters: {total_count}")
+        logger.info(f"Number of estimates Fetched for current page: {len(results)}")
+        
+       
+        for result in results:
+          
+            existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
+            
+            # If it doesn't exist, create one with empty remarks
+   
+            if not existing_remarks:
+                self.remarks_collection.insert_one({
+                    "estID": result["estID"],
+                    "remarks": [{
+                        "remark": "",
+                        "updatedAt": datetime.utcnow(),
+                        "updatedBy": "",
+                        "createdAt": datetime.utcnow(),
+                        "active": True
+                    }],
+                    
+                })
+        
+
+        response = [EstimateStatusResponse(**result) for result in results]
+        
+
+        return {
+            "data": response,
+            "count": total_count,
+        }
+        # return response
+    
         
     def get_best_match(self, target, candidates):
         """
@@ -758,85 +1041,123 @@ class ExcelUploadService:
         return dynamic_mappings
         
     def read_excel_with_multiple_sheetnames(self, content, filename, file_extension, sheet_names, config):
-        """
-        Read a specific sheet from an Excel file.
+            """
+            Read a specific sheet from an Excel file with enhanced error handling.
 
-        Args:
-            content (bytes): File content.
-            filename (str): Name of the file.
-            file_extension (str): File extension.
-            sheet_name (str): Name of the sheet to read.
-            config (dict): Configuration dictionary.
+            Args:
+                content (bytes): File content.
+                filename (str): Name of the file.
+                file_extension (str): File extension.
+                sheet_names (List[str]): List of sheet names to look for.
+                config (dict): Configuration dictionary.
 
-        Returns:
-            pd.DataFrame: DataFrame containing the sheet data.
-        """
-        try:
-            pd.set_option('display.encoding', 'utf-8')
-            logger.info(f"Reading Excel file with sheet names: {sheet_names}")
-            
-            # Choose appropriate engine based on file extension
-            if file_extension.startswith('.'):
-                extension = file_extension
-            else:
-                extension = f".{file_extension}"
+            Returns:
+                pd.DataFrame: DataFrame containing the sheet data.
                 
-            excel_file = pd.ExcelFile(io.BytesIO(content))
-            available_sheets = excel_file.sheet_names
-            valid_sheets = [sheet for sheet in available_sheets if sheet.lower() in sheet_names]
-            sheet_name= valid_sheets[0] if valid_sheets else None    
-                
-            engine = "openpyxl" if extension in [".xlsx", ".xlsm"] else "pyxlsb" if extension == ".xlsb" else "xlrd"
+            Raises:
+                FileProcessingError: When sheet names are not found or other processing errors occur.
+            """
             try:
+                pd.set_option('display.encoding', 'utf-8')
+                logger.info(f"Reading Excel file with sheet names: {sheet_names}")
                 
+                # Choose appropriate engine based on file extension
+                if file_extension.startswith('.'):
+                    extension = file_extension
+                else:
+                    extension = f".{file_extension}"
+                    
+                excel_file = pd.ExcelFile(io.BytesIO(content))
+                available_sheets = excel_file.sheet_names
+                
+                # Convert sheet_names to lowercase for case-insensitive comparison
+                sheet_names_lower = [name.lower() for name in sheet_names]
+                valid_sheets = [sheet for sheet in available_sheets 
+                            if sheet.lower() in sheet_names_lower]
+                
+                # If no valid sheets found, raise error with details
+                if not valid_sheets:
+                    error_details = {
+                        "filename": filename,
+                        "required_sheet_names": sheet_names,
+                        "found_sheet_names": available_sheets,
+                        "error_type": "sheet_not_found"
+                    }
+                    raise FileProcessingError(
+                        f"Required sheet names not found in {filename}", 
+                        error_details
+                    )
+                
+                sheet_name = valid_sheets[0]
+                    
+                if extension in [".xlsx", ".xlsm"]:
+                    engine = "openpyxl"
+                elif extension == ".xlsb":
+                    engine = "pyxlsb"
+                elif extension == ".xls":
+                    engine = "xlrd"
+                else:
+                    raise ValueError(f"Unsupported file extension: {extension}")
+                
+                try:
+                    # Read the specific sheet
+                    df = pd.read_excel(
+                        io.BytesIO(content), 
+                        sheet_name=sheet_name,
+                        engine=engine
+                    )
+                    
+                except UnicodeEncodeError:
+                    # Force UTF-8 encoding for stdout
+                    if sys.stdout.encoding != 'utf-8':
+                        sys.stdout.reconfigure(encoding='utf-8')
+                    
+                    df = pd.read_excel(
+                        io.BytesIO(content), 
+                        sheet_name=sheet_name,
+                        engine=engine
+                    )
+                    logger.info(f"The dataframe columns of {filename} are successfully loaded (column names contain special characters)")
+                
+                # Process based on sheet name type
+                if sheet_name.lower().startswith(("pricing", "sheet1", "price", "page")):
+                    return self._process_pricing_sheet(df, filename, config)
+                elif sheet_name.lower().startswith('mlttable'):
+                    return self._process_mlttable_sheet(df, filename, config)
+                elif sheet_name.lower().startswith('mltaskmlsec1'):
+                    return self._process_mltaskmlsec1_sheet(df, filename, config)
+                elif sheet_name.lower().startswith('mldpmlsec1'):
+                    return self._process_mldpmlsec1_sheet(df, filename, config)
+                else:
+                    df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
+                    df = df[1:].reset_index(drop=True)
+                
+                logger.info(f"Successfully read sheet {sheet_name}")
+                logger.info(f"DataFrame headers: {list(df.columns)}")
+                logger.info(f"DataFrame shape: {df.shape}")
+                
+                return df
             
-                # Read the specific sheet
-                df = pd.read_excel(
-                    io.BytesIO(content), 
-                    sheet_name=sheet_name,
-                    engine=engine
-                )
-                #logger.info(f"The dataframe columns of {filename} are {df.columns}")
-                
-            except UnicodeEncodeError:
+            except FileProcessingError:
+                # Re-raise FileProcessingError as-is
+                raise
+            except ValueError as sheet_error:
+                error_details = {
+                    "filename": filename,
+                    "required_sheet_names": sheet_names,
+                    "found_sheet_names": available_sheets if 'available_sheets' in locals() else [],
+                    "error_type": "sheet_processing_error",
+                    "original_error": str(sheet_error)
+                }
+                raise FileProcessingError(f"Sheet processing error in {filename}: {str(sheet_error)}", error_details)
+            except Exception as error:
+                error_details = {
+                    "filename": filename,
+                    "error_type": "general_error",
+                    "original_error": str(error)
+                }
+                raise FileProcessingError(f"Error reading Excel file {filename}: {str(error)}", error_details)
 
-                # Force UTF-8 encoding for stdout
-                if sys.stdout.encoding != 'utf-8':
-                    sys.stdout.reconfigure(encoding='utf-8')
-                
-                df = pd.read_excel(
-                    io.BytesIO(content), 
-                    sheet_name=sheet_name,
-                    engine=engine
-                )
-                # Log column names as string representation to avoid encoding issues
-                logger.info(f"The dataframe columns of {filename} are successfully loaded (column names contain special characters)")
-            
-            if sheet_name.lower().startswith(("pricing", "sheet1", "price", "page")):
-                return self._process_pricing_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mlttable'):
-                return self._process_mlttable_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mltaskmlsec1'):
-                return self._process_mltaskmlsec1_sheet(df, filename, config)
-            elif sheet_name.lower().startswith('mldpmlsec1'):
-                return self._process_mldpmlsec1_sheet(df, filename, config)
-
-            else:
-                df.columns = df.iloc[0].astype(str).str.replace(".", "", regex=False)
-                df = df[1:].reset_index(drop=True)
-            
-            logger.info(f"Successfully read sheet {sheet_name}")
-            logger.info(f"DataFrame headers: {list(df.columns)}")
-            logger.info(f"DataFrame shape: {df.shape}")
-            
-            return df
-        
-        except ValueError as sheet_error:
-            logger.error(f"Sheet {sheet_name} not found: {str(sheet_error)}")
-            return None
-        except Exception as error:
-            logger.error(f"Error reading Excel file: {str(error)}")
-            return None
     
     def _process_pricing_sheet(self, df, filename, config):
         """Helper method to process pricing sheets"""
@@ -1139,15 +1460,18 @@ class ExcelUploadService:
 
     async def process_multiple_files(self, file: UploadFile, config, SheetNames: List[str]) -> pd.DataFrame:
         """
-        Read and process multiple uploaded Excel or CSV files.
+        Read and process multiple uploaded Excel or CSV files with enhanced error handling.
 
         Args:
             file (UploadFile): Uploaded file to process.
             config (Dict): Configuration settings.
-            SheetName (str): Name of the sheet to read from Excel files.
+            SheetNames (List[str]): Names of the sheets to read from Excel files.
 
         Returns:
             pd.DataFrame: Processed records from matching file
+            
+        Raises:
+            FileProcessingError: When file processing fails
         """
         logger.info(f"Processing the file {file.filename}")
         logger.info(f"Looking for sheet names: {SheetNames}")
@@ -1162,368 +1486,234 @@ class ExcelUploadService:
             logger.info(f"Processing file: {file.filename}, Extension: {file_extension}")
             
             # Handle Excel files
-            if file_extension:
+            if file_extension in ['.xlsx', '.xlsm', '.xlsb', '.xls']:
                 try:
                     # Attempt to read the specified sheet
-                    df = self.read_excel_with_multiple_sheetnames(content, file.filename, file_extension, SheetNames, config)
+                    df = self.read_excel_with_multiple_sheetnames(
+                        content, file.filename, file_extension, SheetNames, config
+                    )
                     if df is not None and not df.empty:
                         logger.info(f"Successfully processed file: {file.filename}")
                         logger.info(f"DataFrame columns: {df.columns}")
                         logger.info(f"DataFrame shape: {df.shape}")
-                        
                         return df
                     else:
-                        logger.warning(f"No data found in sheet {SheetNames} for file {file.filename}")
-                
-                except Exception as excel_error:
-                    logger.error(f"Error processing Excel file {file.filename}: {str(excel_error)}")
-        
-        except Exception as file_error:
-            logger.error(f"Error processing file {file.filename}: {str(file_error)}")
-        
-        # Reset file pointer to beginning for potential reuse
-        await file.seek(0)
-        
-        logger.warning(f"No files found with sheet names: {SheetNames}")
-        return pd.DataFrame() 
-    
-    async def get_upload_estimate_byId(self,estimate_id:str)->Dict[str,Any]:
-        
-        try:
-            file_upload_pipeline=[
-    {
-        '$match': {
-            'estID': estimate_id
-        }
-    }, {
-        '$project': {
-            '_id': 0, 
-            'estID': 1, 
-            'task': 1, 
-            'description': 1, 
-            # 'upload_timestamp': 1, 
-            # 'createdAt': 1, 
-            # 'original_filename': 1, 
-            'probability': 1, 
-            'status': 1, 
-            'operator': 1, 
-            'typeOfCheck': 1, 
-            'typeOfCheckID': 1, 
-            'aircraftAge': 1, 
-            'aircraftRegNo': 1, 
-            'aircraftModel': 1,
-            'operatorForModel':1,
-            'aircraftAgeThreshold':1, 
-            'aircraftFlightHours': 1, 
-            'aircraftFlightCycles': 1, 
-            'areaOfOperations': 1, 
-            'cappingDetails': 1, 
-            'additionalTasks': 1, 
-            'considerDeltaUnAvTasks': 1,
-            'miscLaborTasks': 1
-        }
-    }
-]
-            result = list(self.estima_collection.aggregate(file_upload_pipeline))
-            if not result:
-                logger.warning(f"No estimate found with ID: {estimate_id}")
-                raise HTTPException(status_code=404, detail="Estimate not found")
-            file_upload_result = result[0] if result else {}
-            logger.info(f"file_upload result fetched: {file_upload_result}")
-            return file_upload_result
-        except Exception as e:
-            logger.error(f"Error fetching estimate {estimate_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"error fetching estimate id {estimate_id}: {str(e)}")
-
-    async def historical_estimate_status(self, status: str=None, estID:str=None,aircraftRegNo:str=None,date:datetime=None,page: int = 1, page_size: int = 5) -> dict:
-        logger.info(f"Fetching estimates (Page: {page}, Page Size: {page_size})")
-        logger.info(f"Status: {status}, estID: {estID}, aircraftRegNo: {aircraftRegNo}, date: {date}")
-        
-        skip = (page - 1) * page_size
-        match_stage = {}
-        if status is not None:
-            match_stage['status'] = status
-        if estID is not None:
-            normestID = estID.upper().strip()
-            # Use regex for partial matching - case insensitive
-            match_stage['estID'] = {
-                '$regex': f'.*{re.escape(normestID)}.*',
-                '$options': 'i'  # case insensitive
-            }
-       
-        if date is not None:
-            date_only = date.date()  # Extract date: 2025-04-07
-            start_of_day = datetime.combine(date_only, datetime.min.time())  # 2025-04-07 00:00:00
-            end_of_day = datetime.combine(date_only, datetime.max.time())    # 2025-04-07 23:59:59.999999
-            
-            match_stage['createdAt'] = {
-                '$gte': start_of_day,
-                '$lte': end_of_day
-            }
-            
-        pipeline = []
-        if match_stage:
-            pipeline.append({'$match': match_stage})
-        
-        if aircraftRegNo is not None:
-            norm_aircraftRegNo = aircraftRegNo.replace(" ", "").replace("-", "").upper()
-            pipeline.append({
-            '$match': {
-                '$expr': {
-                    '$regexMatch': {
-                        'input': {
-                            '$toUpper': {
-                                '$replaceAll': {
-                                    'input': {
-                                        '$replaceAll': {
-                                            'input': '$aircraftRegNo',
-                                            'find': ' ',
-                                            'replacement': ''
-                                        }
-                                    },
-                                    'find': '-',
-                                    'replacement': ''
-                                }
-                            }
-                        },
-                        'regex': f'.*{re.escape(norm_aircraftRegNo)}.*',
-                        'options': 'i'
-                    }
-                }
-            }
-        })
-        pipeline.extend([
-   
-    {
-        '$lookup': {
-            'from': 'estima_output', 
-            'let': {
-                'estId': '$estID'
-            }, 
-            'pipeline': [
-                {
-                    '$match': {
-                        '$expr': {
-                            '$eq': [
-                                '$estID', '$$estId'
-                            ]
+                        error_details = {
+                            "filename": file.filename,
+                            "required_sheet_names": SheetNames,
+                            "error_type": "empty_dataframe"
                         }
+                        raise FileProcessingError(
+                            f"No data found in sheets {SheetNames} for file {file.filename}",
+                            error_details
+                        )
+                
+                except FileProcessingError:
+                    # Re-raise FileProcessingError as-is
+                    raise
+                except Exception as excel_error:
+                    error_details = {
+                        "filename": file.filename,
+                        "error_type": "excel_processing_error",
+                        "original_error": str(excel_error)
                     }
-                }, {
-                    '$project': {
-                        '_id': 0, 
-                        'aggregatedTasks': 1, 
-                        'aggregatedFindings': 1
-                    }
+                    raise FileProcessingError(
+                        f"Error processing Excel file {file.filename}: {str(excel_error)}",
+                        error_details
+                    )
+            else:
+                error_details = {
+                    "filename": file.filename,
+                    "file_extension": file_extension,
+                    "error_type": "unsupported_file_type"
                 }
-            ], 
-            'as': 'estimate'
-        }
-    }, {
-        '$unwind': {
-            'path': '$estimate', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, 
-     {
-        '$sort': {
-            'createdAt': -1
-        }
-    }, {
-        '$lookup': {
-            'from': 'estimate_status_remarks', 
-            'localField': 'estID', 
-            'foreignField': 'estID', 
-            'as': 'remarks_doc'
-        }
-    }, {
-        '$unwind': {
-            'path': '$remarks_doc', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$addFields': {
-            'totalMhs': {
-                '$add': [
-                    {
-                        '$ifNull': [
-                            '$estimate.aggregatedTasks.totalMhs', 0
-                        ]
-                    }, {
-                        '$ifNull': [
-                            '$estimate.aggregatedFindings.totalMhs', 0
-                        ]
-                    }
-                ]
-            }, 
-            'totalPartsCost': {
-                '$add': [
-                    {
-                        '$ifNull': [
-                            '$estimate.aggregatedTasks.totalPartsCost', 0
-                        ]
-                    }, {
-                        '$ifNull': [
-                            '$estimate.aggregatedFindings.totalPartsCost', 0
-                        ]
-                    }
-                ]
-            }, 
-            # 'tatTime': {
-            #     '$divide': [
-            #         {
-            #             '$add': [
-            #                 {
-            #                     '$ifNull': [
-            #                         '$estimate.aggregatedTasks.totalMhs', 0
-            #                     ]
-            #                 }, {
-            #                     '$ifNull': [
-            #                         '$estimate.aggregatedFindings.totalMhs', 0
-            #                     ]
-            #                 }
-            #             ]
-            #         }, man_hours_threshold
-            #     ]
-            # }, 
-            'remarks': {
-                '$ifNull': [
-                    '$remarks_doc.remarks', ''
-                ]
+                raise FileProcessingError(
+                    f"Unsupported file type: {file_extension} for file {file.filename}",
+                    error_details
+                )
+        
+        except FileProcessingError:
+            # Re-raise FileProcessingError as-is
+            raise
+        except Exception as file_error:
+            error_details = {
+                "filename": file.filename,
+                "error_type": "general_file_error",
+                "original_error": str(file_error)
             }
-        }
-    }, {
-        '$project': {
-            '_id': 0, 
-            'estID': 1, 
-            'tasks': '$task', 
-            'descriptions': '$description', 
-            'aircraftRegNo': '$aircraftRegNo',          
-            'status': '$status', 
-            'totalMhs': 1, 
-            'totalPartsCost': 1, 
-            'createdAt': '$createdAt', 
-            'remarks': 1
-        }
-    },
-     {
-                '$facet': {
-                    'data': [
-                        { '$skip': skip },
-                        { '$limit': page_size }
-                    ],
-                    'totalCount': [
-                        { '$count': 'total' }
-                    ]
-                }
-            } 
-
-])
-        
-       
-        
-        facet_results = list(self.estima_collection.aggregate(pipeline))
-        results = facet_results[0]['data'] if facet_results else []
-        total_count = facet_results[0]['totalCount'][0]['total'] if facet_results and facet_results[0]['totalCount'] else 0
-        
-        logger.info(f"Total documents matching filters: {total_count}")
-        logger.info(f"Number of estimates Fetched for current page: {len(results)}")
-        
-       
-        for result in results:
-          
-            existing_remarks = self.remarks_collection.find_one({"estID": result["estID"]})
-            
-            # If it doesn't exist, create one with empty remarks
-   
-            if not existing_remarks:
-                self.remarks_collection.insert_one({
-                    "estID": result["estID"],
-                    "remarks": [{
-                        "remark": "",
-                        "updatedAt": datetime.utcnow(),
-                        "updatedBy": "",
-                        "createdAt": datetime.utcnow(),
-                        "active": True
-                    }],
-                    
-                })
-        
-
-        response = [EstimateStatusResponse(**result) for result in results]
-        
-
-        return {
-            "data": response,
-            "count": total_count,
-        }
-        # return response
-    
-    async def compare_estimates(self, estimate_id: str, files: List[UploadFile] = File(...)) -> Dict[str, Any]:
+            raise FileProcessingError(
+                f"Error processing file {file.filename}: {str(file_error)}",
+                error_details
+            )
+        finally:
+            # Reset file pointer to beginning for potential reuse
+            await file.seek(0)
+    def validate_filename_keywords(self, filename: str) -> Optional[str]:
         """
-        Compare estimates for multiple uploaded files
+        Validate if filename contains required keywords.
         
         Args:
-            estimate_id (str): Estimate ID to compare
-            files (List[UploadFile]): List of uploaded files to process
-        
+            filename (str): Name of the file to validate
+            
         Returns:
-            Dict[str, Any]: Comparison results
+            Optional[str]: Expected file type if valid, None otherwise
         """
-        logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
+        filename_lower = filename.lower()
         
-        # Initialize DataFrames
-        task_description = pd.DataFrame()
-        sub_task_description = pd.DataFrame()
-        sub_task_parts = pd.DataFrame()
-        task_parts = pd.DataFrame()
-        
-        # Load configuration
-        config_file_path = os.path.join("app", "config", "config.yaml")
-        try:
-            with open(config_file_path, 'r') as file:
-                config = yaml.safe_load(file)
-            logger.info("Config file data fetched successfully")
-        except Exception as e:
-            logger.error(f"Error loading config file: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error loading configuration")
+        if "mltaskmlsec1" in filename_lower:
+            return "mltaskmlsec1"
+        elif "mldpmlsec1" in filename_lower:
+            return "mldpmlsec1"
+        elif "material" in filename_lower:
+            return "material"
+        elif "mlttable" in filename_lower:
+            return "mlttable"
+        else:
+            return None
+    
+    async def compare_estimates(self, estimate_id: str, files: List[UploadFile]) -> Dict[str, Any]:
+            """
+            Compare estimates for multiple uploaded files with comprehensive error handling
+            
+            Args:
+                estimate_id (str): Estimate ID to compare
+                files (List[UploadFile]): List of uploaded files to process
+            
+            Returns:
+                Dict[str, Any]: Comparison results or error details
+            """
+            logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
+            
+            # Initialize DataFrames
+            task_description = pd.DataFrame()
+            sub_task_description = pd.DataFrame()
+            sub_task_parts = pd.DataFrame()
+            task_parts = pd.DataFrame()
+            
+            # Track processing errors
+            processing_errors = []
+            filename_errors = []
+            
+            # Load configuration
+            config_file_path = os.path.join("app", "config", "config.yaml")
+            try:
+                with open(config_file_path, 'r') as file:
+                    config = yaml.safe_load(file)
+                logger.info("Config file data fetched successfully")
+            except Exception as e:
+                logger.error(f"Error loading config file: {str(e)}")
+                raise HTTPException(status_code=500, detail="Error loading configuration")
 
-        try:
-            for file in files:
-                if file.filename.startswith("mltaskmlsec1"):
-                    task_description = await self.process_multiple_files(file, config, ["mltaskmlsec1"])
-                    logger.info(f"Shape of task_description: {task_description.shape}")
+            # Required file types and their corresponding sheet names
+            required_files = {
+                "mltaskmlsec1": ["mltaskmlsec1"],
+                "mldpmlsec1": ["mldpmlsec1"], 
+                "material": ["pricing", "Pricing", "sheet1", "price", "page"],
+                "mlttable": ["mlttable"]
+            }
+            
+            found_files = {key: False for key in required_files.keys()}
+
+            try:
+                for file in files:
+                    # Validate filename keywords
+                    file_type = self.validate_filename_keywords(file.filename)
                     
-                elif file.filename.startswith("mldpmlsec1"):
-                    sub_task_description = await self.process_multiple_files(file, config, ["mldpmlsec1"])
-                    logger.info(f"Shape of sub_task_description: {sub_task_description.shape}")
-                   
-                elif file.filename.startswith("Material"):
-                    sub_task_parts = await self.process_multiple_files(file, config, ["pricing", "sheet1", "price", "page"])
-                    logger.info(f"Shape of sub_task_parts: {sub_task_parts.shape}")
+                    if not file_type:
+                        filename_errors.append({
+                            "filename": file.filename,
+                            "error": "Filename does not contain required keywords",
+                            "required_keywords": list(required_files.keys()),
+                            "error_type": "invalid_filename"
+                        })
+                        continue
                     
-                elif file.filename.startswith("mlttable"):
-                    task_parts = await self.process_multiple_files(file, config, ["mlttable"])
-                    logger.info(f"Shape of task_parts: {task_parts.shape}")
+                    found_files[file_type] = True
+                    
+                    try:
+                        if file_type == "mltaskmlsec1":
+                            task_description = await self.process_multiple_files(
+                                file, config, required_files["mltaskmlsec1"]
+                            )
+                            logger.info(f"Shape of task_description: {task_description.shape}")
+                            
+                        elif file_type == "mldpmlsec1":
+                            sub_task_description = await self.process_multiple_files(
+                                file, config, required_files["mldpmlsec1"]
+                            )
+                            logger.info(f"Shape of sub_task_description: {sub_task_description.shape}")
+                        
+                        elif file_type == "material":
+                            sub_task_parts = await self.process_multiple_files(
+                                file, config, required_files["material"]
+                            )
+                            logger.info(f"Shape of sub_task_parts: {sub_task_parts.shape}")
+                            
+                        elif file_type == "mlttable":
+                            task_parts = await self.process_multiple_files(
+                                file, config, required_files["mlttable"]
+                            )
+                            logger.info(f"Shape of task_parts: {task_parts.shape}")
 
-            # Verify all required data is available
-            if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
-                error_msg = "One or more required sheets are missing from the uploaded files."
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                    except FileProcessingError as fpe:
+                        processing_errors.append({
+                            "filename": file.filename,
+                            "error": fpe.message,
+                            "details": fpe.details,
+                            "error_type": "file_processing_error"
+                        })
+                        logger.error(f"File processing error for {file.filename}: {fpe.message}")
+                        continue
 
-            # Process and compare data
-            compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
-            logger.info("Compare result successfully fetched")
+                # Check for missing required files
+                missing_files = [file_type for file_type, found in found_files.items() if not found]
+                if missing_files:
+                    filename_errors.extend([{
+                        "error": f"Required file type '{file_type}' not found",
+                        "required_keywords": [file_type],
+                        "error_type": "missing_required_file"
+                    } for file_type in missing_files])
 
-            return compare_result
-        
-        except ValueError as ve:
-            logger.error(f"Validation error: {str(ve)}")
-            raise HTTPException(status_code=400, detail=str(ve))
-        except Exception as e:
-            logger.error(f"Unexpected error in compare_estimates: {str(e)}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+                # If there are any errors, return them to the frontend
+                if processing_errors or filename_errors:
+                    return {
+                        "success": False,
+                        "error_summary": "File processing errors occurred",
+                        "filename_errors": filename_errors,
+                        "processing_errors": processing_errors,
+                        "total_errors": len(filename_errors) + len(processing_errors)
+                    }
+
+                # Verify all required data is available
+                if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
+                    error_msg = "One or more required sheets are missing from the uploaded files."
+                    logger.error(error_msg)
+                    return {
+                        "success": False,
+                        "error_summary": error_msg,
+                        "missing_data": {
+                            "sub_task_parts_empty": sub_task_parts.empty,
+                            "sub_task_description_empty": sub_task_description.empty,
+                            "task_description_empty": task_description.empty,
+                            "task_parts_empty": task_parts.empty
+                        }
+                    }
+
+                # Process and compare data
+                compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
+                logger.info("Compare result successfully fetched")
+
+                return  compare_result
+
+            
+            except Exception as e:
+                logger.error(f"Unexpected error in compare_estimates: {str(e)}")
+                return {
+                    "success": False,
+                    "error_summary": "Internal server error occurred",
+                    "error_details": str(e),
+                    "error_type": "unexpected_error"
+                }
         
     def parts_combine(self,sub_task_parts,task_parts):
         parts_master = list(self.parts_master_collection.find({},))
@@ -1605,7 +1795,12 @@ class ExcelUploadService:
 
         if not pred_data:
             logger.info("None EstID Pred Data -->" + estID)
-            return {}
+            return {
+                        "success": False,
+                        "error_summary": "No Prediction Data found for given {estID}",                    
+                        
+                    }
+
         
         # Process tasks and findings
         pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
