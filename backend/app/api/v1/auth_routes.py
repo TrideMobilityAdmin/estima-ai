@@ -7,8 +7,8 @@ from app.db.database_connection import users_collection,user_login_collection
 from app.pyjwt.jwt import create_access_token
 from app.config.config import settings
 from app.log.logs import logger
-from bson import ObjectId  
-from pymongo import MongoClient 
+from bson import ObjectId   
+from pymongo import MongoClient
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
