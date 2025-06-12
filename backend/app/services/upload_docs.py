@@ -1703,7 +1703,11 @@ class ExcelUploadService():
                 compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
                 logger.info("Compare result successfully fetched")
 
-                return  compare_result
+                return {
+                    "success": True,
+                    "compare_result": compare_result
+
+                }
 
             
             except Exception as e:
