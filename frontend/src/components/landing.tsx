@@ -331,7 +331,17 @@ const Landing: React.FC = () => {
             <Menu.Dropdown>
               <Card w="100%">
                 <Flex direction="column" align="center" justify="center">
-                  <Avatar src={gmrIcon} variant="light" radius="md" size="lg" />
+                  {/* <Avatar src={gmrIcon} variant="light" radius="md" size="lg" /> */}
+                  <div>
+                        <img
+                          src={gmrIcon}
+                          style={{
+                            height: "2em",
+                            cursor: "pointer",
+                            borderRadius: 15,
+                          }}
+                        />
+                      </div>
                   <Text fw="bold" size="md">
                     {currentUser || "-"}
                   </Text>
