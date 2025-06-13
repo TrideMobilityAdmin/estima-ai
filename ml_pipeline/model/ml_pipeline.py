@@ -335,6 +335,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         
 
     # At this point, train_packages contains either at least 5 packages or the maximum we could find
+    if len(train_packages) ==0:
+        raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+    
     print(f"Found {len(train_packages)} packages and the age is {aircraft_age} and   with age_cap of {age_cap}")
     
     print("Training packages are extracted")
@@ -434,7 +437,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     print(f"no of packages in exdata {len(exdata['package_number'].unique().tolist())} ")
 
     print(f"The shape of exdata{exdata.shape} ")
-        
+    if task_data.empty:
+        raise ValueError(f"No tasks data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+    elif exdata.empty:
+        raise ValueError(f"No defects data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+    elif sub_parts_data.empty:
+        raise ValueError(f"No parts data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+            
     def get_manhrs(task_number):
         filtered_data=pd.DataFrame()
         if task_number in task_description_unique_task_list:

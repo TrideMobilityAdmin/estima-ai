@@ -58,6 +58,7 @@ class ExcelUploadService():
         self.parts_master_collection=self.mongo_client.get_collection("parts_master")
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
+        self.error_detail=str("Following error occured while processing the file")
 
 
         
@@ -562,9 +563,10 @@ class ExcelUploadService():
             'estID': 1, 
             'tasks': '$task', 
             'descriptions': '$description', 
-            'aircraftRegNo': '$aircraftRegNo', 
+            'aircraftRegNo': '$aircraftRegNo',
+            'error':  '$error', 
             # 'probability': 1, 
-            # 'operator': 1, 
+
             # 'aircraftAge': 1, 
             # 'typeOfCheck': {
             #     '$ifNull': [
@@ -890,7 +892,8 @@ class ExcelUploadService():
             'estID': 1, 
             'tasks': '$task', 
             'descriptions': '$description', 
-            'aircraftRegNo': '$aircraftRegNo',          
+            'aircraftRegNo': '$aircraftRegNo',
+            'error':'$error',          
             'status': '$status', 
             'totalMhs': 1, 
             'totalPartsCost': 1, 
@@ -1077,6 +1080,14 @@ class ExcelUploadService():
                 
                 # If no valid sheets found, raise error with details
                 if not valid_sheets:
+                    missing_sheets = ", ".join(sheet_names)
+                    available = ", ".join(available_sheets)
+
+                    self.error_detail += (
+                        f", The following required sheet names were not found in {filename}: "
+                        f"{missing_sheets}. Available sheets are: {available}"
+                    )
+
                     error_details = {
                         "filename": filename,
                         "required_sheet_names": sheet_names,
@@ -1097,6 +1108,10 @@ class ExcelUploadService():
                 elif extension == ".xls":
                     engine = "xlrd"
                 else:
+                    self.error_detail += (
+                        f", Unsupported file extension {extension} for {filename}. "
+                        "Supported extensions are: .xlsx, .xlsm, .xlsb, .xls"
+                    )
                     raise ValueError(f"Unsupported file extension: {extension}")
                 
                 try:
@@ -1522,6 +1537,8 @@ class ExcelUploadService():
                         error_details
                     )
             else:
+                self.error_detail+=f", The following {file.filename} has unsupported file extension : {file_extension} and the supported file extensions are: .xlsx, .xlsm, .xlsb, .xls"
+                
                 error_details = {
                     "filename": file.filename,
                     "file_extension": file_extension,
@@ -1583,6 +1600,7 @@ class ExcelUploadService():
                 Dict[str, Any]: Comparison results or error details
             """
             logger.info(f"Comparing estimates for estimate ID: {estimate_id}")
+            self.error_detail=str("Following error occured while processing the compare estimate")
             
             # Initialize DataFrames
             task_description = pd.DataFrame()
@@ -1620,6 +1638,9 @@ class ExcelUploadService():
                     file_type = self.validate_filename_keywords(file.filename)
                     
                     if not file_type:
+                        self.error_detail += f", The file '{file.filename}' does not contain the required keywords: {list(required_files.keys())} in its name."
+
+                
                         filename_errors.append({
                             "filename": file.filename,
                             "error": "Filename does not contain required keywords",
@@ -1673,7 +1694,8 @@ class ExcelUploadService():
                         "required_keywords": [file_type],
                         "error_type": "missing_required_file"
                     } for file_type in missing_files])
-
+                    
+                """
                 # If there are any errors, return them to the frontend
                 if processing_errors or filename_errors:
                     return {
@@ -1683,11 +1705,26 @@ class ExcelUploadService():
                         "processing_errors": processing_errors,
                         "total_errors": len(filename_errors) + len(processing_errors)
                     }
-
+                """
                 # Verify all required data is available
-                if sub_task_parts.empty or sub_task_description.empty or task_description.empty:
-                    error_msg = "One or more required sheets are missing from the uploaded files."
+                if sub_task_parts.empty:
+                    error_msg = ", expected columns in Material consumpation pricing file are not found or empty."
                     logger.error(error_msg)
+                    self.error_detail += f", {error_msg}"
+                    raise ValueError
+                elif sub_task_description.empty:
+                    error_msg = ", expected columns in mldpmlsec1 are not found or empty."
+                    logger.error(error_msg)
+                    self.error_detail += f", {error_msg}"
+                    raise ValueError
+                     
+                elif task_description.empty:
+                    error_msg = ", expected columns in mltaskmlsec1 are not found or empty."
+                    logger.error(error_msg)
+                    self.error_detail += f", {error_msg}"
+                    raise ValueError
+                
+                    """
                     return {
                         "success": False,
                         "error_summary": error_msg,
@@ -1697,27 +1734,28 @@ class ExcelUploadService():
                             "task_description_empty": task_description.empty,
                             "task_parts_empty": task_parts.empty
                         }
-                    }
+                    }"""
 
                 # Process and compare data
                 compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
                 logger.info("Compare result successfully fetched")
 
-                return {
-                    "success": True,
-                    "compare_result": compare_result
+                return  compare_result
 
-                }
-
+            except ValueError as ve:
+                logger.error(f"ValueError in compare_estimates: {str(ve)}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=self.error_detail + f" {str(ve)}"
+                )
             
             except Exception as e:
                 logger.error(f"Unexpected error in compare_estimates: {str(e)}")
-                return {
-                    "success": False,
-                    "error_summary": "Internal server error occurred",
-                    "error_details": str(e),
-                    "error_type": "unexpected_error"
-                }
+                raise HTTPException(
+                status_code=500,
+                detail="Unexpected error occurred while performing comparing estimates"
+            ) 
+
         
     def parts_combine(self,sub_task_parts,task_parts):
         parts_master = list(self.parts_master_collection.find({},))
@@ -1798,12 +1836,10 @@ class ExcelUploadService():
 
 
         if not pred_data:
-            logger.info("None EstID Pred Data -->" + estID)
-            return {
-                        "success": False,
-                        "error_summary": "No Prediction Data found for given {estID}",                    
-                        
-                    }
+            logger.info(f"No EstID Pred Data --> {estID}")
+            raise ValueError(f", No prediction data found for given EstID: {estID}")                 
+                            
+
 
         
         # Process tasks and findings
