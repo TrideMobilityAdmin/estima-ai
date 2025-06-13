@@ -161,6 +161,7 @@ class EstimateStatusResponse(BaseModel):
     totalMhs:float
     totalPartsCost:float
     status:str
+    error: Optional[str] = None
     # tatTime:float=0.0
     aircraftRegNo:str
     # probability:float
