@@ -228,6 +228,7 @@ print(f"The shape of the sub task parts collections {sub_task_parts.shape }")
 print(f"The shape of the sub task descriptions collections {sub_task_description.shape }")
 print(f"The shape of the task descriptions collections {task_description.shape }")
 
+
 def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_TASKS,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold,delta_tasks):
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
@@ -333,9 +334,6 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         
 
     # At this point, train_packages contains either at least 5 packages or the maximum we could find
-    if len(train_packages) ==0:
-        raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
-    
     if len(train_packages) ==0:
         raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
     
@@ -538,17 +536,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         for index, row in mpd_task_data.iterrows():
             task_number = row['TASK NUMBER']
             filtered_parts_data=pd.DataFrame()
-            filtered_parts_data=pd.DataFrame()
             if task_number in task_description_unique_task_list:
-                filtered_parts_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
                 filtered_parts_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
             else:
                 if delta_tasks:
                     # If task_number is not in task_description_unique_task_list, use all data
                     filtered_parts_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
-                    filtered_parts_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
             
-            if filtered_parts_data.empty:
             if filtered_parts_data.empty:
                 continue
             
@@ -557,11 +551,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             for col in numeric_columns:
                 if col in filtered_parts_data.columns:
                     filtered_parts_data[col] = pd.to_numeric(filtered_parts_data[col], errors='coerce').fillna(0)
-                if col in filtered_parts_data.columns:
-                    filtered_parts_data[col] = pd.to_numeric(filtered_parts_data[col], errors='coerce').fillna(0)
             
             # Group by issued_part_number
-            grouped_data = filtered_parts_data.groupby('issued_part_number', as_index=False).agg(
             grouped_data = filtered_parts_data.groupby('issued_part_number', as_index=False).agg(
                 avg_qty_used=('used_quantity', 'mean'),
                 max_qty_used=('used_quantity', 'max'),
@@ -1802,6 +1793,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #aggregatedTasks=json.dumps(output_data["aggregatedTasks"])
     #print(aggregatedTasks)
     return output_data
+
 
 
 
