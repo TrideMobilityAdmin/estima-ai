@@ -15,6 +15,7 @@ db = client["gmr-mro-staging-5y"]
 input_collection = db["estimate_file_upload"]
 output_collection = db["estima_output"]
 
+
 def process_document(estID):
     if estID is None or estID == "":
         print("Invalid estID provided.")
@@ -35,8 +36,7 @@ def process_document(estID):
     
     # Create a directory path
     folder_name = str(estID)
-    filepath = f"/home/jupyter_workspace/ml_pipeline/results/{folder_name}/"
-    
+    filepath = f"/home/Data/python_infer/results/{folder_name}/"
     
     try:
         os.makedirs(filepath, exist_ok=True)
@@ -137,6 +137,14 @@ def run_pipeline():
                         
                         # Process the document
                         process_document(estID)
+                    except ValueError as ve:
+                        print(f"ValueError for estID {estID}: {ve}")
+                        sys.stdout.flush()
+                        
+                        # Update status to failed if there's a ValueError
+                        update_query = {"estID": estID}
+                        update_data = {"$set": {"status": "Failed", "error": str(ve)}}
+                        result = input_collection.update_one(update_query, update_data)
                         
                     except Exception as inner_e:
                         print(f"Error processing estID {estID}: {inner_e}")
@@ -144,7 +152,7 @@ def run_pipeline():
                         
                         # Update status to failed if there's an error
                         update_query = {"estID": estID}
-                        update_data = {"$set": {"status": "Failed", "error": str(inner_e)}}
+                        update_data = {"$set": {"status": "Failed", "error": "A Unexpected error occurred"}}
                         result = input_collection.update_one(update_query, update_data)
             else:
                 print("No documents found with status 'Initiated'.")
