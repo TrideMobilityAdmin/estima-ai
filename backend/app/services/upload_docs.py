@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from fastapi.responses import ORJSONResponse
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Optional
 import pandas as pd
 import numpy as np
 import os
@@ -59,8 +59,6 @@ class ExcelUploadService():
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
         self.error_detail=str("Following error occured while processing the file")
-		
-		
 
 
         

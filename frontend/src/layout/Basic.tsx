@@ -89,7 +89,17 @@ export default function Basic() {
         {/* <Menu.Item> */}
           <Card  w="100%">
             <Flex direction='column' align='center' justify='center'>
-            <Avatar src={gmrIcon} variant="light" radius="md" size="lg" />
+            {/* <Avatar src={gmrIcon} variant="light" radius="md" size="lg" /> */}
+                      <div>
+                        <img
+                          src={gmrIcon}
+                          style={{
+                            height: "2em",
+                            cursor: "pointer",
+                            borderRadius: 15,
+                          }}
+                        />
+                      </div>
             {/* <Flex direction='column'> */}
             <Text fw='bold' size="md">
               GMR EstimaAI

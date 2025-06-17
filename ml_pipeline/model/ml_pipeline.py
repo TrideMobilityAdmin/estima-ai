@@ -82,7 +82,7 @@ def threshold_transform(data: np.ndarray, threshold: float = 0.5, above_value: i
     return np.where(np.array(data) > threshold, above_value, below_value)
 
 
-client = MongoClient("mongodb://admin:admin%40123@10.100.12.82:27017/")
+client = MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]
 
 
@@ -336,6 +336,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     if len(train_packages) ==0:
         raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
     
+    if len(train_packages) ==0:
+        raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+    
     print(f"Found {len(train_packages)} packages and the age is {aircraft_age} and   with age_cap of {age_cap}")
     
     print("Training packages are extracted")
@@ -535,13 +538,17 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         for index, row in mpd_task_data.iterrows():
             task_number = row['TASK NUMBER']
             filtered_parts_data=pd.DataFrame()
+            filtered_parts_data=pd.DataFrame()
             if task_number in task_description_unique_task_list:
+                filtered_parts_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
                 filtered_parts_data = sub_parts_data[sub_parts_data['task_number'] == task_number].copy()
             else:
                 if delta_tasks:
                     # If task_number is not in task_description_unique_task_list, use all data
                     filtered_parts_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
+                    filtered_parts_data = sub_parts_all_data[sub_parts_all_data['task_number'] == task_number].copy()
             
+            if filtered_parts_data.empty:
             if filtered_parts_data.empty:
                 continue
             
@@ -550,8 +557,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             for col in numeric_columns:
                 if col in filtered_parts_data.columns:
                     filtered_parts_data[col] = pd.to_numeric(filtered_parts_data[col], errors='coerce').fillna(0)
+                if col in filtered_parts_data.columns:
+                    filtered_parts_data[col] = pd.to_numeric(filtered_parts_data[col], errors='coerce').fillna(0)
             
             # Group by issued_part_number
+            grouped_data = filtered_parts_data.groupby('issued_part_number', as_index=False).agg(
             grouped_data = filtered_parts_data.groupby('issued_part_number', as_index=False).agg(
                 avg_qty_used=('used_quantity', 'mean'),
                 max_qty_used=('used_quantity', 'max'),

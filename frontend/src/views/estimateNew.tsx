@@ -23,7 +23,8 @@ import {
   InputBase,
   Loader,
   Tabs,
-  Pagination
+  Pagination,
+  Popover
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -63,6 +64,7 @@ import {
 import { AreaChart, getFilteredChartTooltipPayload } from "@mantine/charts";
 import "../App.css";
 import {
+  IconAlertTriangle,
   IconArrowBackUpDouble,
   IconChartArcs3,
   IconCheck,
@@ -997,6 +999,7 @@ export default function EstimateNew() {
   const form = useForm<any>({
     initialValues: {
       tasks: [],
+      // probability: 0,
       probability: 0,
       operator: "",
       operatorForModel: false,
@@ -3756,32 +3759,64 @@ border-bottom: none;
                       suppressMovable: false,
                       suppressMenu: true,
                       cellRenderer: (val: any) => {
+                        const status = val.data.status?.toLowerCase();
+                        const errorMessage = val.data.error || "No error message";
+
                         let badgeColor: string;
                         let badgeIcon: JSX.Element;
 
-                        // Using switch case for status color and icon mapping
-                        switch (val.data.status.toLowerCase()) {
+                        switch (status) {
                           case "completed":
                             badgeColor = "#10b981"; // Green
-                            badgeIcon = <IconCircleCheck size={15} />; // Check circle badgeIcon
+                            badgeIcon = <IconCircleCheck size={15} />;
                             break;
                           case "progress":
-                            badgeColor = "#f59e0b"; // Amber/Orange
-                            badgeIcon = <IconLoader size={15} />; // Spinner badgeIcon (you can add CSS for the spinning effect)
+                            badgeColor = "#f59e0b"; // Orange
+                            badgeIcon = <IconLoader size={15} className="animate-spin" />;
                             break;
                           case "initiated":
-                            badgeColor = "#3b82f6"; // Light Blue
-                            badgeIcon = <IconClockUp size={15} />; // Play badgeIcon
+                            badgeColor = "#3b82f6"; // Blue
+                            badgeIcon = <IconClockUp size={15} />;
                             break;
                           case "csv generated":
                             badgeColor = "#9333ea"; // Purple
-                            badgeIcon = <IconFileCheck size={15} />; // File CSV badgeIcon
+                            badgeIcon = <IconFileCheck size={15} />;
+                            break;
+                          case "failed":
+                            badgeColor = "gray"; // Red
+                            badgeIcon = <IconAlertTriangle size={15} />;
                             break;
                           default:
-                            badgeColor = "gray"; // Default color if status is not found
-                            badgeIcon = <IconFileCheck size={15} />; // Default badgeIcon (optional)
+                            badgeColor = "gray";
+                            badgeIcon = <IconFileCheck size={15} />;
                         }
 
+                        // If failed, return with Popover
+                        if (status === "failed") {
+                          return (
+                            <Popover width={200} position="top" withArrow shadow="md">
+                              <Popover.Target>
+                                <Badge
+                                  mt="xs"
+                                  variant="light"
+                                  fullWidth
+                                  color={badgeColor}
+                                  rightSection={badgeIcon}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  {val.data.status}
+                                </Badge>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Text size="sm">
+                                  {errorMessage}
+                                </Text>
+                              </Popover.Dropdown>
+                            </Popover>
+                          );
+                        }
+
+                        // Default rendering for other statuses
                         return (
                           <Badge
                             mt="xs"
@@ -3795,6 +3830,7 @@ border-bottom: none;
                         );
                       },
                     },
+
                     {
                       // field: "actions",
                       headerName: "Actions",
@@ -4165,39 +4201,72 @@ border-bottom: none;
                       {
                         field: "status",
                         headerName: "Status",
-                        resizable: true,
                         sortable: false,
-                        // filter: true,
-                        // floatingFilter: true,
+                        filter: true,
+                        floatingFilter: true,
+                        resizable: true,
                         flex: 1.5,
                         suppressMovable: false,
                         suppressMenu: true,
                         cellRenderer: (val: any) => {
+                          const status = val.data.status?.toLowerCase();
+                          const errorMessage = val.data.error || "No error message";
+
                           let badgeColor: string;
                           let badgeIcon: JSX.Element;
 
-                          switch (val.data.status.toLowerCase()) {
+                          switch (status) {
                             case "completed":
-                              badgeColor = "#10b981";
+                              badgeColor = "#10b981"; // Green
                               badgeIcon = <IconCircleCheck size={15} />;
                               break;
                             case "progress":
-                              badgeColor = "#f59e0b";
-                              badgeIcon = <IconLoader size={15} />;
+                              badgeColor = "#f59e0b"; // Orange
+                              badgeIcon = <IconLoader size={15} className="animate-spin" />;
                               break;
                             case "initiated":
-                              badgeColor = "#3b82f6";
+                              badgeColor = "#3b82f6"; // Blue
                               badgeIcon = <IconClockUp size={15} />;
                               break;
                             case "csv generated":
-                              badgeColor = "#9333ea";
+                              badgeColor = "#9333ea"; // Purple
                               badgeIcon = <IconFileCheck size={15} />;
+                              break;
+                            case "failed":
+                              badgeColor = "gray"; // Red
+                              badgeIcon = <IconAlertTriangle size={15} />;
                               break;
                             default:
                               badgeColor = "gray";
                               badgeIcon = <IconFileCheck size={15} />;
                           }
 
+                          // If failed, return with Popover
+                          if (status === "failed") {
+                            return (
+                              <Popover width={200} position="top" withArrow shadow="md">
+                                <Popover.Target>
+                                  <Badge
+                                    mt="xs"
+                                    variant="light"
+                                    fullWidth
+                                    color={badgeColor}
+                                    rightSection={badgeIcon}
+                                    style={{ cursor: "pointer" }}
+                                  >
+                                    {val.data.status}
+                                  </Badge>
+                                </Popover.Target>
+                                <Popover.Dropdown>
+                                  <Text size="sm">
+                                    {errorMessage}
+                                  </Text>
+                                </Popover.Dropdown>
+                              </Popover>
+                            );
+                          }
+
+                          // Default rendering for other statuses
                           return (
                             <Badge
                               mt="xs"
