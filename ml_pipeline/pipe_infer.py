@@ -137,6 +137,14 @@ def run_pipeline():
                         
                         # Process the document
                         process_document(estID)
+                    except ValueError as ve:
+                        print(f"ValueError for estID {estID}: {ve}")
+                        sys.stdout.flush()
+                        
+                        # Update status to failed if there's a ValueError
+                        update_query = {"estID": estID}
+                        update_data = {"$set": {"status": "Failed", "error": str(ve)}}
+                        result = input_collection.update_one(update_query, update_data)
                         
                     except Exception as inner_e:
                         print(f"Error processing estID {estID}: {inner_e}")
@@ -144,7 +152,7 @@ def run_pipeline():
                         
                         # Update status to failed if there's an error
                         update_query = {"estID": estID}
-                        update_data = {"$set": {"status": "Failed", "error": str(inner_e)}}
+                        update_data = {"$set": {"status": "Failed", "error": "A Unexpected error occurred"}}
                         result = input_collection.update_one(update_query, update_data)
             else:
                 print("No documents found with status 'Initiated'.")

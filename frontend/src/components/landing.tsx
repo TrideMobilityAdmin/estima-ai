@@ -24,7 +24,7 @@ import {
   IconMessageCircle,
   IconLogout,
 } from "@tabler/icons-react";
-import gmrIcon from "../../public/GMR_Icon.jpeg";
+import gmrIcon from "../../public/GMR_Icon2.png";
 import aircraftServiceBg from "../../public/airCraft6.jpeg";
 import bgEstimate from "../../public/airCraft10.jpg";
 import bgCompareEstimate from "../../public/airCraft8.jpg";
@@ -258,11 +258,11 @@ const Landing: React.FC = () => {
           }}
         >
           {/* Left Logo */}
-          <div>
+          <div style={{backgroundColor: "white", padding: "5px", borderRadius: "10px"}}>
             <img
               src={gmrIcon}
               style={{
-                height: "3em",
+                height: "2em",
                 cursor: "pointer",
                 borderRadius: 15,
               }}
@@ -331,7 +331,17 @@ const Landing: React.FC = () => {
             <Menu.Dropdown>
               <Card w="100%">
                 <Flex direction="column" align="center" justify="center">
-                  <Avatar src={gmrIcon} variant="light" radius="md" size="lg" />
+                  {/* <Avatar src={gmrIcon} variant="light" radius="md" size="lg" /> */}
+                  <div>
+                        <img
+                          src={gmrIcon}
+                          style={{
+                            height: "2em",
+                            cursor: "pointer",
+                            borderRadius: 15,
+                          }}
+                        />
+                      </div>
                   <Text fw="bold" size="md">
                     {currentUser || "-"}
                   </Text>
@@ -459,7 +469,7 @@ export default Landing;
 //   IconMessageCircle,
 //   IconLogout,
 // } from "@tabler/icons-react";
-// import gmrIcon from "../../public/GMR_Icon.jpeg";
+// import gmrIcon from "../../public/GMR_Icon2.png";
 // import aircraftServiceBg from "../../public/airCraft6.jpeg";
 // import bgEstimate from "../../public/airCraft10.jpg";
 // import bgCompareEstimate from "../../public/airCraft8.jpg";
@@ -735,7 +745,7 @@ export default Landing;
 //   IconMessageCircle,
 //   IconLogout,
 // } from "@tabler/icons-react";
-// import gmrIcon from "../../public/GMR_Icon.jpeg";
+// import gmrIcon from "../../public/GMR_Icon2.png";
 // import aircraftServiceBg from "../../public/airCraft6.jpeg";
 // import bgEstimate from "../../public/airCraft10.jpg";
 // import bgCompareEstimate from "../../public/airCraft8.jpg";
