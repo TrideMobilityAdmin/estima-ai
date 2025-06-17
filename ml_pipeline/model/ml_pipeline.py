@@ -355,11 +355,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     task_description_unique_task_list = task_data["task_number"].unique().tolist()
     task_all_data=task_description[task_description["task_number"].isin(mpd_task_data["TASK NUMBER"].unique().tolist())]
     # Get distinct task_number and description combinations
-    filtered_tasks = task_data[["task_number", "description"]].drop_duplicates()
+    filtered_tasks = task_data[["task_number", "description"]].groupby("task_number", as_index=False).agg({"description": "first"})
+
 
     # Get task numbers from filtered_tasks as a list
     filtered_task_numbers = filtered_tasks["task_number"].unique().tolist()
 
+
+        
+    # Filter mpd_task_data for tasks not in filtered_task_numbers
+    not_available_tasks = mpd_task_data[~mpd_task_data["TASK NUMBER"].isin(filtered_task_numbers)]
+
+    # Rename columns for consistency
+    not_available_tasks = not_available_tasks.rename(columns={"TASK NUMBER": "task_number", "DESCRIPTION": "description"})
     def lhrh_removal(task_numbers):
         """
         Remove ' (LH)' and ' (RH)' suffixes from task numbers.
@@ -369,12 +377,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
     # Apply the cleaning function
     filtered_task_numbers = lhrh_removal(filtered_task_numbers)
-        
-    # Filter mpd_task_data for tasks not in filtered_task_numbers
-    not_available_tasks = mpd_task_data[~mpd_task_data["TASK NUMBER"].isin(filtered_task_numbers)]
-
-    # Rename columns for consistency
-    not_available_tasks = not_available_tasks.rename(columns={"TASK NUMBER": "task_number", "DESCRIPTION": "description"})
+    
     def get_check_category(task_number):
         """
         Get the check category for a given task number.
