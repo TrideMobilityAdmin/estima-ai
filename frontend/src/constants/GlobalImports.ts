@@ -95,7 +95,7 @@ import {
 import axios from "axios";
 import { useAtom } from "jotai";
 import { Dropzone, IMAGE_MIME_TYPE, FileWithPath } from "@mantine/dropzone";
-import gmrIcon from "../../public/GMR_Icon.jpeg";
+import gmrIcon from "../../public/GMR_Icon2.png";
 import * as XLSX from "xlsx";
 // import { entityID, roleID, userID, userToken } from "../Api/tokenJotai";
 // import { getUserLogin_Url } from "../Api/apiUrls";
