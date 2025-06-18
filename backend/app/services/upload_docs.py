@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException,Depends
 from fastapi.responses import ORJSONResponse
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Optional
 import pandas as pd
 import numpy as np
 import os
@@ -1895,7 +1895,6 @@ class ExcelUploadService():
                 iteration += 1
             
             # Update with the resolved reference
-            
             task_findings_dict[finding] = current
 
         # Assign resolved values back to DataFrame

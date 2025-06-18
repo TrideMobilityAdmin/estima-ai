@@ -15,6 +15,7 @@ db = client["gmr-mro-staging-5y"]
 input_collection = db["estimate_file_upload"]
 output_collection = db["estima_output"]
 
+
 def process_document(estID):
     if estID is None or estID == "":
         print("Invalid estID provided.")
@@ -36,7 +37,6 @@ def process_document(estID):
     # Create a directory path
     folder_name = str(estID)
     filepath = f"/home/jupyter_workspace/ml_pipeline/results/{folder_name}/"
-    
     
     try:
         os.makedirs(filepath, exist_ok=True)
