@@ -3791,10 +3791,32 @@ border-bottom: none;
                             badgeIcon = <IconFileCheck size={15} />;
                         }
 
+                        const knownErrors = [
+                          "No packages found for aircraft",
+                          "No tasks data found",
+                          "No parts data found",
+                          "No defects data found",
+                        ];
+
+                        // Utility to detect known error patterns
+                        const getSafeErrorMessage = (message: string) => {
+                          if (!message) return "An Unexpected error occured";
+
+                          const lowerMsg = message;
+
+                          const hasKnownError = knownErrors.some((err) =>
+                            lowerMsg?.includes(err)
+                          );
+
+                          return hasKnownError ?  message : "An Unexpected error occured";
+                        };
+
                         // If failed, return with Popover
                         if (status === "failed") {
+                          const safeMessage = getSafeErrorMessage(errorMessage);
+
                           return (
-                            <Popover width={200} position="top" withArrow shadow="md">
+                            <Popover width={250} position="top" withArrow shadow="md">
                               <Popover.Target>
                                 <Badge
                                   mt="xs"
@@ -3807,14 +3829,21 @@ border-bottom: none;
                                   {val.data.status}
                                 </Badge>
                               </Popover.Target>
-                              <Popover.Dropdown>
-                                <Text size="sm">
-                                  {errorMessage}
-                                </Text>
+
+                              <Popover.Dropdown
+                                style={{
+                                  maxHeight: 150,
+                                  overflowY: "auto",
+                                  padding: "10px",
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                <Text size="sm">{safeMessage}</Text>
                               </Popover.Dropdown>
                             </Popover>
                           );
                         }
+
 
                         // Default rendering for other statuses
                         return (
@@ -4241,10 +4270,32 @@ border-bottom: none;
                               badgeIcon = <IconFileCheck size={15} />;
                           }
 
+                          const knownErrors = [
+                            "No packages found for aircraft",
+                            "No tasks data found",
+                            "No parts data found",
+                            "No defects data found",
+                          ];
+
+                          // Utility to detect known error patterns
+                          const getSafeErrorMessage = (message: string) => {
+                            if (!message) return "An Unexpected error occured";
+
+                            const lowerMsg = message;
+
+                            const hasKnownError = knownErrors.some((err) =>
+                              lowerMsg?.includes(err)
+                            );
+
+                            return hasKnownError ?  message : "An Unexpected error occured";
+                          };
+
                           // If failed, return with Popover
                           if (status === "failed") {
+                            const safeMessage = getSafeErrorMessage(errorMessage);
+
                             return (
-                              <Popover width={200} position="top" withArrow shadow="md">
+                              <Popover width={250} position="top" withArrow shadow="md">
                                 <Popover.Target>
                                   <Badge
                                     mt="xs"
@@ -4257,14 +4308,21 @@ border-bottom: none;
                                     {val.data.status}
                                   </Badge>
                                 </Popover.Target>
-                                <Popover.Dropdown>
-                                  <Text size="sm">
-                                    {errorMessage}
-                                  </Text>
+
+                                <Popover.Dropdown
+                                  style={{
+                                    maxHeight: 200,
+                                    overflowY: "auto",
+                                    padding: "10px",
+                                    whiteSpace: "pre-wrap",
+                                  }}
+                                >
+                                  <Text size="sm">{safeMessage}</Text>
                                 </Popover.Dropdown>
                               </Popover>
                             );
                           }
+
 
                           // Default rendering for other statuses
                           return (
