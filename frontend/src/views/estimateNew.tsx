@@ -2611,13 +2611,13 @@ export default function EstimateNew() {
                 </Text>
                 {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
                   <Badge ta="center" color="green" size="md" radius="lg">
-                    {Math.round(
-                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
+                    {
+                      (([...validatedTasks, ...validatedAdditionalTasks].filter(
                         (ele) => ele?.status === true
                       ).length /
                         [...validatedTasks, ...validatedAdditionalTasks].length) *
-                      100 || 0
-                    )}{" "}
+                      100)?.toFixed(2) || 0
+                    }{" "}
                     %
                   </Badge>
                 ) : (
@@ -2638,13 +2638,13 @@ export default function EstimateNew() {
                 </Text>
                 {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
                   <Badge ta="center" color="blue" size="md" radius="lg">
-                    {Math.round(
-                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
+                    {
+                      (([...validatedTasks, ...validatedAdditionalTasks].filter(
                         (ele) => ele?.status === false
                       ).length /
                         [...validatedTasks, ...validatedAdditionalTasks].length) *
-                      100 || 0
-                    )}{" "}
+                      100)?.toFixed(2) || 0
+                    }{" "}
                     %
                   </Badge>
                 ) : (
