@@ -159,6 +159,7 @@ export default function EstimateNew() {
     getOperatorsList,
     getEstimateDetailsByID,
     getFilteredTasksByID,
+    getFilteredTasksByTasks,
     getAllHistoryEstimatesStatus
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
@@ -217,7 +218,7 @@ export default function EstimateNew() {
   // const [estimateId, setEstimateId] = useState<string>("");
   const [generatedEstimateId, setGeneratedEstimateId] = useState<string>("");
   const [loading, setLoading] = useState(false); // Add loading state
-  
+
   // const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
   // const [isLoading, setIsLoading] = useState(false);
   console.log("selected remarks >>>>", selectedEstRemarksData);
@@ -310,11 +311,11 @@ export default function EstimateNew() {
   const [selectedHistoryEstId, setSelectedHistoryEstId] = useState<string>("");
   const [selectedHistoryAircrRegNo, setSelectedHistoryAircrRegNo] = useState<string>("");
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<string | null>(null);
-  const [loadingHistoryEstimates, setLoadingHistoryEstimates] = useState(false); 
+  const [loadingHistoryEstimates, setLoadingHistoryEstimates] = useState(false);
 
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(0); // 0-based
-  
+
   const [gridApi, setGridApi] = useState<any>(null);
   const onGridReady = (params: any) => {
     setGridApi(params.api);
@@ -324,8 +325,8 @@ export default function EstimateNew() {
     setLoadingHistoryEstimates(true);
 
     const dateISO = selectedHistoryDate
-    ? `${selectedHistoryDate.getFullYear()}-${String(selectedHistoryDate.getMonth() + 1).padStart(2, '0')}-${String(selectedHistoryDate.getDate()).padStart(2, '0')}T00:00:00`
-    : undefined;
+      ? `${selectedHistoryDate.getFullYear()}-${String(selectedHistoryDate.getMonth() + 1).padStart(2, '0')}-${String(selectedHistoryDate.getDate()).padStart(2, '0')}T00:00:00`
+      : undefined;
 
 
     const params = {
@@ -795,6 +796,18 @@ export default function EstimateNew() {
       }))
       .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
+
+  const [filteredTasksListByTasks, setFilteredTasksListByTasks] = useState<any>(null);
+  const [loadingFiltTasksByTasks, setLoadingFiltTasksByTasks] = useState(false);
+
+  useEffect(() => {
+    const fetchFilteredTasksByTasks = async () => {
+      setLoadingFiltTasksByTasks(true);
+      // const data = await getFilteredTasksByTasks(selectedEstimateTasks);
+    }
+  });
+
+
 
   // console.log("Filtered Tasks List >>>", filteredTasksList);
   // console.log("Filtered combined List >>>", combinedFilteredTasksList);
@@ -2195,7 +2208,7 @@ export default function EstimateNew() {
               {/* Fixed Header */}
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="teal" radius="sm" size="lg">
-                   {/* {combinedFilteredTasksList?.length} */}
+                  {/* {combinedFilteredTasksList?.length} */}
                   {filteredTasksList?.filtered_tasks_count?.total_count || 0}
                 </Badge>
                 <Text fw={600} size="md">After Filter</Text>
@@ -2207,7 +2220,7 @@ export default function EstimateNew() {
                       variant="light"
                       rightSection={<IconDownload size="18" />}
                       onClick={() => downloadExcelFilteredTasks(true)}
-                      // disabled={filteredTasksList?.filtered_tasks_count?.available_tasks_count > 0 ? false : true}
+                    // disabled={filteredTasksList?.filtered_tasks_count?.available_tasks_count > 0 ? false : true}
                     >
                       {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === true)
@@ -2223,7 +2236,7 @@ export default function EstimateNew() {
                       variant="light"
                       rightSection={<IconDownload size="18" />}
                       onClick={() => downloadExcelFilteredTasks(false)}
-                      // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
+                    // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
                     >
                       {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === false)
@@ -2539,53 +2552,18 @@ export default function EstimateNew() {
           setSelectedFileTasksOpened(false);
           setValidatedAdditionalTasks([]);
         }}
-        size={800}
+        size={1200}
         title={
           <>
             <Group justify="space-between">
               <Group>
-                <Badge variant="filled" color="teal" radius="sm" size="lg">
-                  {validatedTasks.length + validatedAdditionalTasks.length}
-                </Badge>
                 <Text c="gray" fw={600}>
                   Tasks for:
                 </Text>
                 <Text fw={600}>{selectedEstimateId}</Text>
               </Group>
 
-              <Group>
-                <Tooltip label="Download Available Tasks">
-                  <Button
-                    size="xs"
-                    color="green"
-                    variant="light"
-                    rightSection={<IconDownload size="18" />}
-                    onClick={() => downloadExcel(true)}
-                  >
-                    {
-                      [...validatedTasks, ...validatedAdditionalTasks].filter(
-                        (ele) => ele?.status === true
-                      ).length
-                    }
-                  </Button>
-                </Tooltip>
 
-                <Tooltip label="Download Not Available Tasks">
-                  <Button
-                    size="xs"
-                    color="blue"
-                    variant="light"
-                    rightSection={<IconDownload size="18" />}
-                    onClick={() => downloadExcel(false)}
-                  >
-                    {
-                      [...validatedTasks, ...validatedAdditionalTasks].filter(
-                        (ele) => ele?.status === false
-                      ).length
-                    }
-                  </Button>
-                </Tooltip>
-              </Group>
             </Group>
             <Space h="sm" />
             {sheetInfo && (
@@ -2604,128 +2582,273 @@ export default function EstimateNew() {
                 </Badge>
               </Group>
             )}
-            <Group justify="space-between">
-              <Group mb="xs" align="center">
-                <Text size="md" fw={500}>
-                  Tasks Available
-                </Text>
-                {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
-                  <Badge ta="center" color="green" size="md" radius="lg">
-                    {Math.round(
-                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
-                        (ele) => ele?.status === true
-                      ).length /
-                        [...validatedTasks, ...validatedAdditionalTasks].length) *
-                      100 || 0
-                    )}{" "}
-                    %
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="light"
-                    ta="center"
-                    color="green"
-                    size="md"
-                    radius="lg"
-                  >
-                    0
-                  </Badge>
-                )}
-              </Group>
-              <Group mb="xs" align="center">
-                <Text size="md" fw={500}>
-                  Tasks Not-Available
-                </Text>
-                {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
-                  <Badge ta="center" color="blue" size="md" radius="lg">
-                    {Math.round(
-                      ([...validatedTasks, ...validatedAdditionalTasks].filter(
-                        (ele) => ele?.status === false
-                      ).length /
-                        [...validatedTasks, ...validatedAdditionalTasks].length) *
-                      100 || 0
-                    )}{" "}
-                    %
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="light"
-                    ta="center"
-                    color="blue"
-                    size="md"
-                    radius="lg"
-                  >
-                    0
-                  </Badge>
-                )}
-              </Group>
-            </Group>
           </>
         }
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        <LoadingOverlay
-          visible={isValidating}
-          zIndex={1000}
-          overlayProps={{ radius: "sm", blur: 2 }}
-          loaderProps={{ color: "indigo", type: "bars" }}
-        />
+        {
+          isValidating ? (
+            <LoadingOverlay
+              visible={isValidating}
+              zIndex={1000}
+              overlayProps={{ radius: "sm", blur: 2 }}
+              loaderProps={{ color: "indigo", type: "bars" }}
+            />
+          ) : (
+            <>
+              <SimpleGrid cols={2} spacing="md">
+                {/* Left side Before filtered */}
+                <Box
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '480px',
+                    border: '1px solid #e9ecef',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}
+                >
+                  {/* Fixed Header */}
+                  <Group mb="md" style={{ flexShrink: 0 }}>
+                    <Badge variant="filled" color="orange" radius="sm" size="lg">
+                      {validatedTasks.length + validatedAdditionalTasks.length}
+                    </Badge>
+                    <Group>
+                      <Tooltip label="Download Available Tasks">
+                        <Button
+                          size="xs"
+                          color="green"
+                          variant="light"
+                          rightSection={<IconDownload size="18" />}
+                          onClick={() => downloadExcel(true)}
+                        >
+                          {
+                            [...validatedTasks, ...validatedAdditionalTasks].filter(
+                              (ele) => ele?.status === true
+                            ).length
+                          }
+                        </Button>
+                      </Tooltip>
 
-        {/* Display all validated tasks */}
-        {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
-          <>
-            {validatedTasks.length > 0 && (
-              <Box mb="md">
-                <Text size="sm" fw={600} mb="xs">Original Tasks:</Text>
-                <SimpleGrid cols={5}>
-                  {validatedTasks
-                    ?.slice() // to avoid mutating the original array
-                    .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-                    ?.map((task, index) => (
-                      <Badge
-                        fullWidth
-                        key={`original-${index}`}
-                        color={task?.status === false ? "blue" : "green"}
-                        variant="light"
-                        radius="sm"
-                        style={{ margin: "0.25em" }}
-                      >
-                        {task?.taskid}
-                      </Badge>
-                    ))}
-                </SimpleGrid>
-              </Box>
-            )}
+                      <Tooltip label="Download Not Available Tasks">
+                        <Button
+                          size="xs"
+                          color="blue"
+                          variant="light"
+                          rightSection={<IconDownload size="18" />}
+                          onClick={() => downloadExcel(false)}
+                        >
+                          {
+                            [...validatedTasks, ...validatedAdditionalTasks].filter(
+                              (ele) => ele?.status === false
+                            ).length
+                          }
+                        </Button>
+                      </Tooltip>
+                    </Group>
 
-            {/* Display additional validated tasks with a separator */}
-            {validatedAdditionalTasks.length > 0 && (
-              <Box>
-                <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
-                <SimpleGrid cols={5}>
-                  {validatedAdditionalTasks
-                    ?.slice() // to avoid mutating the original array
-                    .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
-                    .map((task, index) => (
-                      <Badge
-                        fullWidth
-                        key={`additional-${index}`}
-                        color={task?.status === false ? "blue" : "green"}
-                        variant="light"
-                        radius="sm"
-                        style={{ margin: "0.25em" }}
-                      >
-                        {task?.taskid}
-                      </Badge>
-                    ))}
-                </SimpleGrid>
-              </Box>
-            )}
-          </>
-        ) : (
-          <Text ta="center" size="sm" c="dimmed">
-            No tasks found. Please select a file or add additional tasks.
-          </Text>
-        )}
+                    <Group justify="space-between">
+                      <Group mb="xs" align="center">
+                        <Text size="md" fw={500}>
+                          Tasks Available
+                        </Text>
+                        {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+                          <Badge ta="center" color="green" size="md" radius="lg">
+                            {
+                              (([...validatedTasks, ...validatedAdditionalTasks].filter(
+                                (ele) => ele?.status === true
+                              ).length /
+                                [...validatedTasks, ...validatedAdditionalTasks].length) *
+                                100)?.toFixed(2) || 0
+                            }{" "}
+                            %
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="light"
+                            ta="center"
+                            color="green"
+                            size="md"
+                            radius="lg"
+                          >
+                            0
+                          </Badge>
+                        )}
+                      </Group>
+                      <Group mb="xs" align="center">
+                        <Text size="md" fw={500}>
+                          Tasks Not-Available
+                        </Text>
+                        {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+                          <Badge ta="center" color="blue" size="md" radius="lg">
+                            {
+                              (([...validatedTasks, ...validatedAdditionalTasks].filter(
+                                (ele) => ele?.status === false
+                              ).length /
+                                [...validatedTasks, ...validatedAdditionalTasks].length) *
+                                100)?.toFixed(2) || 0
+                            }{" "}
+                            %
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="light"
+                            ta="center"
+                            color="blue"
+                            size="md"
+                            radius="lg"
+                          >
+                            0
+                          </Badge>
+                        )}
+                      </Group>
+                    </Group>
+                  </Group>
+
+                  {/* Scrollable Content */}
+                  <ScrollArea
+                    style={{
+                      flex: 1,
+                      width: '100%'
+                    }}
+                    scrollbars="y"
+                    offsetScrollbars={false}
+                  >
+                    <Box style={{ width: '100%', paddingRight: '8px' }}>
+
+                      {/* Display all validated tasks */}
+                      {(validatedTasks.length > 0 || validatedAdditionalTasks.length > 0) ? (
+                        <>
+                          {validatedTasks.length > 0 && (
+                            <Box mb="md">
+                              {/* <Text size="sm" fw={600} mb="xs"> Tasks :</Text> */}
+                              <SimpleGrid cols={5}>
+                                {validatedTasks
+                                  ?.slice() // to avoid mutating the original array
+                                  .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                                  ?.map((task, index) => (
+                                    <Badge
+                                      fullWidth
+                                      key={`original-${index}`}
+                                      color={task?.status === false ? "blue" : "green"}
+                                      variant="light"
+                                      radius="sm"
+                                      style={{ margin: "0.25em" }}
+                                    >
+                                      {task?.taskid}
+                                    </Badge>
+                                  ))}
+                              </SimpleGrid>
+                            </Box>
+                          )}
+
+
+                        </>
+                      ) : (
+                        <Text ta="center" size="sm" c="dimmed">
+                          No tasks found. Please select a file or add additional tasks.
+                        </Text>
+                      )}
+
+                    </Box>
+                  </ScrollArea>
+                </Box>
+
+                {/* Right side After filtered */}
+                <Box
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '480px',
+                    border: '1px solid #e9ecef',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}
+                >
+              {/* Fixed Header */}
+              <Group mb="md" style={{ flexShrink: 0 }}>
+                <Badge variant="filled" color="teal" radius="sm" size="lg">
+                  {/* {combinedFilteredTasksList?.length} */}
+                  {filteredTasksList?.filtered_tasks_count?.total_count || 0}
+                </Badge>
+                <Text fw={600} size="md">After Filter</Text>
+                <Group>
+                  <Tooltip label="Download Available Tasks">
+                    <Button
+                      size="xs"
+                      color="cyan"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcelFilteredTasks(true)}
+                    // disabled={filteredTasksList?.filtered_tasks_count?.available_tasks_count > 0 ? false : true}
+                    >
+                      {/* {
+                        combinedFilteredTasksList?.filter((ele) => ele?.status === true)
+                          ?.length
+                      } */}
+                      {filteredTasksList?.filtered_tasks_count?.available_tasks_count || 0}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Download Not Available Tasks">
+                    <Button
+                      size="xs"
+                      color="violet"
+                      variant="light"
+                      rightSection={<IconDownload size="18" />}
+                      onClick={() => downloadExcelFilteredTasks(false)}
+                    // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
+                    >
+                      {/* {
+                        combinedFilteredTasksList?.filter((ele) => ele?.status === false)
+                          ?.length
+                      } */}
+                      {filteredTasksList?.filtered_tasks_count?.not_available_tasks_count || 0}
+                    </Button>
+                  </Tooltip>
+                </Group>
+              </Group>
+                </Box>
+              </SimpleGrid>
+              <Space h="md" />
+              <SimpleGrid cols={2} spacing="md">
+                {/* Display additional validated tasks with a separator */}
+                {validatedAdditionalTasks.length > 0 && (
+                  <Box
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: '1px solid #e9ecef',
+                      borderRadius: '8px',
+                      padding: '12px'
+                    }}
+                  >
+                    <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
+                    <SimpleGrid cols={5}>
+                      {validatedAdditionalTasks
+                        ?.slice() // to avoid mutating the original array
+                        .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
+                        .map((task, index) => (
+                          <Badge
+                            fullWidth
+                            key={`additional-${index}`}
+                            color={task?.status === false ? "blue" : "green"}
+                            variant="light"
+                            radius="sm"
+                            style={{ margin: "0.25em" }}
+                          >
+                            {task?.taskid}
+                          </Badge>
+                        ))}
+                    </SimpleGrid>
+                  </Box>
+                )}
+              </SimpleGrid>
+            </>
+          )
+        }
+
+
+
       </Modal>
       {/* Remarks for Estimate id */}
       <Modal
@@ -3458,21 +3581,21 @@ export default function EstimateNew() {
                 </SimpleGrid>
                 <Space h="md" />
                 <SimpleGrid cols={2} spacing="xs">
-                  <Card 
-                  // bg='#f5f5f5' 
-                  p='5' 
-                  withBorder
+                  <Card
+                    // bg='#f5f5f5' 
+                    p='5'
+                    withBorder
                   >
-                     <Checkbox
-                    checked={form.values.considerDeltaUnAvTasks}
-                    onChange={(event) =>
-                    form.setFieldValue('considerDeltaUnAvTasks', event.currentTarget.checked)}
-                    label="Consider Delta Un-Available Tasks"
-                    color="#000480"
-                    size="sm"
-                  />
+                    <Checkbox
+                      checked={form.values.considerDeltaUnAvTasks}
+                      onChange={(event) =>
+                        form.setFieldValue('considerDeltaUnAvTasks', event.currentTarget.checked)}
+                      label="Consider Delta Un-Available Tasks"
+                      color="#000480"
+                      size="sm"
+                    />
                   </Card>
-                 
+
                 </SimpleGrid>
                 <Space h="xs" />
 
@@ -3628,7 +3751,7 @@ export default function EstimateNew() {
                 }}
               >
                 <style>
-                            {`
+                  {`
 /* Remove the borders and grid lines */
 .ag-theme-alpine .ag-root-wrapper, 
 .ag-theme-alpine .ag-root-wrapper-body,
@@ -3649,7 +3772,7 @@ box-shadow: none !important; /* Remove any box shadow */
 border-bottom: none;
 }
 `}
-                        </style>
+                </style>
 
                 <AgGridReact
                   pagination={true}
@@ -3660,41 +3783,41 @@ border-bottom: none;
                   rowData={estimatesStatusData || []}
                   columnDefs={[
                     {
-                    field: "createdAt",
-                    headerName: "Date",
-                    resizable: true,
-                    sortable: false,
-                    filter: true,
-                    floatingFilter: true,
-                    flex: 1.8,
-                    suppressMovable: false,
-                    suppressMenu: true,
-                    lockPosition: false,
-                    valueGetter: (params: any) => {
-                      const value = params.data?.createdAt;
-                      if (!value) return "";
+                      field: "createdAt",
+                      headerName: "Date",
+                      resizable: true,
+                      sortable: false,
+                      filter: true,
+                      floatingFilter: true,
+                      flex: 1.8,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                      lockPosition: false,
+                      valueGetter: (params: any) => {
+                        const value = params.data?.createdAt;
+                        if (!value) return "";
 
-                      const date = new Date(value);
-                      const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-                      date.setTime(date.getTime() + istOffsetInMilliseconds);
+                        const date = new Date(value);
+                        const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
+                        date.setTime(date.getTime() + istOffsetInMilliseconds);
 
-                      const day = date.getDate().toString().padStart(2, "0");
-                      const month = date.toLocaleString("default", { month: "short" });
-                      const year = date.getFullYear();
-                      const hours = date.getHours().toString().padStart(2, "0");
-                      const minutes = date.getMinutes().toString().padStart(2, "0");
-                      const seconds = date.getSeconds().toString().padStart(2, "0");
+                        const day = date.getDate().toString().padStart(2, "0");
+                        const month = date.toLocaleString("default", { month: "short" });
+                        const year = date.getFullYear();
+                        const hours = date.getHours().toString().padStart(2, "0");
+                        const minutes = date.getMinutes().toString().padStart(2, "0");
+                        const seconds = date.getSeconds().toString().padStart(2, "0");
 
-                      const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
-                      return `${formatted} ${value}`;
+                        const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                        return `${formatted} ${value}`;
+                      },
+                      cellRenderer: (params: any) => {
+                        if (!params.value) return null;
+                        const parts = params.value.split(" ");
+                        const formattedPart = parts.slice(0, 2).join(" ");
+                        return <Text mt="xs">{formattedPart}</Text>;
+                      },
                     },
-                    cellRenderer: (params: any) => {
-                      if (!params.value) return null;
-                      const parts = params.value.split(" ");
-                      const formattedPart = parts.slice(0, 2).join(" ");
-                      return <Text mt="xs">{formattedPart}</Text>;
-                    },
-                  },
                     {
                       field: "estID",
                       headerName: "Estimate ID",
@@ -3791,10 +3914,32 @@ border-bottom: none;
                             badgeIcon = <IconFileCheck size={15} />;
                         }
 
+                        const knownErrors = [
+                          "No packages found for aircraft",
+                          "No tasks data found",
+                          "No parts data found",
+                          "No defects data found",
+                        ];
+
+                        // Utility to detect known error patterns
+                        const getSafeErrorMessage = (message: string) => {
+                          if (!message) return "An Unexpected error occured";
+
+                          const lowerMsg = message;
+
+                          const hasKnownError = knownErrors.some((err) =>
+                            lowerMsg?.includes(err)
+                          );
+
+                          return hasKnownError ? message : "An Unexpected error occured";
+                        };
+
                         // If failed, return with Popover
                         if (status === "failed") {
+                          const safeMessage = getSafeErrorMessage(errorMessage);
+
                           return (
-                            <Popover width={200} position="top" withArrow shadow="md">
+                            <Popover width={250} position="top" withArrow shadow="md">
                               <Popover.Target>
                                 <Badge
                                   mt="xs"
@@ -3807,14 +3952,21 @@ border-bottom: none;
                                   {val.data.status}
                                 </Badge>
                               </Popover.Target>
-                              <Popover.Dropdown>
-                                <Text size="sm">
-                                  {errorMessage}
-                                </Text>
+
+                              <Popover.Dropdown
+                                style={{
+                                  maxHeight: 150,
+                                  overflowY: "auto",
+                                  padding: "10px",
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                <Text size="sm">{safeMessage}</Text>
                               </Popover.Dropdown>
                             </Popover>
                           );
                         }
+
 
                         // Default rendering for other statuses
                         return (
@@ -3896,7 +4048,7 @@ border-bottom: none;
                             <IconChartArcs3 />
                           </ActionIcon>
                         </Tooltip> */}
-                            <Tooltip label="Remarks!"> 
+                            <Tooltip label="Remarks!">
                               <ActionIcon
                                 size={20}
                                 color="blue"
@@ -3961,66 +4113,66 @@ border-bottom: none;
                 />
               </div>
             </Tabs.Panel>
-            
+
             <Tabs.Panel value="history">
               <>
-              <Group p={15}>
-                <DatePickerInput
-                  value={selectedHistoryDate}
-                  onChange={(date) => {
-                    setSelectedHistoryDate(date);
-                    setCurrentPage(0); // reset page number
-                    setPageSize(10);   // reset page size
-                  }}
-                  placeholder="Select date"
-                  label="Select Date"
-                  size="xs"
-                  clearable
-                  minDate={new Date(2025, 2, 1)} // March is month 2 (0-indexed)
-                  maxDate={new Date()} // today's date
-                  styles={{ input: { width: '15vw' } }}
-                />
+                <Group p={15}>
+                  <DatePickerInput
+                    value={selectedHistoryDate}
+                    onChange={(date) => {
+                      setSelectedHistoryDate(date);
+                      setCurrentPage(0); // reset page number
+                      setPageSize(10);   // reset page size
+                    }}
+                    placeholder="Select date"
+                    label="Select Date"
+                    size="xs"
+                    clearable
+                    minDate={new Date(2025, 2, 1)} // March is month 2 (0-indexed)
+                    maxDate={new Date()} // today's date
+                    styles={{ input: { width: '15vw' } }}
+                  />
 
-                <TextInput
-                  value={selectedHistoryEstId}
-                  onChange={(e) => {
-                    setSelectedHistoryEstId(e.currentTarget.value.toUpperCase());
-                    setCurrentPage(0); // reset page number
-                    setPageSize(10);   // reset page size
-                  }}
-                  placeholder="Estimate ID"
-                  label="Estimate ID"
-                  size="xs"
-                  styles={{ input: { width: '16vw' } }}
-                />
-                <TextInput
-                  value={selectedHistoryAircrRegNo}
-                  onChange={(e) => {
-                    setSelectedHistoryAircrRegNo(e.currentTarget.value);
-                    setCurrentPage(0); // reset page number
-                    setPageSize(10);   // reset page size
-                  }}
-                  placeholder="Aircraft Reg No"
-                  label="Aircraft Reg No"
-                  size="xs"
-                  styles={{ input: { width: '100%' } }}
-                />
-                <Select
-                  value={selectedHistoryStatus}
-                  onChange={(value) => {
-                    setSelectedHistoryStatus(value);
-                    setCurrentPage(0); // reset page number
-                    setPageSize(10);   // reset page size
-                  }}
-                  data={["Completed", "Progress", "Initiated", "Failed"]}
-                  placeholder="Select Status"
-                  label="Status"
-                  size="xs"
-                  clearable
-                  styles={{ input: { width: '100%' } }}
-                />
-              </Group>
-                <div   
+                  <TextInput
+                    value={selectedHistoryEstId}
+                    onChange={(e) => {
+                      setSelectedHistoryEstId(e.currentTarget.value.toUpperCase());
+                      setCurrentPage(0); // reset page number
+                      setPageSize(10);   // reset page size
+                    }}
+                    placeholder="Estimate ID"
+                    label="Estimate ID"
+                    size="xs"
+                    styles={{ input: { width: '16vw' } }}
+                  />
+                  <TextInput
+                    value={selectedHistoryAircrRegNo}
+                    onChange={(e) => {
+                      setSelectedHistoryAircrRegNo(e.currentTarget.value);
+                      setCurrentPage(0); // reset page number
+                      setPageSize(10);   // reset page size
+                    }}
+                    placeholder="Aircraft Reg No"
+                    label="Aircraft Reg No"
+                    size="xs"
+                    styles={{ input: { width: '100%' } }}
+                  />
+                  <Select
+                    value={selectedHistoryStatus}
+                    onChange={(value) => {
+                      setSelectedHistoryStatus(value);
+                      setCurrentPage(0); // reset page number
+                      setPageSize(10);   // reset page size
+                    }}
+                    data={["Completed", "Progress", "Initiated", "Failed"]}
+                    placeholder="Select Status"
+                    label="Status"
+                    size="xs"
+                    clearable
+                    styles={{ input: { width: '100%' } }}
+                  />
+                </Group>
+                <div
                   className="ag-theme-alpine"
                   style={{
                     width: "100%",
@@ -4180,7 +4332,7 @@ border-bottom: none;
                         resizable: true,
                         flex: 1,
                         suppressMovable: false,
-                        sortable:false,
+                        sortable: false,
                         suppressMenu: true,
                         cellRenderer: (params: any) => (
                           <Text mt="xs">{Math.round(params.value)}</Text>
@@ -4202,8 +4354,8 @@ border-bottom: none;
                         field: "status",
                         headerName: "Status",
                         sortable: false,
-                        filter: true,
-                        floatingFilter: true,
+                        // filter: true,
+                        // floatingFilter: true,
                         resizable: true,
                         flex: 1.5,
                         suppressMovable: false,
@@ -4241,10 +4393,32 @@ border-bottom: none;
                               badgeIcon = <IconFileCheck size={15} />;
                           }
 
+                          const knownErrors = [
+                            "No packages found for aircraft",
+                            "No tasks data found",
+                            "No parts data found",
+                            "No defects data found",
+                          ];
+
+                          // Utility to detect known error patterns
+                          const getSafeErrorMessage = (message: string) => {
+                            if (!message) return "An Unexpected error occured";
+
+                            const lowerMsg = message;
+
+                            const hasKnownError = knownErrors.some((err) =>
+                              lowerMsg?.includes(err)
+                            );
+
+                            return hasKnownError ? message : "An Unexpected error occured";
+                          };
+
                           // If failed, return with Popover
                           if (status === "failed") {
+                            const safeMessage = getSafeErrorMessage(errorMessage);
+
                             return (
-                              <Popover width={200} position="top" withArrow shadow="md">
+                              <Popover width={250} position="top" withArrow shadow="md">
                                 <Popover.Target>
                                   <Badge
                                     mt="xs"
@@ -4257,14 +4431,21 @@ border-bottom: none;
                                     {val.data.status}
                                   </Badge>
                                 </Popover.Target>
-                                <Popover.Dropdown>
-                                  <Text size="sm">
-                                    {errorMessage}
-                                  </Text>
+
+                                <Popover.Dropdown
+                                  style={{
+                                    maxHeight: 200,
+                                    overflowY: "auto",
+                                    padding: "10px",
+                                    whiteSpace: "pre-wrap",
+                                  }}
+                                >
+                                  <Text size="sm">{safeMessage}</Text>
                                 </Popover.Dropdown>
                               </Popover>
                             );
                           }
+
 
                           // Default rendering for other statuses
                           return (
@@ -4377,50 +4558,50 @@ border-bottom: none;
                   />
                 </div>
                 <Divider my="sm" />
-              {/* Custom footer for pagination */}
-              <Group justify="right" mt="sm" px="md">
-                <Text size="sm">
-                  <Text span c="black" fw={600}>
-                    {currentPage * pageSize + 1}
-                  </Text>{" "}
-                  <Text span fw={100}>to</Text>{" "}
-                  <Text span c="black" fw={600}>
-                    {Math.min((currentPage + 1) * pageSize, historyEstimatesCount || 0)}
-                  </Text>{" "}
-                  <Text span fw={100}>of</Text>{" "}
-                  <Text span c="black" fw={600}>
-                    {historyEstimatesCount || 0}
-                  </Text>{" "}
-                </Text>
+                {/* Custom footer for pagination */}
+                <Group justify="right" mt="sm" px="md">
+                  <Text size="sm">
+                    <Text span c="black" fw={600}>
+                      {currentPage * pageSize + 1}
+                    </Text>{" "}
+                    <Text span fw={100}>to</Text>{" "}
+                    <Text span c="black" fw={600}>
+                      {Math.min((currentPage + 1) * pageSize, historyEstimatesCount || 0)}
+                    </Text>{" "}
+                    <Text span fw={100}>of</Text>{" "}
+                    <Text span c="black" fw={600}>
+                      {historyEstimatesCount || 0}
+                    </Text>{" "}
+                  </Text>
 
 
-                <Group gap="xs">
-                  <Text size="xs">Page Size:</Text>
-                  <Select
-                  color="black"
-                    size="xs"
-                    radius='sm'
-                    data={["10", "20", "30", "50"]}
-                    value={String(pageSize)}
-                    styles={{ input: { width: '5vw',borderColor:"gray"} }}
-                    onChange={(value) => {
-                      if (value) {
-                        setPageSize(parseInt(value, 10));
-                        setCurrentPage(0); // Reset to first page
-                      }
-                    }}
-                  />
-                  <Space w='lg'/>
-                  <Pagination
-                  color="black"
-                    withEdges 
-                    total={Math.ceil((historyEstimatesCount || 0) / pageSize)}
-                    value={currentPage + 1}
-                    onChange={(page) => setCurrentPage(page - 1)} // convert to 0-based
-                    size="xs"
-                  />
+                  <Group gap="xs">
+                    <Text size="xs">Page Size:</Text>
+                    <Select
+                      color="black"
+                      size="xs"
+                      radius='sm'
+                      data={["10", "20", "30", "50"]}
+                      value={String(pageSize)}
+                      styles={{ input: { width: '5vw', borderColor: "gray" } }}
+                      onChange={(value) => {
+                        if (value) {
+                          setPageSize(parseInt(value, 10));
+                          setCurrentPage(0); // Reset to first page
+                        }
+                      }}
+                    />
+                    <Space w='lg' />
+                    <Pagination
+                      color="black"
+                      withEdges
+                      total={Math.ceil((historyEstimatesCount || 0) / pageSize)}
+                      value={currentPage + 1}
+                      onChange={(page) => setCurrentPage(page - 1)} // convert to 0-based
+                      size="xs"
+                    />
+                  </Group>
                 </Group>
-              </Group>
 
               </>
             </Tabs.Panel>

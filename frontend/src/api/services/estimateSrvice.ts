@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getFilteredTasksByTasks_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -308,6 +308,22 @@ export const useApi = () => {
   };
 
 
+  const getFilteredTasksByTasks = async (tasks: string[], description: string[]) => {
+    try {
+      const response = await axiosInstance.post(getFilteredTasksByTasks_Url, { tasks, description });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌Filtered Task Validation API Error:", error.response?.data || error.message);
+
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return [];
+    }
+  };
+
+
   // New function to upload a file with Estimate ID
   const compareUploadFile = async (files: File[], selectedEstID: string) => {
     if (!files.length || !selectedEstID) {
@@ -539,6 +555,7 @@ export const useApi = () => {
     updateRemarkByEstID,
     getOperatorsList,
     getEstimateDetailsByID,
-    getFilteredTasksByID
+    getFilteredTasksByID,
+    getFilteredTasksByTasks
   };
 };
