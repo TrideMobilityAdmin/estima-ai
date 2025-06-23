@@ -1070,9 +1070,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         for idx, part_row in group_level_parts_result.iterrows():
             unit_of_measurement = str(part_row["issued_unit_of_measurement"]).strip().upper()
             if unit_of_measurement in discrete_units:
-                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_qty_used']), 0)
+                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 0)
             else:
-                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_qty_used']), 3)
+                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 3)
 
         # Define parts price calculation
         def parts_price(row):
