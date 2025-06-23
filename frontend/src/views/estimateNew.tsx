@@ -159,7 +159,7 @@ export default function EstimateNew() {
     getOperatorsList,
     getEstimateDetailsByID,
     getFilteredTasksByID,
-    getFilteredTasksByTasks,
+    getModelTasksValidate,
     getAllHistoryEstimatesStatus
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
@@ -797,17 +797,6 @@ export default function EstimateNew() {
       .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
 
-  const [filteredTasksListByTasks, setFilteredTasksListByTasks] = useState<any>(null);
-  const [loadingFiltTasksByTasks, setLoadingFiltTasksByTasks] = useState(false);
-
-  useEffect(() => {
-    const fetchFilteredTasksByTasks = async () => {
-      setLoadingFiltTasksByTasks(true);
-      // const data = await getFilteredTasksByTasks(selectedEstimateTasks);
-    }
-  });
-
-
 
   // console.log("Filtered Tasks List >>>", filteredTasksList);
   // console.log("Filtered combined List >>>", combinedFilteredTasksList);
@@ -1309,6 +1298,112 @@ export default function EstimateNew() {
 
   console.log("rfq sub >>> ", rfqSubmissionResponse);
 
+  const [modalTaskValidateData, setModalTaskValidateData] = useState<any>(null);
+  const [loadingModalTasksValidate, setLoadingModalTasksValidate] = useState(false);
+
+  useEffect(() => {
+    const fetchModalTasksValidate = async () => {
+      setLoadingModalTasksValidate(true);
+
+      // Get values from form
+      const requestData = {
+        MPD_TASKS: {
+          tasks: extractedTasks || [],
+          description : extractedDescriptions || [],
+        },
+        typeOfCheck: form.values.typeOfCheck || [],
+        aircraftAge: form.values.aircraftAge || 0.0,
+        aircraftModel: form.values.aircraftModel || "",
+        operatorForModel: form.values.operatorForModel || false,
+        operator: form.values.operator || "",
+        aircraftAgeThreshold: form.values.aircraftAgeThreshold || 3,
+      };
+
+      const data = await getModelTasksValidate(requestData);
+      setModalTaskValidateData(data);
+      setLoadingModalTasksValidate(false);
+    };
+      fetchModalTasksValidate();
+  }, [
+    extractedTasks,
+    form.values.typeOfCheck,
+    form.values.aircraftAge,
+    form.values.aircraftModel,
+    form.values.operatorForModel,
+    form.values.operator,
+    form.values.aircraftAgeThreshold,
+  ]);
+  console.log("Modal Task Validate Data >>>", modalTaskValidateData);
+
+  const combinedModalTasksValidate = [
+    ...(modalTaskValidateData?.filtered_tasks_list || [])
+      .map((task: any) => ({
+        ...task,
+        status: true
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== ''),
+
+    ...(modalTaskValidateData?.not_available_tasks_list || [])
+      .map((task: any) => ({
+        ...task,
+        status: false
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== '')
+  ];
+
+  console.log("Combined Modal Tasks Validate >>>", combinedModalTasksValidate);
+
+  const downloadExcelModalTaskValidate = (status: boolean) => {
+  const filteredTasks = combinedModalTasksValidate?.filter((task) => task?.status === status) || [];
+
+  let excelData: Record<string, any>[] = [];
+
+  if (status) {
+    // Status === true: Only include TASK NUMBER and DESCRIPTION
+    excelData =
+      filteredTasks.length > 0
+        ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.task_number || "",
+            DESCRIPTION: task?.description || "",
+          }))
+        : [
+            {
+              "TASK NUMBER": "",
+              DESCRIPTION: "",
+            },
+          ];
+  } else {
+    // Status === false: Include CHECK CATEGORY as comma-separated string
+    excelData =
+      filteredTasks.length > 0
+        ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.task_number || "",
+            DESCRIPTION: task?.description || "",
+            "CHECK CATEGORY": Array.isArray(task?.check_category)
+              ? task.check_category.filter(Boolean).join(", ")
+              : "",
+          }))
+        : [
+            {
+              "TASK NUMBER": "",
+              DESCRIPTION: "",
+              "CHECK CATEGORY": "",
+            },
+          ];
+  }
+
+  // Create Excel sheet and download
+  const ws = XLSX.utils.json_to_sheet(excelData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+  XLSX.writeFile(
+    wb,
+    `Estimate_${selectedEstimateId}_${status ? "ModalTasks_Available" : "ModalTasks_NotAvailable"}.xlsx`
+  );
+};
+
+
   const handleSubmitSkills = async () => {
     const validTasks = validatedSkillsTasks
       ?.filter((task) => task?.status === true)
@@ -1437,7 +1532,7 @@ export default function EstimateNew() {
 
   // Step 3: Modify the "Show Tasks" button click handler to include additional tasks validation
   const handleShowTasks = async () => {
-    setSelectedEstimateId(selectedFile?.name);
+     (selectedFile?.name);
     setSelectedFileTasksOpened(true);
 
     // Check if there are any additional tasks to validate
@@ -2769,7 +2864,7 @@ export default function EstimateNew() {
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="teal" radius="sm" size="lg">
                   {/* {combinedFilteredTasksList?.length} */}
-                  {filteredTasksList?.filtered_tasks_count?.total_count || 0}
+                  {modalTaskValidateData?.filtered_tasks_count?.total_count || 0}
                 </Badge>
                 <Text fw={600} size="md">After Filter</Text>
                 <Group>
@@ -2779,14 +2874,14 @@ export default function EstimateNew() {
                       color="cyan"
                       variant="light"
                       rightSection={<IconDownload size="18" />}
-                      onClick={() => downloadExcelFilteredTasks(true)}
+                      onClick={() => downloadExcelModalTaskValidate(true)}
                     // disabled={filteredTasksList?.filtered_tasks_count?.available_tasks_count > 0 ? false : true}
                     >
                       {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === true)
                           ?.length
                       } */}
-                      {filteredTasksList?.filtered_tasks_count?.available_tasks_count || 0}
+                      {modalTaskValidateData?.filtered_tasks_count?.available_tasks_count || 0}
                     </Button>
                   </Tooltip>
                   <Tooltip label="Download Not Available Tasks">
@@ -2795,18 +2890,137 @@ export default function EstimateNew() {
                       color="violet"
                       variant="light"
                       rightSection={<IconDownload size="18" />}
-                      onClick={() => downloadExcelFilteredTasks(false)}
+                      onClick={() => downloadExcelModalTaskValidate(false)}
                     // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
                     >
                       {/* {
                         combinedFilteredTasksList?.filter((ele) => ele?.status === false)
                           ?.length
                       } */}
-                      {filteredTasksList?.filtered_tasks_count?.not_available_tasks_count || 0}
+                      {modalTaskValidateData?.filtered_tasks_count?.not_available_tasks_count || 0}
                     </Button>
                   </Tooltip>
                 </Group>
+                <Group justify="space-between">
+                      <Group mb="xs" align="center">
+                        <Text size="md" fw={500}>
+                          Tasks Available
+                        </Text>
+                        {(modalTaskValidateData?.filtered_tasks_count?.available_tasks_count > 0) ? (
+                          <Badge ta="center" color="cyan" size="md" radius="lg">
+                            {
+                              ((modalTaskValidateData?.filtered_tasks_count?.available_tasks_count /
+                                modalTaskValidateData?.filtered_tasks_count?.total_count) *
+                                100)?.toFixed(2) || 0
+                            }{" "}
+                            %
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="light"
+                            ta="center"
+                            color="cyan"
+                            size="md"
+                            radius="lg"
+                          >
+                            0
+                          </Badge>
+                        )}
+                      </Group>
+                      <Group mb="xs" align="center">
+                        <Text size="md" fw={500}>
+                          Tasks Not-Available
+                        </Text>
+                        {(modalTaskValidateData?.filtered_tasks_count?.not_available_tasks_count > 0) ? (
+                          <Badge ta="center" color="violet" size="md" radius="lg">
+                            {
+                              ((modalTaskValidateData?.filtered_tasks_count?.not_available_tasks_count /
+                                modalTaskValidateData?.filtered_tasks_count?.total_count) *
+                                100)?.toFixed(2) || 0
+                            }{" "}
+                            %
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="light"
+                            ta="center"
+                            color="blue"
+                            size="md"
+                            radius="lg"
+                          >
+                            0
+                          </Badge>
+                        )}
+                      </Group>
+                    </Group>
               </Group>
+              {/* Scrollable Content */}
+              <ScrollArea
+                style={{
+                  flex: 1,
+                  width: '100%'
+                }}
+                scrollbars="y"
+                offsetScrollbars={false}
+              >
+                <Box style={{ width: '100%', paddingRight: '8px' }}>
+                  <SimpleGrid
+                    cols={4}
+                    spacing="xs"
+                    style={{
+                      width: '100%',
+                      minWidth: 0 // Allows grid to shrink below content size
+                    }}
+                  >
+                    {
+                      combinedModalTasksValidate
+                        ?.slice() // to avoid mutating the original array
+                        ?.sort((a, b) => (a?.task_number || '').localeCompare(b?.task_number || ''))
+                        ?.map((task, index) => {
+                          const badgeColor = task?.status ? "cyan" : "violet";
+                          return task?.task_number?.length > 12 ? (
+                            <Tooltip
+                              key={index}
+                              label={task?.task_number}
+                              withArrow
+                              position="top"
+                            >
+                              <Badge
+                                fullWidth
+                                color={badgeColor}
+                                variant="light"
+                                radius="sm"
+                                size="md"
+                                style={{
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
+                                {task?.task_number}
+                              </Badge>
+                            </Tooltip>
+                          ) : (
+                            <Badge
+                              fullWidth
+                              key={index}
+                              color={badgeColor}
+                              variant="light"
+                              radius="sm"
+                              size="sm"
+                              style={{
+                                minWidth: 0,
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {task?.task_number}
+                            </Badge>
+                          );
+                        })
+                    }
+                  </SimpleGrid>
+                </Box>
+              </ScrollArea>
                 </Box>
               </SimpleGrid>
               <Space h="md" />
