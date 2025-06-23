@@ -310,13 +310,13 @@ async def get_historical_estimate_status(
     current_user: dict = Depends(get_current_user)
 ):
     return await excel_service.historical_estimate_status(status,estID,aircraftRegNo,date,page, page_size)
-@router.post("/model_tasks_validate", response_model=dict)
+@router.post("/model_tasks_validate")
 async def model_tasks_validate(
     request: ModelTasksRequest,
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
-    print("validate_tasks")
+
 
     return await task_service.model_tasks_validate(
         request.MPD_TASKS,

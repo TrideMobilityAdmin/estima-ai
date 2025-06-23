@@ -2633,7 +2633,8 @@ class TaskService:
             if not task_data.empty and not mpd_task_data.empty:
                 mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
                 task_data = task_data[task_data["task_number"].isin(mpd_task_numbers)]
-            
+            if task_data.empty:
+                raise ValueError(f"No tasks data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
             # Get unique task numbers from filtered data
             task_description_unique_task_list = task_data["task_number"].unique().tolist() if not task_data.empty else []
             
@@ -2742,6 +2743,9 @@ class TaskService:
                 "age_cap_used": age_cap,  # Int - SERIALIZABLE
                 "packages_found": len(train_packages)  # Int - SERIALIZABLE
             }
+        except ValueError as ve:
+            print(f"Validation error in model_tasks_validate: {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))
             
         except Exception as e:
             print(f"Error in model_tasks_validate: {str(e)}")
