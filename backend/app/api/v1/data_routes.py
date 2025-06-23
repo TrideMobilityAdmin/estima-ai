@@ -310,4 +310,17 @@ async def get_historical_estimate_status(
     current_user: dict = Depends(get_current_user)
 ):
     return await excel_service.historical_estimate_status(status,estID,aircraftRegNo,date,page, page_size)
-
+@router.post("/model_tasks_validate",response_model=dict)
+async def validate_tasks(
+    MPD_TASKS: ValidRequest,
+    aircraft_age :float,
+    aircraft_model :str,
+    customer_name_consideration :bool,
+    check_category :List[str],
+    customer_name :str,
+    age_cap :int,
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends()
+):
+    print("validate_tasks")
+    return await task_service.model_tasks_validate(MPD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap, current_user)
