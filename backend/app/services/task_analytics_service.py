@@ -2616,6 +2616,8 @@ class TaskService:
                     error_msg += f" Customer filter: {customer_name}"
                 raise ValueError(error_msg)
             
+            if len(train_packages) ==0:
+                raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
             print(f"Found {len(train_packages)} packages with final age_cap of {age_cap}")
             print("Training packages extracted successfully")
             print("Processing tasks...")
@@ -2714,7 +2716,7 @@ class TaskService:
             not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
             
             # Calculate task counts
-            total_mpd_tasks = len(mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()) if not mpd_task_data.empty else 0
+            total_mpd_tasks = len(MPD_TASKS["TASK NUMBER"].astype(str).str.strip().unique().tolist()) if not MPD_TASKS.empty else 0
             available_tasks_count = len(filtered_task_numbers)
             not_available_tasks_count = total_mpd_tasks - available_tasks_count
             
