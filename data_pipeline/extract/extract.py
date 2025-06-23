@@ -154,15 +154,12 @@ def predict_column_mappings(df, expected_mappings):
     return dynamic_mappings
 
 # Step 2: File Processing and Data Extraction
-def get_processed_files(files_to_process, data_path,error_message,aircraft_details_initial_name, task_description_initial_name, 
-                              task_parts_initial_name, sub_task_description_initial_name, 
-                              sub_task_parts_initial_name):
+def get_processed_files(files_to_process, error_message=""):
     """
     Extract and combine data from Excel files into dataframes.
     Returns processed dataframes and a set of newly processed files.
     """
     try:
-        error_message="Found issues in the following files while  processing."
         config = load_config()  # Load once to avoid multiple reads
         newly_processed_files = set()
 
@@ -685,7 +682,7 @@ def get_processed_files(files_to_process, data_path,error_message,aircraft_detai
             else:
                 return None
         
-        def files_check(file_path, sheet_names, folder_name):
+        def files_check(file_path, sheet_names, folder_name,error_message):
             """
             Check and process individual files.
             
@@ -750,7 +747,7 @@ def get_processed_files(files_to_process, data_path,error_message,aircraft_detai
         
 
 
-        def process_files( files_to_process):
+        def process_files(files_to_process,error_message):
             """
             Process multiple files based on their keywords.
             
@@ -781,32 +778,34 @@ def get_processed_files(files_to_process, data_path,error_message,aircraft_detai
                 if file_keyword:
                     if file_keyword == "mltaskmlsec1":
                         sheet_names = ["mltaskmlsec1"]
-                        df = files_check(file_path, sheet_names, folder_name)
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
                         aircraft_details = pd.concat([aircraft_details, df], ignore_index=True)
                         
                     elif file_keyword == "mldpmlsec1":
                         sheet_names = ["mldpmlsec1"]
-                        df = files_check(file_path, sheet_names, folder_name)
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
                         sub_task_description = pd.concat([sub_task_description, df], ignore_index=True)
                         
                     elif file_keyword == "material":
                         sheet_names = ["pricing", "Pricing", "sheet1", "price", "page"]
-                        df = files_check(file_path, sheet_names, folder_name)
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
                         sub_task_parts = pd.concat([sub_task_parts, df], ignore_index=True)
                         
                     elif file_keyword == "mlttable":
                         sheet_names = ["mlttable"]
-                        df = files_check(file_path, sheet_names, folder_name)
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
                         task_parts = pd.concat([task_parts, df], ignore_index=True)
                 else:
                     error_message += f"\n File {file_path} does not have  any expected keywords like mltaskmlsec1, mldpmlsec1, material, mlttable in the file name. So, Skipping it."
-            
+            print(error_message)
+            print("Processing completed for all files.")
+            # Return the processed dataframes
             return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message
         
-        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message=process_files(files_to_process)
+        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message=process_files(files_to_process,error_message)
         return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files, error_message
     except Exception as e:
-        error_message="Unexpected error occured duing the processing the data pipeline"
+        error_message = f"Error in get_processed_files: {e}"
         logger.error(f"Error in get_processed_files: {e}")
         print(f"Error fetching processed files: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), set(),error_message
