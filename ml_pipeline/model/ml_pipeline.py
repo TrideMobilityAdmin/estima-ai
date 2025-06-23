@@ -571,7 +571,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             numeric_agg_columns = ['avg_qty_used', 'max_qty_used', 'min_qty_used', 'total_billable', 'max_price', 'total_quantity']
             for col in numeric_agg_columns:
                 grouped_data[col] = pd.to_numeric(grouped_data[col], errors='coerce').fillna(0)
-            """
+
             # Apply rounding logic row by row
             discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
             
@@ -581,7 +581,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
                 else:
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
-            """
+
             # Calculate cost per unit (avoid division by zero)
             grouped_data['avg_cost_per_unit'] = np.where(
                 grouped_data['total_quantity'] != 0,
@@ -1062,6 +1062,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         group_level_parts_result["prob"] = group_level_parts_result.apply(
             lambda row: prob(row), axis=1
         )
+        
+        discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
+        
+        for idx, part_row in group_level_parts_result.iterrows():
+            unit_of_measurement = str(part_row["issued_unit_of_measurement"]).strip().upper()
+            if unit_of_measurement in discrete_units:
+                group_level_parts_result.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
+            else:
+                group_level_parts_result.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
 
         # Define parts price calculation
         def parts_price(row):
