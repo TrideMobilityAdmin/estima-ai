@@ -13,7 +13,7 @@ import yaml
 from logs.Log_config import setup_logging
 import pandas as pd
 import warnings
-
+import datetime as dt
 # Suppress FutureWarning to keep logs clean
 warnings.simplefilter(action='ignore', category=FutureWarning)
 # Initialize logger
@@ -390,19 +390,14 @@ async def main():
         # Extract data from files - note: we're passing processed_file_paths which doesn't include updated files
         # This is intentional because we want get_processed_files to reprocess the updated files
         files_to_process = set(files_to_process).union(set(updated_files))
-        error_message="No files to process"
+        error_message = f"No files to process at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
         if len(files_to_process)>0:
-            error_message="Found issues in the following files while  processing."
+            error_message=f"Found issues in the following files while  processing at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
 
             aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files,error_message =  get_processed_files(
                 files_to_process,  
-                data_path,
-                error_message,
-                "AIRCRAFT", 
-                "mltaskmlsec1", 
-                "mlttable", 
-                "mldpmlsec1", 
-                "Material"
+                error_message
             )
             
             task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(

@@ -101,6 +101,16 @@ class EstimateRequest(BaseModel):
 class ValidRequest(BaseModel):
     tasks: List[str]
     description:List[str]
+    
+class ModelTasksRequest(BaseModel):
+    MPD_TASKS: ValidRequest
+    aircraft_age: float
+    aircraft_model: str
+    customer_name_consideration: bool
+    check_category: List[str]
+    customer_name: str
+    age_cap: int
+
 class ValidTasks(BaseModel):
     taskid: str
     status: bool
