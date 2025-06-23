@@ -2465,7 +2465,286 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching operator list: {e}")
             raise HTTPException(status_code=500, detail=f"Error fetching operator list: {str(e)}")
-           
+    
+    async def model_tasks_validate(self, MPD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap=3,current_user: dict = Depends(get_current_user)) -> Dict:
+        """
+        Validate model tasks based on aircraft parameters and customer requirements.
+        
+        Args:
+            MPD_TASKS: DataFrame containing MPD task data
+            aircraft_age: Age of the aircraft (will be converted to float)
+            aircraft_model: Model of the aircraft
+            customer_name_consideration: Boolean flag for customer name filtering
+            check_category: List of check categories to filter by
+            customer_name: Customer name for filtering (if customer_name_consideration is True)
+            age_cap: Initial age range for filtering (default: 3)
+        
+        Returns:
+            Dictionary containing filtered tasks and statistics
+        """
+        
+        try:
+            tasks = MPD_TASKS.tasks
+            descriptions = MPD_TASKS.description
+            MPD_TASKS=pd.DataFrame({"TASK NUMBER": tasks, "DESCRIPTION": descriptions})
+
+            # Fetch LH/RH tasks and update MPD tasks
+            LhRhTasks = pd.DataFrame(list(self.RHLH_Tasks_collection.find({})))
+
+            mpd_task_data = modelUpdateLhRhTasks(LhRhTasks, MPD_TASKS)
+            
+            # Fetch aircraft details
+            aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
+            
+            # Validate and convert aircraft_age to float
+            try:
+                aircraft_age = float(aircraft_age)
+            except (ValueError, TypeError):
+                raise ValueError(f"Invalid aircraft_age: {aircraft_age}. Must be a number.")
+            
+            # Ensure aircraft_details has the required columns
+            if aircraft_details.empty:
+                raise ValueError("No aircraft details found in database.")
+            
+            required_columns = ['aircraft_age', 'aircraft_model', 'check_category', 'package_number']
+            if customer_name_consideration:
+                required_columns.append('customer_name')
+                
+            missing_columns = [col for col in required_columns if col not in aircraft_details.columns]
+            if missing_columns:
+                raise ValueError(f"Missing required columns in aircraft_details: {missing_columns}")
+            
+            # Convert aircraft_age column to float, handle non-numeric values
+            aircraft_details['aircraft_age'] = pd.to_numeric(aircraft_details['aircraft_age'], errors='coerce')
+            
+            # Remove rows with invalid aircraft_age
+            aircraft_details = aircraft_details.dropna(subset=['aircraft_age'])
+            
+            # Define aircraft model families
+            aircraft_model_families = {
+                "A320_family": ["A319", "A320", "A321"],
+                "Boeing_NG": ["B737 NG", "B737-800(BCF)"],
+                "others": ["ATR42", "ATR72", "Q400", "B737 MAX"]
+            }
+            
+            # Determine aircraft model family
+            aircraft_model_family = []
+            for family_name, models in aircraft_model_families.items():
+                if aircraft_model in models:
+                    if family_name in ["A320_family", "Boeing_NG"]:
+                        aircraft_model_family = models
+                    else:  # others
+                        aircraft_model_family = [aircraft_model]
+                    break
+            else:
+                # If aircraft_model not found in predefined families, use all available models
+                aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
+
+            print(f"Aircraft model: {aircraft_model}, Check category: {check_category}, Aircraft age: {aircraft_age}")
+            print(f"Aircraft model family: {aircraft_model_family}")
+            
+            # Ensure check_category is a list
+            if not isinstance(check_category, list):
+                check_category = [check_category]
+            
+            # Initialize variables
+            train_packages = []
+            original_age_cap = age_cap
+            max_age_limit = 30
+            min_packages_required = 5
+            
+            # Find training packages based on aircraft age
+            if aircraft_age > 0.0:
+                # Continue increasing age_cap until we get at least 5 packages or reach the maximum age limit
+                while len(train_packages) < min_packages_required and (aircraft_age + age_cap) <= max_age_limit:
+                    # Calculate age range
+                    min_age = max(aircraft_age - age_cap, 0)
+                    max_age = min(aircraft_age + age_cap, max_age_limit)
+                    
+                    # Build filter conditions
+                    base_filter = (
+                        (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                        (aircraft_details["check_category"].isin(check_category)) & 
+                        (aircraft_details["aircraft_age"].between(min_age, max_age))
+                    )
+                    
+                    if customer_name_consideration and customer_name:
+                        # Add customer name filter
+                        customer_filter = aircraft_details["customer_name"].str.contains(
+                            customer_name, na=False, case=False
+                        )
+                        combined_filter = base_filter & customer_filter
+                    else:
+                        combined_filter = base_filter
+                    
+                    # Get unique package numbers
+                    train_packages = aircraft_details[combined_filter]["package_number"].unique().tolist()
+                    
+                    # If we found enough packages, break
+                    if len(train_packages) >= min_packages_required:
+                        break
+                    
+                    # Increase age_cap for next iteration
+                    age_cap += 1
+                    
+                    print(f"Age cap increased to {age_cap}, found {len(train_packages)} packages")
+            else:
+                # For aircraft_age <= 0, don't use age filtering
+                base_filter = (
+                    (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                    (aircraft_details["check_category"].isin(check_category))
+                )
+                
+                if customer_name_consideration and customer_name:
+                    customer_filter = aircraft_details["customer_name"].str.contains(
+                        customer_name, na=False, case=False
+                    )
+                    combined_filter = base_filter & customer_filter
+                else:
+                    combined_filter = base_filter
+                
+                train_packages = aircraft_details[combined_filter]["package_number"].unique().tolist()
+
+            # Check if we found any packages
+            if len(train_packages) == 0:
+                error_msg = (
+                    f"No packages found for aircraft model {aircraft_model} "
+                    f"with check category {check_category} and age {aircraft_age} "
+                    f"within the age cap of {age_cap}."
+                )
+                if customer_name_consideration:
+                    error_msg += f" Customer filter: {customer_name}"
+                raise ValueError(error_msg)
+            
+            print(f"Found {len(train_packages)} packages with final age_cap of {age_cap}")
+            print("Training packages extracted successfully")
+            print("Processing tasks...")
+
+            # Get task data for the selected packages
+            task_data_cursor = self.lhrh_task_description.find(
+                {"package_number": {"$in": train_packages}},
+                {"_id": 0, "task_number": 1, "description": 1, "package_number": 1}
+            )
+            task_data = pd.DataFrame(list(task_data_cursor))
+            
+            # Filter task_data for tasks that exist in mpd_task_data
+            if not task_data.empty and not mpd_task_data.empty:
+                mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
+                task_data = task_data[task_data["task_number"].isin(mpd_task_numbers)]
+            
+            # Get unique task numbers from filtered data
+            task_description_unique_task_list = task_data["task_number"].unique().tolist() if not task_data.empty else []
+            
+            # Get all task data for MPD tasks
+            if not mpd_task_data.empty:
+                mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
+                task_all_data_cursor = self.lhrh_task_description.find(
+                    {"task_number": {"$in": mpd_task_numbers}},
+                    {"_id": 0, "task_number": 1, "description": 1, "package_number": 1}
+                )
+                task_all_data = pd.DataFrame(list(task_all_data_cursor))
+            else:
+                task_all_data = pd.DataFrame()
+            
+            # Helper function to remove LH/RH suffixes
+            def lhrh_removal(task_numbers):
+                """Remove ' (LH)' and ' (RH)' suffixes from task numbers."""
+                if not task_numbers:
+                    return []
+                return list({str(task_number).replace(" (LH)", "").replace(" (RH)", "") 
+                            for task_number in task_numbers})
+
+            # Get distinct task_number and description combinations
+            filtered_tasks = pd.DataFrame()
+            filtered_task_numbers = []
+            
+            if not task_data.empty:
+                filtered_tasks = task_data[["task_number", "description"]].groupby(
+                    "task_number", as_index=False
+                ).agg({"description": "first"})
+                filtered_task_numbers = lhrh_removal(filtered_tasks["task_number"].unique().tolist())
+            
+            # Find tasks not available in filtered results
+            not_available_tasks = pd.DataFrame()
+            if not mpd_task_data.empty:
+                mpd_task_numbers_cleaned = lhrh_removal(mpd_task_data["TASK NUMBER"].unique().tolist())
+                not_available_task_numbers = [
+                    task for task in mpd_task_numbers_cleaned 
+                    if task not in filtered_task_numbers
+                ]
+                
+                if not_available_task_numbers:
+                    # Find original task numbers that correspond to not available cleaned numbers
+                    original_not_available = mpd_task_data[
+                        mpd_task_data["TASK NUMBER"].apply(
+                            lambda x: str(x).replace(" (LH)", "").replace(" (RH)", "")
+                        ).isin(not_available_task_numbers)
+                    ].copy()
+                    
+                    not_available_tasks = original_not_available.rename(columns={
+                        "TASK NUMBER": "task_number", 
+                        "DESCRIPTION": "description"
+                    })
+            
+            # Function to get check category for a task
+            def get_check_category(task_number):
+                """Get the check category for a given task number."""
+                if task_all_data.empty:
+                    return ["Not Available"]
+                    
+                if task_number in task_all_data["task_number"].values:
+                    task_packages = task_all_data.loc[
+                        task_all_data["task_number"] == task_number, "package_number"
+                    ].unique().tolist()
+                    
+                    if task_packages and not aircraft_details.empty:
+                        check_categories = aircraft_details[
+                            aircraft_details["package_number"].isin(task_packages)
+                        ]["check_category"].unique().tolist()
+                        return check_categories if check_categories else ["Not Available"]
+                
+                return ["Not Available"]
+
+            # Add check category to not_available_tasks
+            if not not_available_tasks.empty:
+                not_available_tasks["check_category"] = not_available_tasks["task_number"].apply(get_check_category)
+            
+            # Convert DataFrames to lists of dictionaries
+            filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
+            not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
+            
+            # Calculate task counts
+            total_mpd_tasks = len(mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()) if not mpd_task_data.empty else 0
+            available_tasks_count = len(filtered_task_numbers)
+            not_available_tasks_count = total_mpd_tasks - available_tasks_count
+            
+            filtered_tasks_count = {
+                "total_count": total_mpd_tasks,
+                "not_available_tasks_count": not_available_tasks_count,
+                "available_tasks_count": available_tasks_count
+            }
+            
+            print(f"Task processing completed. Available: {available_tasks_count}, Not available: {not_available_tasks_count}")
+            
+            # FIXED: Convert DataFrames to serializable format
+            # Return results - only return serializable data
+            return {
+                # Remove these DataFrame returns that cause the error:
+                # "filtered_tasks": filtered_tasks,  # DataFrame - NOT SERIALIZABLE
+                # "not_available_tasks": not_available_tasks,  # DataFrame - NOT SERIALIZABLE
+                
+                # Keep only serializable data:
+                "filtered_tasks_list": filtered_tasks_list,  # List of dicts - SERIALIZABLE
+                "not_available_tasks_list": not_available_tasks_list,  # List of dicts - SERIALIZABLE
+                "filtered_tasks_count": filtered_tasks_count,  # Dict - SERIALIZABLE
+                "age_cap_used": age_cap,  # Int - SERIALIZABLE
+                "packages_found": len(train_packages)  # Int - SERIALIZABLE
+            }
+            
+        except Exception as e:
+            print(f"Error in model_tasks_validate: {str(e)}")
+            raise
+            
 def replace_nan_inf(obj):
             """Helper function to recursively replace NaN and inf values with None"""
             if isinstance(obj, dict):
@@ -2502,4 +2781,37 @@ def updateLhRhTasks(LhRhTasks, task_ids):
         logger.info(f"the updated taks:{updated_tasks}")
     
     return updated_tasks
+
+
+
+def modelUpdateLhRhTasks(LhRhTasks, MPD_TASKS):
+    """
+    Update MPD tasks by adding (LH) and (RH) suffixes for tasks marked as LHRH.
+
+    Parameters:
+    - LhRhTasks: DataFrame with 'LHRH' and 'TASK_CLEANED' columns
+    - MPD_TASKS: DataFrame with 'TASK NUMBER' and 'DESCRIPTION' columns
+
+    Returns:
+    - Updated DataFrame with LH and RH tasks duplicated if LHRH == 1
+    """
+    # Get list of task numbers where LHRH is 1
+    LhRhTasks_list = LhRhTasks[LhRhTasks["LHRH"] == 1]["TASK_CLEANED"].tolist()
+    
+    # List to collect rows
+    data = []
+
+    for _, row in MPD_TASKS.iterrows():
+        task_number = str(row["TASK NUMBER"])
+        description = row["DESCRIPTION"]
+
+        if task_number in LhRhTasks_list:
+            data.append({"TASK NUMBER": f"{task_number} (LH)", "DESCRIPTION": description})
+            data.append({"TASK NUMBER": f"{task_number} (RH)", "DESCRIPTION": description})
+        else:
+            data.append({"TASK NUMBER": task_number, "DESCRIPTION": description})
+    
+    # Convert list of rows to DataFrame
+    mpdLhRhTasks = pd.DataFrame(data)
+    return mpdLhRhTasks
 

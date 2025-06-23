@@ -7,12 +7,22 @@ from fuzzywuzzy import process
 from difflib import SequenceMatcher
 from pymongo import MongoClient
 import numpy as np
+from typing import List, Dict, Optional
 # Initialize logger
 logger = setup_logging()
-
+#'/home/CNLT7197/estima-ai/data_pipeline/config.yaml'
 # Load config.yaml
-def load_config(config_path='/home/CNLT7197/estima-ai/data_pipeline/config.yaml'):
+def load_config(config_path=None):
     """Load configuration from YAML file."""
+    if config_path is None:
+        # Try to find config relative to the current file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_dir, '..', 'config.yaml')
+        
+        # If not found, try alternate location
+        if not os.path.exists(config_path):
+            config_path = '/home/CNLT7197/estima-ai/data_pipeline/config.yaml'
+            
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
 
@@ -144,9 +154,7 @@ def predict_column_mappings(df, expected_mappings):
     return dynamic_mappings
 
 # Step 2: File Processing and Data Extraction
-def get_processed_files(files_to_process, data_path, aircraft_details_initial_name, task_description_initial_name, 
-                              task_parts_initial_name, sub_task_description_initial_name, 
-                              sub_task_parts_initial_name):
+def get_processed_files(files_to_process, error_message=""):
     """
     Extract and combine data from Excel files into dataframes.
     Returns processed dataframes and a set of newly processed files.
@@ -649,74 +657,155 @@ def get_processed_files(files_to_process, data_path, aircraft_details_initial_na
                 logger.error(f"Error processing file {file_path}, sheet {sheet_name}: {e}")
                 print(f"Error processing file {file_path}, sheet {sheet_name}: {e}")
                 return pd.DataFrame()
-
-        def collect_files_by_prefix(prefix, sheet_names, data_path):
-            """Collect and process files by prefix."""
-            collected_data = []
-
-            # Ensure sheet_names is a list
-            if isinstance(sheet_names, str):
-                sheet_names = [sheet_names]
-
-            for root, _, files in os.walk(data_path):
-                if "2019" in os.path.normpath(root).split(os.sep):
-                    continue  # Skip any folder in the path that is '2019'
+                # Collecting data
                 
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Check if file is not already processed
-                    if file_path  in files_to_process:
-                        if file.startswith(prefix):
-                            file_path = os.path.join(root, file)
-                            folder_name = os.path.basename(root)
-                            print(f"Processing file: {file_path}")
+        def validate_filename_keywords( filename: str) -> Optional[str]:
+            """
+            Validate if filename contains required keywords.
+            
+            Args:
+                filename (str): Name of the file to validate
+                
+            Returns:
+                Optional[str]: Expected file type if valid, None otherwise
+            """
+            filename_lower = filename.lower()
+            
+            if "mltaskmlsec1" in filename_lower:
+                return "mltaskmlsec1"
+            elif "mldpmlsec1" in filename_lower:
+                return "mldpmlsec1"
+            elif "material" in filename_lower:
+                return "material"
+            elif "mlttable" in filename_lower:
+                return "mlttable"
+            else:
+                return None
+        
+        def files_check(file_path, sheet_names, folder_name,error_message):
+            """
+            Check and process individual files.
+            
+            Args:
+                file_path (str): Full path to the file
+                sheet_names (list): List of expected sheet names
+                folder_name (str): Name of the folder containing the file
+                
+            Returns:
+                pd.DataFrame: Processed dataframe or empty dataframe
+            """
+            print(f"Processing file: {file_path}")
+            try:
+                filename = os.path.basename(file_path)  # Extract filename from path
+                file_extension = os.path.splitext(filename)[1].lower()
+                
+                if not file_extension:
+                    file_extension = f".{filename.split('.')[-1].lower()}"
+                
+                # Check if file extension is supported
+                if file_extension in [".xlsx", ".xlsm", ".xlsb", ".xls"]:
+                    extension = file_extension
+                else:
+                    error_message += (
+                        f", Unsupported file extension {file_extension} for {filename}. "
+                        "Supported extensions are: .xlsx, .xlsm, .xlsb, .xls"
+                    )
+                    raise Exception(
+                        f"Unsupported file extension {file_extension} for {file_path}. "
+                        "Supported extensions are: .xlsx, .xlsm, .xlsb, .xls"
+                    )
+                
+                # Read Excel file and get available sheets
+                excel_file = pd.ExcelFile(file_path)
+                available_sheets = excel_file.sheet_names
+                sheet_names_lower = [name.lower() for name in sheet_names]
+                valid_sheets = [sheet for sheet in available_sheets 
+                            if sheet.lower() in sheet_names_lower]
+        
+                sheet_name = valid_sheets[0] if valid_sheets else None
+                if not sheet_name:
+                    print(f"⚠️ Skipping file {file_path}: None of the required sheets found.")
+                    error_message += f"\n File {file_path} does not contain any of the required sheets: {sheet_names}. So, Skipping it."
+                    return pd.DataFrame()  # Return empty DataFrame if no valid sheet found
 
-                            try:
-                                # Get available sheet names from the file
-                                excel_file = pd.ExcelFile(file_path)
-                                available_sheets = excel_file.sheet_names
-                                valid_sheets = [sheet for sheet in sheet_names if sheet in available_sheets]
+                # Process the file (assuming read_and_process_file function exists)
+                df = read_and_process_file(file_path, sheet_name, folder_name)
 
-                                if not valid_sheets:
-                                    print(f"⚠️ Skipping file {file_path}: None of the required sheets found.")
-                                    continue  # Skip this file
+                if df is not None and not df.empty:
+                    df.reset_index(drop=True, inplace=True)
+                    print(f"✅ Processed file: {file_path}")
+                    return df
+                else:
+                    print(f"⚠️ No valid data found in file: {file_path}")
+                    error_message += f"\n File {file_path} does not contain required columns names in the sheet {sheet_name}. So, Skipping it."
+                    return pd.DataFrame()  
 
-                                all_sheets_data = []  # Store data from all valid sheets
-
-                                for sheet_name in valid_sheets:
-                                    #print(f"Processing sheet: {sheet_name} in file: {file_path}")
-                                    df = read_and_process_file(file_path, sheet_name, folder_name)
-                                    #print("size of df:", df.shape,"of file:", file_path)
-
-                                    if df is not None and not df.empty:
-                                        df.reset_index(drop=True, inplace=True)
-                                        all_sheets_data.append(df)
-
-                                # Append combined data for the current file
-                                if all_sheets_data:
-                                    collected_data.append(pd.concat(all_sheets_data, ignore_index=True))
-
-                                print(f"✅ Processed file: {file_path}")
-                                newly_processed_files.add(file)
-                            except Exception as e:
-                                logger.error(f"❌ Error processing file: {file_path}: {e}")
-                                print(f"❌ Error processing file: {file_path}: {e}")
-                            
-            # Make sure we're not returning an empty DataFrame
-            if not collected_data:
+            except Exception as e:
+                logger.error(f"❌ Error processing file: {file_path}: {e}")
+                print(f"❌ Error processing file: {file_path}: {e}")
                 return pd.DataFrame()
+        
+
+
+        def process_files(files_to_process,error_message):
+            """
+            Process multiple files based on their keywords.
+            
+            Args:
+                files_to_process (list): List of file paths
                 
-            return pd.concat(collected_data, ignore_index=True) if collected_data else pd.DataFrame()
-
-        # Collecting data
-        aircraft_details = collect_files_by_prefix(aircraft_details_initial_name, ["HMV","2023","2022","2021","2020","2019"], data_path)      
-        task_description = collect_files_by_prefix(task_description_initial_name, 'mltaskmlsec1', data_path)
-        task_parts = collect_files_by_prefix(task_parts_initial_name, 'mlttable', data_path)
-        sub_task_description = collect_files_by_prefix(sub_task_description_initial_name, 'mldpmlsec1', data_path)
-        sub_task_parts = collect_files_by_prefix(sub_task_parts_initial_name, ['PRICING', "Sheet1", 'sheet1', "Pricing", "Price"], data_path)
-
-        return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files
+            Returns:
+                tuple: Five dataframes containing processed data
+            """
+            aircraft_details = pd.DataFrame()
+            task_description = pd.DataFrame()
+            task_parts = pd.DataFrame()
+            sub_task_description = pd.DataFrame()
+            sub_task_parts = pd.DataFrame()
+            
+            for file_path in files_to_process:
+                # Skip any file path that contains '2019' in its directory structure
+                if "2019" in os.path.normpath(file_path).split(os.sep):
+                    continue
+                
+                # Extract filename and folder name from the full path
+                filename = os.path.basename(file_path)
+                folder_name = os.path.basename(os.path.dirname(file_path))
+                
+                # Validate filename keywords
+                file_keyword = validate_filename_keywords(filename)
+                
+                if file_keyword:
+                    if file_keyword == "mltaskmlsec1":
+                        sheet_names = ["mltaskmlsec1"]
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
+                        aircraft_details = pd.concat([aircraft_details, df], ignore_index=True)
+                        
+                    elif file_keyword == "mldpmlsec1":
+                        sheet_names = ["mldpmlsec1"]
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
+                        sub_task_description = pd.concat([sub_task_description, df], ignore_index=True)
+                        
+                    elif file_keyword == "material":
+                        sheet_names = ["pricing", "Pricing", "sheet1", "price", "page"]
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
+                        sub_task_parts = pd.concat([sub_task_parts, df], ignore_index=True)
+                        
+                    elif file_keyword == "mlttable":
+                        sheet_names = ["mlttable"]
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
+                        task_parts = pd.concat([task_parts, df], ignore_index=True)
+                else:
+                    error_message += f"\n File {file_path} does not have  any expected keywords like mltaskmlsec1, mldpmlsec1, material, mlttable in the file name. So, Skipping it."
+            print(error_message)
+            print("Processing completed for all files.")
+            # Return the processed dataframes
+            return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message
+        
+        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message=process_files(files_to_process,error_message)
+        return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files, error_message
     except Exception as e:
+        error_message = f"Error in get_processed_files: {e}"
         logger.error(f"Error in get_processed_files: {e}")
         print(f"Error fetching processed files: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), set()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), set(),error_message
