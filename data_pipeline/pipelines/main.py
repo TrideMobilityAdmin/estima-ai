@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Add parent directory to path for relative imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+from email_service.email_service import send_email
 from extract.extract import connect_to_database, get_processed_files
 from transform.transform import clean_data
 from load.load import append_to_database
@@ -13,7 +13,7 @@ import yaml
 from logs.Log_config import setup_logging
 import pandas as pd
 import warnings
-
+import datetime as dt
 # Suppress FutureWarning to keep logs clean
 warnings.simplefilter(action='ignore', category=FutureWarning)
 # Initialize logger
@@ -312,6 +312,7 @@ async def main():
     """
     try:
         print("Starting main process...")
+
         # Load configuration
         config = load_config()
         db_uri = config["database"]["uri"]
@@ -323,7 +324,7 @@ async def main():
             print("Failed to connect to database")
             logger.error("Failed to connect to database")
             return
-            
+  
         # Get processed file paths with their modification timestamps
         processed_files_cursor = db["processed_file_paths"].find({})
         processed_file_paths = set()
@@ -346,8 +347,8 @@ async def main():
         # Fallback to absolute path if directory doesn't exist
         #if not os.path.exists(data_path):
         #data_path = r"D:\Projects\gmr-mro\Data_Pipeline\Data"
-        data_path=config["excel_files"]["data_path"] 
-        #data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
+        #data_path=config["excel_files"]["data_path"] 
+        data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
@@ -389,63 +390,68 @@ async def main():
         # Extract data from files - note: we're passing processed_file_paths which doesn't include updated files
         # This is intentional because we want get_processed_files to reprocess the updated files
         files_to_process = set(files_to_process).union(set(updated_files))
+        error_message = f"No files to process at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
-        aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files =  get_processed_files(
-            files_to_process,  
-            data_path,
-            "AIRCRAFT", 
-            "mltaskmlsec1", 
-            "mlttable", 
-            "mldpmlsec1", 
-            "Material"
-        )
-        
-        task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(
-            task_description, 
-            task_parts, 
-            sub_task_description, 
-            sub_task_parts
-        )
-        # Process all collections and track successful file processing
-        collections_to_process = [
-            ("aircraft_details", aircraft_details),
-            ("task_description", task_description),
-            ("task_parts", task_parts),
-            ("sub_task_description", sub_task_description),
-            ("sub_task_parts", sub_task_parts),
-            ("task_description_max500mh_lhrh", task_description_max500mh_lhrh),
-            ("task_parts_lhrh", task_parts_lhrh),
-            ("sub_task_description_max500mh_lhrh", sub_task_description_max500mh_lhrh),
-            ("sub_task_parts_lhrh", sub_task_parts_lhrh)
-        ]
-        
-        # Keep track of which files were successfully processed 
-        successfully_processed_files = set()
-        
-        for collection_name, dataframe in collections_to_process:
-            if not dataframe.empty:
-                # Get the file paths in this dataframe
-                if "file_path" in dataframe.columns:
-                    collection_files = set(dataframe["file_path"].unique())
-                    
-                    # Process this collection (pass updated_files to handle properly)
-                    success =  process_collection(db, collection_name, dataframe, updated_files)
-                    
-                    if success:
-                        # Add successfully processed files to our tracking set
-                        successfully_processed_files.update(collection_files)
-                else:
-                    logger.warning(f"No 'file_path' column in {collection_name} dataframe")
-                    process_collection(db, collection_name, dataframe)
-        
-        # Add newly processed files AND updated files to track all changes
-        all_processed_files = set().union(newly_processed_files, updated_files)
-        
-        # Only update entries for files that were successfully loaded
-        update_processed_files_db(db, file_info_dict, successfully_processed_files)
-        update_part_master_data(db, "sub_task_parts_lhrh")
+        if len(files_to_process)>0:
+            error_message=f"Found issues in the following files while  processing at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+
+            aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files,error_message =  get_processed_files(
+                files_to_process,  
+                error_message
+            )
+            
+            task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(
+                task_description, 
+                task_parts, 
+                sub_task_description, 
+                sub_task_parts
+            )
+            # Process all collections and track successful file processing
+            collections_to_process = [
+                ("aircraft_details", aircraft_details),
+                ("task_description", task_description),
+                ("task_parts", task_parts),
+                ("sub_task_description", sub_task_description),
+                ("sub_task_parts", sub_task_parts),
+                ("task_description_max500mh_lhrh", task_description_max500mh_lhrh),
+                ("task_parts_lhrh", task_parts_lhrh),
+                ("sub_task_description_max500mh_lhrh", sub_task_description_max500mh_lhrh),
+                ("sub_task_parts_lhrh", sub_task_parts_lhrh)
+            ]
+            
+            # Keep track of which files were successfully processed 
+            successfully_processed_files = set()
+            
+            for collection_name, dataframe in collections_to_process:
+                if not dataframe.empty:
+                    # Get the file paths in this dataframe
+                    if "file_path" in dataframe.columns:
+                        collection_files = set(dataframe["file_path"].unique())
+                        
+                        # Process this collection (pass updated_files to handle properly)
+                        success =  process_collection(db, collection_name, dataframe, updated_files)
+                        
+                        if success:
+                            # Add successfully processed files to our tracking set
+                            successfully_processed_files.update(collection_files)
+                    else:
+                        logger.warning(f"No 'file_path' column in {collection_name} dataframe")
+                        process_collection(db, collection_name, dataframe)
+            
+            # Add newly processed files AND updated files to track all changes
+            all_processed_files = set().union(newly_processed_files, updated_files)
+            
+            # Only update entries for files that were successfully loaded
+            update_processed_files_db(db, file_info_dict, successfully_processed_files)
+            update_part_master_data(db, "sub_task_parts_lhrh")
+            
         print("Process completed")
         logger.info("Process completed")
+        body = error_message
+        receiver_email = "niraja_adithya_dasireddi@outlook.com"
+        send_email("Data Pipeline Failed Files Report", body, receiver_email)
+        #print(f"Email is successfully sent to the {receiver_email}")
+        
     except Exception as e:
         print(f"Unexpected error in main: {e}")
         logger.error(f"Unexpected error in main: {e}")
