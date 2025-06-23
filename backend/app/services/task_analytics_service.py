@@ -2466,7 +2466,8 @@ class TaskService:
             logger.error(f"Error fetching operator list: {e}")
             raise HTTPException(status_code=500, detail=f"Error fetching operator list: {str(e)}")
     
-    async def model_tasks_validate(self, MPD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap=3,current_user: dict = Depends(get_current_user)) -> Dict:
+    async def model_tasks_validate(self, MPD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap=3,current_user: dict = Depends(get_current_user)) :
+     
         """
         Validate model tasks based on aircraft parameters and customer requirements.
         
@@ -2616,6 +2617,8 @@ class TaskService:
                     error_msg += f" Customer filter: {customer_name}"
                 raise ValueError(error_msg)
             
+            if len(train_packages) ==0:
+                raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
             print(f"Found {len(train_packages)} packages with final age_cap of {age_cap}")
             print("Training packages extracted successfully")
             print("Processing tasks...")
@@ -2631,7 +2634,8 @@ class TaskService:
             if not task_data.empty and not mpd_task_data.empty:
                 mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
                 task_data = task_data[task_data["task_number"].isin(mpd_task_numbers)]
-            
+            if task_data.empty:
+                raise ValueError(f"No tasks data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
             # Get unique task numbers from filtered data
             task_description_unique_task_list = task_data["task_number"].unique().tolist() if not task_data.empty else []
             
@@ -2714,7 +2718,7 @@ class TaskService:
             not_available_tasks_list = not_available_tasks.to_dict('records') if not not_available_tasks.empty else []
             
             # Calculate task counts
-            total_mpd_tasks = len(mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()) if not mpd_task_data.empty else 0
+            total_mpd_tasks = len(MPD_TASKS["TASK NUMBER"].astype(str).str.strip().unique().tolist()) if not MPD_TASKS.empty else 0
             available_tasks_count = len(filtered_task_numbers)
             not_available_tasks_count = total_mpd_tasks - available_tasks_count
             
@@ -2740,6 +2744,9 @@ class TaskService:
                 "age_cap_used": age_cap,  # Int - SERIALIZABLE
                 "packages_found": len(train_packages)  # Int - SERIALIZABLE
             }
+        except ValueError as ve:
+            print(f"Validation error in model_tasks_validate: {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))
             
         except Exception as e:
             print(f"Error in model_tasks_validate: {str(e)}")
