@@ -2488,6 +2488,8 @@ class TaskService:
             tasks = MPD_TASKS.tasks
             descriptions = MPD_TASKS.description
             MPD_TASKS=pd.DataFrame({"TASK NUMBER": tasks, "DESCRIPTION": descriptions})
+            if MPD_TASKS.empty:
+                raise ValueError(f"Input data can be empty.")
 
             # Fetch LH/RH tasks and update MPD tasks
             LhRhTasks = pd.DataFrame(list(self.RHLH_Tasks_collection.find({})))
