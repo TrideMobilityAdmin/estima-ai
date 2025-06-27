@@ -24,7 +24,8 @@ import {
   Loader,
   Tabs,
   Pagination,
-  Popover
+  Popover,
+  rem
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -126,7 +127,6 @@ import { useApi } from "../api/services/estimateSrvice";
 import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
 import robotGif from "../../public/7efs.gif";
-import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CsvDownloadButton from "react-json-to-csv";
@@ -141,10 +141,16 @@ import ExcelJS from "exceljs";
 import aircraftMOdelsData from "../assets/aircraftModels.json";
 import aircraftOperators from "../assets/aircraftOperators.json";
 import { DatePickerInput } from "@mantine/dates";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+import excelDownloadIcon from "../../public/ExcelDownloadLogo.png";
+import excelIcon from "../../public/ExcelIcon3.svg";
 // import mountMantineLoaderToGrid from "../components/LoadingCellRenderer";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isoWeek); 
+
 
 export default function EstimateNew() {
   const {
@@ -2061,6 +2067,28 @@ export default function EstimateNew() {
     document.body.removeChild(a);
   };
 
+
+  const [rangeType, setRangeType] = useState("Today");
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+
+  console.log("Selected Date range :",rangeType + dateRange);
+
+  // Update date range based on dropdown
+  useEffect(() => {
+  if (rangeType === "Today") {
+    const start = dayjs().startOf("day").toDate();
+    const end = dayjs().endOf("day").toDate();
+    setDateRange([start, end]);
+  } else if (rangeType === "Last Week") {
+    const start = dayjs().subtract(6, "day").startOf("day").toDate(); // 6 days ago
+    const end = dayjs().endOf("day").toDate(); // today
+    setDateRange([start, end]);
+  } else if (rangeType === "Custom Range") {
+    setDateRange([null, null]); // reset for manual input
+  }
+}, [rangeType]);
+
+
   return (
     <>
       {/* Estimate success Modal */}
@@ -2807,6 +2835,8 @@ export default function EstimateNew() {
                       width: '100%'
                     }}
                     scrollbars="y"
+                    scrollbarSize={3}
+                    scrollHideDelay={0}
                     offsetScrollbars={false}
                   >
                     <Box style={{ width: '100%', paddingRight: '8px' }}>
@@ -2817,7 +2847,14 @@ export default function EstimateNew() {
                           {validatedTasks.length > 0 && (
                             <Box mb="md">
                               {/* <Text size="sm" fw={600} mb="xs"> Tasks :</Text> */}
-                              <SimpleGrid cols={5}>
+                              <SimpleGrid 
+                              cols={4}
+                              spacing="xs"
+                              style={{
+                                width: '100%',
+                                minWidth: 0 // Allows grid to shrink below content size
+                              }}
+                              >
                                 {validatedTasks
                                   ?.slice() // to avoid mutating the original array
                                   .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
@@ -2961,6 +2998,8 @@ export default function EstimateNew() {
                   width: '100%'
                 }}
                 scrollbars="y"
+                scrollbarSize={3}
+                scrollHideDelay={0}
                 offsetScrollbars={false}
               >
                 <Box style={{ width: '100%', paddingRight: '8px' }}>
@@ -3037,7 +3076,7 @@ export default function EstimateNew() {
                     }}
                   >
                     <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
-                    <SimpleGrid cols={5}>
+                    <SimpleGrid cols={4}>
                       {validatedAdditionalTasks
                         ?.slice() // to avoid mutating the original array
                         .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
@@ -3938,12 +3977,70 @@ export default function EstimateNew() {
 
         <Space h="sm" />
         <Card>
-          <Group align="center" gap="sm">
-            <ThemeIcon variant="light">
-              <IconReport />
-            </ThemeIcon>
-            <Title order={5}>Estimations</Title>
-          </Group>
+      <Stack gap="xs">
+      <Group justify="space-between" align="center" gap="sm">
+        {/* Left Side: Title + Icon */}
+        <Group gap="xs">
+          <ThemeIcon variant="light">
+            <IconReport />
+          </ThemeIcon>
+          <Title order={5}>Estimations</Title>
+        </Group>
+
+        {/* Right Side: Dropdown + Date Range Picker + Download */}
+        <Group gap="xs">
+                    {rangeType === "Custom Range" && (
+            <DatePickerInput
+              type="range"
+              value={dateRange}
+              onChange={setDateRange}
+              size="xs"
+              allowSingleDateInRange
+              styles={{ input: { width: rem(220) } }}
+              placeholder="Select range"
+              clearable
+            />
+          )}
+
+          <Select
+            data={["Today", "Last Week", "Custom Range"]}
+            value={rangeType}
+            onChange={(value) => setRangeType(value || "Today")}
+            size="xs"
+            styles={{ input: { width: rem(140) } }}
+            allowDeselect={false}
+          />
+
+          {/* <Tooltip label="Download Estimates Summary"> 
+            <ActionIcon
+              variant="gradient"
+              size="lg"
+              aria-label="Gradient action icon"
+              gradient={{ from: 'rgba(13, 0, 158, 1)', to: 'rgba(152, 143, 255, 1)', deg: 310 }}
+            >
+              <IconDownload />
+            </ActionIcon>
+          </Tooltip> */}
+
+          <Tooltip label="Download Estimates Summary" withArrow>
+            <ActionIcon
+              variant="light"
+              color="green"
+              radius="sm"
+              size="lg"
+              style={{ padding: 6 }}
+            >
+              <img
+                src={excelIcon}
+                alt="Download"
+                height={28}
+                style={{ display: "block" }}
+              />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      </Group>
+    </Stack>
           <Space h="sm" />
           <Tabs color="violet" variant="outline" radius="md" defaultValue="recent">
             <Tabs.List>
