@@ -2747,13 +2747,19 @@ class TaskService:
             
             # Create proper boolean masks for additional tasks filtering
             if not filtered_tasks.empty and not ADD_TASKS.empty:
-                add_filtered_tasks = filtered_tasks[filtered_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_filtered_tasks = filtered_tasks[filtered_tasks["task_number"].apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).tolist())
+                    ]
             else:
                 add_filtered_tasks = pd.DataFrame(columns=["task_number", "description"] if not filtered_tasks.empty else [])
 
             # Fix: Corrected the logic for add_not_available_tasks
             if not not_available_tasks.empty and not ADD_TASKS.empty:
-                add_not_available_tasks = not_available_tasks[not_available_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_not_available_tasks = not_available_tasks[
+                    not_available_tasks["task_number"]
+                    .apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).tolist())
+                    ]
             else:
                 columns = ["task_number", "description", "check_category"] if not not_available_tasks.empty else []
                 add_not_available_tasks = pd.DataFrame(columns=columns)
