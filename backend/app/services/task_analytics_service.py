@@ -2658,14 +2658,12 @@ class TaskService:
             
             # Get task data for the selected packages
             task_data_cursor = self.lhrh_task_description.find(
-                {"package_number": {"$in": train_packages}},
+                {"package_number": {"$in": train_packages},"task_number": {"$in": mpd_task_numbers}},
                 {"_id": 0, "task_number": 1, "description": 1, "package_number": 1}
             )
             task_data = pd.DataFrame(list(task_data_cursor))
             
-            # Filter task_data for tasks that exist in mpd_task_data
-            if not task_data.empty:
-                task_data = task_data[task_data["task_number"].isin(mpd_task_numbers)]
+
             
             if task_data.empty:
                 raise ValueError(f"No tasks data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
