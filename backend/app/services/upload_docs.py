@@ -954,6 +954,119 @@ class ExcelUploadService():
         }
         # return response
     
+    async def get_estimate_aggregates(self, startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate,endDate}")
+        """
+        Get estimate aggregates for a specific within a date range.
+        """
+        try:
+            estimate_pipeline = [
+    {
+        '$project': {
+            'estID': 1, 
+            'createdAt': 1, 
+            'aggregatedFindings': 1, 
+            'aggregatedTasks': 1, 
+            'capping_values': 1, 
+            'cappingDetails': 1, 
+            'filtered_tasks_count': 1
+        }
+    }, {
+        '$lookup': {
+            'from': 'estimate_file_upload', 
+            'let': {
+                'est_id': '$estID'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$eq': [
+                                '$estID', '$$est_id'
+                            ]
+                        }
+                    }
+                }, {
+                    '$project': {
+                        '_id': 0, 
+                        'estID': 1, 
+                        'aircraftRegNo': 1, 
+                        'operator': 1, 
+                        'typeOfCheck': 1, 
+                        'probability': 1, 
+                        'typeOfCheckID': 1
+                    }
+                }
+            ], 
+            'as': 'estima'
+        }
+    }, {
+        '$unwind': {
+            'path': '$estima', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$createdAt', startDate
+                        ]
+                    }, {
+                        '$lte': [
+                            '$createdAt', endDate
+                        ]
+                    }, {
+                        '$eq': [
+                            '$estID', '$estima.estID'
+                        ]
+                    }
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            'estID': 1, 
+            '_id': 0,
+            'availableTasks': '$filtered_tasks_count.available_tasks_count', 
+            'notAvailableTasks': '$filtered_tasks_count.not_available_tasks_count', 
+            'unbillableManhrs': '$capping_values.unbillableManhrs', 
+            'unbillableSpareCost': '$capping_values.unbillableSpareCost', 
+            'cappingManhrs': '$cappingDetails.cappingManhrs', 
+            'cappingSpareCost': '$cappingDetails.cappingSpareCost', 
+            'totalManhrs': '$aggregatedTasks.totalMhs', 
+            'preloadcost': '$aggregatedTasks.totalPartsCost', 
+            'findingsManhrs': '$aggregatedFindings.totalMhs', 
+            'findingsSpareCost': '$aggregatedFindings.totalPartsCost', 
+            'createdAt': 1, 
+            'probability': {'$ifNull': ['$estima.probability', 0.0]}, 
+            'operator': {'$ifNull': ['$estima.operator', '']},            
+           'typeOfCheckID': {
+                '$ifNull': [
+                    '$estima.typeOfCheckID', ''
+                ]
+            }, 
+            'typeOfCheck': {
+                '$ifNull': [
+                    '$estima.typeOfCheck', []
+                ]
+            }, 
+             'aircraftRegNo': { '$ifNull': ['$estima.aircraftRegNo', ''] } 
+        }
+    }
+]
+            results = list(self.estimate_output.aggregate(estimate_pipeline))
+            logger.info(f"Number of estimates found: {len(results)}")
+            if not results:
+                logger.warning("No estimates found for the given date range.")
+                return {"message": "No estimates found for the given date range."}
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching estimate aggregates: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error fetching estimate aggregates: {str(e)}")
+            
+        
         
     def get_best_match(self, target, candidates):
         """
