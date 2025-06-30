@@ -2514,7 +2514,7 @@ class TaskService:
             if not ADD_TASKS.empty:
                 ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].str.strip()
                 ADD_TASKS = ADD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
-            
+            # Validate MPD_TASKS
             if MPD_TASKS.empty:
                 raise ValueError("Input MPD_TASKS data cannot be empty.")
             
@@ -2526,7 +2526,7 @@ class TaskService:
             
             # Combine MPD and additional tasks
             mpd_task_data = pd.concat([mpd_task_data, add_task_data], ignore_index=True)
-            
+            mpd_task_data= mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             # Fetch aircraft details
             aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
             
