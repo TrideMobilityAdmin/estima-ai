@@ -2178,7 +2178,7 @@ export default function EstimateNew() {
     "AIRCRAFT MODEL": item.aircraftModel,
     "AIRCRAFT AGE": item.aircraftAge,
     "CHECK TYPE": Array.isArray(item.typeOfCheck) ? item.typeOfCheck.join(", ") : item.typeOfCheck,
-    "PROBABILITY": item.probability,
+    // "PROBABILITY": item.probability,
 
     // Additional Flags
     "CONSIDER DELTA UNAV TASKS": item.considerDeltaUnAvTasks,
@@ -2236,7 +2236,7 @@ export default function EstimateNew() {
     { wch: 15 },  // AIRCRAFT MODEL
     { wch: 15 },  // AIRCRAFT AGE
     { wch: 25 },  // CHECK TYPE
-    { wch: 12 },  // PROBABILITY
+    // { wch: 12 },  // PROBABILITY
     { wch: 25 },  // CONSIDER DELTA UNAV TASKS
     { wch: 20 },  // OPERATOR FOR MODEL
     { wch: 22 },  // AIRCRAFTAGE THRESHOLD
