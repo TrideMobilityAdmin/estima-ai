@@ -82,7 +82,7 @@ def threshold_transform(data: np.ndarray, threshold: float = 0.5, above_value: i
     return np.where(np.array(data) > threshold, above_value, below_value)
 
 
-client =  MongoClient("mongodb://admin:admin%40123@10.100.12.82:27017/")
+client =  MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]
 
 

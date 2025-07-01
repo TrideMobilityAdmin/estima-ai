@@ -10,7 +10,7 @@ import sys
 from model.ml_pipeline import defects_prediction
 print("Pipe Infer script started...")
 # Connect to MongoDB
-client = MongoClient("mongodb://admin:admin%40123@10.100.12.82:27017/")
+client = MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]
 input_collection = db["estimate_file_upload"]
 output_collection = db["estima_output"]
