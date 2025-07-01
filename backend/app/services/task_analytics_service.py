@@ -11,6 +11,7 @@ from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
+import sys
 from collections import defaultdict
 from app.models.estimates import (
     Estimate,
@@ -2486,9 +2487,15 @@ class TaskService:
         """
         
         try:
+            print("Validating model tasks with the following parameters:")
+            sys.stdout.flush()
             # Extract tasks and descriptions
             tasks = MPD_TASKS.tasks
+            print("length of tasks:", len(tasks))
+            sys.stdout.flush()
             descriptions = MPD_TASKS.description
+            print("length of descriptions:", len(descriptions))
+            sys.stdout.flush()
             addtasks = ADD_TASKS.tasks
             add_descriptions = ADD_TASKS.description
             
@@ -2499,25 +2506,26 @@ class TaskService:
             if len(addtasks)>0:
                 if " " in addtasks: 
                     addtasks.remove(" ")
-                addtasks = addtasks.str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
+                addtasks = addtasks.astype(str).str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
 
             if len(add_descriptions)>0:
                 if " " in add_descriptions:
                     add_descriptions.remove(" ")
-                add_descriptions = add_descriptions.str.strip() if hasattr(add_descriptions, 'str') else [str(desc).strip() for desc in add_descriptions]
+                add_descriptions = add_descriptions.astype(str).str.strip() if hasattr(add_descriptions, 'str') else [str(desc).strip() for desc in add_descriptions]
             
             # Create DataFrames
             MPD_TASKS = pd.DataFrame({"TASK NUMBER": tasks, "DESCRIPTION": descriptions})
-            MPD_TASKS["TASK NUMBER"] = MPD_TASKS["TASK NUMBER"].str.strip()
+            MPD_TASKS["TASK NUMBER"] = MPD_TASKS["TASK NUMBER"].astype(str).str.strip()
             MPD_TASKS = MPD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
             ADD_TASKS = pd.DataFrame({"TASK NUMBER": addtasks, "DESCRIPTION": add_descriptions})
             if not ADD_TASKS.empty:
-                ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].str.strip()
+                ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].astype(str).str.strip()
                 ADD_TASKS = ADD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
             # Validate MPD_TASKS
             if MPD_TASKS.empty:
                 raise ValueError("Input MPD_TASKS data cannot be empty.")
             
+            print("MPD_TASKS and ADD_TASKS DataFrames created successfully.")
             # Fetch LH/RH tasks and update MPD tasks
             LhRhTasks = pd.DataFrame(list(self.RHLH_Tasks_collection.find({})))
             
@@ -2604,7 +2612,7 @@ class TaskService:
                     
                     if customer_name_consideration and customer_name:
                         # Add customer name filter
-                        customer_filter = aircraft_details["customer_name"].str.contains(
+                        customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
                             customer_name, na=False, case=False
                         )
                         combined_filter = base_filter & customer_filter
@@ -2630,7 +2638,7 @@ class TaskService:
                 )
                 
                 if customer_name_consideration and customer_name:
-                    customer_filter = aircraft_details["customer_name"].str.contains(
+                    customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
                         customer_name, na=False, case=False
                     )
                     combined_filter = base_filter & customer_filter
@@ -2748,7 +2756,7 @@ class TaskService:
             # Create proper boolean masks for additional tasks filtering
             if not filtered_tasks.empty and not ADD_TASKS.empty:
                 add_filtered_tasks = filtered_tasks[filtered_tasks["task_number"].apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
-                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).tolist())
+                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).str.tolist())
                     ]
             else:
                 add_filtered_tasks = pd.DataFrame(columns=["task_number", "description"] if not filtered_tasks.empty else [])
@@ -2758,7 +2766,7 @@ class TaskService:
                 add_not_available_tasks = not_available_tasks[
                     not_available_tasks["task_number"]
                     .apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
-                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).tolist())
+                    .isin(ADD_TASKS["TASK NUMBER"].astype(str).str.tolist())
                     ]
             else:
                 columns = ["task_number", "description", "check_category"] if not not_available_tasks.empty else []

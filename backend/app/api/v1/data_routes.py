@@ -341,4 +341,4 @@ async def get_estimate_aggregates(
     """
     Get estimate aggregates for a given date range.
     """
-    return await excel_service.get_estimate_aggregates(start_date, end_date)
+    return await excel_service.get_estimate_aggregates(start_date, end_date,current_user)
