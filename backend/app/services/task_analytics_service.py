@@ -2522,8 +2522,7 @@ class TaskService:
                 ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].astype(str).str.strip()
                 ADD_TASKS = ADD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
             # Validate MPD_TASKS
-            if MPD_TASKS.empty:
-                raise ValueError("Input MPD_TASKS data cannot be empty.")
+
             
             print("MPD_TASKS and ADD_TASKS DataFrames created successfully.")
             # Fetch LH/RH tasks and update MPD tasks
@@ -2534,6 +2533,9 @@ class TaskService:
             
             # Combine MPD and additional tasks
             mpd_task_data = pd.concat([mpd_task_data, add_task_data], ignore_index=True)
+            if mpd_task_data.empty:
+                raise ValueError("Input MPD_TASKS or ADD_TASKS data cannot be empty.")
+            
             mpd_task_data= mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             # Fetch aircraft details
             aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
