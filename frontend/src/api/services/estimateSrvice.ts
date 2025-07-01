@@ -1,5 +1,5 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getModelTasksValidate_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url } from "../apiUrls";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getModelTasksValidate_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url, getAllEstimatesSummary_Url } from "../apiUrls";
 import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
@@ -311,6 +311,7 @@ export const useApi = () => {
   const getModelTasksValidate = async (data : any) => {
         const payloadRequest = {
           MPD_TASKS: data.MPD_TASKS,
+          ADD_TASKS: data.ADD_TASKS,
           check_category: data.typeOfCheck,
           aircraft_age : data.aircraftAge,
           aircraft_model : data.aircraftModel,
@@ -332,6 +333,22 @@ export const useApi = () => {
     return [];
   }
 };
+
+
+const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
+    try {
+      const response = await axiosInstance.get(`${getAllEstimatesSummary_Url}?start_date=${startDate}&end_date=${endDate}`);
+      console.log("✅ API Response all estimates summary :", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
+    }
+  };
 
 
   // New function to upload a file with Estimate ID
@@ -566,6 +583,7 @@ export const useApi = () => {
     getOperatorsList,
     getEstimateDetailsByID,
     getFilteredTasksByID,
-    getModelTasksValidate
+    getModelTasksValidate,
+    getAllEstimatesSummary
   };
 };
