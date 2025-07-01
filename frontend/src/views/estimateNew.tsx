@@ -2221,21 +2221,57 @@ export default function EstimateNew() {
 };
 
   const handleDownloadEstimateSummary = () => {
-    if (!estimatesSummary.length) return;
+  if (!estimatesSummary.length) return;
 
-    const formatted = getExcelFormattedData(estimatesSummary);
-    const worksheet = XLSX.utils.json_to_sheet(formatted);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Estimates Summary");
+  const formatted = getExcelFormattedData(estimatesSummary);
+  const worksheet = XLSX.utils.json_to_sheet(formatted);
 
-    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([excelBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
+  // ✅ Define column widths (in characters)
+  worksheet["!cols"] = [
+    { wch: 6 },   // S. NO
+    { wch: 20 },  // CREATED AT
+    { wch: 35 },  // ESTIMATE ID
+    { wch: 15 },  // A/c REG NO
+    { wch: 30 },  // OPERATOR
+    { wch: 15 },  // AIRCRAFT MODEL
+    { wch: 15 },  // AIRCRAFT AGE
+    { wch: 25 },  // CHECK TYPE
+    { wch: 12 },  // PROBABILITY
+    { wch: 25 },  // CONSIDER DELTA UNAV TASKS
+    { wch: 20 },  // OPERATOR FOR MODEL
+    { wch: 22 },  // AIRCRAFTAGE THRESHOLD
+    { wch: 30 },  // AVAILABLE TASKS BEFORE FILTER
+    { wch: 32 },  // NOT AVAILABLE TASKS BEFORE FILTER
+    { wch: 28 },  // AVAILABLE TASKS AFTER FILTER
+    { wch: 30 },  // UNAVAILABLE TASKS AFTER FILTER
+    { wch: 28 },  // MATCHING % BEFORE FILTER
+    { wch: 26 },  // MATCHING % AFTER FILTER
+    { wch: 20 },  // TOTAL TASKS COUNT
+    { wch: 35 },  // AVAILABLE TASKS IN OTHER CHECK CATEGORY
+    { wch: 10 },  // MH
+    { wch: 18 },  // PRELOAD COST
+    { wch: 20 },  // TOTAL FINDING MH
+    { wch: 26 },  // TOTAL FINDING SPARES COST
+    { wch: 22 },  // CAPPING TYPE MANHRS
+    { wch: 20 },  // UNBILLABLE MH CAP
+    { wch: 18 },  // UNBILLABLE MH
+    { wch: 26 },  // CAPPING TYPE SPARE COST
+    { wch: 24 },  // UNBILLABLE MATERIAL CAP
+    { wch: 28 },  // UNBILLABLE MATERIAL COSTING
+    { wch: 10 },  // TAT
+  ];
 
-    const filename = `EstimatesSummary.xlsx`;
-    saveAs(blob, filename);
-  };
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Estimates Summary");
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  const filename = `EstimatesSummary.xlsx`;
+  saveAs(blob, filename);
+};
 
 
   return (
