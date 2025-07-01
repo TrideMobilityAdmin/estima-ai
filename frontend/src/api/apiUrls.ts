@@ -20,3 +20,4 @@ export const getOperatorsList_Url = "/operators_list";
 export const getEstimateDetails_Url = "/file_upload_estimate/";
 export const getFilteredTasks_Url = "/filtered_tasks/";
 export const getModelTasksValidate_Url = "/model_tasks_validate";
+export const getAllEstimatesSummary_Url = "/estimate_aggregates";

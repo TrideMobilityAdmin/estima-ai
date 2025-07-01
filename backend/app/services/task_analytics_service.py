@@ -2658,6 +2658,8 @@ class TaskService:
                     error_msg += f" Customer filter: {customer_name}"
                 raise ValueError(error_msg)
             
+            if len(train_packages) ==0:
+                raise ValueError(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
             print(f"Found {len(train_packages)} packages with final age_cap of {age_cap}")
             print("Training packages extracted successfully")
             print("Processing tasks...")

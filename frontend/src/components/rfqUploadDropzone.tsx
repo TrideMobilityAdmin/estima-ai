@@ -179,7 +179,7 @@ const RFQUploadDropZoneExcel = ({
     }
   }, [findMatchingColumnName, findMatchingColumnNameInData]);
 
-  // MODIFIED: Now also extracts descriptions array
+  // MODIFIED: Now also extracts descriptions array, and extracts ALL (not unique) tasks and descriptions
   const extractTasksAndDescriptionsFromSheet = useCallback(async (
     workbook: XLSX.WorkBook, 
     sheetName: string, 
@@ -193,7 +193,7 @@ const RFQUploadDropZoneExcel = ({
         return;
       }
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      const extractedTasks = new Set<string>();
+      const extractedTasks: string[] = [];
       const extractedDescriptions: string[] = [];
       let descriptionKey: string | undefined;
 
@@ -213,9 +213,11 @@ const RFQUploadDropZoneExcel = ({
             taskCell = row[matchingKey];
           }
         }
-        // Always extract tasks
-        processTaskCell(taskCell).forEach(task => extractedTasks.add(task));
-        // If MPD and description column found, extract the description
+        // Always extract tasks (NOT unique, include duplicates)
+        const tasksInRow = processTaskCell(taskCell);
+        // For each task in cell, push to extractedTasks
+        tasksInRow.forEach(task => extractedTasks.push(task));
+        // If MPD and description column found, extract the description (keep alignment with tasks)
         if (sheetName === REQUIRED_SHEET_NAME && descriptionKey) {
           let descVal = row[descriptionKey];
           if (descVal === undefined) {
@@ -226,21 +228,23 @@ const RFQUploadDropZoneExcel = ({
               descVal = row[matchingDescKey];
             }
           }
-          // Store empty string if not present to keep alignment with tasks
-          extractedDescriptions.push(descVal !== undefined && descVal !== null ? String(descVal) : "");
+          // For each task in cell, repeat description as many times as number of tasks in cell
+          const taskCount = tasksInRow.length;
+          for (let i = 0; i < taskCount; i++) {
+            extractedDescriptions.push(descVal !== undefined && descVal !== null ? String(descVal) : "");
+          }
         }
       });
 
-      const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
-      if (uniqueTasks.length === 0) {
+      if (extractedTasks.length === 0) {
         setFileError(`No tasks found in the "${taskColumnName}" column. Please select another file or column.`);
         return;
       }
-      setTasks(uniqueTasks);
+      setTasks(extractedTasks);
       setDescriptions(sheetName === REQUIRED_SHEET_NAME ? extractedDescriptions : []);
       changeHandler(
         currentFile, 
-        uniqueTasks, 
+        extractedTasks, 
         sheetName === REQUIRED_SHEET_NAME ? extractedDescriptions : [], 
         { sheetName, columnName: taskColumnName }
       );
@@ -558,7 +562,7 @@ const RFQUploadDropZoneExcel = ({
                     {tasks.length > 0 && (
                       <Paper withBorder p="xs" radius="md">
                         <Text size="xs" fw={500}>
-                          Extracted {tasks.length} task(s)
+                          Extracted {tasks.length} task's
                         </Text>
                         <Text size="xs" color="dimmed" lineClamp={2}>
                           {tasks.slice(0, 5).join(", ")}
@@ -568,12 +572,12 @@ const RFQUploadDropZoneExcel = ({
                         {selectedSheet === REQUIRED_SHEET_NAME && descriptions.length > 0 && (
                           <>
                             <Text size="xs" fw={500} mt="xs">
-                              Extracted Descriptions:
+                              Extracted  {descriptions.length} Description's
                             </Text>
-                            <Text size="xs" color="dimmed" lineClamp={2}>
+                            {/* <Text size="xs" color="dimmed" lineClamp={2}>
                               {descriptions.slice(0, 5).join(" | ")}
                               {descriptions.length > 5 ? ` and ${descriptions.length - 5} more...` : ""}
-                            </Text>
+                            </Text> */}
                           </>
                         )}
                       </Paper>
