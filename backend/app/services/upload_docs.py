@@ -10,6 +10,7 @@ import json
 import math
 import yaml
 import re
+import sys
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
@@ -28,7 +29,7 @@ from app.models.estimates import EstimateRequest
 import asyncio
 import re
 from fuzzywuzzy import process
-
+from app.models.estimates import ValidRequest,ModelTasksRequest
 from difflib import SequenceMatcher
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -59,6 +60,7 @@ class ExcelUploadService():
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
         self.error_detail=str("Following error occured while processing the file")
+        self.task_service=TaskService()
 
 
         
@@ -954,6 +956,300 @@ class ExcelUploadService():
         }
         # return response
     
+    async def get_estimate_aggregates(self, startDate: datetime, endDate: datetime,current_user) -> Dict:
+        logger.info(f"startDate and endDate are: {startDate}, {endDate}")
+        """
+        Get estimate aggregates for a specific within a date range.
+        """
+        try:
+            estimate_pipeline = [
+                {
+                    '$project': {
+                        'estID': 1, 
+                        'createdAt': 1, 
+                        'aggregatedFindings': 1, 
+                        'aggregatedTasks': 1, 
+                        'capping_values': 1, 
+                        'cappingDetails': 1, 
+                    }
+                }, 
+                {
+                    '$lookup': {
+                        'from': 'estimate_file_upload', 
+                        'let': {
+                            'est_id': '$estID'
+                        }, 
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$eq': ['$estID', '$$est_id']
+                                    }
+                                }
+                            }, 
+                            {
+                                '$project': {
+                                    '_id': 0, 
+                                    'estID': 1, 
+                                    'aircraftRegNo': 1, 
+                                    'operator': 1, 
+                                    'typeOfCheck': 1, 
+                                    'probability': 1, 
+                                    'typeOfCheckID': 1,
+                                    'task': 1,
+                                    'description': 1,
+                                    'additionalTasks': 1,
+                                    "considerDeltaUnAvTasks": 1,
+                                    "operatorForModel": 1,
+                                    'aircraftageThreshold': 1,
+                                    'aircraftModel': 1,
+                                    'aircraftAge': 1
+                                }
+                            }
+                        ], 
+                        'as': 'estima'
+                    }
+                }, 
+                {
+                    '$unwind': {
+                        'path': '$estima', 
+                        'preserveNullAndEmptyArrays': True
+                    }
+                }, 
+                {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$gte': ['$createdAt', startDate]
+                                }, 
+                                {
+                                    '$lte': ['$createdAt', endDate]
+                                }, 
+                                {
+                                    '$eq': ['$estID', '$estima.estID']
+                                }
+                            ]
+                        }
+                    }
+                }, 
+                {
+                    '$project': {
+                        'estID': 1, 
+                        '_id': 0,
+                        'tasks': {'$ifNull': ['$estima.task', []]},
+                        'aircraftModel': {'$ifNull': ['$estima.aircraftModel', '']},
+                        'aircraftAge': {'$ifNull': ['$estima.aircraftAge', 0]},
+                        'descriptions': {'$ifNull': ['$estima.description', []]},
+                        'additionalTasks': {'$ifNull': ['$estima.additionalTasks', []]},
+                        'considerDeltaUnAvTasks': {'$ifNull': ['$estima.considerDeltaUnAvTasks', False]},
+                        'operatorForModel': {'$ifNull': ['$estima.operatorForModel', '']},
+                        'aircraftageThreshold': {'$ifNull': ['$estima.aircraftageThreshold', 3]},
+                        'unbillableManhrs': '$capping_values.unbillableManhrs', 
+                        'unbillableSpareCost': '$capping_values.unbillableSpareCost',
+                        'cappingTypeManhrs': '$cappingDetails.cappingTypeManhrs', 
+                        'cappingTypeSpareCost': '$cappingDetails.cappingTypeSpareCost',
+                        'cappingManhrs': '$cappingDetails.cappingManhrs', 
+                        'cappingSpareCost': '$cappingDetails.cappingSpareCost', 
+                        'totalManhrs': '$aggregatedTasks.totalMhs', 
+                        'preloadcost': '$aggregatedTasks.totalPartsCost', 
+                        'findingsManhrs': '$aggregatedFindings.totalMhs', 
+                        'findingsSpareCost': '$aggregatedFindings.totalPartsCost', 
+                        'createdAt': 1, 
+                        'probability': {'$ifNull': ['$estima.probability', 0.0]}, 
+                        'operator': {'$ifNull': ['$estima.operator', '']},            
+                        'typeOfCheck': {'$ifNull': ['$estima.typeOfCheck', []]}, 
+                        'aircraftRegNo': {'$ifNull': ['$estima.aircraftRegNo', '']}
+                    }
+                }
+            ]
+            
+            results = list(self.estimate_output.aggregate(estimate_pipeline))
+            
+            for result in results:
+                # Create ValidRequest objects for task validation
+                # Convert result dict to Pydantic model instance
+                print("est_id is:", result.get("estID"))
+                mpd_request = ValidRequest(
+                    tasks=result.get('tasks', []), 
+                    description=result.get('descriptions', [])
+                )
+                print("created mpd_request")
+                sys.stdout.flush()
+
+                # Handle additional tasks safely
+                additional_tasks = result.get("additionalTasks", [])
+                add_tasks_request = ValidRequest(
+                    tasks=[
+                        add.get("taskID", "") 
+                        for add in additional_tasks 
+                        if isinstance(add, dict) and add.get("taskID") is not None
+                    ],
+                    description=[
+                        add.get("taskDescription", "") 
+                        for add in additional_tasks 
+                        if isinstance(add, dict) and add.get("taskDescription") is not None
+                    ]
+                )
+                print("created add_request")
+                sys.stdout.flush()
+                # Validate tasks using the corrected method call
+                validate_tasks_data = await self.task_service.validate_tasks(mpd_request,current_user)
+                print("mpd tasks data is validated")
+                sys.stdout.flush()  # Ensure the output is flushed immediately
+                if add_tasks_request.tasks or add_tasks_request.description:
+                    add_validate_tasks_data = await self.task_service.validate_tasks(add_tasks_request,current_user)
+                
+                # Convert to DataFrame-like structure for processing
+                # Ensure both DataFrames have the same structure before concatenating
+                validate_df = pd.DataFrame(validate_tasks_data) if validate_tasks_data else pd.DataFrame()
+                add_validate_df = pd.DataFrame(add_validate_tasks_data) if add_validate_tasks_data else pd.DataFrame()
+
+                # Combine
+                if not validate_df.empty and not add_validate_df.empty:
+                    validate_tasks_df = pd.concat([validate_df, add_validate_df], ignore_index=True)
+                elif not validate_df.empty:
+                    validate_tasks_df = validate_df
+                elif not add_validate_df.empty:
+                    validate_tasks_df = add_validate_df
+                else:
+                    validate_tasks_df = pd.DataFrame()
+                # Remove duplicates if DataFrame is not empty
+                if not validate_tasks_df.empty:
+                    validate_tasks_df = validate_tasks_df.drop_duplicates(subset=['taskid'], keep='first')
+                    unavailable_tasks = validate_tasks_df[validate_tasks_df["status"] == False]['taskid']
+                    available_tasks = validate_tasks_df[validate_tasks_df["status"] == True]['taskid']
+                    available_tasks_length = len(set(available_tasks))
+                    unavailable_tasks_length = len(set(unavailable_tasks))
+                else:
+                    available_tasks_length = 0
+                    unavailable_tasks_length = 0
+                
+                result['available_tasks_before_filter'] = available_tasks_length
+                result['unavailable_tasks_before_filter'] = unavailable_tasks_length
+                result["task_matching_percentage_before_filter"] = round(
+                    (available_tasks_length / (available_tasks_length + unavailable_tasks_length)) * 100, 4
+                ) if (available_tasks_length + unavailable_tasks_length) > 0 else 0
+                print("validate tasks data is validated")
+                sys.stdout.flush()  # Ensure the output is flushed immediately
+                print("creating model tasks request")
+                sys.stdout.flush()  # Ensure the output is flushed immediately
+                # Create ModelTasksRequest object for model validation
+                mpd_tasks_request = ValidRequest(
+                    tasks=result.get("tasks", []),
+                    description=result.get("descriptions", [])
+                )
+                
+                add_tasks_request = ValidRequest(
+                    tasks=[add.get("taskID", "") for add in additional_tasks if isinstance(add, dict) and add.get("taskID")],
+                    description=[add.get("taskDescription", "") for add in additional_tasks if isinstance(add, dict) and add.get("taskDescription")]
+                )
+                
+                model_tasks_request = ModelTasksRequest(
+                    MPD_TASKS=mpd_tasks_request,
+                    ADD_TASKS=add_tasks_request,
+                    aircraft_age=float(result.get("aircraftAge", 0)),
+                    aircraft_model=result.get("aircraftModel", ""),
+                    customer_name_consideration=result.get("OperatorForModel",False),  # Set based on your business logic
+                    check_category=result.get("typeOfCheck", []),
+                    customer_name=result.get("operator", ""),
+                    age_cap=result.get("aircraftageThreshold", 3)
+                )
+                print("model tasks request created")
+                sys.stdout.flush()  # Ensure the output is flushed immediately
+                # Call model tasks validation
+                model_validate_tasks_data = await self.task_service.model_tasks_validate(
+                    model_tasks_request.MPD_TASKS,
+                    model_tasks_request.ADD_TASKS,
+                    model_tasks_request.aircraft_age,
+                    model_tasks_request.aircraft_model,
+                    model_tasks_request.customer_name_consideration,
+                    model_tasks_request.check_category,
+                    model_tasks_request.customer_name,
+                    model_tasks_request.age_cap,
+                    current_user
+                )
+                print("model tasks validated")
+                # Safely extract data from model validation response
+                filtered_tasks_count = model_validate_tasks_data.get("filtered_tasks_count", {})
+                total_count = filtered_tasks_count.get("total_count", 0)
+                available_count = filtered_tasks_count.get("available_tasks_count", 0)
+                not_available_count = filtered_tasks_count.get("not_available_tasks_count", 0)
+                
+                result['total_tasks_count'] = total_count
+                result['available_tasks_after_filter'] = available_count
+                result['unavailable_tasks_after_filter'] = not_available_count
+                result['task_matching_percentage_after_filter'] = round(
+                    (available_count / total_count) * 100, 4
+                ) if total_count > 0 else 0
+                
+                # Handle delta tasks if considerDeltaUnAvTasks is True
+                result['available_tasks_in_other_check_category'] = 0
+                if result.get('considerDeltaUnAvTasks', False):
+                    not_available_tasks_list = model_validate_tasks_data.get("not_available_tasks_list", [])
+                    add_not_available_tasks = model_validate_tasks_data.get("add_not_available_tasks", [])
+                    
+                    # Filter tasks that are available in other check categories
+                    delta_tasks_count = 0
+                    for task in not_available_tasks_list:
+                        if isinstance(task, dict):
+                            check_category = task.get("check_category", ["Not Available"])
+                            if isinstance(check_category, list) and len(check_category) > 0 and check_category[0] != "Not Available":
+                                delta_tasks_count += 1
+                            
+                    for task in add_not_available_tasks:
+                        if isinstance(task, dict):
+                            check_category = task.get("check_category", ["Not Available"])
+                            if isinstance(check_category, list) and len(check_category) > 0 and check_category[0] != "Not Available":
+                                delta_tasks_count += 1
+                                
+                    result['available_tasks_in_other_check_category'] = delta_tasks_count
+
+            # Select only the required columns for the final result
+            final_results = []
+            for result in results:
+                final_result = {
+                    "estID": result.get("estID"),
+                    "aircraftModel": result.get("aircraftModel"),
+                    "aircraftAge": result.get("aircraftAge"),
+                    "considerDeltaUnAvTasks": result.get("considerDeltaUnAvTasks"),
+                    "operatorForModel": result.get("operatorForModel"),
+                    "aircraftageThreshold": result.get("aircraftageThreshold"),
+                    'cappingTypeManhrs': result.get("cappingTypeManhrs"),
+                    'cappingTypeSpareCost': result.get("cappingTypeSpareCost"),
+                    "unbillableManhrs": result.get("unbillableManhrs"),
+                    "unbillableSpareCost": result.get("unbillableSpareCost"),
+                    "cappingManhrs": result.get("cappingManhrs"),
+                    "cappingSpareCost": result.get("cappingSpareCost"),
+                    "totalManhrs": result.get("totalManhrs"),
+                    "preloadcost": result.get("preloadcost"),
+                    "findingsManhrs": result.get("findingsManhrs"),
+                    "findingsSpareCost": result.get("findingsSpareCost"),
+                    "createdAt": result.get("createdAt"),
+                    "probability": result.get("probability"),
+                    "operator": result.get("operator"),
+                    "typeOfCheck": result.get("typeOfCheck"),
+                    "aircraftRegNo": result.get("aircraftRegNo"),
+                    "available_tasks_before_filter": result.get("available_tasks_before_filter"),
+                    "unavailable_tasks_before_filter": result.get("unavailable_tasks_before_filter"),
+                    "task_matching_percentage_before_filter": result.get("task_matching_percentage_before_filter"),
+                    "total_tasks_count": result.get("total_tasks_count"),
+                    "available_tasks_after_filter": result.get("available_tasks_after_filter"),
+                    "unavailable_tasks_after_filter": result.get("unavailable_tasks_after_filter"),
+                    "task_matching_percentage_after_filter": result.get("task_matching_percentage_after_filter"),
+                    "available_tasks_in_other_check_category": result.get("available_tasks_in_other_check_category")
+                }
+                final_results.append(final_result)
+                
+            return final_results
+
+        except Exception as e:
+            logger.error(f"Error in get_estimate_aggregates: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error retrieving estimate aggregates: {str(e)}"
+            )
+            
         
     def get_best_match(self, target, candidates):
         """

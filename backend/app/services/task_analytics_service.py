@@ -11,6 +11,7 @@ from fastapi import UploadFile, File
 from app.models.estimates import ValidTasks,ValidRequest,EstimateStatus
 from datetime import datetime,timezone
 import re
+import sys
 from collections import defaultdict
 from app.models.estimates import (
     Estimate,
@@ -2486,33 +2487,39 @@ class TaskService:
         """
         
         try:
+            print("Validating model tasks with the following parameters:")
+            sys.stdout.flush()
             # Extract tasks and descriptions
             tasks = MPD_TASKS.tasks
+            print("length of tasks:", len(tasks))
+            sys.stdout.flush()
             descriptions = MPD_TASKS.description
+            print("length of descriptions:", len(descriptions))
+            sys.stdout.flush()
             addtasks = ADD_TASKS.tasks
             add_descriptions = ADD_TASKS.description
             
             # Clean task data by removing whitespace
+            if len(addtasks)>0:
+                if " " in addtasks: 
+                    addtasks.remove(" ")
+                addtasks = addtasks.astype(str).str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
 
-            addtasks.remove(" ")
-            add_descriptions.remove(" ")
-            if addtasks is not None:
-                addtasks = addtasks.str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
-
-            if add_descriptions is not None:
-                add_descriptions = add_descriptions.str.strip() if hasattr(add_descriptions, 'str') else [str(desc).strip() for desc in add_descriptions]
+            if len(add_descriptions)>0:
+                if " " in add_descriptions:
+                    add_descriptions.remove(" ")
+                add_descriptions = add_descriptions.astype(str).str.strip() if hasattr(add_descriptions, 'str') else [str(desc).strip() for desc in add_descriptions]
             
             # Create DataFrames
             MPD_TASKS = pd.DataFrame({"TASK NUMBER": tasks, "DESCRIPTION": descriptions})
-            MPD_TASKS["TASK NUMBER"] = MPD_TASKS["TASK NUMBER"].str.strip()
+            MPD_TASKS["TASK NUMBER"] = MPD_TASKS["TASK NUMBER"].astype(str).str.strip()
             MPD_TASKS = MPD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
             ADD_TASKS = pd.DataFrame({"TASK NUMBER": addtasks, "DESCRIPTION": add_descriptions})
-            ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].str.strip()
-            ADD_TASKS = ADD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
-            
-            if MPD_TASKS.empty:
-                raise ValueError("Input MPD_TASKS data cannot be empty.")
-            
+            if not ADD_TASKS.empty:
+                ADD_TASKS["TASK NUMBER"] = ADD_TASKS["TASK NUMBER"].astype(str).str.strip()
+                ADD_TASKS = ADD_TASKS.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True)
+
+            print("MPD_TASKS and ADD_TASKS DataFrames created successfully.")
             # Fetch LH/RH tasks and update MPD tasks
             LhRhTasks = pd.DataFrame(list(self.RHLH_Tasks_collection.find({})))
             
@@ -2521,6 +2528,10 @@ class TaskService:
             
             # Combine MPD and additional tasks
             mpd_task_data = pd.concat([mpd_task_data, add_task_data], ignore_index=True)
+            if mpd_task_data.empty:
+                raise ValueError("Input MPD_TASKS or ADD_TASKS data cannot be empty.")
+            
+            mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
             # Fetch aircraft details
             aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
@@ -2533,15 +2544,17 @@ class TaskService:
             
             # Ensure aircraft_details has the required columns
             if aircraft_details.empty:
-                raise ValueError("No aircraft details found in database.")
+                print("Warning: No aircraft details found in database. All tasks will be marked as not available.")
+                # Return all tasks as not available
+                return return_all_tasks_as_not_available(mpd_task_data, ADD_TASKS)
             
-            required_columns = ['aircraft_age', 'aircraft_model', 'check_category', 'package_number']
-            if customer_name_consideration:
-                required_columns.append('customer_name')
+            required_columns = ['aircraft_age', 'aircraft_model', 'check_category']
+
                 
             missing_columns = [col for col in required_columns if col not in aircraft_details.columns]
             if missing_columns:
-                raise ValueError(f"Missing required columns in aircraft_details: {missing_columns}")
+                print(f"Warning: Missing required columns in aircraft_details: {missing_columns}. All tasks will be marked as not available.")
+                return return_all_tasks_as_not_available(mpd_task_data, ADD_TASKS)
             
             # Convert aircraft_age column to float, handle non-numeric values
             aircraft_details['aircraft_age'] = pd.to_numeric(aircraft_details['aircraft_age'], errors='coerce')
@@ -2599,7 +2612,7 @@ class TaskService:
                     
                     if customer_name_consideration and customer_name:
                         # Add customer name filter
-                        customer_filter = aircraft_details["customer_name"].str.contains(
+                        customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
                             customer_name, na=False, case=False
                         )
                         combined_filter = base_filter & customer_filter
@@ -2625,7 +2638,7 @@ class TaskService:
                 )
                 
                 if customer_name_consideration and customer_name:
-                    customer_filter = aircraft_details["customer_name"].str.contains(
+                    customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
                         customer_name, na=False, case=False
                     )
                     combined_filter = base_filter & customer_filter
@@ -2634,16 +2647,10 @@ class TaskService:
                 
                 train_packages = aircraft_details[combined_filter]["package_number"].unique().tolist()
 
-            # Check if we found any packages
+            # Check if we found any packages - if not, return all tasks as not available
             if len(train_packages) == 0:
-                error_msg = (
-                    f"No packages found for aircraft model {aircraft_model} "
-                    f"with check category {check_category} and age {aircraft_age} "
-                    f"within the age cap of {age_cap}."
-                )
-                if customer_name_consideration:
-                    error_msg += f" Customer filter: {customer_name}"
-                raise ValueError(error_msg)
+                print(f"No packages found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age}. All tasks will be marked as not available.")
+                return return_all_tasks_as_not_available(mpd_task_data, ADD_TASKS, age_cap)
             
             print(f"Found {len(train_packages)} packages with final age_cap of {age_cap}")
             print("Training packages extracted successfully")
@@ -2653,17 +2660,15 @@ class TaskService:
             
             # Get task data for the selected packages
             task_data_cursor = self.lhrh_task_description.find(
-                {"package_number": {"$in": train_packages}},
+                {"package_number": {"$in": train_packages},"task_number": {"$in": mpd_task_numbers}},
                 {"_id": 0, "task_number": 1, "description": 1, "package_number": 1}
             )
             task_data = pd.DataFrame(list(task_data_cursor))
             
-            # Filter task_data for tasks that exist in mpd_task_data
-            if not task_data.empty:
-                task_data = task_data[task_data["task_number"].isin(mpd_task_numbers)]
-            
+            # If task_data is empty, return all tasks as not available
             if task_data.empty:
-                raise ValueError(f"No tasks data found for aircraft model {aircraft_model} with check category {check_category} and age {aircraft_age} within the cap of {age_cap}.")
+                print(f"No tasks data found for the selected packages. All tasks will be marked as not available.")
+                return return_all_tasks_as_not_available(mpd_task_data, ADD_TASKS, age_cap, len(train_packages))
             
             # Get unique task numbers from filtered data
             task_description_unique_task_list = task_data["task_number"].unique().tolist() if not task_data.empty else []
@@ -2744,23 +2749,33 @@ class TaskService:
             
             # Create proper boolean masks for additional tasks filtering
             if not filtered_tasks.empty and not ADD_TASKS.empty:
-                add_filtered_tasks = filtered_tasks[filtered_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_task_numbers = ADD_TASKS["TASK NUMBER"].astype(str).str.strip().tolist()
+                add_filtered_tasks = filtered_tasks[filtered_tasks["task_number"].apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+                    .isin(add_task_numbers)
+                    ]
             else:
                 add_filtered_tasks = pd.DataFrame(columns=["task_number", "description"] if not filtered_tasks.empty else [])
 
             # Fix: Corrected the logic for add_not_available_tasks
             if not not_available_tasks.empty and not ADD_TASKS.empty:
-                add_not_available_tasks = not_available_tasks[not_available_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_task_numbers = ADD_TASKS["TASK NUMBER"].astype(str).str.strip().tolist()
+                add_not_available_tasks = not_available_tasks[
+                    not_available_tasks["task_number"]
+                    .apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+                    .isin(add_task_numbers)
+                    ]
             else:
                 columns = ["task_number", "description", "check_category"] if not not_available_tasks.empty else []
                 add_not_available_tasks = pd.DataFrame(columns=columns)
             
             # Remove additional tasks from main task lists
             if not filtered_tasks.empty and not ADD_TASKS.empty:
-                filtered_tasks = filtered_tasks[~filtered_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_task_numbers = ADD_TASKS["TASK NUMBER"].astype(str).str.strip().tolist()
+                filtered_tasks = filtered_tasks[~filtered_tasks["task_number"].isin(add_task_numbers)]
             
             if not not_available_tasks.empty and not ADD_TASKS.empty:
-                not_available_tasks = not_available_tasks[~not_available_tasks["task_number"].isin(ADD_TASKS["TASK NUMBER"].tolist())]
+                add_task_numbers = ADD_TASKS["TASK NUMBER"].astype(str).str.strip().tolist()
+                not_available_tasks = not_available_tasks[~not_available_tasks["task_number"].isin(add_task_numbers)]
             
             # Convert DataFrames to lists of dictionaries
             filtered_tasks_list = filtered_tasks.to_dict('records') if not filtered_tasks.empty else []
@@ -2802,6 +2817,57 @@ class TaskService:
         except Exception as e:
             print(f"Error in model_tasks_validate: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+def return_all_tasks_as_not_available( mpd_task_data, ADD_TASKS, age_cap=3, packages_found=0):
+    """
+    Helper method to return all tasks as not available when no packages or task data is found.
+    """
+    # Prepare all tasks as not available
+    all_not_available_tasks = mpd_task_data.rename(columns={
+        "TASK NUMBER": "task_number", 
+        "DESCRIPTION": "description"
+    }).copy()
+    
+    # Add check_category as "Not Available" for all tasks
+    all_not_available_tasks["check_category"] = ["Not Available"] * len(all_not_available_tasks)
+    
+    # Separate ADD_TASKS from MPD_TASKS in not available list
+    add_not_available_tasks = pd.DataFrame(columns=["task_number", "description", "check_category"])
+    if not ADD_TASKS.empty:
+        add_task_numbers = ADD_TASKS["TASK NUMBER"].astype(str).str.strip().tolist()
+        add_not_available_tasks = all_not_available_tasks[
+            all_not_available_tasks["task_number"]
+            .apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+            .isin(add_task_numbers)
+        ]
+        
+        # Remove additional tasks from main not available list
+        all_not_available_tasks = all_not_available_tasks[
+            ~all_not_available_tasks["task_number"]
+            .apply(lambda x: str(x).replace(" (LH)", "").replace(" (RH)", ""))
+            .isin(add_task_numbers)
+        ]
+    
+    # Calculate task counts
+    total_mpd_tasks = len(mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist())
+    
+    filtered_tasks_count = {
+        "total_count": total_mpd_tasks,
+        "not_available_tasks_count": total_mpd_tasks,
+        "available_tasks_count": 0
+    }
+    
+    print(f"All {total_mpd_tasks} tasks marked as not available")
+    
+    return {
+        "filtered_tasks_list": [],  # No available tasks
+        "not_available_tasks_list": all_not_available_tasks.to_dict('records'),
+        "filtered_tasks_count": filtered_tasks_count,
+        "add_filtered_tasks": [],  # No available additional tasks
+        "add_not_available_tasks": add_not_available_tasks.to_dict('records'),
+        "age_cap_used": age_cap,
+        "packages_found": packages_found
+    }
             
 def replace_nan_inf(obj):
             """Helper function to recursively replace NaN and inf values with None"""
@@ -2872,4 +2938,3 @@ def modelUpdateLhRhTasks(LhRhTasks, MPD_TASKS):
     # Convert list of rows to DataFrame
     mpdLhRhTasks = pd.DataFrame(data)
     return mpdLhRhTasks
-

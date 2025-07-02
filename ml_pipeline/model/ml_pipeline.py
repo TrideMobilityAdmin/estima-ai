@@ -86,6 +86,8 @@ client =  MongoClient("mongodb://admin:admin%40123@10.100.12.82:27017/")
 db = client["gmr-mro-staging-5y"]
 
 
+
+
 test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
@@ -227,6 +229,7 @@ print(f"The shape of the aircraft collections {aircraft_details.shape }")
 print(f"The shape of the sub task parts collections {sub_task_parts.shape }")
 print(f"The shape of the sub task descriptions collections {sub_task_description.shape }")
 print(f"The shape of the task descriptions collections {task_description.shape }")
+
 
 
 
@@ -573,6 +576,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             for col in numeric_agg_columns:
                 grouped_data[col] = pd.to_numeric(grouped_data[col], errors='coerce').fillna(0)
 
+
             # Apply rounding logic row by row
             discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
             
@@ -582,6 +586,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
                 else:
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
+
 
             # Calculate cost per unit (avoid division by zero)
             grouped_data['avg_cost_per_unit'] = np.where(
@@ -1063,6 +1068,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         group_level_parts_result["prob"] = group_level_parts_result.apply(
             lambda row: prob(row), axis=1
         )
+        
+ 
         
         discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
         
@@ -1806,6 +1813,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #aggregatedTasks=json.dumps(output_data["aggregatedTasks"])
     #print(aggregatedTasks)
     return output_data
+
 
 
 
