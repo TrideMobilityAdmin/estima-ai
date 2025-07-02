@@ -2468,11 +2468,13 @@ class TaskService:
             raise HTTPException(status_code=500, detail=f"Error fetching operator list: {str(e)}")
     
     async def model_tasks_validate(self, MPD_TASKS, ADD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap=3, current_user: dict = Depends(get_current_user)):
+    async def model_tasks_validate(self, MPD_TASKS, ADD_TASKS, aircraft_age, aircraft_model, customer_name_consideration, check_category, customer_name, age_cap=3, current_user: dict = Depends(get_current_user)):
         """
         Validate model tasks based on aircraft parameters and customer requirements.
         
         Args:
             MPD_TASKS: DataFrame containing MPD task data
+            ADD_TASKS: DataFrame containing additional task data
             ADD_TASKS: DataFrame containing additional task data
             aircraft_age: Age of the aircraft (will be converted to float)
             aircraft_model: Model of the aircraft
@@ -2480,6 +2482,7 @@ class TaskService:
             check_category: List of check categories to filter by
             customer_name: Customer name for filtering (if customer_name_consideration is True)
             age_cap: Initial age range for filtering (default: 3)
+            current_user: Current user information
             current_user: Current user information
         
         Returns:
@@ -2490,7 +2493,12 @@ class TaskService:
             print("Validating model tasks with the following parameters:")
             sys.stdout.flush()
             # Extract tasks and descriptions
+            print("Validating model tasks with the following parameters:")
+            sys.stdout.flush()
+            # Extract tasks and descriptions
             tasks = MPD_TASKS.tasks
+            print("length of tasks:", len(tasks))
+            sys.stdout.flush()
             print("length of tasks:", len(tasks))
             sys.stdout.flush()
             descriptions = MPD_TASKS.description
@@ -2523,6 +2531,7 @@ class TaskService:
             # Fetch LH/RH tasks and update MPD tasks
             LhRhTasks = pd.DataFrame(list(self.RHLH_Tasks_collection.find({})))
             
+            
             mpd_task_data = modelUpdateLhRhTasks(LhRhTasks, MPD_TASKS)
             add_task_data = modelUpdateLhRhTasks(LhRhTasks, ADD_TASKS)
             
@@ -2533,6 +2542,9 @@ class TaskService:
             
             mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
+            # Combine MPD and additional tasks
+            mpd_task_data = pd.concat([mpd_task_data, add_task_data], ignore_index=True)
+            mpd_task_data= mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             # Fetch aircraft details
             aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
             
@@ -2613,6 +2625,7 @@ class TaskService:
                     if customer_name_consideration and customer_name:
                         # Add customer name filter
                         customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
+                        customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
                             customer_name, na=False, case=False
                         )
                         combined_filter = base_filter & customer_filter
@@ -2658,8 +2671,12 @@ class TaskService:
             
             mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
             
+            
+            mpd_task_numbers = mpd_task_data["TASK NUMBER"].astype(str).str.strip().unique().tolist()
+            
             # Get task data for the selected packages
             task_data_cursor = self.lhrh_task_description.find(
+                {"package_number": {"$in": train_packages},"task_number": {"$in": mpd_task_numbers}},
                 {"package_number": {"$in": train_packages},"task_number": {"$in": mpd_task_numbers}},
                 {"_id": 0, "task_number": 1, "description": 1, "package_number": 1}
             )
@@ -2703,6 +2720,7 @@ class TaskService:
                 filtered_task_numbers = lhrh_removal(filtered_tasks["task_number"].unique().tolist())
             
             # Find tasks not available in filtered results
+            not_available_tasks = pd.DataFrame() 
             not_available_tasks = pd.DataFrame() 
             if not mpd_task_data.empty:
                 mpd_task_numbers_cleaned = lhrh_removal(mpd_task_data["TASK NUMBER"].unique().tolist())

@@ -233,6 +233,7 @@ print(f"The shape of the task descriptions collections {task_description.shape }
 
 
 
+
 def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_TASKS,filepath,cappingDetails,age_cap,customer_name,customer_name_consideration,probability_threshold,delta_tasks):
 
     def updateLhRhTasks(LhRhTasks, MPD_TASKS):
@@ -577,6 +578,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 grouped_data[col] = pd.to_numeric(grouped_data[col], errors='coerce').fillna(0)
 
 
+
             # Apply rounding logic row by row
             discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
             
@@ -586,6 +588,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 0)
                 else:
                     grouped_data.at[idx, 'avg_qty_used'] = round(float(part_row['avg_qty_used']), 3)
+
 
 
             # Calculate cost per unit (avoid division by zero)

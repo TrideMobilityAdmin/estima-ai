@@ -24,7 +24,8 @@ import {
   Loader,
   Tabs,
   Pagination,
-  Popover
+  Popover,
+  rem
 } from "@mantine/core";
 import DropZoneExcel from "../components/fileDropZone";
 import {
@@ -126,7 +127,6 @@ import { useApi } from "../api/services/estimateSrvice";
 import { baseUrl, getEstimateReport_Url } from "../api/apiUrls";
 import RFQUploadDropZoneExcel from "../components/rfqUploadDropzone";
 import robotGif from "../../public/7efs.gif";
-import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CsvDownloadButton from "react-json-to-csv";
@@ -141,10 +141,16 @@ import ExcelJS from "exceljs";
 import aircraftMOdelsData from "../assets/aircraftModels.json";
 import aircraftOperators from "../assets/aircraftOperators.json";
 import { DatePickerInput } from "@mantine/dates";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+import excelDownloadIcon from "../../public/ExcelDownloadLogo.png";
+import excelIcon from "../../public/ExcelIcon3.svg";
 // import mountMantineLoaderToGrid from "../components/LoadingCellRenderer";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isoWeek); 
+
 
 export default function EstimateNew() {
   const {
@@ -160,7 +166,8 @@ export default function EstimateNew() {
     getEstimateDetailsByID,
     getFilteredTasksByID,
     getModelTasksValidate,
-    getAllHistoryEstimatesStatus
+    getAllHistoryEstimatesStatus,
+    getAllEstimatesSummary
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
   const { getSkillAnalysis } = useApiSkillAnalysis();
@@ -589,9 +596,7 @@ export default function EstimateNew() {
 
   const downloadExcelFilteredTasks = (status: boolean) => {
     const filteredTasks = combinedFilteredTasksList?.filter((task) => task?.status === status) || [];
-
     let excelData: Record<string, any>[] = [];
-
     if (status) {
       // Status === true: Only include TASK NUMBER, ESTIMATE ID, STATUS
       excelData =
@@ -627,18 +632,17 @@ export default function EstimateNew() {
             },
           ];
     }
-
     // Create Excel sheet and download
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "MPD");
-
     XLSX.writeFile(
       wb,
       `Estimate_${selectedEstimateId}_${status ? "Filtered_Available" : "Filtered_NotAvailable"
       }.xlsx`
     );
   };
+
 
   const [estimateDetails, setEstimateDetails] = useState<any>(null);
   const [loadingEstDet, setLoadingEstDet] = useState(false);
@@ -656,6 +660,7 @@ export default function EstimateNew() {
 
   //   fetchEstDetails();
   // }, [selectedEstimateIdDetails]);
+ 
   useEffect(() => {
     const fetchEstDetails = async () => {
       setLoadingEstDet(true);
@@ -1301,15 +1306,25 @@ export default function EstimateNew() {
   const [modalTaskValidateData, setModalTaskValidateData] = useState<any>(null);
   const [loadingModalTasksValidate, setLoadingModalTasksValidate] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchModalTasksValidate = async () => {
       setLoadingModalTasksValidate(true);
 
-      // Get values from form
+      // Extract task numbers and descriptions as string arrays
+      const additionalTaskIDs =
+        additionalTasks?.map((task:any) => task.taskID?.toString() || "") || [];
+      const additionalTaskDescriptions =
+        additionalTasks?.map((task:any) => task.taskDescription?.toString() || "") || [];
+
+      // Prepare request payload
       const requestData = {
         MPD_TASKS: {
           tasks: extractedTasks || [],
-          description : extractedDescriptions || [],
+          description: extractedDescriptions || [],
+        },
+        ADD_TASKS: {
+          tasks: additionalTaskIDs,
+          description: additionalTaskDescriptions,
         },
         typeOfCheck: form.values.typeOfCheck || [],
         aircraftAge: form.values.aircraftAge || 0.0,
@@ -1323,9 +1338,11 @@ export default function EstimateNew() {
       setModalTaskValidateData(data);
       setLoadingModalTasksValidate(false);
     };
-      fetchModalTasksValidate();
+
+    fetchModalTasksValidate();
   }, [
     extractedTasks,
+    additionalTasks,
     form.values.typeOfCheck,
     form.values.aircraftAge,
     form.values.aircraftModel,
@@ -1333,6 +1350,7 @@ export default function EstimateNew() {
     form.values.operator,
     form.values.aircraftAgeThreshold,
   ]);
+
   console.log("Modal Task Validate Data >>>", modalTaskValidateData);
 
   const combinedModalTasksValidate = [
@@ -1351,29 +1369,47 @@ export default function EstimateNew() {
       .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
 
+  const combinedModalTasksValidateAdditional = [
+    ...(modalTaskValidateData?.add_filtered_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: true
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== ''),
+
+    ...(modalTaskValidateData?.add_not_available_tasks || [])
+      .map((task: any) => ({
+        ...task,
+        status: false
+      }))
+      .filter((task: any) => task.task_number && task.task_number.trim() !== '')
+  ];
+
   console.log("Combined Modal Tasks Validate >>>", combinedModalTasksValidate);
 
-  const downloadExcelModalTaskValidate = (status: boolean) => {
-  const filteredTasks = combinedModalTasksValidate?.filter((task) => task?.status === status) || [];
+  const [excelModalOpened, setExcelModalOpened] = useState(false);
+  const [downloadedNotAvailableTasks, setDownloadedNotAvailableTasks] = useState<any[]>([]);
+
+  const downloadExcelModalTaskValidate = (
+  status: boolean,
+  setTaskListCallback?: (tasks: any[]) => void
+) => {
+  const filteredTasks =
+    combinedModalTasksValidate?.filter((task) => task?.status === status) || [];
 
   let excelData: Record<string, any>[] = [];
 
   if (status) {
-    // Status === true: Only include TASK NUMBER and DESCRIPTION
+    // Status === true: only TASK NUMBER & DESCRIPTION
     excelData =
       filteredTasks.length > 0
         ? filteredTasks.map((task) => ({
             "TASK NUMBER": task?.task_number || "",
             DESCRIPTION: task?.description || "",
           }))
-        : [
-            {
-              "TASK NUMBER": "",
-              DESCRIPTION: "",
-            },
-          ];
+        : [{ "TASK NUMBER": "", DESCRIPTION: "" }];
   } else {
-    // Status === false: Include CHECK CATEGORY as comma-separated string
+    // Status === false: TASK NUMBER, DESCRIPTION, CHECK CATEGORY (comma-separated)
     excelData =
       filteredTasks.length > 0
         ? filteredTasks.map((task) => ({
@@ -1383,24 +1419,24 @@ export default function EstimateNew() {
               ? task.check_category.filter(Boolean).join(", ")
               : "",
           }))
-        : [
-            {
-              "TASK NUMBER": "",
-              DESCRIPTION: "",
-              "CHECK CATEGORY": "",
-            },
-          ];
+        : [{ "TASK NUMBER": "", DESCRIPTION: "", "CHECK CATEGORY": "" }];
   }
 
-  // Create Excel sheet and download
+  // Download Excel
   const ws = XLSX.utils.json_to_sheet(excelData);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "MPD");
-
   XLSX.writeFile(
     wb,
-    `Estimate_${selectedEstimateId}_${status ? "ModalTasks_Available" : "ModalTasks_NotAvailable"}.xlsx`
+    `Estimate_${selectedEstimateId}_${
+      status ? "ModalTasks_Available" : "ModalTasks_NotAvailable"
+    }.xlsx`
   );
+
+  // Pass filtered data for modal if status === false
+  if (!status && setTaskListCallback) {
+    setTaskListCallback(excelData);
+  }
 };
 
 
@@ -2060,6 +2096,183 @@ export default function EstimateNew() {
     a.click();
     document.body.removeChild(a);
   };
+
+
+  const [rangeType, setRangeType] = useState("Today");
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [estimatesSummary, setEstimatesSummary] = useState<any[]>([]);
+  const [loadingEstimatesSummary, setLoadingEstimatesSummary] = useState(false);
+  const [statusText, setStatusText] = useState("");
+
+  console.log("Selected Date range :",rangeType + dateRange);
+
+  
+  const fetchAllEstimatesSummary = async () => {
+    let startDate: string | null = null;
+    let endDate: string | null = null;
+
+    if (rangeType === "Today") {
+      startDate = dayjs().startOf("day").toISOString();
+      endDate = dayjs().endOf("day").toISOString();
+    } else if (rangeType === "Last Week") {
+      startDate = dayjs().subtract(1, "week").startOf("day").toISOString();
+      endDate = dayjs().endOf("day").toISOString();
+    } else if (rangeType === "Custom Range") {
+      if (dateRange[0] && dateRange[1]) {
+        startDate = dayjs(dateRange[0]).startOf("day").toISOString();
+        endDate = dayjs(dateRange[1]).endOf("day").toISOString();
+      } else {
+        return;
+      }
+    }
+
+    if (startDate && endDate) {
+      setLoadingEstimatesSummary(true);
+      setStatusText("Loading...");
+      try {
+        const response = await getAllEstimatesSummary(startDate, endDate);
+        setEstimatesSummary(response || []);
+
+        if (response && response.length > 0) {
+          setStatusText("Ready to download");
+        } else {
+          setStatusText("No data found");
+        }
+      } catch (err) {
+        setStatusText("Error fetching data");
+        setEstimatesSummary([]);
+      } finally {
+        setLoadingEstimatesSummary(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchAllEstimatesSummary();
+  }, [rangeType, dateRange]);
+
+  useEffect(() => {
+    if (rangeType === "Today") {
+      setDateRange([
+        dayjs().startOf("day").toDate(),
+        dayjs().endOf("day").toDate(),
+      ]);
+    } else if (rangeType === "Last Week") {
+      setDateRange([
+        dayjs().subtract(6, "day").startOf("day").toDate(),
+        dayjs().endOf("day").toDate(),
+      ]);
+    } else if (rangeType === "Custom Range") {
+      setDateRange([null, null]);
+    }
+  }, [rangeType]);
+
+  // Custom Excel column headers mapping
+  const getExcelFormattedData = (data: any[]) => {
+  return data.map((item, index) => ({
+    "S. NO": index + 1,
+    "CREATED AT": dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss"),
+    "ESTIMATE ID": item.estID,
+    "A/c REG NO": item.aircraftRegNo,
+    "OPERATOR": item.operator,
+    "AIRCRAFT MODEL": item.aircraftModel,
+    "AIRCRAFT AGE": item.aircraftAge,
+    "CHECK TYPE": Array.isArray(item.typeOfCheck) ? item.typeOfCheck.join(", ") : item.typeOfCheck,
+    // "PROBABILITY": item.probability,
+
+    // Additional Flags
+    "CONSIDER DELTA UNAV TASKS": item.considerDeltaUnAvTasks,
+    "OPERATOR FOR MODEL": item.operatorForModel,
+    "AIRCRAFTAGE THRESHOLD": item.aircraftageThreshold,
+
+    // Tasks Before Filter
+    "AVAILABLE TASKS BEFORE FILTER": item.available_tasks_before_filter,
+    "NOT AVAILABLE TASKS BEFORE FILTER": item.unavailable_tasks_before_filter,
+
+    // Tasks After Filter
+    "AVAILABLE TASKS AFTER FILTER": item.available_tasks_after_filter,
+    "UNAVAILABLE TASKS AFTER FILTER": item.unavailable_tasks_after_filter,
+
+    // Matching Percentages
+    "MATCHING % BEFORE FILTER": item.task_matching_percentage_before_filter,
+    "MATCHING % AFTER FILTER": item.task_matching_percentage_after_filter,
+
+    // Task Count and Others
+    "TOTAL TASKS COUNT": item.total_tasks_count,
+    "AVAILABLE TASKS IN OTHER CHECK CATEGORY": item.available_tasks_in_other_check_category,
+
+    // Manhours & Costs
+    "MH": item.totalManhrs,
+    "PRELOAD COST": item.preloadcost,
+    "TOTAL FINDING MH": item.findingsManhrs,
+    "TOTAL FINDING SPARES COST": item.findingsSpareCost,
+
+    // Capping and Unbillable Details
+    "CAPPING TYPE MANHRS": item.cappingTypeManhrs,
+    "UNBILLABLE MH CAP": item.cappingManhrs,
+    "UNBILLABLE MH": item.unbillableManhrs,
+    "CAPPING TYPE SPARE COST": item.cappingTypeSpareCost,
+    "UNBILLABLE MATERIAL CAP": item.cappingSpareCost,
+    "UNBILLABLE MATERIAL COSTING": item.unbillableSpareCost,
+
+    // Final TAT
+    "TAT": item.tat,
+  }));
+};
+
+  const handleDownloadEstimateSummary = () => {
+  if (!estimatesSummary.length) return;
+
+  const formatted = getExcelFormattedData(estimatesSummary);
+  const worksheet = XLSX.utils.json_to_sheet(formatted);
+
+  // ✅ Define column widths (in characters)
+  worksheet["!cols"] = [
+    { wch: 6 },   // S. NO
+    { wch: 20 },  // CREATED AT
+    { wch: 35 },  // ESTIMATE ID
+    { wch: 15 },  // A/c REG NO
+    { wch: 30 },  // OPERATOR
+    { wch: 15 },  // AIRCRAFT MODEL
+    { wch: 15 },  // AIRCRAFT AGE
+    { wch: 25 },  // CHECK TYPE
+    // { wch: 12 },  // PROBABILITY
+    { wch: 25 },  // CONSIDER DELTA UNAV TASKS
+    { wch: 20 },  // OPERATOR FOR MODEL
+    { wch: 22 },  // AIRCRAFTAGE THRESHOLD
+    { wch: 30 },  // AVAILABLE TASKS BEFORE FILTER
+    { wch: 32 },  // NOT AVAILABLE TASKS BEFORE FILTER
+    { wch: 28 },  // AVAILABLE TASKS AFTER FILTER
+    { wch: 30 },  // UNAVAILABLE TASKS AFTER FILTER
+    { wch: 28 },  // MATCHING % BEFORE FILTER
+    { wch: 26 },  // MATCHING % AFTER FILTER
+    { wch: 20 },  // TOTAL TASKS COUNT
+    { wch: 35 },  // AVAILABLE TASKS IN OTHER CHECK CATEGORY
+    { wch: 10 },  // MH
+    { wch: 18 },  // PRELOAD COST
+    { wch: 20 },  // TOTAL FINDING MH
+    { wch: 26 },  // TOTAL FINDING SPARES COST
+    { wch: 22 },  // CAPPING TYPE MANHRS
+    { wch: 20 },  // UNBILLABLE MH CAP
+    { wch: 18 },  // UNBILLABLE MH
+    { wch: 26 },  // CAPPING TYPE SPARE COST
+    { wch: 24 },  // UNBILLABLE MATERIAL CAP
+    { wch: 28 },  // UNBILLABLE MATERIAL COSTING
+    { wch: 10 },  // TAT
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Estimates Summary");
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  const filename = `EstimatesSummary.xlsx`;
+  saveAs(blob, filename);
+};
+
 
   return (
     <>
@@ -2807,6 +3020,8 @@ export default function EstimateNew() {
                       width: '100%'
                     }}
                     scrollbars="y"
+                    scrollbarSize={3}
+                    scrollHideDelay={0}
                     offsetScrollbars={false}
                   >
                     <Box style={{ width: '100%', paddingRight: '8px' }}>
@@ -2817,7 +3032,14 @@ export default function EstimateNew() {
                           {validatedTasks.length > 0 && (
                             <Box mb="md">
                               {/* <Text size="sm" fw={600} mb="xs"> Tasks :</Text> */}
-                              <SimpleGrid cols={5}>
+                              <SimpleGrid 
+                              cols={4}
+                              spacing="md"
+                              style={{
+                                width: '100%',
+                                minWidth: 0 // Allows grid to shrink below content size
+                              }}
+                              >
                                 {validatedTasks
                                   ?.slice() // to avoid mutating the original array
                                   .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
@@ -2889,17 +3111,19 @@ export default function EstimateNew() {
                       size="xs"
                       color="violet"
                       variant="light"
-                      rightSection={<IconDownload size="18" />}
-                      onClick={() => downloadExcelModalTaskValidate(false)}
-                    // disabled={filteredTasksList?.filtered_tasks_count?.not_available_tasks_count > 0 ? false : true}
+                      rightSection={<IconDownload size={18} />}
+                      onClick={() => {
+                        downloadExcelModalTaskValidate(false, setDownloadedNotAvailableTasks); // download + store
+                        setExcelModalOpened(true); // open modal
+                      }}
+                      disabled={
+                        (modalTaskValidateData?.filtered_tasks_count?.not_available_tasks_count || 0) === 0
+                      }
                     >
-                      {/* {
-                        combinedFilteredTasksList?.filter((ele) => ele?.status === false)
-                          ?.length
-                      } */}
                       {modalTaskValidateData?.filtered_tasks_count?.not_available_tasks_count || 0}
                     </Button>
                   </Tooltip>
+
                 </Group>
                 <Group justify="space-between">
                       <Group mb="xs" align="center">
@@ -2961,12 +3185,14 @@ export default function EstimateNew() {
                   width: '100%'
                 }}
                 scrollbars="y"
+                scrollbarSize={3}
+                scrollHideDelay={0}
                 offsetScrollbars={false}
               >
                 <Box style={{ width: '100%', paddingRight: '8px' }}>
                   <SimpleGrid
                     cols={4}
-                    spacing="xs"
+                    spacing="md"
                     style={{
                       width: '100%',
                       minWidth: 0 // Allows grid to shrink below content size
@@ -3036,8 +3262,8 @@ export default function EstimateNew() {
                       padding: '12px'
                     }}
                   >
-                    <Text size="sm" fw={600} mb="xs">Additional Tasks:</Text>
-                    <SimpleGrid cols={5}>
+                    <Text size="sm" fw={600} mb="xs">Additional Tasks :</Text>
+                    <SimpleGrid cols={4}>
                       {validatedAdditionalTasks
                         ?.slice() // to avoid mutating the original array
                         .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
@@ -3056,13 +3282,44 @@ export default function EstimateNew() {
                     </SimpleGrid>
                   </Box>
                 )}
+
+                {
+                  combinedModalTasksValidateAdditional.length > 0 && (
+                  <Box
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: '1px solid #e9ecef',
+                      borderRadius: '8px',
+                      padding: '12px'
+                    }}
+                  >
+                    <Text size="sm" fw={600} mb="xs">Additional Tasks after Filter :</Text>
+                    <SimpleGrid cols={4}>
+                      {combinedModalTasksValidateAdditional
+                        ?.slice() // to avoid mutating the original array
+                        .sort((a, b) => (a?.task_number || '').localeCompare(b?.task_number || ''))
+                        .map((task, index) => (
+                          <Badge
+                            fullWidth
+                            key={`additional-${index}`}
+                            color={task?.status === false ? "violet" : "cyan"}
+                            variant="light"
+                            radius="sm"
+                            style={{ margin: "0.25em" }}
+                          >
+                            {task?.task_number}
+                          </Badge>
+                        ))}
+                    </SimpleGrid>
+                  </Box>
+                  )
+                }
+
               </SimpleGrid>
             </>
           )
         }
-
-
-
       </Modal>
       {/* Remarks for Estimate id */}
       <Modal
@@ -3198,6 +3455,80 @@ export default function EstimateNew() {
           </Button>
         </Group>
         <Group></Group>
+      </Modal>
+      {/* filtered not available tasks */}
+      <Modal
+        opened={excelModalOpened}
+        onClose={() => setExcelModalOpened(false)}
+        title="After Filter Not-Available Tasks"
+        size={1000}
+      >
+        {/* AG Grid Wrapper */}
+        <div
+          className="ag-theme-alpine"
+          style={{
+            height: 500, // Total height of grid section
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Grid body scrolls independently */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <AgGridReact
+              rowData={downloadedNotAvailableTasks}
+              columnDefs={[
+                {
+                  field: "TASK NUMBER",
+                  headerName: "Task Number",
+                  flex: 0.5,
+                  autoHeight: true,
+                  cellStyle: {
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: '1.5rem',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                  },
+                },
+                {
+                  field: "DESCRIPTION",
+                  headerName: "Description",
+                  flex: 2,
+                  autoHeight: true,
+                  cellStyle: {
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: '1.5rem',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                  },
+                },
+                {
+                  field: "CHECK CATEGORY",
+                  headerName: "Check Category",
+                  flex: 1,
+                  autoHeight: true,
+                  cellStyle: {
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: '1.5rem',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                  },
+                },
+              ]}
+              defaultColDef={{
+                resizable: true,
+                wrapText: true,
+                autoHeight: true,
+              }}
+              pagination={true}
+              paginationPageSize={10}
+              suppressPaginationPanel={false} // Keeps pagination visible
+              domLayout="normal" // Required for scrollable rows
+            />
+          </div>
+        </div>
       </Modal>
 
       <div style={{ padding: 60 }}>
@@ -3938,12 +4269,78 @@ export default function EstimateNew() {
 
         <Space h="sm" />
         <Card>
-          <Group align="center" gap="sm">
-            <ThemeIcon variant="light">
-              <IconReport />
-            </ThemeIcon>
-            <Title order={5}>Estimations</Title>
-          </Group>
+      <Stack gap="xs">
+      <Group justify="space-between" align="center" gap="sm">
+        {/* Left Side: Title + Icon */}
+        <Group gap="xs">
+          <ThemeIcon variant="light">
+            <IconReport />
+          </ThemeIcon>
+          <Title order={5}>Estimations</Title>
+        </Group>
+
+        {/* Right Side: Dropdown + Date Range Picker + Download */}
+        <Group justify="right">
+          <Flex direction='column' align='end'>
+              <Group gap="xs">
+                {rangeType === "Custom Range" && (
+                  <DatePickerInput
+                    type="range"
+                    value={dateRange}
+                    onChange={setDateRange}
+                    size="xs"
+                    allowSingleDateInRange
+                    styles={{ input: { width: rem(220) } }}
+                    placeholder="Select range"
+                    clearable
+                  />
+                )}
+
+                <Select
+                // label={statusText}
+                  data={["Today", "Last Week", "Custom Range"]}
+                  value={rangeType}
+                  onChange={(value) => setRangeType(value || "Today")}
+                  size="xs"
+                  styles={{ input: { width: rem(140) } }}
+                  allowDeselect={false}
+                />
+
+                <Tooltip label="Download Estimates Summary" withArrow>
+                  <ActionIcon
+                    variant="light"
+                    color="green"
+                    radius="sm"
+                    size="lg"
+                    style={{ padding: 6 }}
+                    onClick={handleDownloadEstimateSummary}
+                    disabled={loadingEstimatesSummary || estimatesSummary.length === 0}
+                  >
+                    {loadingEstimatesSummary ? (
+                      <Loader size={24} color="green" />
+                    ) : (
+                      <img src={excelIcon} alt="Download" height={28} style={{ display: "block" }} />
+                    )}
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              <Text size="xs" c="dimmed" pr={45}>
+                {statusText}
+              </Text>
+              </Flex>
+      </Group> 
+      </Group>
+      {/* <Tooltip label="Download Estimates Summary"> 
+            <ActionIcon
+              variant="gradient"
+              size="lg"
+              aria-label="Gradient action icon"
+              gradient={{ from: 'rgba(13, 0, 158, 1)', to: 'rgba(152, 143, 255, 1)', deg: 310 }}
+            >
+              <IconDownload />
+            </ActionIcon>
+          </Tooltip> */}
+    </Stack>
           <Space h="sm" />
           <Tabs color="violet" variant="outline" radius="md" defaultValue="recent">
             <Tabs.List>
