@@ -18,11 +18,12 @@ import {
   showNotification,
   Space
 } from "../constants/GlobalImports";
-import flightBg from '../../public/airCraft8.jpg'
+import flightBg from '../../public/airCraft8.jpg';
 import { Overlay } from "@mantine/core";
 import { entityID, roleID, userEmail, userID, userName, userToken } from "../api/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
+import gmrIcon from "../../public/GMR_Icon2.png";
 
 type LoginInput = {
   username: string;
@@ -40,13 +41,12 @@ function Login() {
       password: "",
     },
   });
+
   const [token, setToken] = useAtom(userToken);
   const [userId, setUserID] = useAtom(userID);
   const [name, setName] = useAtom(userName);
   const [email, setEmail] = useAtom(userEmail);
-  // const [roleId, setRoleID] = useAtom(roleID);
-  // const [entityId, setEntityID] = useAtom(entityID);
-  
+
   const login = async (values: LoginInput) => {
     setIsLoading(true);
     try {
@@ -60,20 +60,14 @@ function Login() {
         userID, 
         username,
         email
-        // roleID, 
-        // entityID 
       } = response.data;
 
       if (response.status === 200) {
-        // Update Jotai atoms
         setToken(accessToken);
         setUserID(userID);
         setName(username);
         setEmail(email);
-        // setRoleID(roleID);
-        // setEntityID(entityID);
 
-        // Save to sessionStorage using the helper function
         saveAuthData({ 
           token: accessToken, 
           userID, 
@@ -81,20 +75,14 @@ function Login() {
           email 
         });
 
-        // Verify that the token is stored
-        console.log("✅ Token stored in sessionStorage:", accessToken.substring(0, 10) + "...");  
-        console.log("✅ User stored in sessionStorage:", username);  
-        console.log("✅ Email stored in sessionStorage:", email);  
-
         showNotification({
           title: "Login Successful",
           message: "Welcome to EstimaAI",
           color: "green",
           style: { position: "fixed", bottom: 20, right: 20, zIndex: 1000 },
         });
-        
+
         setIsLoading(false);
-        // Redirect to dashboard
         navigate("/home");
       } else {
         setIsLoading(false);
@@ -103,7 +91,6 @@ function Login() {
     } catch (error: any) {
       setIsLoading(false);
       clearAuthState();
-      console.log("Error during login:", error);
       const errorMessage =
         error.response?.data?.detail || "Something went wrong!";
 
@@ -128,6 +115,7 @@ function Login() {
         position: "relative",
       }}
     >
+      {/* Background Image */}
       <Image
         src={flightBg}
         style={{
@@ -139,12 +127,49 @@ function Login() {
           left: 0,
         }}
       />
-       <Overlay
-          gradient="linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, .20) 60%)"
-          opacity={1}
-          zIndex={0}
-        />
 
+      {/* Gradient Overlay */}
+      <Overlay
+        gradient="linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, .20) 60%)"
+        opacity={1}
+        zIndex={0}
+      />
+
+      {/* GMR Watermark - Top Right Corner with Subtitle */}
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "30px",
+          textAlign: "center",
+          zIndex: 0,
+          pointerEvents: "none",
+          userSelect: "none",
+          lineHeight: 1.1,
+        }}
+      >
+        <div
+          style={{
+            fontSize: "70px",
+            color: "rgba(255, 255, 255, 0.3)",
+            fontWeight: 900,
+          }}
+        >
+          GMR
+        </div>
+        <div
+          style={{
+            fontSize: "30px",
+            color: "rgba(255, 255, 255, 0.25)",
+            fontWeight: 600,
+          }}
+        >
+          Aero Technic
+        </div>
+      </div>
+
+
+      {/* Login Card */}
       <Flex
         justify="center"
         align="center"
@@ -164,21 +189,23 @@ function Login() {
             backgroundColor: "rgba(255, 255, 255, 0.7)",
             borderRadius: "8px",
             boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            position: "relative",
+            zIndex: 1,
           }}
         >
-          <form
-            onSubmit={form.onSubmit((values) => login(values))}
-          >
-            <Flex align='center' justify='center' direction='column'>
-            <Title ta="center" >
-              EstimaAI
-            </Title>
-            <Text>
-            Intelligent RFQ Predictor
-            </Text>
+          <form onSubmit={form.onSubmit((values) => login(values))}>
+            <Flex align="center" justify="center" direction="column">
+              {/* Smaller GMR Icon */}
+              <Image
+                src={gmrIcon}
+                alt="GMR Logo"
+                style={{ width: 200, height: 200, marginBottom: 12 }} // smaller size
+              />
+
+              <Title ta="center">EstimaAI</Title>
+              <Text>Intelligent RFQ Predictor</Text>
             </Flex>
-            <Space h='50'/>
-            
+            <Space h="20" />
             <TextInput
               label="Username"
               placeholder="hello@gmail.com"
@@ -193,7 +220,14 @@ function Login() {
               {...form.getInputProps("password")}
             />
             <Checkbox label="Keep me logged in" mt="xl" size="md" />
-            <Button loading={isLoading} type="submit" bg="#000DB4" fullWidth mt="xl" size="md">
+            <Button
+              loading={isLoading}
+              type="submit"
+              bg="#000DB4"
+              fullWidth
+              mt="xl"
+              size="md"
+            >
               Login
             </Button>
           </form>
