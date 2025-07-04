@@ -1091,6 +1091,8 @@ class ExcelUploadService():
                         if isinstance(add, dict) and add.get("taskDescription") is not None
                     ]
                 )
+
+                   
                 print("created add_request")
                 sys.stdout.flush()
                 # Validate tasks using the corrected method call
@@ -1126,7 +1128,7 @@ class ExcelUploadService():
                     unavailable_tasks_length = 0
                 
                 result['available_tasks_before_filter'] = available_tasks_length
-                result['unavailable_tasks_before_filter'] = unavailable_tasks_length
+                result['unavailable_tasks_before_filter'] = unavailable_tasks_length-1
                 result["task_matching_percentage_before_filter"] = round(
                     (available_tasks_length / (available_tasks_length + unavailable_tasks_length)) * 100, 4
                 ) if (available_tasks_length + unavailable_tasks_length) > 0 else 0
@@ -1191,9 +1193,13 @@ class ExcelUploadService():
                     
                     # Filter tasks that are available in other check categories
                     delta_tasks_count = 0
+                    #task_unique_list=[]
                     for task in not_available_tasks_list:
                         if isinstance(task, dict):
                             check_category = task.get("check_category", ["Not Available"])
+                            #task_cleaned=task.replace(" (LH)", "").replace(" (RH)", "")
+                            #task_unique_list.append(task.replace(" (LH)", "").replace(" (RH)", ""))
+                            
                             if isinstance(check_category, list) and len(check_category) > 0 and check_category[0] != "Not Available":
                                 delta_tasks_count += 1
                             
