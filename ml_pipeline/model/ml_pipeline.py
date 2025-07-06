@@ -206,7 +206,9 @@ cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_bil
 for col in cols_to_convert:
     sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
     
-
+sub_task_parts["latest_price"] = sub_task_parts["issued_part_number"].apply(
+    lambda x: parts_master.loc[parts_master["issued_part_number"] == x, "latest_price"].values[0] if x in parts_master["issued_part_number"].values else 0
+)
 
 #sub_task_description_collection="sub_task_description"
 task_description = db["task_description_max500mh_lhrh"]
@@ -563,7 +565,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 max_qty_used=('used_quantity', 'max'),
                 min_qty_used=('used_quantity', 'min'),
                 total_billable=('billable_value_usd', 'sum'),
-                max_price=('total_billable_price', 'max'),
+                max_price=('latest_price', 'first'),
                 total_quantity=('used_quantity', 'sum'),
                 part_description=("part_description", 'first'),
                 issued_unit_of_measurement=("issued_unit_of_measurement", 'first')
@@ -1016,6 +1018,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             avg_used_qty=("used_quantity", 'mean'),
             max_used_qty=("used_quantity", "max"),
             min_used_qty=("used_quantity", "min"),
+            latest_price=("latest_price", "first"),
             total_billable_value_usd=("billable_value_usd", "sum"),
             total_used_qty=("used_quantity", "sum"),
             part_description=('part_description', "first"),
@@ -1075,20 +1078,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 0)
             else:
                 group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 3)
-        
-        discrete_units = ["EA", "JR", "BOTTLE", "TU", "PAC", "BOX", "GR", "PC", "NO", "PINT", "PAIR", "GAL"]
-        
-        for idx, part_row in group_level_parts_result.iterrows():
-            unit_of_measurement = str(part_row["issued_unit_of_measurement"]).strip().upper()
-            if unit_of_measurement in discrete_units:
-                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 0)
-            else:
-                group_level_parts_result.at[idx, 'avg_used_qty'] = round(float(part_row['avg_used_qty']), 3)
 
         # Define parts price calculation
         def parts_price(row):
-            if row["total_used_qty"] and row["total_used_qty"] > 0:
-                return row["avg_used_qty"] * (row["total_billable_value_usd"] / row["total_used_qty"])
+            if row["latest_price"] :
+                return row["avg_used_qty"] * (row["latest_price"])
             else:
                 return 0
 
@@ -1114,6 +1108,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
             max_used_qty=("used_quantity", "max"),
             min_used_qty=("used_quantity", "min"),
+            latest_price=("latest_price", "first"),
             total_billable_value_usd=("billable_value_usd", "sum"),
             total_used_qty=("used_quantity", "sum"),
             part_description=('part_description', "first"),
@@ -1153,13 +1148,18 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             lambda row: prob(row), axis=1
             )
 
-        
+        """
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
         
             else:
-                return 0  # Better to return 0 than None
+                return 0  # Better to return 0 than None"""
+        def parts_price(row):
+            if row["latest_price"] :
+                return row["avg_used_qty"] * (row["latest_price"])
+            else:
+                return 0
         # Apply the function row-wise
         task_level_parts_result["billable_value_usd"] = task_level_parts_result.apply(parts_price, axis=1)
         
@@ -1184,6 +1184,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             avg_used_qty=("used_quantity", 'mean'),  # Added the missing comma here
             max_used_qty=("used_quantity", "max"),
             min_used_qty=("used_quantity", "min"),
+            latest_price=("latest_price", "first"),
             total_billable_value_usd=("billable_value_usd", "sum"),
             total_used_qty=("used_quantity", "sum"),
             part_description=('part_description', "first"),
@@ -1222,12 +1223,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         parts_line_items_result["prob"] =parts_line_items_result.apply(
         lambda row: prob(row), axis=1
         )
+        '''
         def parts_price(row):
             if row["total_used_qty"] and row["total_used_qty"] > 0:
                 return row["avg_used_qty"] * (row["total_billable_value_usd"]/row["total_used_qty"])
         
             else:
-                return 0  # Better to return 0 than None
+                return 0  # Better to return 0 than None'''
+                
+        def parts_price(row):
+            if row["latest_price"] :
+                return row["avg_used_qty"] * (row["latest_price"])
+            else:
+                return 0
         # Apply the function row-wise
         parts_line_items_result["billable_value_usd"] =  parts_line_items_result.apply(parts_price, axis=1)
         print("parts line items are computed")

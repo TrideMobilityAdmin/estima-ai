@@ -1125,8 +1125,8 @@ class ExcelUploadService():
                     available_tasks_length = 0
                     unavailable_tasks_length = 0
                 
-                result['available_tasks_before_filter'] = available_tasks_length
-                result['unavailable_tasks_before_filter'] = unavailable_tasks_length
+                result['available_tasks_before_filter'] = available_tasks_length-1
+                result['unavailable_tasks_before_filter'] = unavailable_tasks_length-1
                 result["task_matching_percentage_before_filter"] = round(
                     (available_tasks_length / (available_tasks_length + unavailable_tasks_length)) * 100, 4
                 ) if (available_tasks_length + unavailable_tasks_length) > 0 else 0
