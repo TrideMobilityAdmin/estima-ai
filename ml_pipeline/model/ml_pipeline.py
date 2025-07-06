@@ -808,7 +808,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             sub_task_parts[
                 ['task_number', 'issued_part_number','part_description',
                  'issued_unit_of_measurement', 'used_quantity', 'base_price_usd',
-                 'billable_value_usd']
+                 'billable_value_usd','latest_price']
             ],
             left_on="log_item_number",
             right_on="task_number",
@@ -980,7 +980,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         group_level_parts = exdata_parts_updated[[
             "log_item_number", "source_task_discrepancy_number", "group", "package_number",
             "issued_part_number", "part_description", "issued_unit_of_measurement",
-            "used_quantity", "billable_value_usd"
+            "used_quantity", "billable_value_usd",'latest_price'
         ]]
         group_level_parts = group_level_parts.merge(
         group_level_mh_result[["source_task_discrepancy_number", "group", "prob"]],
@@ -1001,6 +1001,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             billable_value_usd=("billable_value_usd", "sum"),
             used_quantity=("used_quantity", "sum"),
             part_description=('part_description', "first"),
+            latest_price=('latest_price', "first"),
             issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
         
@@ -1096,6 +1097,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         billable_value_usd=("billable_value_usd","sum"),
         used_quantity=("used_quantity", "sum"),
         part_description=('part_description', "first"),
+        latest_price=('latest_price', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
                 
@@ -1173,6 +1175,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         billable_value_usd=("billable_value_usd","sum"),
         used_quantity=("used_quantity", "sum"),
         part_description=('part_description', "first"),
+        latest_price=('latest_price', "first"),
         issued_unit_of_measurement=('issued_unit_of_measurement', "first")
         ).reset_index()
         parts_line_items["package_numbers"]  = parts_line_items["issued_unit_of_measurement"].apply(
@@ -1241,9 +1244,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         print("parts line items are computed")
         
         
-        
 
-        
         
         group_level_mh_result=group_level_mh_result[group_level_mh_result["prob"]>probability_threshold]
         group_level_mh_result.to_csv(f"{filepath}/{estID}group_level_mh_result.csv")
