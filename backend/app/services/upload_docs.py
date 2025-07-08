@@ -1889,6 +1889,48 @@ class ExcelUploadService():
             return "mlttable"
         else:
             return None
+        
+    def update_lh_rh_tasks(self,task):
+        """
+        Convert LH/RH suffix to a standardized format.
+        
+        Args:
+            task: String containing task number/name
+            
+        Returns:
+            String with standardized LH/RH format
+        """
+        if not isinstance(task, str):
+            return task
+        task = task.strip()
+        if task.endswith(" LH") or task.endswith("_LH"):
+            return task[:-3] + " (LH)"
+        elif task.endswith("LH"):
+            return task[:-2] + " (LH)"
+        elif task.endswith(" RH") or task.endswith("_RH"):
+            return task[:-3] + " (RH)"
+        elif task.endswith("RH"):
+            return task[:-2] + " (RH)"
+        else:
+            return task
+    def convert_task_numbers_format(self,df, task_number_columns=["task_number","source_task_discrepancy_number_updated"]):
+        """
+        Apply LH/RH formatting to task numbers in a dataframe.
+        
+        Args:
+            df: Pandas DataFrame
+            task_number_column: Column containing task numbers
+            
+        Returns:
+            DataFrame with updated task numbers
+        """
+        
+        for  task_number_column  in task_number_columns:
+            if task_number_column  in df.columns:
+                result_df = df.copy()
+                result_df[task_number_column] = result_df[task_number_column].apply(self.update_lh_rh_tasks)
+                return result_df
+
     
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile]) -> Dict[str, Any]:
             """
@@ -2039,6 +2081,11 @@ class ExcelUploadService():
                     }"""
 
                 # Process and compare data
+                task_description= self.convert_task_numbers_format(task_description, task_number_columns=["task_number"])
+                sub_task_description=self.convert_task_numbers_format(sub_task_description, task_number_columns=["source_task_discrepancy_number_updated"])
+                sub_task_parts = self.convert_task_numbers_format(sub_task_parts, task_number_columns=["task_number"])
+                if not task_parts.empty:
+                    task_parts = self.convert_task_numbers_format(task_parts, task_number_columns=["task_number"])
                 compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
                 logger.info("Compare result successfully fetched")
 
@@ -2132,9 +2179,23 @@ class ExcelUploadService():
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
         est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
-        mpd_tasks = list(est_upload[0].get("task", [])) if est_upload else []
-        LhRhTasks = list(self.LhRhTasks_collection.find({},))
+        # Safely extract tasks from the first element of est_upload if available
+        mpd_tasks = est_upload[0].get("task", []) if est_upload else []
+        add_task_data = est_upload[0].get("additionalTasks", []) if est_upload else []
+
+        # Extract taskIDs from additionalTasks
+        add_tasks = [str(task.get("taskID", "")) for task in add_task_data]
+        if len(add_tasks)>0:
+                if " " in addtasks: 
+                    addtasks.remove(" ")
+                addtasks = addtasks.astype(str).str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
+
+        # Fetch all documents from the LhRhTasks_collection and convert to DataFrame
+        LhRhTasks = list(self.LhRhTasks_collection.find({}))
         LhRhTasks = pd.DataFrame(LhRhTasks)
+
+        # Combine mpd_tasks and additional task numbers
+        mpd_tasks += add_tasks
 
 
         if not pred_data:
@@ -2146,6 +2207,7 @@ class ExcelUploadService():
         
         # Process tasks and findings
         pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
+        
         pred_findings_data_full = pd.DataFrame(pred_data[0].get("findings", []))
         
         # Get capping details safely
@@ -2237,7 +2299,7 @@ class ExcelUploadService():
 
         # Calculate actual capping values
         actual_capping_values = actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts)
-        
+       
         # Filter task descriptions
         eligible_task_description = task_description[task_description["task_number"].isin(eligible_tasks)]
         
@@ -2249,9 +2311,12 @@ class ExcelUploadService():
             actual_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
             predicted_task_data = pred_tasks_data_full[pred_tasks_data_full["sourceTask"] == task]
             
-            if not actual_task_data.empty:
+            if not predicted_task_data.empty:
                 # Process actual man hours
-                actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
+                actual_manhours=0
+                if not actual_task_data.empty:
+                    
+                    actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
                 
                 # Process actual spares
                 actual_spares_cost = 0
