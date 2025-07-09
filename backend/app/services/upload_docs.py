@@ -1043,7 +1043,7 @@ class ExcelUploadService():
                         'descriptions': {'$ifNull': ['$estima.description', []]},
                         'additionalTasks': {'$ifNull': ['$estima.additionalTasks', []]},
                         'considerDeltaUnAvTasks': {'$ifNull': ['$estima.considerDeltaUnAvTasks', False]},
-                        'operatorForModel': {'$ifNull': ['$estima.operatorForModel', '']},
+                        'operatorForModel': {'$ifNull': ['$estima.operatorForModel', False]},
                         'aircraftageThreshold': {'$ifNull': ['$estima.aircraftageThreshold', 3]},
                         'unbillableManhrs': '$capping_values.unbillableManhrs', 
                         'unbillableSpareCost': '$capping_values.unbillableSpareCost',
@@ -1152,7 +1152,7 @@ class ExcelUploadService():
                     ADD_TASKS=add_tasks_request,
                     aircraft_age=float(result.get("aircraftAge", 0)),
                     aircraft_model=result.get("aircraftModel", ""),
-                    customer_name_consideration=result.get("OperatorForModel",False),  # Set based on your business logic
+                    customer_name_consideration=result.get("operatorForModel",False),  # Set based on your business logic
                     check_category=result.get("typeOfCheck", []),
                     customer_name=result.get("operator", ""),
                     age_cap=result.get("aircraftageThreshold", 3)
@@ -1913,23 +1913,28 @@ class ExcelUploadService():
             return task[:-2] + " (RH)"
         else:
             return task
-    def convert_task_numbers_format(self,df, task_number_columns=["task_number","source_task_discrepancy_number_updated"]):
+    def convert_task_numbers_format(self, df, task_number_columns=["task_number", "source_task_discrepancy_number_updated"]):
         """
-        Apply LH/RH formatting to task numbers in a dataframe.
-        
-        Args:
-            df: Pandas DataFrame
-            task_number_column: Column containing task numbers
-            
-        Returns:
-            DataFrame with updated task numbers
+        Vectorized version using pandas string operations for maximum performance.
         """
+        result_df = df.copy()
         
-        for  task_number_column  in task_number_columns:
-            if task_number_column  in df.columns:
-                result_df = df.copy()
-                result_df[task_number_column] = result_df[task_number_column].apply(self.update_lh_rh_tasks)
-                return result_df
+        for col in task_number_columns:
+            if col in result_df.columns:
+                # Convert to string and handle NaN values
+                series = result_df[col].astype(str).str.strip()
+                
+                # Use vectorized string operations
+                # Replace patterns in order of specificity
+                series = series.str.replace(r'([_ ])LH$', r' (LH)', regex=True)
+                series = series.str.replace(r'LH$', r' (LH)', regex=True)
+                series = series.str.replace(r'([_ ])RH$', r' (RH)', regex=True)
+                series = series.str.replace(r'RH$', r' (RH)', regex=True)
+                
+                # Handle original NaN values
+                result_df[col] = series.where(result_df[col].notna(), result_df[col])
+        
+        return result_df
 
     
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile]) -> Dict[str, Any]:
