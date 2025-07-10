@@ -600,7 +600,7 @@ class ExcelUploadService():
         }
     },
     {
-        '$limit': 30
+        '$limit': 10
     }
 ]
         
