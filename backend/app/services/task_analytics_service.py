@@ -2581,6 +2581,16 @@ class TaskService:
             else:
                 # If aircraft_model not found in predefined families, use all available models
                 aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
+                normalized_customer_name = customer_name.upper()
+
+            # Filter based on customer name consideration
+            if normalized_customer_name in ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]:
+                customer_name_list = ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]
+            else:
+                customer_name_list = [customer_name]
+
+            # Normalize 'customer_name' column in dataframe for case-insensitive matching
+            aircraft_details["customer_name_upper"] = aircraft_details["customer_name"].str.upper()
 
             print(f"Aircraft model: {aircraft_model}, Check category: {check_category}, Aircraft age: {aircraft_age}")
             print(f"Aircraft model family: {aircraft_model_family}")
@@ -2612,9 +2622,7 @@ class TaskService:
                     
                     if customer_name_consideration and customer_name:
                         # Add customer name filter
-                        customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
-                            customer_name, na=False, case=False
-                        )
+                        customer_filter=(aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))
                         combined_filter = base_filter & customer_filter
                     else:
                         combined_filter = base_filter
@@ -2638,9 +2646,7 @@ class TaskService:
                 )
                 
                 if customer_name_consideration and customer_name:
-                    customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
-                        customer_name, na=False, case=False
-                    )
+                    customer_filter = (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))
                     combined_filter = base_filter & customer_filter
                 else:
                     combined_filter = base_filter

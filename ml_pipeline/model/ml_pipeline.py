@@ -296,6 +296,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
 
 
+    normalized_customer_name = customer_name.upper()
+
+    # Filter based on customer name consideration
+    if normalized_customer_name in ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]:
+        customer_name_list = ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]
+    else:
+        customer_name_list = [customer_name]
+
+    # Normalize 'customer_name' column in dataframe for case-insensitive matching
+    aircraft_details["customer_name_upper"] = aircraft_details["customer_name"].str.upper()
+
+
+
     print(f"type(age_cap): {type(age_cap)}, value: {age_cap}")
     print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
     print(f"The aircraft_model is {aircraft_model} and check_category is {check_category} and aircraft_age is {aircraft_age}")
@@ -305,12 +318,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         while len(train_packages) < 5:  # Changed from >4 to <5 to keep looping until we have at least 5 packages
             if customer_name_consideration:
                 # Filter based on customer name consideration
-                 train_packages = aircraft_details[
+                # Normalize customer_name to uppercase for comparison
+                train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
                     (aircraft_details["check_category"].isin(check_category)) & 
-                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))&
-                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap,0), min(aircraft_age + age_cap,31)))    
+                    (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list])) &
+                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap, 0), min(aircraft_age + age_cap, 31)))    
                 ]["package_number"].unique().tolist()
+
+
             else:
             
                 train_packages = aircraft_details[
@@ -331,11 +347,13 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 break 
     else:
         if customer_name_consideration:
-                train_packages = aircraft_details[
-                    (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
-                    (aircraft_details["check_category"].isin(check_category))&
-                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))  
-                ]["package_number"].unique().tolist()
+            train_packages = aircraft_details[
+                (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                (aircraft_details["check_category"].isin(check_category)) & 
+                (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list])) &
+                (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap, 0), min(aircraft_age + age_cap, 31)))    
+            ]["package_number"].unique().tolist()
+
             
         else:
             train_packages = aircraft_details[
