@@ -2581,7 +2581,8 @@ class TaskService:
             else:
                 # If aircraft_model not found in predefined families, use all available models
                 aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
-                normalized_customer_name = customer_name.upper()
+                
+            normalized_customer_name = customer_name.upper()
 
             # Filter based on customer name consideration
             if normalized_customer_name in ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]:
