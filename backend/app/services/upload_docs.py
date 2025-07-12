@@ -11,6 +11,7 @@ import math
 import yaml
 import re
 import sys
+from app.models.estimates import ValidTasks
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
@@ -27,6 +28,7 @@ from reportlab.pdfgen import canvas
 from app.services.task_analytics_service import TaskService
 from app.models.estimates import EstimateRequest
 import asyncio
+from app.services.task_analytics_service import updateLhRhTasks
 import re
 from fuzzywuzzy import process
 from app.models.estimates import ValidRequest,ModelTasksRequest
@@ -47,8 +49,6 @@ class FileProcessingError(Exception):
 class ExcelUploadService():
     def __init__(self):
         self.mongo_client = MongoDBClient()
-        # self.collection = self.mongo_client.get_collection("estima_input_upload")
-        # self.collection=self.mongo_client.get_collection("estima_input")
         self.estima_collection=self.mongo_client.get_collection("estimate_file_upload")
         self.collection=self.mongo_client.get_collection("estima_input")
         self.estimate_output=self.mongo_client.get_collection("estima_output")
@@ -60,6 +60,8 @@ class ExcelUploadService():
         self.operators_master_collection=self.mongo_client.get_collection("operators_master")
         self.LhRhTasks_collection = self.mongo_client.get_collection("RHLH_Tasks")
         self.error_detail=str("Following error occured while processing the file")
+        self.RHLH_Tasks_collection=self.mongo_client.get_collection("RHLH_Tasks")
+        self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
         self.task_service=TaskService()
 
 
@@ -536,23 +538,7 @@ class ExcelUploadService():
                     }
                 ]
             }, 
-            # 'tatTime': {
-            #     '$divide': [
-            #         {
-            #             '$add': [
-            #                 {
-            #                     '$ifNull': [
-            #                         '$estimate.aggregatedTasks.totalMhs', 0
-            #                     ]
-            #                 }, {
-            #                     '$ifNull': [
-            #                         '$estimate.aggregatedFindings.totalMhs', 0
-            #                     ]
-            #                 }
-            #             ]
-            #         }, man_hours_threshold
-            #     ]
-            # }, 
+           
             'remarks': {
                 '$ifNull': [
                     '$remarks_doc.remarks', ''
@@ -563,32 +549,12 @@ class ExcelUploadService():
         '$project': {
             '_id': 0, 
             'estID': 1, 
-            'tasks': '$task', 
-            'descriptions': '$description', 
+            # 'tasks': '$task', 
+            # 'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo',
-            'error':  '$error', 
-            # 'probability': 1, 
-
-            # 'aircraftAge': 1, 
-            # 'typeOfCheck': {
-            #     '$ifNull': [
-            #         '$typeOfCheck', []
-            #     ]
-            # },
-            # 'aircraftModel': 1, 
-            # 'aircraftFlightHours': 1, 
-            # 'aircraftFlightCycles': 1, 
-            # 'areaOfOperations': 1, 
-            # 'typeOfCheckID': {
-            #     '$ifNull': [
-            #         '$typeOfCheckID', ''
-            #     ]
-            # }, 
+            'error':  '$error',           
             'status': '$status', 
             'totalMhs': 1, 
-            # 'cappingDetails': 1, 
-            # 'additionalTasks': 1, 
-            # 'miscLaborTasks': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
@@ -892,8 +858,8 @@ class ExcelUploadService():
         '$project': {
             '_id': 0, 
             'estID': 1, 
-            'tasks': '$task', 
-            'descriptions': '$description', 
+            # 'tasks': '$task', 
+            # 'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo',
             'error':'$error',          
             'status': '$status', 
@@ -1750,7 +1716,88 @@ class ExcelUploadService():
                     "original_error": str(error)
                 }
                 raise FileProcessingError(f"Error reading Excel file {filename}: {str(error)}", error_details)
+    
+    async def validate_tasks_by_estid(self, estimate_id, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        For tasks not found (status=False), fill the description from the input description[] by index.
+        Only unique cleaned taskids will be returned.
+        """
+        try:
+            estimate=await self.get_upload_estimate_byId(estimate_id=estimate_id)
+            task_ids = estimate["task"]
+            input_descriptions = estimate["description"]
 
+            # Map input taskid to its index
+            task_index_map = {task: idx for idx, task in enumerate(task_ids)}
+
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
+
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1, "description": 1}
+            )
+            existing_tasks_list = list(existing_tasks_list)
+
+            cleaned_task_map = {}
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                description = doc["description"]
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]
+                cleaned_task_map[task_number] = description
+
+            logger.info(f"cleaned_task_map: {cleaned_task_map}")
+
+            # Use an ordered set for unique cleaned tasks, preserving order of first occurrence
+            from collections import OrderedDict
+            unique_cleaned_lrhTasks = OrderedDict()
+            cleaned_task_original_map = {}
+
+            for task in lrhTasks:
+                cleaned_task = task
+                if " (LH)" in task or " (RH)" in task:
+                    cleaned_task = task.split(" ")[0]
+                if cleaned_task not in unique_cleaned_lrhTasks:
+                    unique_cleaned_lrhTasks[cleaned_task] = None
+                if cleaned_task not in cleaned_task_original_map:
+                    cleaned_task_original_map[cleaned_task] = []
+                cleaned_task_original_map[cleaned_task].append(task)
+
+            validated_tasks = []
+            for cleaned_task in unique_cleaned_lrhTasks.keys():
+                status = cleaned_task in cleaned_task_map
+                if status:
+                    description = cleaned_task_map[cleaned_task]
+                else:
+                    matched_index = None
+                    for orig_task in cleaned_task_original_map.get(cleaned_task, []):
+                        if orig_task in task_index_map:
+                            matched_index = task_index_map[orig_task]
+                            break
+                    # Fallback: try direct match
+                    if matched_index is None and cleaned_task in task_index_map:
+                        matched_index = task_index_map[cleaned_task]
+                    if matched_index is not None and matched_index < len(input_descriptions):
+                        description = input_descriptions[matched_index]
+                    else:
+                        description = ""
+                validated_tasks.append({
+                    "taskid": cleaned_task,
+                    "status": status,
+                    "description": description
+                })
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
+  
     
     def _process_pricing_sheet(self, df, filename, config):
         """Helper method to process pricing sheets"""
@@ -3159,7 +3206,6 @@ def datetime_to_str(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
     raise TypeError("Object of type 'datetime' is not JSON serializable")
-            
 
 def replace_nan_inf(obj):
     """

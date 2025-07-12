@@ -254,6 +254,7 @@ class TaskService:
                 status_code=500,
                 detail=f"Error validating tasks: {str(e)}"
             )
+  
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
         """
