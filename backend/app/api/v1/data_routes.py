@@ -342,3 +342,11 @@ async def get_estimate_aggregates(
     Get estimate aggregates for a given date range.
     """
     return await excel_service.get_estimate_aggregates(start_date, end_date,current_user)
+
+@router.post("/validate_tasks_by_estid/{estimate_id}",response_model=List[ValidTasks])
+async def validate_tasks(
+    estimate_id: str,
+    current_user: dict = Depends(get_current_user)
+  
+):
+   return await excel_service.validate_tasks_by_estid(estimate_id,current_user)
