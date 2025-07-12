@@ -1,11 +1,12 @@
 import { showNotification } from "@mantine/notifications";
 import { getPartUsage_Url, getSkillReq_Url } from "../apiUrls";
-import { useAxiosInstance } from "../axiosInstance";
+// import { useAxiosInstance } from "../axiosInstance";
 import { showAppNotification } from "../../components/showNotificationGlobally";
+import axiosInstance from "../axiosInstance";
 
 
 export const useApiSkillAnalysis = () => {
-    const axiosInstance = useAxiosInstance();
+    // const axiosInstance = useAxiosInstance();
 
     const getSkillAnalysis = async (data: any) => {
         try {

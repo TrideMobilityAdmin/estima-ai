@@ -34,11 +34,12 @@ import bgConfiguration from "../../public/airCraft8.jpg";
 import { userName } from "../api/tokenJotai";
 import { userEmail } from "../api/tokenJotai";
 import { MdLock, useAtom, useForm } from "../constants/GlobalImports";
-import { useAxiosInstance } from "../api/axiosInstance";
+// import { useAxiosInstance } from "../api/axiosInstance";
 import { showAppNotification } from "./showNotificationGlobally";
 import { getChangepassword_Url } from "../api/apiUrls";
+import axiosInstance from "../api/axiosInstance";
 const Landing: React.FC = () => {
-  const axiosInstance = useAxiosInstance();
+  // const axiosInstance = useAxiosInstance();
   const navigate = useNavigate();
   const location = useLocation();
   const [active, setActive] = useState(location.pathname);

@@ -1,7 +1,7 @@
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Login from "../layout/Login";
 import Landing from "../components/landing";
-import Estimate from "../views/estimate";
+// import Estimate from "../views/estimate";
 import CompareEstimate from "../views/compareEstimate";
 import PartUsage from "../views/partUsage";
 import SkillRequirement from "../views/skillRequirement";
@@ -10,13 +10,14 @@ import { useEffect } from "react";
 import EstimateNew from "../views/estimateNew";
 // import CompareEstimateNew from "../views/compareEstimateNew";
 import CompareNew from "../views/compareNew";
+import EstimateNewScreen from "../views/estimateNewScreen";
 
 const MainRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/home" element={<Landing />}>
-        <Route path="/home/estimate" element={<EstimateNew />} />
+        <Route path="/home/estimate" element={<EstimateNewScreen />} />
         <Route path="/home/compare-estimate" element={<CompareNew />} />
         <Route path="/home/part-usage" element={<PartUsage />} />
         <Route path="/home/skill-requirement" element={<SkillRequirement />} />

@@ -1,8 +1,9 @@
 import { showAppNotification } from "../../components/showNotificationGlobally";
-import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getModelTasksValidate_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url, getAllEstimatesSummary_Url } from "../apiUrls";
-import { useAxiosInstance } from "../axiosInstance";
+import { getConfigurations_Url, getEstimateDetails_Url, getEstimateReport_Url, getEstimateStatus_Url, getFilteredTasks_Url, getModelTasksValidate_Url, getHistoryEstimateStatus_Url, getOperatorsList_Url, getProbabilityWise_Url, getValidateTasks_Url, uploadEstimate_Url, getAllEstimatesSummary_Url, getValidatedTasksByID_Url } from "../apiUrls";
+// import { useAxiosInstance } from "../axiosInstance";
 import { showNotification } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
+import axiosInstance from "../axiosInstance";
 
 export interface EstimateReportPayload {
   tasks: string[];
@@ -19,7 +20,7 @@ interface TaskValidationResponse {
 }
 
 export const useApi = () => {
-  const axiosInstance = useAxiosInstance();
+  // const axiosInstance = useAxiosInstance();
   const navigate = useNavigate();
 
   // Function to handle session expiration and navigate to login
@@ -221,6 +222,21 @@ export const useApi = () => {
       }
 
       return [];
+    }
+  };
+
+   const getValidatedTasksByID = async (estimateId: string) => {
+    try {
+      const response = await axiosInstance.post(getValidatedTasksByID_Url + estimateId);
+      console.log("✅ API Response validated by estimate details :", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ API Error:", error.response?.data || error.message);
+      // Check if authentication has expired
+      if (error.response?.data?.detail === "Invalid authentication credentials") {
+        handleSessionExpired();
+      }
+      return null;
     }
   };
 
@@ -584,6 +600,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
     getEstimateDetailsByID,
     getFilteredTasksByID,
     getModelTasksValidate,
-    getAllEstimatesSummary
+    getAllEstimatesSummary,
+    getValidatedTasksByID
   };
 };
