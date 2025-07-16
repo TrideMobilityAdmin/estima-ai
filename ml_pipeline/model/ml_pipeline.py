@@ -165,20 +165,20 @@ task_parts_up = task_parts_up[sub_task_parts_columns]
 merged_df = task_parts_up.merge(
     parts_master[[
         "issued_part_number",  
-        "agg_base_price_usd", 
-        "agg_freight_cost", 
-        "agg_admin_charges"
+        "latest_base_price_usd", 
+        "latest_freight_cost", 
+        "latest_admin_charges"
     ]],
     on="issued_part_number",
     how="left"
 )
 
 # Step 2: Compute new columns using vectorized operations
-merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["agg_base_price_usd"]
+merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["latest_base_price_usd"]
 merged_df["total_billable_price"] = (
     merged_df["billable_value_usd"] +
-    merged_df["agg_freight_cost"] +
-    merged_df["agg_admin_charges"]
+    merged_df["latest_freight_cost"] +
+    merged_df["latest_admin_charges"]
 )
 
 # Step 3: Update the original task_parts_up with the computed values
@@ -210,7 +210,7 @@ for col in cols_to_convert:
     
     
 sub_task_parts["latest_price"] = sub_task_parts["issued_part_number"].apply(
-    lambda x: parts_master.loc[parts_master["issued_part_number"] == x, "latest_price"].values[0] if x in parts_master["issued_part_number"].values else 0
+    lambda x: parts_master.loc[parts_master["issued_part_number"] == x, "latest_total_billable_price"].values[0] if x in parts_master["issued_part_number"].values else 0
 )
 
 
