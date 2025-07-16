@@ -318,7 +318,8 @@ def get_processed_files(files_to_process, error_message=""):
 
 
                     # Handle datetime columns
-                    datetime_cols = ["issue_date", 'start_date', 'end_date', 'last_maintenance_date']
+                    datetime_cols = ["issue_date", 'start_date', 'end_date']
+
                     for col in datetime_cols:
                         if col in df.columns:
                             # Convert to datetime with error handling
@@ -335,7 +336,7 @@ def get_processed_files(files_to_process, error_message=""):
                         'customer_order_number', 'customer_name', 'package_number',
                         'aircraft_registration_number', 'aircraft_model',
                         'release_tracking_number', 'package_details', 'check_category',
-                        'train_data', 'test_data', 'type_of_check'
+                        'train_data', 'test_data', 'type_of_check', 'last_maintenance_date'
                     ]
 
                     # Convert string columns, handling None values
@@ -453,9 +454,7 @@ def get_processed_files(files_to_process, error_message=""):
                     missing_columns = [col for col in expected_columns if col not in df.columns]
                     
                     # Handle datetime columns
-                    datetime_cols = ['planned_start_date',
-                        'planned_end_date',  'actual_start_date',
-                        'actual_end_date']
+                    datetime_cols = [  'actual_start_date','actual_end_date']
                     for col in datetime_cols:
                         if col in df.columns:
                             # Convert to datetime with error handling
@@ -549,9 +548,7 @@ def get_processed_files(files_to_process, error_message=""):
                     missing_columns = [col for col in expected_columns if col not in df.columns]
                     
                     # Handle datetime columns
-                    datetime_cols = ['planned_start_date',
-                        'planned_end_date',  'actual_start_date',
-                        'actual_end_date']
+                    datetime_cols = ['planned_start_date','planned_end_date',  'actual_start_date','actual_end_date']
                     for col in datetime_cols:
                         if col in df.columns:
                             # Convert to datetime with error handling
@@ -679,7 +676,10 @@ def get_processed_files(files_to_process, error_message=""):
                 return "material"
             elif "mlttable" in filename_lower:
                 return "mlttable"
+            elif "aircraft" in filename_lower:
+                return "aircraft_details"
             else:
+                print(f"⚠️ Skipping file {filename}: does not match any expected keywords.")
                 return None
         
         def files_check(file_path, sheet_names, folder_name,error_message):
@@ -779,7 +779,7 @@ def get_processed_files(files_to_process, error_message=""):
                     if file_keyword == "mltaskmlsec1":
                         sheet_names = ["mltaskmlsec1"]
                         df = files_check(file_path, sheet_names, folder_name,error_message)
-                        aircraft_details = pd.concat([aircraft_details, df], ignore_index=True)
+                        task_description = pd.concat([task_description, df], ignore_index=True)
                         
                     elif file_keyword == "mldpmlsec1":
                         sheet_names = ["mldpmlsec1"]
@@ -795,9 +795,15 @@ def get_processed_files(files_to_process, error_message=""):
                         sheet_names = ["mlttable"]
                         df = files_check(file_path, sheet_names, folder_name,error_message)
                         task_parts = pd.concat([task_parts, df], ignore_index=True)
+                    elif file_keyword == "aircraft_details":
+                        sheet_names = ["HMV", "hMV", "2024", "2025",'2023', '2022', '2021', '2020']
+                        df = files_check(file_path, sheet_names, folder_name,error_message)
+                        aircraft_details = pd.concat([aircraft_details, df], ignore_index=True)
                 else:
-                    error_message += f"\n File {file_path} does not have  any expected keywords like mltaskmlsec1, mldpmlsec1, material, mlttable in the file name. So, Skipping it."
-            print(error_message)
+                    #print(f"⚠️ Skipping file {file_path}: does not match any expected keywords.")
+                    error_message += f"\n File {filename} in the folder {folder_name} does not have  any expected keywords like mltaskmlsec1, mldpmlsec1, material, mlttable,aircraft in the file name. So, Skipping it."
+                    
+            #print(error_message)
             print("Processing completed for all files.")
             # Return the processed dataframes
             return aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts,error_message

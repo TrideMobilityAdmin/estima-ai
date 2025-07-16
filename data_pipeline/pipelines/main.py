@@ -163,6 +163,24 @@ def process_collection(db, collection_name, dataframe, updated_files=None):
         print(f"Error processing {collection_name}: {e}")
         logger.error(f"Error processing {collection_name}: {e}")
         return False
+
+
+def remove_outliers(df, column_name, threshold=500):
+    """
+    Remove outliers from a dataframe based on a threshold value.
+    
+    Args:
+        df: Pandas DataFrame
+        column_name: Column to check for outliers
+        threshold: Maximum value to keep (values above will be filtered out)
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in dataframe")
+    
+    return df[df[column_name].between(0, threshold)].copy()
 def update_lh_rh_tasks(task):
     """
     Convert LH/RH suffix to a standardized format.
@@ -186,26 +204,9 @@ def update_lh_rh_tasks(task):
         return task[:-2] + " (RH)"
     else:
         return task
-
-def remove_outliers(df, column_name, threshold=500):
-    """
-    Remove outliers from a dataframe based on a threshold value.
-    
-    Args:
-        df: Pandas DataFrame
-        column_name: Column to check for outliers
-        threshold: Maximum value to keep (values above will be filtered out)
-        
-    Returns:
-        DataFrame with outliers removed
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in dataframe")
-    
-    return df[df[column_name].between(0, threshold)].copy()
-
+"""
 def convert_task_numbers_format(df, task_number_columns=["task_number","source_task_discrepancy_number_updated"]):
-    """
+    \"""
     Apply LH/RH formatting to task numbers in a dataframe.
     
     Args:
@@ -214,13 +215,35 @@ def convert_task_numbers_format(df, task_number_columns=["task_number","source_t
         
     Returns:
         DataFrame with updated task numbers
-    """
+    \"""
     
     for  task_number_column  in task_number_columns:
         if task_number_column  in df.columns:
             result_df = df.copy()
             result_df[task_number_column] = result_df[task_number_column].apply(update_lh_rh_tasks)
-            return result_df
+            return result_df"""
+def convert_task_numbers_format( df, task_number_columns=["task_number", "source_task_discrepancy_number_updated"]):
+    """
+    Vectorized version using pandas string operations for maximum performance.
+    """
+    result_df = df.copy()
+    
+    for col in task_number_columns:
+        if col in result_df.columns:
+            # Convert to string and handle NaN values
+            series = result_df[col].astype(str).str.strip()
+            
+            # Use vectorized string operations
+            # Replace patterns in order of specificity
+            series = series.str.replace(r'([_ ])LH$', r' (LH)', regex=True)
+            series = series.str.replace(r'LH$', r' (LH)', regex=True)
+            series = series.str.replace(r'([_ ])RH$', r' (RH)', regex=True)
+            series = series.str.replace(r'RH$', r' (RH)', regex=True)
+            
+            # Handle original NaN values
+            result_df[col] = series.where(result_df[col].notna(), result_df[col])
+    
+    return result_df
 
 def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_description, sub_task_parts, 
                                        manhour_column="actual_man_hours", task_columns=["task_number","source_task_discrepancy_number_updated"], 
@@ -270,39 +293,109 @@ def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_d
     # Return the processed dataframes
     return (task_description_processed, task_parts_processed, 
             sub_task_description_processed, sub_task_parts_processed)
-def update_part_master_data(db, parts_collection_name="sub_task_parts_lhrh"):
-    sub_task_parts = db[parts_collection_name]
-    sub_task_parts = list(sub_task_parts.find({}))
-    sub_task_parts = pd.DataFrame(sub_task_parts)
-
-    if sub_task_parts.empty:
+def update_part_master_data(db, parts_collection_name="sub_task_parts", sub_task_description_collection_name="sub_task_description", task_description_collection_name="task_description"):
+    # Fetch data from collections
+    sub_task_parts_collection = db[parts_collection_name]
+    sub_task_parts_data = list(sub_task_parts_collection.find({}))
+    
+    if not sub_task_parts_data:
         print("No data found in the parts collection.")
         if logger:
             logger.warning("No data found in the parts collection.")
         return
+    
+    sub_task_parts = pd.DataFrame(sub_task_parts_data)
+    
+    sub_task_description_collection = db[sub_task_description_collection_name]
+    sub_task_description_data = list(sub_task_description_collection.find({}))
+    sub_task_description = pd.DataFrame(sub_task_description_data)
+    
+    task_description_collection = db[task_description_collection_name]
+    task_description_data = list(task_description_collection.find({}))
+    task_description = pd.DataFrame(task_description_data)
+    
+    sub_task_parts.dropna(subset=["task_number"], inplace=True)
+    if sub_task_parts.empty:
+        print("No valid task numbers found in the parts collection.")
 
-    # Group and aggregate
-    parts_master = sub_task_parts.groupby("issued_part_number").agg({
-        "part_description": "first",
-        "issued_unit_of_measurement": "first",
-        "freight_cost": "max",
-        "admin_charges": "max",
-        "base_price_usd": "max"
-    })
-    parts_master.rename(columns={"freight_cost": "agg_freight_cost",
-                                 "admin_charges": "agg_admin_charges",
-                                 "base_price_usd": "agg_base_price_usd"}, inplace=True)
+    # Split HMV and non-HMV rows
+    hmv_parts = sub_task_parts[sub_task_parts["task_number"].str.startswith("HMV")].copy()
+    non_hmv_parts = sub_task_parts[~sub_task_parts["task_number"].str.startswith("HMV")].copy()
 
+    # Merge HMV on log_item_number
+    if not hmv_parts.empty and not sub_task_description.empty:
+        hmv_merged = hmv_parts.merge(
+            sub_task_description[["package_number", "log_item_number", "actual_end_date"]],
+            left_on=["package_number", "task_number"],
+            right_on=["package_number", "log_item_number"],
+            how="left"
+        )
+
+
+    # Merge non-HMV on task_number
+    if not non_hmv_parts.empty and not task_description.empty:
+        non_hmv_merged = non_hmv_parts.merge(
+            task_description[["package_number", "task_number", "actual_end_date"]],
+            on=["package_number", "task_number"],
+            how="left"
+        )
+        
+    hmv_merged.drop(columns=["log_item_number"],axis=1,inplace=True)
+    sub_task_parts = pd.concat([non_hmv_merged, hmv_merged])
+    sub_task_parts.rename(columns={"actual_end_date":"price_date"},inplace=True)
+    
+    # Filter out rows where 'total_billable_price' is NaN
+    sub_task_parts_filtered = sub_task_parts.dropna(subset=["total_billable_price"])
+    
+    # Check if filtered DataFrame is empty
+    if sub_task_parts_filtered.empty:
+        print("No valid price data found in the parts collection.")
+        if logger:
+            logger.warning("No valid price data found in the parts collection.")
+        parts_master = pd.DataFrame()  # return empty result
+    else:
+        # Sort by price_date to ensure 'first' gives the latest record
+        sub_task_parts_filtered = sub_task_parts_filtered.sort_values("price_date", ascending=False,na_position='last')
+        
+        # Main aggregation block
+        parts_master = sub_task_parts_filtered.groupby("issued_part_number").agg(
+            part_description=("part_description", "first"),
+            issued_unit_of_measurement=("issued_unit_of_measurement", "first"),
+            
+            max_freight_cost=("freight_cost", "max"),
+            latest_freight_cost=("freight_cost", "first"),
+            avg_freight_cost=("freight_cost", "mean"),
+            
+            max_admin_charges=("admin_charges", "max"),
+            latest_admin_charges=("admin_charges", "first"),
+            avg_admin_charges=("admin_charges", "mean"),
+            
+            max_base_price_usd=("base_price_usd", "max"),
+            latest_base_price_usd=("base_price_usd", "first"),
+            avg_base_price_usd=("base_price_usd", "mean"),
+            
+            max_total_billable_price=("total_billable_price", "max"),
+            min_total_billable_price=("total_billable_price", "min"),
+            latest_total_billable_price=("total_billable_price", "first"),
+            latest_date=("price_date", "first")
+        ).reset_index()
+    
     # Save to collection
     parts_master_collection = db["parts_master"]
     parts_master_collection.delete_many({})  # Clear existing data
-
+    
     if not parts_master.empty:
+        # Remove the problematic reset_index call that was creating duplicate index
         parts_master.reset_index(inplace=True)
-        parts_master_collection.insert_many(parts_master.to_dict("records"))
+        parts_master_dict = parts_master.to_dict("records")
+        parts_master_collection.insert_many(parts_master_dict)
         print(f"Updated parts master with {len(parts_master)} records")
         if logger:
             logger.info(f"Updated parts master with {len(parts_master)} records")
+    else:
+        print("No records to insert into parts master")
+        if logger:
+            logger.info("No records to insert into parts master")
     
     
     
@@ -348,7 +441,7 @@ async def main():
         #if not os.path.exists(data_path):
         #data_path = r"D:\Projects\gmr-mro\Data_Pipeline\Data"
         #data_path=config["excel_files"]["data_path"] 
-        data_path = r"D:\Projects\gmr-mro\test_data_pipeline"
+        data_path = r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025"
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
@@ -357,33 +450,33 @@ async def main():
         # Find all relevant files and check if they need processing
         for root, _, files in os.walk(data_path):
             for file in files:
-                if any(file.startswith(prefix) for prefix in ["AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material"]):
-                    file_path = os.path.join(root, file)
-                    file_info = get_file_info(file_path)
+                #if any(file.startswith(prefix) for prefix in ["AIRCRAFT", "mltaskmlsec1", "mlttable", "mldpmlsec1", "Material"]):
+                file_path = os.path.join(root, file)
+                file_info = get_file_info(file_path)
+                
+                # Check if file exists in processed_file_paths
+                if file_path in processed_file_paths:
+                    # Check if file was modified since last processed
+                    db_info = file_info_map.get(file_path, {})
+                    db_modified_time = db_info.get("db_modified_time", 0)
+                    db_size = db_info.get("db_size", 0)
                     
-                    # Check if file exists in processed_file_paths
-                    if file_path in processed_file_paths:
-                        # Check if file was modified since last processed
-                        db_info = file_info_map.get(file_path, {})
-                        db_modified_time = db_info.get("db_modified_time", 0)
-                        db_size = db_info.get("db_size", 0)
-                        
-                        # If file was modified or size changed, process it again
-                        if file_info["modified_time"] > db_modified_time or file_info["size"] != db_size:
-                            files_to_process.add(file_path)
-                            updated_files.add(file_path)
-                            print(f"File modified since last process: {file_path}")
-                            
-                            # Mark file as existing in DB for update operation
-                            file_info["exists_in_db"] = True
-                            file_info["db_id"] = db_info.get("db_id")
-                    else:
-                        # New file, process it
+                    # If file was modified or size changed, process it again
+                    if file_info["modified_time"] > db_modified_time or file_info["size"] != db_size:
                         files_to_process.add(file_path)
-                        file_info["exists_in_db"] = False
-                    
-                    # Store file info for all files we're tracking
-                    file_info_dict[file_path] = file_info
+                        updated_files.add(file_path)
+                        print(f"File modified since last process: {file_path}")
+                        
+                        # Mark file as existing in DB for update operation
+                        file_info["exists_in_db"] = True
+                        file_info["db_id"] = db_info.get("db_id")
+                else:
+                    # New file, process it
+                    files_to_process.add(file_path)
+                    file_info["exists_in_db"] = False
+                
+                # Store file info for all files we're tracking
+                file_info_dict[file_path] = file_info
         
         print(f"Found {len(files_to_process)} files to process ({len(updated_files)} updates, {len(files_to_process) - len(updated_files)} new)")
         
@@ -393,19 +486,24 @@ async def main():
         error_message = f"No files to process at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
         if len(files_to_process)>0:
-            error_message=f"Found issues in the following files while  processing at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+            error_message=f"Found issues in the following files while  processing {len(files_to_process)} files at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
 
             aircraft_details, task_description, task_parts, sub_task_description, sub_task_parts, newly_processed_files,error_message =  get_processed_files(
                 files_to_process,  
                 error_message
             )
-            
+            print("completed extracting data from files")
+            print("removing outliers and converting LH/RH tasks")
+            if '\n' not in error_message:
+                error_message = f"No issues found in the files while processing {len(files_to_process)} files at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
             task_description_max500mh_lhrh, task_parts_lhrh, sub_task_description_max500mh_lhrh, sub_task_parts_lhrh = outlier_removal_and_lhrh_conversion(
                 task_description, 
                 task_parts, 
                 sub_task_description, 
                 sub_task_parts
             )
+            print("completed removing outliers and converting LH/RH tasks")
+            print("intersecting with database to update processed files")
             # Process all collections and track successful file processing
             collections_to_process = [
                 ("aircraft_details", aircraft_details),
@@ -429,8 +527,9 @@ async def main():
                         collection_files = set(dataframe["file_path"].unique())
                         
                         # Process this collection (pass updated_files to handle properly)
+                        print(f"Processing collection: {collection_name} with {len(collection_files)} files")
                         success =  process_collection(db, collection_name, dataframe, updated_files)
-                        
+                        print(f"Finished processing collection: {collection_name}")
                         if success:
                             # Add successfully processed files to our tracking set
                             successfully_processed_files.update(collection_files)
@@ -443,12 +542,14 @@ async def main():
             
             # Only update entries for files that were successfully loaded
             update_processed_files_db(db, file_info_dict, successfully_processed_files)
+            print("Updating parts master data")
             update_part_master_data(db, "sub_task_parts_lhrh")
             
         print("Process completed")
         logger.info("Process completed")
         body = error_message
-        receiver_email = "niraja_adithya_dasireddi@outlook.com"
+        receiver_email = "adithya.d@tridemobility.com"
+        #print("sending email\n",body, "\n", receiver_email)
         send_email("Data Pipeline Failed Files Report", body, receiver_email)
         #print(f"Email is successfully sent to the {receiver_email}")
         

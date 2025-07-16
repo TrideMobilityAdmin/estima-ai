@@ -350,8 +350,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             train_packages = aircraft_details[
                 (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
                 (aircraft_details["check_category"].isin(check_category)) & 
-                (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list])) &
-                (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap, 0), min(aircraft_age + age_cap, 31)))    
+                (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))     
             ]["package_number"].unique().tolist()
 
             
