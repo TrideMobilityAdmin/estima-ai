@@ -1776,8 +1776,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
     
     if capping_values['unbillableSpareCost'] > findings_total_parts_cost:
-        capping_values['unbillableSpareCost'] = findings_total_parts_cost * np.random.uniform(0.75, 1.0)
-        capping_values['billableSpareCost'] = 0.0
+        capping_values['unbillableSpareCost'] = findings_total_parts_cost * 0.773192702
+        capping_values['billableSpareCost'] =findings_total_parts_cost- capping_values['unbillableSpareCost']
     #findings_total_mhs=
     task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
     task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
