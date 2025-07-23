@@ -174,9 +174,11 @@ merged_df = task_parts_up.merge(
 )
 
 # Step 2: Compute new columns using vectorized operations
-merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["latest_base_price_usd"]
+merged_df["billable_value_usd"] = merged_df["used_quantity"] * (merged_df["latest_base_price_usd"]+merged_df["latest_freight_cost"] +
+    merged_df["latest_admin_charges"]
+)
 merged_df["total_billable_price"] = (
-    merged_df["billable_value_usd"] +
+    merged_df["latest_base_price_usd"] +
     merged_df["latest_freight_cost"] +
     merged_df["latest_admin_charges"]
 )
@@ -1536,7 +1538,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
             axis=1
         )
 
-
+        task_level_line_items_cap["task_prob"] = task_level_line_items_cap.apply(
+            lambda row: task_prob_map.get(row["source_task_discrepancy_number"], 100),
+            axis=1
+        )
         # Copy group level data
         group_level_mh_cap = group_level_mh_result.copy()
         group_level_parts_cap = group_level_parts_result.copy()
@@ -1726,8 +1731,8 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 task_level_line_items_cap.to_csv(f"{filepath}/{estID}_task_level_line_items_cap_intermediate.csv", index=False)
                 
                 # Apply probability to get final values
-                task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
-                task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] * (task_level_line_items_cap["prob"]/100)
+                task_level_line_items_cap["unbillable_spares"] = task_level_line_items_cap["unbillable_spares_raw"] * (task_level_line_items_cap["prob"]/100)*(task_level_line_items_cap["task_prob"]/100)
+                task_level_line_items_cap["billable_spares"] = task_level_line_items_cap["billable_spares_raw"] * (task_level_line_items_cap["prob"]/100)*(task_level_line_items_cap["task_prob"]/100)
                 
                 # Save final results to CSV
                 task_level_line_items_cap.to_csv(f"{filepath}/{estID}_task_level_line_items_cap_final.csv", index=False)
@@ -1776,8 +1781,11 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
     
     if capping_values['unbillableSpareCost'] > findings_total_parts_cost:
-        capping_values['unbillableSpareCost'] = findings_total_parts_cost * 0.773192702
+        capping_values['unbillableSpareCost'] = findings_total_parts_cost * 0.90
         capping_values['billableSpareCost'] =findings_total_parts_cost- capping_values['unbillableSpareCost']
+    if capping_values['unbillableManhrs'] > findings_total_mhs:
+        capping_values['unbillableManhrs'] = findings_total_mhs * 0.90
+        capping_values['billableManhrs'] = findings_total_mhs - capping_values['unbillableManhrs']
     #findings_total_mhs=
     task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
     task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0

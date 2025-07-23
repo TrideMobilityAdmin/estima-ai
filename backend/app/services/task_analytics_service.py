@@ -2531,6 +2531,9 @@ class TaskService:
             if mpd_task_data.empty:
                 raise ValueError("Input MPD_TASKS or ADD_TASKS data cannot be empty.")
             
+            if aircraft_model =="" and len(check_category) == 0:
+                raise ValueError("Both aircraft_model and check_category cannot be empty.")
+            
             mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
             # Fetch aircraft details

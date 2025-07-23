@@ -2201,7 +2201,7 @@ class ExcelUploadService():
             matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
             
             if not matching_parts.empty:
-                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["latest_base_price_usd"]+matching_parts.iloc[0]["latest_freight_cost"]+matching_parts.iloc[0]["latest_admin_charges"]
+                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * (matching_parts.iloc[0]["latest_base_price_usd"]+matching_parts.iloc[0]["latest_freight_cost"]+matching_parts.iloc[0]["latest_admin_charges"])
             
         sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
         # Convert to string
