@@ -5664,18 +5664,21 @@ border-bottom: none;
                         estimateReportData?.overallEstimateReport
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.overallEstimateReport?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) ||
                         []
@@ -5720,18 +5723,21 @@ border-bottom: none;
                         estimateReportData?.aggregatedFindings
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.aggregatedFindings?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
@@ -5775,18 +5781,21 @@ border-bottom: none;
                         estimateReportData?.aggregatedTasks
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.aggregatedTasks?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
@@ -5948,8 +5957,10 @@ interface TATDashboardProps {
     max: number;
     capping: number;
   };
-  capppingMhs: any;
+  cappingManhrs: any;
+  cappingSpareCost: any;
   capppingMhsType: any;
+  unbilledCapppingMhs : any;
   cappingUnbilledCost: any;
   cappingUnbilledCostType: any;
   parts: Part[];
@@ -5961,8 +5972,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -6065,7 +6078,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -6086,10 +6099,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
@@ -6318,8 +6331,10 @@ const OverallFindingsReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -6418,7 +6433,7 @@ const OverallFindingsReport: React.FC<any> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -6439,10 +6454,10 @@ const OverallFindingsReport: React.FC<any> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
@@ -6645,8 +6660,10 @@ const OverallMPDReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -6731,7 +6748,7 @@ const OverallMPDReport: React.FC<any> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -6752,10 +6769,10 @@ const OverallMPDReport: React.FC<any> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>

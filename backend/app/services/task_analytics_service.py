@@ -1331,7 +1331,7 @@ class TaskService:
             '_id': 0, 
             'estID': 1, 
             'description': 1, 
-            
+            'cappingDetails':1,
             'cappingValues': '$capping_values',
             'overallEstimateReport': {
                 # 'estimatedTatTime': '$tatTime', 

@@ -86,6 +86,8 @@ client =  MongoClient("mongodb://admin:admin123@10.100.3.13:27017/")
 db = client["gmr-mro-staging-5y"]
 
 
+
+
 test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
@@ -163,20 +165,22 @@ task_parts_up = task_parts_up[sub_task_parts_columns]
 merged_df = task_parts_up.merge(
     parts_master[[
         "issued_part_number",  
-        "agg_base_price_usd", 
-        "agg_freight_cost", 
-        "agg_admin_charges"
+        "latest_base_price_usd", 
+        "latest_freight_cost", 
+        "latest_admin_charges"
     ]],
     on="issued_part_number",
     how="left"
 )
 
 # Step 2: Compute new columns using vectorized operations
-merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["agg_base_price_usd"]
+merged_df["billable_value_usd"] = merged_df["used_quantity"] * merged_df["latest_base_price_usd"]
+merged_df["latest_freight_cost"] = merged_df["used_quantity"] * merged_df["latest_freight_cost"]
+merged_df["latest_admin_charges"] = merged_df["used_quantity"] * merged_df["latest_admin_charges"]
 merged_df["total_billable_price"] = (
     merged_df["billable_value_usd"] +
-    merged_df["agg_freight_cost"] +
-    merged_df["agg_admin_charges"]
+    merged_df["latest_freight_cost"] +
+    merged_df["latest_admin_charges"]
 )
 
 # Step 3: Update the original task_parts_up with the computed values
@@ -206,9 +210,13 @@ cols_to_convert = ['base_price_usd', 'freight_cost', 'admin_charges', 'total_bil
 for col in cols_to_convert:
     sub_task_parts[col] = pd.to_numeric(sub_task_parts[col], errors='coerce')
     
+    
 sub_task_parts["latest_price"] = sub_task_parts["issued_part_number"].apply(
-    lambda x: parts_master.loc[parts_master["issued_part_number"] == x, "latest_price"].values[0] if x in parts_master["issued_part_number"].values else 0
+    lambda x: parts_master.loc[parts_master["issued_part_number"] == x, "latest_total_billable_price"].values[0] if x in parts_master["issued_part_number"].values else 0
 )
+
+
+
 
 #sub_task_description_collection="sub_task_description"
 task_description = db["task_description_max500mh_lhrh"]
@@ -229,6 +237,7 @@ print(f"The shape of the aircraft collections {aircraft_details.shape }")
 print(f"The shape of the sub task parts collections {sub_task_parts.shape }")
 print(f"The shape of the sub task descriptions collections {sub_task_description.shape }")
 print(f"The shape of the task descriptions collections {task_description.shape }")
+
 
 
 
@@ -289,6 +298,19 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
 
 
+    normalized_customer_name = customer_name.upper()
+
+    # Filter based on customer name consideration
+    if normalized_customer_name in ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]:
+        customer_name_list = ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]
+    else:
+        customer_name_list = [customer_name]
+
+    # Normalize 'customer_name' column in dataframe for case-insensitive matching
+    aircraft_details["customer_name_upper"] = aircraft_details["customer_name"].str.upper()
+
+
+
     print(f"type(age_cap): {type(age_cap)}, value: {age_cap}")
     print(f"type(aircraft_age): {type(aircraft_age)}, value: {aircraft_age}")
     print(f"The aircraft_model is {aircraft_model} and check_category is {check_category} and aircraft_age is {aircraft_age}")
@@ -298,12 +320,15 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         while len(train_packages) < 5:  # Changed from >4 to <5 to keep looping until we have at least 5 packages
             if customer_name_consideration:
                 # Filter based on customer name consideration
-                 train_packages = aircraft_details[
+                # Normalize customer_name to uppercase for comparison
+                train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
                     (aircraft_details["check_category"].isin(check_category)) & 
-                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))&
-                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap,0), min(aircraft_age + age_cap,31)))    
+                    (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list])) &
+                    (aircraft_details["aircraft_age"].between(max(aircraft_age - age_cap, 0), min(aircraft_age + age_cap, 31)))    
                 ]["package_number"].unique().tolist()
+
+
             else:
             
                 train_packages = aircraft_details[
@@ -324,12 +349,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
                 break 
     else:
         if customer_name_consideration:
-                train_packages = aircraft_details[
-                    (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
-                    (aircraft_details["check_category"].isin(check_category))&
-                    (aircraft_details["customer_name"].str.contains(customer_name, na=False, case=False))  
-                ]["package_number"].unique().tolist()
-            
+            train_packages = aircraft_details[
+                (aircraft_details["aircraft_model"].isin(aircraft_model_family)) & 
+                (aircraft_details["check_category"].isin(check_category)) & 
+                (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))     
+            ]["package_number"].unique().tolist()
+    
         else:
             train_packages = aircraft_details[
                     (aircraft_details["aircraft_model"] .isin(aircraft_model_family)) & 
@@ -1751,8 +1776,10 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
 
     findings_min_mhs = sum((finding["details"][0]["mhs"]["min"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
     findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)*(finding["details"][0]["task_defect_probability"]/100)) for finding in findings if finding["details"]) if findings else 0
-
     
+    if capping_values['unbillableSpareCost'] > findings_total_parts_cost:
+        capping_values['unbillableSpareCost'] = findings_total_parts_cost * 0.773192702
+        capping_values['billableSpareCost'] =findings_total_parts_cost- capping_values['unbillableSpareCost']
     #findings_total_mhs=
     task_findings_total_mhs = sum((finding["details"][0]["mhs"]["avg"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
     task_findings_total_parts_cost = sum(sum(part["price"]*(part['prob']/100) for part in finding["details"][0].get("spare_parts", [])) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
@@ -1827,6 +1854,12 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     #aggregatedTasks=json.dumps(output_data["aggregatedTasks"])
     #print(aggregatedTasks)
     return output_data
+
+
+
+
+
+
 
 
 
