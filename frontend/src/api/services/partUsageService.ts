@@ -1,10 +1,11 @@
 import { showNotification } from "@mantine/notifications";
 import { getMultiPartUsage_Url, getPartUsage_Url } from "../apiUrls";
-import { useAxiosInstance } from "../axiosInstance";
+// import  { useAxiosInstance } from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
+import axiosInstance from "../axiosInstance";
 
 export const useApiPartUsage = () => {
-    const axiosInstance = useAxiosInstance();
+    // const axiosInstance = useAxiosInstance();
     const navigate = useNavigate();
 
     // Function to handle session expiration and navigate to login
