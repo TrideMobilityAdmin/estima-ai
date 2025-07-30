@@ -4708,8 +4708,6 @@ border-bottom: none;
                       valueGetter: (params: any) => {
                         const value = params.data?.createdAt;
                         if (!value) return "";
-
-                        // Use dayjs to parse and add 5.5 hours (IST offset)
                         const dayjsDate = dayjs(value).add(5.5, 'hour');
                         const formatted = dayjsDate.format("DD-MMM-YYYY, HH:mm:ss");
                         return `${formatted} ${value}`;
