@@ -895,7 +895,7 @@ const handleEditAndGenerateFile = async (estID: string) => {
       operatorForModel: data.operatorForModel || false,
       aircraftRegNo: data.aircraftRegNo || "",
       aircraftModel: data.aircraftModel || "",
-      aircraftAge: data.aircraftAge || 0,
+      aircraftAge: data.aircraftAge || "", // was 0, now empty string for input
       aircraftAgeThreshold: data.aircraftAgeThreshold || 3,
       aircraftFlightHours: data.aircraftFlightHours || "",
       aircraftFlightCycles: data.aircraftFlightCycles || "",
@@ -1266,13 +1266,12 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
   const form = useForm<any>({
     initialValues: {
       tasks: [],
-      // probability: 0,
       probability: 0,
       operator: "",
       operatorForModel: false,
       aircraftRegNo: "",
       aircraftModel: "",
-      aircraftAge: 0,
+      aircraftAge: "", // was 0, now empty string for input
       aircraftAgeThreshold: 3,
       aircraftFlightHours: "",
       aircraftFlightCycles: "",
@@ -1297,8 +1296,6 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
       operator: (value) => (value?.trim() ? null : "Operator is required"),
       aircraftRegNo: (value) =>
         value?.trim() ? null : "Aircraft Registration Number is required",
-      // aircraftAge: (value) =>
-      //   value ? null : "Aircraft Age is required",
       typeOfCheck: (value) =>
         value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
       typeOfCheckID: (value) =>
@@ -1476,7 +1473,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
       operatorForModel: form.values.operatorForModel || false,
       aircraftRegNo: form.values.aircraftRegNo || "",
       aircraftModel: form.values.aircraftModel || "",
-      aircraftAge: form.values.aircraftAge || 0.0,
+      aircraftAge: form.values.aircraftAge || 0, // Send 0 if empty
       aircraftAgeThreshold: form.values.aircraftAgeThreshold || 3,
       aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
       aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
@@ -1526,7 +1523,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
           operator: "",
           aircraftRegNo: "",
           aircraftModel: "",
-          aircraftAge: 0,
+          aircraftAge: "",
           operatorForModel: false,
           aircraftFlightHours: "",
           aircraftFlightCycles: "",
@@ -1545,7 +1542,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
           additionalTasks: [],
           considerDeltaUnAvTasks: false,
         });
-
+        setSearch(""); // <-- Clear operator search state
         setSelectedFile(null);
         setValidatedTasks([]);
         setAdditionalTasks([]);
@@ -1587,7 +1584,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
           description: additionalTaskDescriptions,
         },
         typeOfCheck: form.values.typeOfCheck || [],
-        aircraftAge: form.values.aircraftAge || 0.0,
+        aircraftAge: form.values.aircraftAge || 0,
         aircraftModel: form.values.aircraftModel || "",
         operatorForModel: form.values.operatorForModel || false,
         operator: form.values.operator || "",
@@ -4195,7 +4192,18 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
                     leftSection={<MdPin />}
                     placeholder="Ex: 5.5"
                     label="Aircraft Age"
-                    {...form.getInputProps("aircraftAge")}
+                    value={form.values.aircraftAge === 0 || form.values.aircraftAge === "0" ? "" : form.values.aircraftAge}
+                    onChange={e => {
+                      const val = e.target.value;
+                      // Accept only numbers or empty
+                      if (/^\d*\.?\d*$/.test(val)) {
+                        form.setFieldValue("aircraftAge", val);
+                      }
+                    }}
+                    onBlur={e => {
+                      // If left empty, set to 0 for submission
+                      if (e.target.value === "") form.setFieldValue("aircraftAge", 0);
+                    }}
                     error={form.errors.aircraftAge}
                     styles={{
                       input: {
@@ -4700,19 +4708,8 @@ border-bottom: none;
                       valueGetter: (params: any) => {
                         const value = params.data?.createdAt;
                         if (!value) return "";
-
-                        const date = new Date(value);
-                        const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-                        date.setTime(date.getTime() + istOffsetInMilliseconds);
-
-                        const day = date.getDate().toString().padStart(2, "0");
-                        const month = date.toLocaleString("default", { month: "short" });
-                        const year = date.getFullYear();
-                        const hours = date.getHours().toString().padStart(2, "0");
-                        const minutes = date.getMinutes().toString().padStart(2, "0");
-                        const seconds = date.getSeconds().toString().padStart(2, "0");
-
-                        const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                        const dayjsDate = dayjs(value).add(5.5, 'hour');
+                        const formatted = dayjsDate.format("DD-MMM-YYYY, HH:mm:ss");
                         return `${formatted} ${value}`;
                       },
                       cellRenderer: (params: any) => {
@@ -5181,22 +5178,14 @@ border-bottom: none;
                         lockPosition: false,
                         // filter: true,
                         // floatingFilter: true,
+                        // 
                         valueGetter: (params: any) => {
                           const value = params.data?.createdAt;
                           if (!value) return "";
-
-                          const date = new Date(value);
-                          const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-                          date.setTime(date.getTime() + istOffsetInMilliseconds);
-
-                          const day = date.getDate().toString().padStart(2, "0");
-                          const month = date.toLocaleString("default", { month: "short" });
-                          const year = date.getFullYear();
-                          const hours = date.getHours().toString().padStart(2, "0");
-                          const minutes = date.getMinutes().toString().padStart(2, "0");
-                          const seconds = date.getSeconds().toString().padStart(2, "0");
-
-                          const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+  
+                          // Use dayjs to parse and add 5.5 hours (IST offset)
+                          const dayjsDate = dayjs(value).add(5.5, 'hour');
+                          const formatted = dayjsDate.format("DD-MMM-YYYY, HH:mm:ss");
                           return `${formatted} ${value}`;
                         },
                         cellRenderer: (params: any) => {
@@ -5205,6 +5194,12 @@ border-bottom: none;
                           const formattedPart = parts.slice(0, 2).join(" ");
                           return <Text mt="xs">{formattedPart}</Text>;
                         },
+                        // cellRenderer: (params: any) => {
+                        //   if (!params.value) return null;
+                        //   const parts = params.value.split(" ");
+                        //   const formattedPart = parts.slice(0, 2).join(" ");
+                        //   return <Text mt="xs">{formattedPart}</Text>;
+                        // },
                       },
                       {
                         field: "estID",
@@ -6046,12 +6041,12 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     <Text fz="xs" fw={500}>
                       Unbillable Man hours
                     </Text>
-                    <Text fz="sm" fw={600} c={"green.6"}>
+                    <Text fz="sm" fw={600} c="green.6">
                       {capppingMhs?.toFixed(0)} Hrs
                     </Text>
                   </Group>
                   <Progress
-                    color={"green.6"}
+                    color="green.6"
                     value={Math.min(capppingMhs / 100, 100) ?? 0}
                     size="md"
                     radius="sm"
