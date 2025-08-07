@@ -2537,7 +2537,8 @@ class TaskService:
             mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
             # Fetch aircraft details
-            aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
+            aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({
+            "year": { "$in": [2022, 2023, 2024, 2025] }})))
             
             # Validate and convert aircraft_age to float
             try:

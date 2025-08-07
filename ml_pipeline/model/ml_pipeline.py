@@ -91,8 +91,11 @@ db = client["gmr-mro-staging-5y"]
 test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
-aircraft_cursor = aircraft_details_collection.find({})
+aircraft_cursor = aircraft_details_collection.find({
+    "year": { "$in": [2022, 2023, 2024, 2025] }
+})
 aircraft_details = pd.DataFrame(list(aircraft_cursor))
+
 
 # Drop the MongoDB _id column if present
 aircraft_details.drop(columns=["_id"], errors="ignore", inplace=True)
