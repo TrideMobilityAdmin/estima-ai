@@ -536,9 +536,9 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         filtered_data['actual_man_hours'] = pd.to_numeric(filtered_data['actual_man_hours'], errors='coerce')
         filtered_data['estimated_man_hours'] = pd.to_numeric(filtered_data['estimated_man_hours'], errors='coerce')
         
-        min_actual = filtered_data['actual_man_hours'].min()
-        max_actual = filtered_data['actual_man_hours'].max()
-        avg_actual = filtered_data['actual_man_hours'].mean()
+        min_actual = filtered_data['estimated_man_hours'].min()
+        max_actual = filtered_data['estimated_man_hours'].max()
+        avg_actual = filtered_data['estimated_man_hours'].mean()
         avg_estimated = filtered_data['estimated_man_hours'].mean()
         
         # Handle potential empty skill_number list

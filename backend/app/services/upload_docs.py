@@ -2173,7 +2173,7 @@ class ExcelUploadService():
         parts_master=parts_master.drop_duplicates()
         task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
         task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
-        task_parts_up=task_parts[task_parts["part_type"]!="Component"]
+        task_parts_up=task_parts_up[task_parts_up["part_type"]!="Component"]
         task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
 
         # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
@@ -2202,6 +2202,10 @@ class ExcelUploadService():
             
             if not matching_parts.empty:
                 task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * (matching_parts.iloc[0]["latest_base_price_usd"]+matching_parts.iloc[0]["latest_freight_cost"]+matching_parts.iloc[0]["latest_admin_charges"])
+                
+        logger.info(f"the shape of the task_parts_up DataFrame is {task_parts_up.shape}")        
+        logger.info(f"the mlttable spare cost {task_parts_up['billable_value_usd'].sum()}")
+
             
         sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
         # Convert to string
@@ -2597,7 +2601,8 @@ class ExcelUploadService():
             "task_avialability_summary":task_availability_summary
         }
         finaloutput= replace_nan_inf(finaloutput)
-        
+        logger.info("Final output structure created successfully")
+        logger.info(f"Final output: {summary_findings_comparision }")
         return finaloutput
     
 def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts):
