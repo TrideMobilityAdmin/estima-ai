@@ -1265,6 +1265,37 @@ class ExcelUploadService():
                                 delta_tasks_count += 1
                                 
                     result['available_tasks_in_other_check_category'] = delta_tasks_count
+                    findings_mh_estimate=0
+                    tasks_total_mhs=result['totalManhrs']
+                    findings_total_mhs=result['findingsManhrs']
+                    check_category = result["typeOfCheck"][0]
+                    if check_category=="C CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.35
+                    elif check_category=="6Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.40
+                    elif check_category=="12Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.50
+                    elif check_category=="18Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.50
+                    elif check_category=="EOL CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.80
+                    elif check_category=="NON C CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.10
+                    tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+                    extended_tat=0
+                    tat_message=''
+                    if findings_mh_estimate < findings_total_mhs:
+                        extended_tat = ((findings_total_mhs - findings_mh_estimate)/(250))
+                        tat_message = "Extended TAT is calculated as predicted findings are more than estimated findings"
+                    elif findings_mh_estimate > findings_total_mhs:
+                        extended_tat = 0
+                        tat_message = "No extended TAT as predicted findings are less than estimated findings" 
+                    else:
+                        extended_tat = 0
+                        tat_message = "No extended TAT as predicted findings are equal to estimated findings" 
+                    result['tat'] = tat
+                    result['extendedTat'] = extended_tat
+                    result['tatMessage'] = tat_message  
 
             # Select only the required columns for the final result
             final_results = []
@@ -1298,7 +1329,10 @@ class ExcelUploadService():
                     "available_tasks_after_filter": result.get("available_tasks_after_filter"),
                     "unavailable_tasks_after_filter": result.get("unavailable_tasks_after_filter"),
                     "task_matching_percentage_after_filter": result.get("task_matching_percentage_after_filter"),
-                    "available_tasks_in_other_check_category": result.get("available_tasks_in_other_check_category")
+                    "available_tasks_in_other_check_category": result.get("available_tasks_in_other_check_category"),
+                    "TAT": result.get("tat"),
+                    "extendedTAT": result.get("extendedTat"),
+                    "TATMessage": result.get("tatMessage")
                 }
                 final_results.append(final_result)
                 
