@@ -1272,10 +1272,10 @@ class ExcelUploadService():
                 final_result = {
                     "estID": result.get("estID"),
                     "aircraftModel": result.get("aircraftModel"),
-                    "aircraftAge": result.get("aircraftAge"),
+                    "aircraftAge": "-" if not result.get("aircraftAge") else result.get("aircraftAge"),
                     "considerDeltaUnAvTasks": result.get("considerDeltaUnAvTasks"),
                     "operatorForModel": result.get("operatorForModel"),
-                    "aircraftageThreshold": result.get("aircraftageThreshold"),
+                    "aircraftageThreshold": "-" if result.get("aircraftageThreshold")==3 else result.get("aircraftageThreshold"),
                     'cappingTypeManhrs': result.get("cappingTypeManhrs"),
                     'cappingTypeSpareCost': result.get("cappingTypeSpareCost"),
                     "unbillableManhrs": result.get("unbillableManhrs"),
