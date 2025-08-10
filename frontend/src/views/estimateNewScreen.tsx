@@ -152,7 +152,7 @@ dayjs.extend(timezone);
 dayjs.extend(isoWeek); 
 
 
-export default function EstimateNew() {
+export default function EstimateNewScreen() {
   const {
     postEstimateReport,
     updateRemarkByEstID,
@@ -167,7 +167,8 @@ export default function EstimateNew() {
     getFilteredTasksByID,
     getModelTasksValidate,
     getAllHistoryEstimatesStatus,
-    getAllEstimatesSummary
+    getAllEstimatesSummary,
+    getValidatedTasksByID
   } = useApi();
   const { getAllDataExpertInsights } = useApi();
   const { getSkillAnalysis } = useApiSkillAnalysis();
@@ -317,6 +318,26 @@ export default function EstimateNew() {
       if (pollingRef.current) clearTimeout(pollingRef.current);
     };
   }, [fetchEstimatesStatus]);
+
+
+  const [selectedEstIdValidate, setSelectedEstimateIdValidate] = useState<any>();
+    const [validatedTasksByID, setValidatedTasksByID] = useState<any[]>([]);
+    const [loadingValidatedByID, setLoadingValidatedByID] = useState(false); // Add loading state
+
+    const fetchValidatedTaskByID = async () => {
+        setLoadingValidatedByID(true);
+    const data = await getValidatedTasksByID(selectedEstIdValidate);
+    if (data) {
+        setValidatedTasksByID(data); // store validated tasks
+        await handleSubmitSkills(data); // proceed to call skill analysis
+    }
+    setLoadingValidatedByID(false);
+    };
+
+  useEffect(()=>{
+    fetchValidatedTaskByID();
+  },[selectedEstIdValidate]);
+
 
   // const threeDaysAgo = new Date();
       // threeDaysAgo.setDate(threeDaysAgo.getDate() - 5);
@@ -615,6 +636,65 @@ export default function EstimateNew() {
     );
   };
 
+  const downloadExcelValidateByID = (status: boolean) => {
+    // Combine both the original validated tasks and additional validated tasks
+    const allValidatedTasks = [...validatedTasksByID, ...validatedAdditionalTasks];
+    // Filter based on the selected status (available or not available)
+    const filteredTasks = allValidatedTasks.filter((task) => task?.status === status) || [];
+
+    // const filteredTasks =
+    //   validatedTasks?.filter((task) => task?.status === status) || [];
+
+    let excelData: Record<string, any>[] = [];
+
+    if (status) {
+      // Status === true: Only include TASK NUMBER, ESTIMATE ID, STATUS
+      excelData =
+        filteredTasks.length > 0
+          ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.taskid || "",
+            "DESCRIPTION": task?.description || "",
+            STATUS: "Available",
+          }))
+          : [
+            {
+              "TASK NUMBER": "",
+              "DESCRIPTION": "",
+              STATUS: "",
+            },
+          ];
+    } else {
+      // Status === false: Include MAN HOURS and DESCRIPTION as empty
+      excelData =
+        filteredTasks.length > 0
+          ? filteredTasks.map((task) => ({
+            "TASK NUMBER": task?.taskid || "",
+            DESCRIPTION: task?.description || "",
+            "MAN HOURS": "",
+            STATUS: "Not Available",
+          }))
+          : [
+            {
+              "TASK NUMBER": "",
+              DESCRIPTION: "",
+              "MAN HOURS": "",
+              STATUS: "",
+            },
+          ];
+    }
+
+    // Create Excel sheet and download
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+    XLSX.writeFile(
+      wb,
+      `Estimate_${selectedEstimateId}_${status ? "Available" : "NotAvailable"
+      }.xlsx`
+    );
+  };
+
   const downloadExcelFilteredTasks = (status: boolean) => {
     const filteredTasks = combinedFilteredTasksList?.filter((task) => task?.status === status) || [];
     let excelData: Record<string, any>[] = [];
@@ -682,112 +762,226 @@ export default function EstimateNew() {
   //   fetchEstDetails();
   // }, [selectedEstimateIdDetails]);
  
-  useEffect(() => {
-    const fetchEstDetails = async () => {
-      setLoadingEstDet(true);
-      const data = await getEstimateDetailsByID(selectedEstimateIdDetails);
-      if (data) {
-        setEstimateDetails(data);
+//   useEffect(() => {
+//     const fetchEstDetails = async () => {
+//       setLoadingEstDet(true);
+//       const data = await getEstimateDetailsByID(selectedEstimateIdDetails);
+//       if (data) {
+//         setEstimateDetails(data);
 
-        // Populate form with API response data
-        const formData = {
-          tasks: data.tasks || [],
-          probability: data.probability || 0,
-          operator: data.operator || "",
-          operatorForModel: data.operatorForModel || false,
-          aircraftRegNo: data.aircraftRegNo || "",
-          aircraftModel: data.aircraftModel || "",
-          aircraftAge: data.aircraftAge || 0,
-          aircraftAgeThreshold: data.aircraftAgeThreshold || 3,
-          aircraftFlightHours: data.aircraftFlightHours || "",
-          aircraftFlightCycles: data.aircraftFlightCycles || "",
-          areaOfOperations: data.areaOfOperations || "",
-          cappingDetails: {
-            cappingTypeManhrs: data.cappingDetails?.cappingTypeManhrs || "",
-            cappingManhrs: data.cappingDetails?.cappingManhrs || "",
-            cappingTypeSpareCost: data.cappingDetails?.cappingTypeSpareCost || "",
-            cappingSpareCost: data.cappingDetails?.cappingSpareCost || "",
-          },
-          taskID: data.taskID || "",
-          taskDescription: data.taskDescription || "",
-          typeOfCheck: data.typeOfCheck || [],
-          typeOfCheckID: data.typeOfCheckID || "",
-          miscLaborTasks: data.miscLaborTasks || [],
-          additionalTasks: data.additionalTasks || [],
-          considerDeltaUnAvTasks: data.considerDeltaUnAvTasks || false,
-        };
+//         // Populate form with API response data
+//         const formData = {
+//           tasks: data.tasks || [],
+//           probability: data.probability || 0,
+//           operator: data.operator || "",
+//           operatorForModel: data.operatorForModel || false,
+//           aircraftRegNo: data.aircraftRegNo || "",
+//           aircraftModel: data.aircraftModel || "",
+//           aircraftAge: data.aircraftAge || 0,
+//           aircraftAgeThreshold: data.aircraftAgeThreshold || 3,
+//           aircraftFlightHours: data.aircraftFlightHours || "",
+//           aircraftFlightCycles: data.aircraftFlightCycles || "",
+//           areaOfOperations: data.areaOfOperations || "",
+//           cappingDetails: {
+//             cappingTypeManhrs: data.cappingDetails?.cappingTypeManhrs || "",
+//             cappingManhrs: data.cappingDetails?.cappingManhrs || "",
+//             cappingTypeSpareCost: data.cappingDetails?.cappingTypeSpareCost || "",
+//             cappingSpareCost: data.cappingDetails?.cappingSpareCost || "",
+//           },
+//           taskID: data.taskID || "",
+//           taskDescription: data.taskDescription || "",
+//           typeOfCheck: data.typeOfCheck || [],
+//           typeOfCheckID: data.typeOfCheckID || "",
+//           miscLaborTasks: data.miscLaborTasks || [],
+//           additionalTasks: data.additionalTasks || [],
+//           considerDeltaUnAvTasks: data.considerDeltaUnAvTasks || false,
+//         };
 
-        // Set form values
-        form.setValues(formData);
+//         // Set form values
+//         form.setValues(formData);
 
-        // Update search state for operator combobox to reflect the populated value
-        setSearch(data.operator || "");
+//         // Update search state for operator combobox to reflect the populated value
+//         setSearch(data.operator || "");
 
-        // Auto-populate selectedFields and showFields based on API data
-        const fieldsToShow = [];
+//         // Auto-populate selectedFields and showFields based on API data
+//         const fieldsToShow = [];
 
-        // Check which optional fields have values and should be shown
-        if (data.probability) fieldsToShow.push("probability");
-        if (data.aircraftFlightCycles) fieldsToShow.push("aircraftFlightCycles");
-        if (data.aircraftFlightHours) fieldsToShow.push("aircraftFlightHours");
-        if (data.aircraftAgeThreshold && data.aircraftAgeThreshold !== 3) fieldsToShow.push("aircraftAgeThreshold");
-        if (data.areaOfOperations) fieldsToShow.push("areaOfOperations");
-        if (data.cappingDetails?.cappingManhrs || data.cappingDetails?.cappingTypeManhrs) fieldsToShow.push("cappingManhrs");
-        if (data.cappingDetails?.cappingSpareCost || data.cappingDetails?.cappingTypeSpareCost) fieldsToShow.push("cappingSpares");
+//         // Check which optional fields have values and should be shown
+//         if (data.probability) fieldsToShow.push("probability");
+//         if (data.aircraftFlightCycles) fieldsToShow.push("aircraftFlightCycles");
+//         if (data.aircraftFlightHours) fieldsToShow.push("aircraftFlightHours");
+//         if (data.aircraftAgeThreshold && data.aircraftAgeThreshold !== 3) fieldsToShow.push("aircraftAgeThreshold");
+//         if (data.areaOfOperations) fieldsToShow.push("areaOfOperations");
+//         if (data.cappingDetails?.cappingManhrs || data.cappingDetails?.cappingTypeManhrs) fieldsToShow.push("cappingManhrs");
+//         if (data.cappingDetails?.cappingSpareCost || data.cappingDetails?.cappingTypeSpareCost) fieldsToShow.push("cappingSpares");
 
-        // Update selected fields and show fields
-        setSelectedFields(fieldsToShow);
-        setShowFields(fieldsToShow);
+//         // Update selected fields and show fields
+//         setSelectedFields(fieldsToShow);
+//         setShowFields(fieldsToShow);
 
-        // Force re-render to update form keys
-        setFormKey(prev => prev + 1);
+//         // Force re-render to update form keys
+//         setFormKey(prev => prev + 1);
 
-        // Scroll to top after state updates are complete
-        setTimeout(() => {
-          // Method 1: Scroll to Required Parameters section
-          const requiredSection = document.getElementById('required-parameters-section');
-          if (requiredSection) {
-            requiredSection.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
-              inline: 'nearest'
-            });
-          }
+//         // Scroll to top after state updates are complete
+//         setTimeout(() => {
+//           // Method 1: Scroll to Required Parameters section
+//           const requiredSection = document.getElementById('required-parameters-section');
+//           if (requiredSection) {
+//             requiredSection.scrollIntoView({
+//               behavior: 'smooth',
+//               block: 'start',
+//               inline: 'nearest'
+//             });
+//           }
 
-          // Method 2: Scroll the ScrollArea viewport to top
-          if (scrollAreaRef.current) {
-            const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
-            if (viewport) {
-              viewport.scrollTop = 0;
-            }
-          }
+//           // Method 2: Scroll the ScrollArea viewport to top
+//           if (scrollAreaRef.current) {
+//             const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
+//             if (viewport) {
+//               viewport.scrollTop = 0;
+//             }
+//           }
 
-          // Method 3: Scroll the card into view
-          if (cardRef.current) {
-            cardRef.current.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
-              inline: 'start'
-            });
-          }
+//           // Method 3: Scroll the card into view
+//           if (cardRef.current) {
+//             cardRef.current.scrollIntoView({
+//               behavior: 'smooth',
+//               block: 'start',
+//               inline: 'start'
+//             });
+//           }
 
-        }, 500);
+//         }, 500);
 
-        // Immediate scroll attempt
-        if (scrollAreaRef.current) {
-          const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
-          if (viewport) {
-            viewport.scrollTop = 0;
-          }
-        }
-      }
-      setLoadingEstDet(false);
+//         // Immediate scroll attempt
+//         if (scrollAreaRef.current) {
+//           const viewport = scrollAreaRef.current.querySelector('[data-scrollarea-viewport]');
+//           if (viewport) {
+//             viewport.scrollTop = 0;
+//           }
+//         }
+//       }
+//       setLoadingEstDet(false);
+//     };
+
+//     if (selectedEstimateIdDetails) {
+//       fetchEstDetails();
+//     }
+//   }, [selectedEstimateIdDetails]);
+
+
+const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+
+const handleEditAndGenerateFile = async (estID: string) => {
+  try {
+    setLoadingEditId(estID); // ✅ set loading for this specific estimate
+    setLoadingEstDet(true);
+
+    // Step 1: Fetch Estimate Details
+    const data = await getEstimateDetailsByID(estID);
+    if (!data) {
+      setLoadingEditId(null);
+      return;
+    }
+
+    // Step 2: Populate Form
+    setSelectedEstimateIdDetails(estID);
+    setEstimateDetails(data);
+
+    const formData = {
+      tasks: data.tasks || [],
+      probability: data.probability || 0,
+      operator: data.operator || "",
+      operatorForModel: data.operatorForModel || false,
+      aircraftRegNo: data.aircraftRegNo || "",
+      aircraftModel: data.aircraftModel || "",
+      aircraftAge: data.aircraftAge || "", // was 0, now empty string for input
+      aircraftAgeThreshold: data.aircraftAgeThreshold || 3,
+      aircraftFlightHours: data.aircraftFlightHours || "",
+      aircraftFlightCycles: data.aircraftFlightCycles || "",
+      areaOfOperations: data.areaOfOperations || "",
+      cappingDetails: {
+        cappingTypeManhrs: data.cappingDetails?.cappingTypeManhrs || "",
+        cappingManhrs: data.cappingDetails?.cappingManhrs || "",
+        cappingTypeSpareCost: data.cappingDetails?.cappingTypeSpareCost || "",
+        cappingSpareCost: data.cappingDetails?.cappingSpareCost || "",
+      },
+      taskID: data.taskID || "",
+      taskDescription: data.taskDescription || "",
+      typeOfCheck: data.typeOfCheck || [],
+      typeOfCheckID: data.typeOfCheckID || "",
+      miscLaborTasks: data.miscLaborTasks || [],
+      additionalTasks: data.additionalTasks || [],
+      considerDeltaUnAvTasks: data.considerDeltaUnAvTasks || false,
     };
 
-    if (selectedEstimateIdDetails) {
-      fetchEstDetails();
-    }
-  }, [selectedEstimateIdDetails]);
+    form.setValues(formData);
+    setSearch(data.operator || "");
+
+    // Step 3: Optional Fields
+    const fieldsToShow = [];
+    if (data.probability) fieldsToShow.push("probability");
+    if (data.aircraftFlightCycles) fieldsToShow.push("aircraftFlightCycles");
+    if (data.aircraftFlightHours) fieldsToShow.push("aircraftFlightHours");
+    if (data.aircraftAgeThreshold && data.aircraftAgeThreshold !== 3) fieldsToShow.push("aircraftAgeThreshold");
+    if (data.areaOfOperations) fieldsToShow.push("areaOfOperations");
+    if (data.cappingDetails?.cappingManhrs || data.cappingDetails?.cappingTypeManhrs) fieldsToShow.push("cappingManhrs");
+    if (data.cappingDetails?.cappingSpareCost || data.cappingDetails?.cappingTypeSpareCost) fieldsToShow.push("cappingSpares");
+
+    setSelectedFields(fieldsToShow);
+    setShowFields(fieldsToShow);
+    setFormKey((prev) => prev + 1);
+
+    // Step 4: Generate Excel
+    const tasks = data.task || [];
+    const descriptions = data.description || [];
+
+    const excelData = tasks.length && descriptions.length
+      ? tasks.map((task: string, idx: number) => ({
+          "TASK NUMBER": task || "",
+          "DESCRIPTION": descriptions[idx] || "",
+        }))
+      : [{ "TASK NUMBER": "", "DESCRIPTION": "" }];
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData, { skipHeader: false });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "MPD");
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const file = new File([blob], `Estimate_${estID}.xlsx`, { type: blob.type });
+
+    await handleFileChange(file, tasks, descriptions, {
+      sheetName: "MPD",
+      columnName: "TASK NUMBER",
+    });
+
+    // Step 5: Scroll (optional)
+    setTimeout(() => {
+      document.getElementById("required-parameters-section")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      const viewport = scrollAreaRef.current?.querySelector("[data-scrollarea-viewport]");
+      if (viewport) viewport.scrollTop = 0;
+
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 500);
+  } catch (err) {
+    console.error("❌ Error in Edit & Re-run:", err);
+  } finally {
+    setLoadingEditId(null);
+    setLoadingEstDet(false);
+  }
+};
+
+
+
+
 
   console.log("Estimate Id Details >>>", estimateDetails);
 
@@ -970,49 +1164,94 @@ export default function EstimateNew() {
     }
   };
 
-  const downloadAllValidatedTasksOnly = async (
-    tasks: string[],
-    descriptions: string[],
-    estID: string
-  ) => {
-    // Check if tasks and descriptions have data
-    const hasData = tasks.length > 0 && descriptions.length > 0;
+//   const downloadAllValidatedTasksOnly = async (
+//     tasks: string[],
+//     descriptions: string[],
+//     estID: string
+//   ) => {
+//     // Check if tasks and descriptions have data
+//     const hasData = tasks.length > 0 && descriptions.length > 0;
 
-    const excelData = hasData
-      ? tasks.map((task, index) => ({
-        "TASK NUMBER": task || "",
-        DESCRIPTION: descriptions[index] || "",
-        "FINAL MH": "",
-      }))
-      : [
-        {
-          "TASK NUMBER": "",
-          DESCRIPTION: "",
-          "FINAL MH": "",
-        },
-      ];
+//     const excelData = hasData
+//       ? tasks.map((task, index) => ({
+//         "TASK NUMBER": task || "",
+//         DESCRIPTION: descriptions[index] || "",
+//         "FINAL MH": "",
+//       }))
+//       : [
+//         {
+//           "TASK NUMBER": "",
+//           DESCRIPTION: "",
+//           "FINAL MH": "",
+//         },
+//       ];
 
-    // Create Excel workbook
+//     // Create Excel workbook
+//     const ws = XLSX.utils.json_to_sheet(excelData);
+//     const wb = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(wb, ws, "MPD");
+
+//     // Generate Excel file as blob instead of direct download
+//     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+//     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+//     // Create File object from blob
+//     const fileName = `Estimate_${estID}.xlsx`;
+//     const file = new File([blob], fileName, { type: blob.type });
+
+//     // Download the file (for user to have a copy)
+//     const url = window.URL.createObjectURL(blob);
+//     const link = document.createElement('a');
+//     link.href = url;
+//     link.download = fileName;
+//     link.click();
+//     window.URL.revokeObjectURL(url);
+//   };
+const [downloadingEstId, setDownloadingEstId] = useState<string | null>(null);
+
+const downloadAllValidatedTasksOnly = async (estID: string) => {
+  try {
+    setDownloadingEstId(estID); // Mark this button as loading
+
+    const validatedTasks = await getValidatedTasksByID(estID);
+
+    if (!validatedTasks || validatedTasks.length === 0) {
+      setDownloadingEstId(null);
+      // showAppNotification("warning", "No validated tasks found.");
+      return;
+    }
+
+    // Format data: TASK NUMBER and DESCRIPTION
+    const excelData = validatedTasks.map((task: any) => ({
+      "TASK NUMBER": task.taskid || "",
+      "DESCRIPTION": task.description || "",
+    }));
+
+    // Create Excel sheet and download
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "MPD");
+    XLSX.utils.book_append_sheet(wb, ws, "MPD"); // ✅ Sheet name
 
-    // Generate Excel file as blob instead of direct download
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
 
-    // Create File object from blob
     const fileName = `Estimate_${estID}.xlsx`;
-    const file = new File([blob], fileName, { type: blob.type });
-
-    // Download the file (for user to have a copy)
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
     link.download = fileName;
     link.click();
-    window.URL.revokeObjectURL(url);
-  };
+    URL.revokeObjectURL(link.href);
+  } catch (error) {
+    console.error("Download error:", error);
+    // showAppNotification("error", "Download failed");
+  } finally {
+    setDownloadingEstId(null); // Reset loading
+  }
+};
+
+
 
 
   const [formKey, setFormKey] = useState(0);
@@ -1027,13 +1266,12 @@ export default function EstimateNew() {
   const form = useForm<any>({
     initialValues: {
       tasks: [],
-      // probability: 0,
       probability: 0,
       operator: "",
       operatorForModel: false,
       aircraftRegNo: "",
       aircraftModel: "",
-      aircraftAge: 0,
+      aircraftAge: "", // was 0, now empty string for input
       aircraftAgeThreshold: 3,
       aircraftFlightHours: "",
       aircraftFlightCycles: "",
@@ -1058,8 +1296,6 @@ export default function EstimateNew() {
       operator: (value) => (value?.trim() ? null : "Operator is required"),
       aircraftRegNo: (value) =>
         value?.trim() ? null : "Aircraft Registration Number is required",
-      // aircraftAge: (value) =>
-      //   value ? null : "Aircraft Age is required",
       typeOfCheck: (value) =>
         value?.length > 0 ? null : "Type of Check is required", // Modified for array validation
       typeOfCheckID: (value) =>
@@ -1237,7 +1473,7 @@ export default function EstimateNew() {
       operatorForModel: form.values.operatorForModel || false,
       aircraftRegNo: form.values.aircraftRegNo || "",
       aircraftModel: form.values.aircraftModel || "",
-      aircraftAge: form.values.aircraftAge || 0.0,
+      aircraftAge: form.values.aircraftAge || 0, // Send 0 if empty
       aircraftAgeThreshold: form.values.aircraftAgeThreshold || 3,
       aircraftFlightHours: Number(form.values.aircraftFlightHours) || 0,
       aircraftFlightCycles: Number(form.values.aircraftFlightCycles) || 0,
@@ -1287,7 +1523,7 @@ export default function EstimateNew() {
           operator: "",
           aircraftRegNo: "",
           aircraftModel: "",
-          aircraftAge: 0,
+          aircraftAge: "",
           operatorForModel: false,
           aircraftFlightHours: "",
           aircraftFlightCycles: "",
@@ -1306,7 +1542,7 @@ export default function EstimateNew() {
           additionalTasks: [],
           considerDeltaUnAvTasks: false,
         });
-
+        setSearch(""); // <-- Clear operator search state
         setSelectedFile(null);
         setValidatedTasks([]);
         setAdditionalTasks([]);
@@ -1348,7 +1584,7 @@ export default function EstimateNew() {
           description: additionalTaskDescriptions,
         },
         typeOfCheck: form.values.typeOfCheck || [],
-        aircraftAge: form.values.aircraftAge || 0.0,
+        aircraftAge: form.values.aircraftAge || 0,
         aircraftModel: form.values.aircraftModel || "",
         operatorForModel: form.values.operatorForModel || false,
         operator: form.values.operator || "",
@@ -1461,44 +1697,77 @@ export default function EstimateNew() {
 };
 
 
-  const handleSubmitSkills = async () => {
-    const validTasks = validatedSkillsTasks
-      ?.filter((task) => task?.status === true)
-      ?.map((task) => task?.taskid);
+//   const handleSubmitSkills = async () => {
+//     const validTasks = validatedSkillsTasks
+//       ?.filter((task) => task?.status === true)
+//       ?.map((task) => task?.taskid);
 
-    if (validTasks.length === 0) {
-      // showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
-      return null; // Return null to indicate no response
-    }
+//     if (validTasks.length === 0) {
+//       // showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
+//       return null; // Return null to indicate no response
+//     }
 
-    const requestData = {
-      source_tasks: validTasks,
-    };
+//     const requestData = {
+//       source_tasks: validTasks,
+//     };
 
-    console.log("Submitting data:", requestData);
+//     console.log("Submitting data:", requestData);
 
-    try {
-      setLoading(true);
-      const response = await getSkillAnalysis(requestData);
-      console.log("API Response:", response);
+//     try {
+//       setLoading(true);
+//       const response = await getSkillAnalysis(requestData);
+//       console.log("API Response:", response);
 
-      // if (response) {
-      setSkillAnalysisData(response);
-      // showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
-      return response; // Return the response
-      // }
-    } catch (error) {
-      // showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
-      console.error("API Error:", error);
-    } finally {
-      setLoading(false);
-    }
-    return null; // Return null if no response
+//       // if (response) {
+//       setSkillAnalysisData(response);
+//       // showAppNotification("success", "Success!", "Successfully Generated Skill Analysis");
+//       return response; // Return the response
+//       // }
+//     } catch (error) {
+//       // showAppNotification("error", "Error!", "Failed Generating Skill Analysis, try again");
+//       console.error("API Error:", error);
+//     } finally {
+//       setLoading(false);
+//     }
+//     return null; // Return null if no response
+//   };
+
+//   useEffect(() => {
+//     handleSubmitSkills();
+//   }, [validatedSkillsTasks]);
+
+const handleSubmitSkills = async (validatedTasks: any[]) => {
+  const validTasks = validatedTasks
+    ?.filter((task) => task?.status === true)
+    ?.map((task) => task?.taskid);
+
+  if (!validTasks || validTasks.length === 0) {
+    // showAppNotification("warning", "Warning!", "No valid tasks available to estimate the report.");
+    return null;
+  }
+
+  const requestData = {
+    source_tasks: validTasks,
   };
 
-  useEffect(() => {
-    handleSubmitSkills();
-  }, [validatedSkillsTasks]);
+  console.log("Submitting to skill analysis:", requestData);
+
+  try {
+    setLoading(true);
+    const response = await getSkillAnalysis(requestData);
+    console.log("🎯 Skill Analysis Response:", response);
+    setSkillAnalysisData(response);
+    return response;
+  } catch (error) {
+    console.error("Skill Analysis API Error:", error);
+    // showAppNotification("error", "Error!", "Failed Generating Skill Analysis");
+  } finally {
+    setLoading(false);
+  }
+
+  return null;
+};
+
 
   console.log("skillAnalysisData", skillAnalysisData);
 
@@ -2119,7 +2388,7 @@ export default function EstimateNew() {
   };
 
 
-  const [rangeType, setRangeType] = useState("Today");
+  const [rangeType, setRangeType] = useState("");
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [estimatesSummary, setEstimatesSummary] = useState<any[]>([]);
   const [loadingEstimatesSummary, setLoadingEstimatesSummary] = useState(false);
@@ -2398,9 +2667,9 @@ export default function EstimateNew() {
         }
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        {isValidating ? (
+        {loadingValidatedByID ? (
           <LoadingOverlay
-            visible={isValidating}
+            visible={loadingValidatedByID}
             zIndex={1000}
             overlayProps={{ radius: "sm", blur: 2 }}
             loaderProps={{ color: "indigo", type: "bars" }}
@@ -2421,7 +2690,7 @@ export default function EstimateNew() {
               {/* Fixed Header */}
               <Group mb="md" style={{ flexShrink: 0 }}>
                 <Badge variant="filled" color="orange" radius="sm" size="lg">
-                  {validatedTasks?.length}
+                  {validatedTasksByID?.length}
                 </Badge>
                 {/* <Text fw={600} size="md">Before Filtered</Text> */}
                 <Group>
@@ -2431,10 +2700,10 @@ export default function EstimateNew() {
                       color="green"
                       variant="light"
                       rightSection={<IconDownload size="18" />}
-                      onClick={() => downloadExcel(true)}
+                      onClick={() => downloadExcelValidateByID(true)}
                     >
                       {
-                        validatedTasks?.filter((ele) => ele?.status === true)
+                        validatedTasksByID?.filter((ele) => ele?.status === true)
                           ?.length
                       }
                     </Button>
@@ -2445,10 +2714,10 @@ export default function EstimateNew() {
                       color="blue"
                       variant="light"
                       rightSection={<IconDownload size="18" />}
-                      onClick={() => downloadExcel(false)}
+                      onClick={() => downloadExcelValidateByID(false)}
                     >
                       {
-                        validatedTasks?.filter((ele) => ele?.status === false)
+                        validatedTasksByID?.filter((ele) => ele?.status === false)
                           ?.length
                       }
                     </Button>
@@ -2474,7 +2743,7 @@ export default function EstimateNew() {
                       minWidth: 0 // Allows grid to shrink below content size
                     }}
                   >
-                    {validatedTasks
+                    {validatedTasksByID
                       ?.slice() // to avoid mutating the original array
                       .sort((a, b) => (a?.taskid || '').localeCompare(b?.taskid || ''))
                       ?.map((task, index) => {
@@ -3923,7 +4192,18 @@ export default function EstimateNew() {
                     leftSection={<MdPin />}
                     placeholder="Ex: 5.5"
                     label="Aircraft Age"
-                    {...form.getInputProps("aircraftAge")}
+                    value={form.values.aircraftAge === 0 || form.values.aircraftAge === "0" ? "" : form.values.aircraftAge}
+                    onChange={e => {
+                      const val = e.target.value;
+                      // Accept only numbers or empty
+                      if (/^\d*\.?\d*$/.test(val)) {
+                        form.setFieldValue("aircraftAge", val);
+                      }
+                    }}
+                    onBlur={e => {
+                      // If left empty, set to 0 for submission
+                      if (e.target.value === "") form.setFieldValue("aircraftAge", 0);
+                    }}
                     error={form.errors.aircraftAge}
                     styles={{
                       input: {
@@ -4428,19 +4708,8 @@ border-bottom: none;
                       valueGetter: (params: any) => {
                         const value = params.data?.createdAt;
                         if (!value) return "";
-
-                        const date = new Date(value);
-                        const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-                        date.setTime(date.getTime() + istOffsetInMilliseconds);
-
-                        const day = date.getDate().toString().padStart(2, "0");
-                        const month = date.toLocaleString("default", { month: "short" });
-                        const year = date.getFullYear();
-                        const hours = date.getHours().toString().padStart(2, "0");
-                        const minutes = date.getMinutes().toString().padStart(2, "0");
-                        const seconds = date.getSeconds().toString().padStart(2, "0");
-
-                        const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+                        const dayjsDate = dayjs(value).add(5.5, 'hour');
+                        const formatted = dayjsDate.format("DD-MMM-YYYY, HH:mm:ss");
                         return `${formatted} ${value}`;
                       },
                       cellRenderer: (params: any) => {
@@ -4626,7 +4895,7 @@ border-bottom: none;
                       // editable: true,
                       suppressMovable: false,
                       suppressMenu: true,
-                      cellRenderer: (val: any) => {
+                      cellRenderer: (val: any, index : any) => {
                         return (
                           <Group mt="xs" align="center" justify="center">
                             <Tooltip label="Show Tasks">
@@ -4634,10 +4903,12 @@ border-bottom: none;
                                 size={20}
                                 color="indigo"
                                 variant="light"
-                                onClick={() => {
+                                onClick={ async () => {
                                   setSelectedEstimateId(val.data.estID);
-                                  setSelectedEstimateTasks(val.data.tasks);
-                                  handleValidateTasks(val.data.tasks, val.data.descriptions);
+                                  setSelectedEstimateIdValidate(val.data.estID);
+                                //   await fetchValidatedTaskByID(val.data.estID); // call API immediately
+                                //   setSelectedEstimateTasks(val.data.tasks);
+                                //   handleValidateTasks(val.data.tasks, val.data.descriptions);
                                   setOpened(true);
                                 }}
                               >
@@ -4654,7 +4925,8 @@ border-bottom: none;
                                 }
                                 onClick={() => {
                                   setSelectedEstimateIdReport(val.data.estID);
-                                  handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
+                                  setSelectedEstimateIdValidate(val.data.estID);
+                                //   handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
                                   // setOpened(true);
                                 }}
                               >
@@ -4699,44 +4971,39 @@ border-bottom: none;
                               {/* </Indicator> */}
                             </Tooltip>
                             <Tooltip label="Download Uploaded File">
-                              <ActionIcon
-                                size={20}
-                                color="lime"
-                                variant="light"
-                                onClick={() => {
-                                  // setSelectedEstimateIdDetails(val.data.estID);
-                                  downloadAllValidatedTasksOnly(
-                                    val.data.tasks,
-                                    val.data.descriptions,
-                                    val.data.estID
-                                  );
-                                }}
-                              >
-                                <IconFileDownload />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Edit & Re-run Estimate">
-                              <ActionIcon
-                                size={20}
-                                color="lime"
-                                variant="light"
-                                onClick={() => {
-                                  setSelectedEstimateIdDetails(val.data.estID);
-                                  // downloadAllValidatedTasks(
-                                  //   val.data.tasks,
-                                  //   val.data.descriptions,
-                                  //   val.data.estID // pass directly
-                                  // );
-                                  createAndSelectExcelFile(
-                                    val.data.tasks,
-                                    val.data.descriptions,
-                                    val.data.estID // pass directly
-                                  );
-                                }}
-                              >
-                                <IconEdit />
-                              </ActionIcon>
-                            </Tooltip>
+                                <ActionIcon
+                                    size={20}
+                                    color="lime"
+                                    variant="light"
+                                    onClick={() => downloadAllValidatedTasksOnly(val.data.estID)}
+                                    disabled={downloadingEstId === val.data.estID}
+                                >
+                                    {downloadingEstId === val.data.estID ? (
+                                    <Loader size="xs" color="green" />
+                                    ) : (
+                                    <IconFileDownload />
+                                    )}
+                                </ActionIcon>
+                                </Tooltip>
+
+
+                          <Tooltip label="Edit & Re-run Estimate">
+  <ActionIcon
+    size={20}
+    color="lime"
+    variant="light"
+    onClick={() => handleEditAndGenerateFile(val.data.estID)}
+    disabled={loadingEditId === val.data.estID}
+  >
+    {loadingEditId === val.data.estID ? (
+      <Loader size="xs" color="green" />
+    ) : (
+      <IconEdit />
+    )}
+  </ActionIcon>
+</Tooltip>
+
+
                           </Group>
                         );
                       },
@@ -4911,22 +5178,14 @@ border-bottom: none;
                         lockPosition: false,
                         // filter: true,
                         // floatingFilter: true,
+                        // 
                         valueGetter: (params: any) => {
                           const value = params.data?.createdAt;
                           if (!value) return "";
-
-                          const date = new Date(value);
-                          const istOffsetInMilliseconds = 5.5 * 60 * 60 * 1000;
-                          date.setTime(date.getTime() + istOffsetInMilliseconds);
-
-                          const day = date.getDate().toString().padStart(2, "0");
-                          const month = date.toLocaleString("default", { month: "short" });
-                          const year = date.getFullYear();
-                          const hours = date.getHours().toString().padStart(2, "0");
-                          const minutes = date.getMinutes().toString().padStart(2, "0");
-                          const seconds = date.getSeconds().toString().padStart(2, "0");
-
-                          const formatted = `${day}-${month}-${year}, ${hours}:${minutes}:${seconds}`;
+  
+                          // Use dayjs to parse and add 5.5 hours (IST offset)
+                          const dayjsDate = dayjs(value).add(5.5, 'hour');
+                          const formatted = dayjsDate.format("DD-MMM-YYYY, HH:mm:ss");
                           return `${formatted} ${value}`;
                         },
                         cellRenderer: (params: any) => {
@@ -4935,6 +5194,12 @@ border-bottom: none;
                           const formattedPart = parts.slice(0, 2).join(" ");
                           return <Text mt="xs">{formattedPart}</Text>;
                         },
+                        // cellRenderer: (params: any) => {
+                        //   if (!params.value) return null;
+                        //   const parts = params.value.split(" ");
+                        //   const formattedPart = parts.slice(0, 2).join(" ");
+                        //   return <Text mt="xs">{formattedPart}</Text>;
+                        // },
                       },
                       {
                         field: "estID",
@@ -5093,99 +5358,131 @@ border-bottom: none;
                           );
                         },
                       },
-                      {
-                        headerName: "Actions",
-                        flex: 2,
-                        resizable: true,
-                        sortable: false,
-                        // filter: true,
-                        // floatingFilter: true,
-                        suppressMovable: false,
-                        suppressMenu: true,
-                        cellRenderer: (val: any) => {
-                          return (
-                            <Group mt="xs" align="center" justify="center">
-                              <Tooltip label="Show Tasks">
+                     {
+                      // field: "actions",
+                      headerName: "Actions",
+                      sortable: false,
+                      // filter: true,
+                      // floatingFilter: true,
+                      flex: 2,
+                      resizable: true,
+                      // editable: true,
+                      suppressMovable: false,
+                      suppressMenu: true,
+                      cellRenderer: (val: any, index : any) => {
+                        return (
+                          <Group mt="xs" align="center" justify="center">
+                            <Tooltip label="Show Tasks">
+                              <ActionIcon
+                                size={20}
+                                color="indigo"
+                                variant="light"
+                                onClick={ async () => {
+                                  setSelectedEstimateId(val.data.estID);
+                                  setSelectedEstimateIdValidate(val.data.estID);
+                                //   await fetchValidatedTaskByID(val.data.estID); // call API immediately
+                                //   setSelectedEstimateTasks(val.data.tasks);
+                                //   handleValidateTasks(val.data.tasks, val.data.descriptions);
+                                  setOpened(true);
+                                }}
+                              >
+                                <IconListCheck />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Get Estimate">
+                              <ActionIcon
+                                size={20}
+                                color="teal"
+                                variant="light"
+                                disabled={
+                                  val?.data?.status?.toLowerCase() !== "completed"
+                                }
+                                onClick={() => {
+                                  setSelectedEstimateIdReport(val.data.estID);
+                                  setSelectedEstimateIdValidate(val.data.estID);
+                                //   handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
+                                  // setOpened(true);
+                                }}
+                              >
+                                <IconReport />
+                              </ActionIcon>
+                            </Tooltip>
+
+                            {/* <Tooltip label="Probability Details">
+                          <ActionIcon
+                            size={20}
+                            color="rgba(156, 104, 0, 1)"
+                            variant="light"
+                            disabled={
+                              val?.data?.status?.toLowerCase() !== "completed"
+                            }
+                            onClick={(values: any) => {
+                              setProbOpened(true);
+                              setSelectedEstimateIdProbability(
+                                val?.data?.estID
+                              );
+                            }}
+                          >
+                            <IconChartArcs3 />
+                          </ActionIcon>
+                        </Tooltip> */}
+                            <Tooltip label="Remarks!">
+                              <ActionIcon
+                                size={20}
+                                color="blue"
+                                variant="light"
+                                disabled={
+                                  val?.data?.status?.toLowerCase() !== "completed"
+                                }
+                                onClick={(values: any) => {
+                                  setRemarksOpened(true);
+                                  setSelectedEstimateIdRemarks(val?.data?.estID);
+                                  setSelectedEstRemarksData(val?.data?.remarks);
+                                }}
+                              >
+                                <IconMessage />
+                              </ActionIcon>
+                              {/* </Indicator> */}
+                            </Tooltip>
+                            <Tooltip label="Download Uploaded File">
                                 <ActionIcon
-                                  size={20}
-                                  color="indigo"
-                                  variant="light"
-                                  onClick={() => {
-                                    setSelectedEstimateId(val.data.estID);
-                                    setSelectedEstimateTasks(val.data.tasks);
-                                    handleValidateTasks(val.data.tasks, val.data.descriptions);
-                                    setOpened(true);
-                                  }}
+                                    size={20}
+                                    color="lime"
+                                    variant="light"
+                                    onClick={() => downloadAllValidatedTasksOnly(val.data.estID)}
+                                    disabled={downloadingEstId === val.data.estID}
                                 >
-                                  <IconListCheck />
+                                    {downloadingEstId === val.data.estID ? (
+                                    <Loader size="xs" color="green" />
+                                    ) : (
+                                    <IconFileDownload />
+                                    )}
                                 </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Get Estimate">
-                                <ActionIcon
-                                  size={20}
-                                  color="teal"
-                                  variant="light"
-                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                                  onClick={() => {
-                                    setSelectedEstimateIdReport(val.data.estID);
-                                    handleValidateSkillsTasks(val.data.tasks, val.data.descriptions);
-                                  }}
-                                >
-                                  <IconReport />
-                                </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Remarks!">
-                                <ActionIcon
-                                  size={20}
-                                  color="blue"
-                                  variant="light"
-                                  disabled={val?.data?.status?.toLowerCase() !== "completed"}
-                                  onClick={() => {
-                                    setRemarksOpened(true);
-                                    setSelectedEstimateIdRemarks(val?.data?.estID);
-                                    setSelectedEstRemarksData(val?.data?.remarks);
-                                  }}
-                                >
-                                  <IconMessage />
-                                </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Download Uploaded File">
-                                <ActionIcon
-                                  size={20}
-                                  color="lime"
-                                  variant="light"
-                                  onClick={() => {
-                                    downloadAllValidatedTasksOnly(
-                                      val.data.tasks,
-                                      val.data.descriptions,
-                                      val.data.estID
-                                    );
-                                  }}
-                                >
-                                  <IconFileDownload />
-                                </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Edit & Re-run Estimate">
-                                <ActionIcon
-                                  size={20}
-                                  color="lime"
-                                  variant="light"
-                                  onClick={() => {
-                                    setSelectedEstimateIdDetails(val.data.estID);
-                                    createAndSelectExcelFile(
-                                      val.data.tasks,
-                                      val.data.descriptions,
-                                      val.data.estID
-                                    );
-                                  }}
-                                >
-                                  <IconEdit />
-                                </ActionIcon>
-                              </Tooltip>
-                            </Group>
-                          );
-                        },
+                                </Tooltip>
+
+
+                          <Tooltip label="Edit & Re-run Estimate">
+  <ActionIcon
+    size={20}
+    color="lime"
+    variant="light"
+    onClick={() => handleEditAndGenerateFile(val.data.estID)}
+    disabled={loadingEditId === val.data.estID}
+  >
+    {loadingEditId === val.data.estID ? (
+      <Loader size="xs" color="green" />
+    ) : (
+      <IconEdit />
+    )}
+  </ActionIcon>
+</Tooltip>
+
+
+
+                          </Group>
+                        );
                       },
+                    },
                     ]}
                   />
                 </div>
@@ -5362,18 +5659,21 @@ border-bottom: none;
                         estimateReportData?.overallEstimateReport
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.overallEstimateReport?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) ||
                         []
@@ -5418,18 +5718,21 @@ border-bottom: none;
                         estimateReportData?.aggregatedFindings
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.aggregatedFindings?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
@@ -5473,18 +5776,21 @@ border-bottom: none;
                         estimateReportData?.aggregatedTasks
                           ?.estimatedSpareCost || 0
                       }
-                      capppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
                       capppingMhsType={
                         estimateReportData?.cappingValues?.cappingTypeManhrs || 0
                       }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      unbilledCapppingMhs={
+                        estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
                         estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
                       }
+                      cappingUnbilledCost={
+                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                      }
+                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
+                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
+                      
                       parts={
                         estimateReportData?.aggregatedTasks?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
                       }
@@ -5646,8 +5952,10 @@ interface TATDashboardProps {
     max: number;
     capping: number;
   };
-  capppingMhs: any;
+  cappingManhrs: any;
+  cappingSpareCost: any;
   capppingMhsType: any;
+  unbilledCapppingMhs : any;
   cappingUnbilledCost: any;
   cappingUnbilledCostType: any;
   parts: Part[];
@@ -5659,8 +5967,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -5731,12 +6041,12 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     <Text fz="xs" fw={500}>
                       Unbillable Man hours
                     </Text>
-                    <Text fz="sm" fw={600} c={"green.6"}>
+                    <Text fz="sm" fw={600} c="green.6">
                       {capppingMhs?.toFixed(0)} Hrs
                     </Text>
                   </Group>
                   <Progress
-                    color={"green.6"}
+                    color="green.6"
                     value={Math.min(capppingMhs / 100, 100) ?? 0}
                     size="md"
                     radius="sm"
@@ -5763,7 +6073,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -5784,10 +6094,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
@@ -6016,8 +6326,10 @@ const OverallFindingsReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -6116,7 +6428,7 @@ const OverallFindingsReport: React.FC<any> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -6137,10 +6449,10 @@ const OverallFindingsReport: React.FC<any> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
@@ -6343,8 +6655,10 @@ const OverallMPDReport: React.FC<any> = ({
   totalTATTime,
   estimatedManHrs,
   cappingUnbilledCost,
-  capppingMhs,
   capppingMhsType,
+  unbilledCapppingMhs,
+  cappingManhrs,
+  cappingSpareCost,
   cappingUnbilledCostType,
   parts,
   estimatedSparesCost,
@@ -6429,7 +6743,7 @@ const OverallMPDReport: React.FC<any> = ({
                     {(cappingUnbilledCostType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ($ {cappingSpareCost || 0})
                   </Text>
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
@@ -6450,10 +6764,10 @@ const OverallMPDReport: React.FC<any> = ({
                     {(capppingMhsType || "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
-                      )}
+                      )} - ({cappingManhrs || 0} hr)
                   </Text>
                   <Text size="lg" fw={600} c={"green.6"}>
-                    {Math.round(capppingMhs)} hr
+                    {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
