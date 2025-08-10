@@ -1,0 +1,343 @@
+{
+    "data": {
+      "partId": "4200A200-6",
+      "partDescription": "CARTRIDG",
+      "usage": {
+        "tasks": [
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV22/000068/0822",
+                "requested_stock_status": "AIRASIA",
+                "date": "2022-10-12T09:31:59",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV21/000167/0222",
+                "requested_stock_status": "TATA SIA AIRLINES",
+                "date": "2022-03-19T14:54:19",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV21/000167/0222",
+                "requested_stock_status": "TATA SIA AIRLINES",
+                "date": "2022-03-19T14:54:19",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV22/000208/0323",
+                "requested_stock_status": "FLYNAS",
+                "date": "2023-03-30T20:11:50",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000211/0324",
+                "requested_stock_status": "FITSAIR",
+                "date": "2024-03-26T11:14:03",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000211/0324",
+                "requested_stock_status": "FITSAIR",
+                "date": "2024-03-26T11:14:03",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000199/0324",
+                "requested_stock_status": "KUWAIT AIRWAYS",
+                "date": "2024-03-18T17:20:15",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000163/0224",
+                "requested_stock_status": "JAZEERA AIRWAYS",
+                "date": "2024-03-01T11:27:36",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000163/0224",
+                "requested_stock_status": "JAZEERA AIRWAYS",
+                "date": "2024-03-01T11:27:36",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000139/0124",
+                "requested_stock_status": "AERONOMAD",
+                "date": "2024-01-13T19:35:04",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          },
+          {
+            "taskId": "212600-11-1",
+            "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+            "packages": [
+              {
+                "packageId": "HMV23/000139/0124",
+                "requested_stock_status": "AERONOMAD",
+                "date": "2024-01-13T19:35:04",
+                "quantity": 1,
+                "aircraftModel": "A320"
+              }
+            ]
+          }
+        ],
+        "findings": {
+          "hmvTasks": [],
+          "nonHmvTasks": [
+            {
+              "taskId": "212600-11-1",
+              "taskDescription": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+              "packages": [
+                {
+                  "packageId": "HMV22/000009/0422",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2022-06-27T13:21:55",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                },
+                {
+                  "packageId": "HMV22/000068/0822",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2022-10-12T09:31:59",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                },
+                {
+                  "packageId": "HMV22/000117/1022",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2023-04-27T15:03:47",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A321"
+                },
+                {
+                  "packageId": "HMV23/000060/0923",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2023-09-26T14:36:53",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                },
+                {
+                  "packageId": "HMV23/000211/0324",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2024-03-26T11:14:03",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                },
+                {
+                  "packageId": "HMV23/000199/0324",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2024-03-18T17:20:15",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                },
+                {
+                  "packageId": "HMV23/000139/0124",
+                  "logItem": "212600-11-1",
+                  "description": "AVIONICS EQUIPMENT VENTILATION\n\nDISCARD DEMISTER FILTER ELEMENT AND FILTER CARTRIDGE\n(LE BOZEC)\n\nNOTE:\nDEPENDING ON OPERATING ENVIRONMENT AND OPERATOR",
+                  "date": "2024-01-13T19:35:04",
+                  "stock_status": "Owned",
+                  "quantity": 1,
+                  "aircraft_model": "A320"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "aircraftDetails": {
+        "task_parts_aircraft_details": {
+          "aircraftModels": [
+            {
+              "count": 11,
+              "aircraftModel": "A320"
+            }
+          ],
+          "stockStatuses": [
+            {
+              "count": 2,
+              "statusCode": "JAZEERA AIRWAYS"
+            },
+            {
+              "count": 2,
+              "statusCode": "TATA SIA AIRLINES"
+            },
+            {
+              "count": 2,
+              "statusCode": "AERONOMAD"
+            },
+            {
+              "count": 2,
+              "statusCode": "FITSAIR"
+            },
+            {
+              "count": 1,
+              "statusCode": "AIRASIA"
+            },
+            {
+              "count": 1,
+              "statusCode": "FLYNAS"
+            },
+            {
+              "count": 1,
+              "statusCode": "KUWAIT AIRWAYS"
+            }
+          ]
+        },
+        "sub_task_parts_aircraft_details": {
+          "aircraftModels": [
+            {
+              "aircraftModel": "A321",
+              "count": 1
+            },
+            {
+              "aircraftModel": "A320",
+              "count": 8
+            }
+          ],
+          "stockStatuses": [
+            {
+              "statusCode": "Owned",
+              "count": 9
+            }
+          ]
+        }
+      },
+      "dateWiseQty": [
+        {
+          "date": "2022-10-12",
+          "tasksqty": 1,
+          "findingsqty": 1
+        },
+        {
+          "date": "2022-03-19",
+          "tasksqty": 2,
+          "findingsqty": 0
+        },
+        {
+          "date": "2023-03-30",
+          "tasksqty": 1,
+          "findingsqty": 0
+        },
+        {
+          "date": "2024-03-26",
+          "tasksqty": 2,
+          "findingsqty": 1
+        },
+        {
+          "date": "2024-03-18",
+          "tasksqty": 1,
+          "findingsqty": 1
+        },
+        {
+          "date": "2024-03-01",
+          "tasksqty": 2,
+          "findingsqty": 0
+        },
+        {
+          "date": "2024-01-13",
+          "tasksqty": 2,
+          "findingsqty": 1
+        },
+        {
+          "date": "2022-06-27",
+          "tasksqty": 0,
+          "findingsqty": 1
+        },
+        {
+          "date": "2023-04-27",
+          "tasksqty": 0,
+          "findingsqty": 1
+        },
+        {
+          "date": "2023-09-26",
+          "tasksqty": 0,
+          "findingsqty": 1
+        }
+      ]
+    },
+    "response": {
+      "statusCode": 200,
+      "message": "Parts usage retrieved successfully"
+    }
+  }
+  
+  
