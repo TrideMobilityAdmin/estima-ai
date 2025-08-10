@@ -1393,6 +1393,35 @@ class TaskService:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
+            findings_mh_estimate=0
+            tasks_total_mhs= result[0].get("aggregatedTasks", {}).get("totalMhs", 0)
+            findings_total_mhs=result[0].get("aggregatedFindings", {}).get("totalMhs", 0)
+            check_category = capping_result.get("typeOfCheck", "")[0]
+            if check_category=="C CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.35
+            elif check_category=="6Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.40
+            elif check_category=="12Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.50
+            elif check_category=="18Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.50
+            elif check_category=="EOL CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.80
+            elif check_category=="NON C CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.10
+            tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+            extended_tat=0
+            tat_message=''
+            if findings_mh_estimate < findings_total_mhs:
+                extended_tat = ((findings_total_mhs - findings_mh_estimate)/(250))
+                tat_message = "Extended TAT is calculated as predicted findings are more than estimated findings"
+            elif findings_mh_estimate > findings_total_mhs:
+                extended_tat = 0
+                tat_message = "No extended TAT as predicted findings are less than estimated findings" 
+            else:
+                extended_tat = 0
+                tat_message = "No extended TAT as predicted findings are equal to estimated findings"   
+            
             estimate_data = replace_nan_inf(result[0] if result else {})
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
@@ -1401,6 +1430,9 @@ class TaskService:
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
             estimate_data["typeOfCheckID"] = capping_result.get("typeOfCheckID")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
+            estimate_data["tat"]= tat
+            estimate_data["extendedTat"] = extended_tat
+            estimate_data["tatMessage"] = tat_message
             logger.info("estimate_data fetched")
     #         findings_level_pipeline=[
     #                 {
