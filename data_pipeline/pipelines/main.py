@@ -293,6 +293,7 @@ def outlier_removal_and_lhrh_conversion(task_description, task_parts, sub_task_d
     # Return the processed dataframes
     return (task_description_processed, task_parts_processed, 
             sub_task_description_processed, sub_task_parts_processed)
+    
 def update_part_master_data(db, parts_collection_name="sub_task_parts", sub_task_description_collection_name="sub_task_description", task_description_collection_name="task_description"):
     # Fetch data from collections
     sub_task_parts_collection = db[parts_collection_name]
@@ -441,7 +442,7 @@ async def main():
         #if not os.path.exists(data_path):
         #data_path = r"D:\Projects\gmr-mro\Data_Pipeline\Data"
         #data_path=config["excel_files"]["data_path"] 
-        data_path = r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025"
+        data_path = r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025\2025"
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
