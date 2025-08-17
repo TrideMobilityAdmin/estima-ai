@@ -102,6 +102,7 @@ aircraft_details.drop(columns=["_id"], errors="ignore", inplace=True)
 
 # Drop duplicate rows
 aircraft_details.drop_duplicates(inplace=True)
+aircraft_details["check_category"] = aircraft_details["check_category"].str.replace("EOL CHECK", "EOL")
 
 # Filter out test packages
 if "package_number" in aircraft_details.columns:
@@ -1798,7 +1799,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
 
 
-
+    
 
     print("generating the output dict")
     # Construct output JSON data
