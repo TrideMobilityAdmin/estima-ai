@@ -102,6 +102,7 @@ aircraft_details.drop(columns=["_id"], errors="ignore", inplace=True)
 
 # Drop duplicate rows
 aircraft_details.drop_duplicates(inplace=True)
+aircraft_details["check_category"] = aircraft_details["check_category"].str.replace("EOL CHECK", "EOL")
 
 # Filter out test packages
 if "package_number" in aircraft_details.columns:

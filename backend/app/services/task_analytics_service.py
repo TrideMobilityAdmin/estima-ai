@@ -2593,7 +2593,8 @@ class TaskService:
             
             # Convert aircraft_age column to float, handle non-numeric values
             aircraft_details['aircraft_age'] = pd.to_numeric(aircraft_details['aircraft_age'], errors='coerce')
-            
+            aircraft_details["check_category"] = aircraft_details["check_category"].str.replace("EOL CHECK", "EOL")
+
             # Remove rows with invalid aircraft_age
             aircraft_details = aircraft_details.dropna(subset=['aircraft_age'])
             
