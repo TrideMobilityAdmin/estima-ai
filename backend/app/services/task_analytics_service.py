@@ -1392,9 +1392,9 @@ class TaskService:
             if not result:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
-                print("computing tat calculation")
+            
             findings_mh_estimate=0
-            tasks_total_mhs=result[0].get("aggregatedTasks", {}).get("totalMhs", 0)
+            tasks_total_mhs= result[0].get("aggregatedTasks", {}).get("totalMhs", 0)
             findings_total_mhs=result[0].get("aggregatedFindings", {}).get("totalMhs", 0)
             check_category = capping_result.get("typeOfCheck", "")[0]
             if check_category=="C CHECK":
@@ -1408,7 +1408,7 @@ class TaskService:
             elif check_category=="EOL CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.80
             elif check_category=="NON C CHECK":
-                findings_mh_estimate = tasks_total_mhs *0.10
+                findings_mh_estimate = tasks_total_mhs *0.15
             tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
             extended_tat=0
             tat_message=''
@@ -1433,7 +1433,6 @@ class TaskService:
             estimate_data["tat"]= tat
             estimate_data["extendedTat"] = extended_tat
             estimate_data["tatMessage"] = tat_message
-            
             logger.info("estimate_data fetched")
     #         findings_level_pipeline=[
     #                 {
@@ -2570,8 +2569,7 @@ class TaskService:
             mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
             # Fetch aircraft details
-            aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({
-            "year": { "$in": [2022, 2023, 2024, 2025] }})))
+            aircraft_details = pd.DataFrame(list(self.aircraft_details_collection.find({})))
             
             # Validate and convert aircraft_age to float
             try:

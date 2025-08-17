@@ -1520,7 +1520,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     'unbillableSpareCost': 0.0
     }
 
-    if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
+    if cappingDetails["cappingTypeManhrs"] != "" or cappingDetails["cappingTypeSpareCost"] != "":
         # Create copies for processing
 
         #task_level_mh_cap=task_level_mh_cap[(task_level_mh_cap["prob"]/100)>probability_threshold]
