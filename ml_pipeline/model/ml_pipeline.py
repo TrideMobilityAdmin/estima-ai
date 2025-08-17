@@ -91,8 +91,11 @@ db = client["gmr-mro-staging-5y"]
 test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
-aircraft_cursor = aircraft_details_collection.find({})
+aircraft_cursor = aircraft_details_collection.find({
+    "year": { "$in": [2022, 2023, 2024, 2025] }
+})
 aircraft_details = pd.DataFrame(list(aircraft_cursor))
+
 
 # Drop the MongoDB _id column if present
 aircraft_details.drop(columns=["_id"], errors="ignore", inplace=True)
@@ -1517,7 +1520,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     'unbillableSpareCost': 0.0
     }
 
-    if cappingDetails["cappingTypeManhrs"] != "" and cappingDetails["cappingTypeSpareCost"] != "":
+    if cappingDetails["cappingTypeManhrs"] != "" or cappingDetails["cappingTypeSpareCost"] != "":
         # Create copies for processing
 
         #task_level_mh_cap=task_level_mh_cap[(task_level_mh_cap["prob"]/100)>probability_threshold]
@@ -1795,7 +1798,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
     task_findings_max_mhs = sum((finding["details"][0]["mhs"]["max"]*(finding["details"][0]['prob']/100)) for finding in task_level_findings if finding["details"]) if task_level_findings else 0
 
 
-    
+
 
     print("generating the output dict")
     # Construct output JSON data

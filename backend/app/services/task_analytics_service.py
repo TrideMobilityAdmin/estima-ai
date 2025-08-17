@@ -1408,7 +1408,7 @@ class TaskService:
             elif check_category=="EOL CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.80
             elif check_category=="NON C CHECK":
-                findings_mh_estimate = tasks_total_mhs *0.10
+                findings_mh_estimate = tasks_total_mhs *0.15
             tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
             extended_tat=0
             tat_message=''
