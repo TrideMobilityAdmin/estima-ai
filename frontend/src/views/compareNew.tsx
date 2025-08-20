@@ -28,7 +28,7 @@ export default function CompareNew() {
     const data = await getAllEstimates();
     if (data) {
       setEstimates(data);
-      setSelectedEstID(data[0]?.estID);
+      //setSelectedEstID(data[0]?.estID);
     }
     setLoading(false);
   };
