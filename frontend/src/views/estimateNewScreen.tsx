@@ -2506,7 +2506,10 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     "UNBILLABLE MATERIAL COSTING": item.unbillableSpareCost,
 
     // Final TAT
-    "TAT": item.tat,
+    "TAT": Math.floor (item.TAT ?? 0) || 0,
+    "EXTENDED TAT": Math.floor(item.extendedTAT ?? 0) || 0,
+    "TOTAL TAT": Math.floor(item.TAT ?? 0) + Math.floor(item.extendedTAT ?? 0) || 0,
+    "TAT MESSAGE": item.TATMessage,
   }));
 };
 
@@ -2549,6 +2552,9 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     { wch: 24 },  // UNBILLABLE MATERIAL CAP
     { wch: 28 },  // UNBILLABLE MATERIAL COSTING
     { wch: 10 },  // TAT
+    { wch: 10 },  // EXTENDED TAT
+    { wch: 10 },  // TOTAL TAT
+    { wch: 20 },  // TAT MESSAGE
   ];
 
   const workbook = XLSX.utils.book_new();
@@ -5648,9 +5654,9 @@ border-bottom: none;
                   <>
                     <OverallEstimateReport
                       totalTATTime={
-                        estimateReportData?.overallEstimateReport
-                          ?.estimatedTatTime || 0
+                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
                       }
+                      tatMessage={estimateReportData?.tatMessage}
                       estimatedManHrs={
                         estimateReportData?.overallEstimateReport
                           ?.estimateManhrs || {}
@@ -5707,9 +5713,9 @@ border-bottom: none;
                   <>
                     <OverallFindingsReport
                       totalTATTime={
-                        estimateReportData?.aggregatedFindings
-                          ?.estimatedTatTime || 0
+                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
                       }
+                      tatMessage={estimateReportData?.tatMessage}
                       estimatedManHrs={
                         estimateReportData?.aggregatedFindings
                           ?.estimateManhrs || {}
@@ -5765,9 +5771,9 @@ border-bottom: none;
                   <>
                     <OverallMPDReport
                       totalTATTime={
-                        estimateReportData?.aggregatedTasks?.estimatedTatTime ||
-                        0
+                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
                       }
+                      tatMessage={estimateReportData?.tatMessage}
                       estimatedManHrs={
                         estimateReportData?.aggregatedTasks?.estimateManhrs ||
                         {}
@@ -5946,6 +5952,7 @@ interface ChartData {
 
 interface TATDashboardProps {
   totalTATTime: number;
+  tatMessage: string;
   estimatedManHrs: {
     min: number;
     estimated: number;
@@ -5965,6 +5972,7 @@ interface TATDashboardProps {
 
 const OverallEstimateReport: React.FC<TATDashboardProps> = ({
   totalTATTime,
+  tatMessage,
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhsType,
@@ -5985,8 +5993,45 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
 
+            {/* Total  Tat Time*/}
+            <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <IconClock size={24} />
+                </ThemeIcon>
+                <Group justify="space-between" style={{ flex: 1 }}>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Total TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(totalTATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Popover position="left" withArrow shadow="md">
+                    <Popover.Target>
+                      <ThemeIcon 
+                        variant="light" 
+                        radius="md" 
+                        size={20} 
+                        color="yellow.6"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <IconMessage size={20} />
+                      </ThemeIcon>
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <Text size="sm" style={{ maxWidth: '300px' }}>
+                        {tatMessage}
+                      </Text>
+                    </Popover.Dropdown>
+                  </Popover>
+                </Group>
+              </Group>
+            </Card>
+            <Space h="xs" />
             {/* Estimated Man Hours */}
-            <Card withBorder radius="md" p="md" mb="sm" bg="gray.0">
+            <Card withBorder radius="md" p="md" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
                 Estimated Man Hours
               </Text>
@@ -6055,7 +6100,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
               </Flex>
             </Card>
 
-            <Space h={10} />
+            <Space h='xs' />
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
               {/* <Text size="sm" fw={500} c="dimmed">
@@ -6081,7 +6126,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
 
                 </Flex>
               </Group>
-              <Space h="sm" />
+              <Space h="xs" />
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
@@ -6104,22 +6149,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
 
             </Card>
 
-            {/* Estimated Spares Cost */}
-            {/* <Card withBorder radius="md" p="5" bg="blue.0">
-              <Group gap="md">
-                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
-                  <MdOutlineMiscellaneousServices size={24} />
-                </ThemeIcon>
-                <Flex direction="column">
-                  <Text size="sm" fw={500} c="dimmed">
-                    Estimated Spares Cost
-                  </Text>
-                  <Text size="xl" fw={700} c="blue.6">
-                    ${estimatedSparesCost?.toFixed(2) || 0}
-                  </Text>
-                </Flex>
-              </Group>
-            </Card> */}
+            
           </Card>
         </Grid.Col>
 
@@ -6279,7 +6309,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={280}
+                h={310}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -6324,6 +6354,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
 
 const OverallFindingsReport: React.FC<any> = ({
   totalTATTime,
+  tatMessage,
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhsType,
@@ -6343,9 +6374,45 @@ const OverallFindingsReport: React.FC<any> = ({
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
-
+                        {/* Total  Tat Time*/}
+            <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <IconClock size={24} />
+                </ThemeIcon>
+                <Group justify="space-between" style={{ flex: 1 }}>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Total TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(totalTATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Popover position="left" withArrow shadow="md">
+                    <Popover.Target>
+                      <ThemeIcon 
+                        variant="light" 
+                        radius="md" 
+                        size={20} 
+                        color="yellow.6"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <IconMessage size={20} />
+                      </ThemeIcon>
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <Text size="sm" style={{ maxWidth: '300px' }}>
+                        {tatMessage}
+                      </Text>
+                    </Popover.Dropdown>
+                  </Popover>
+                </Group>
+              </Group>
+            </Card>
+            <Space h='xs'   />
             {/* Estimated Man Hours */}
-            <Card withBorder radius="md" p="md" mb="md" bg="gray.0">
+            <Card withBorder radius="md" p="md" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
                 Estimated Man Hours
               </Text>
@@ -6410,7 +6477,7 @@ const OverallFindingsReport: React.FC<any> = ({
                                         </Box> */}
               </Flex>
             </Card>
-
+            <Space h='xs'   />
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
               {/* <Text size="sm" fw={500} c="dimmed">
@@ -6436,7 +6503,7 @@ const OverallFindingsReport: React.FC<any> = ({
 
                 </Flex>
               </Group>
-              <Space h="sm" />
+              <Space h="xs" />
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
@@ -6608,7 +6675,7 @@ const OverallFindingsReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={280}
+                h={310}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -6653,6 +6720,7 @@ const OverallFindingsReport: React.FC<any> = ({
 
 const OverallMPDReport: React.FC<any> = ({
   totalTATTime,
+  tatMessage,
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhsType,
@@ -6672,9 +6740,46 @@ const OverallMPDReport: React.FC<any> = ({
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
-
+            {/* Total  Tat Time*/}
+                        {/* Total  Tat Time*/}
+                        <Card withBorder radius="md" p="5" bg="blue.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
+                  <IconClock size={24} />
+                </ThemeIcon>
+                <Group justify="space-between" style={{ flex: 1 }}>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Total TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(totalTATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Popover position="left" withArrow shadow="md">
+                    <Popover.Target>
+                      <ThemeIcon 
+                        variant="light" 
+                        radius="md" 
+                        size={20} 
+                        color="yellow.6"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <IconMessage size={20} />
+                      </ThemeIcon>
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <Text size="sm" style={{ maxWidth: '300px' }}>
+                        {tatMessage}
+                      </Text>
+                    </Popover.Dropdown>
+                  </Popover>
+                </Group>
+              </Group>
+            </Card>
+            <Space h="xs" />
             {/* Estimated Man Hours */}
-            <Card withBorder radius="md" p="md" mb="md" bg="gray.0">
+            <Card withBorder radius="md" p="md"  bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
                 Estimated Man Hours
               </Text>
@@ -6725,7 +6830,7 @@ const OverallMPDReport: React.FC<any> = ({
                   })}
               </Flex>
             </Card>
-
+            <Space h='xs'   />
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
               {/* <Text size="sm" fw={500} c="dimmed">
@@ -6924,7 +7029,7 @@ const OverallMPDReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={280}
+                h={310}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
