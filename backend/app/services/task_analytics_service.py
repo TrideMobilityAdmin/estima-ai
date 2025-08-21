@@ -1394,6 +1394,35 @@ class TaskService:
                 logger.warning(f"No estimate found with ID: {estimate_id}")
                 raise HTTPException(status_code=404, detail="Estimate not found")
             
+            findings_mh_estimate=0
+            tasks_total_mhs= result[0].get("aggregatedTasks", {}).get("totalMhs", 0)
+            findings_total_mhs=result[0].get("aggregatedFindings", {}).get("totalMhs", 0)
+            check_category = capping_result.get("typeOfCheck", "")[0]
+            if check_category=="C CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.35
+            elif check_category=="6Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.40
+            elif check_category=="12Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.50
+            elif check_category=="18Y CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.50
+            elif check_category=="EOL CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.80
+            elif check_category=="NON C CHECK":
+                findings_mh_estimate = tasks_total_mhs *0.15
+            tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+            extended_tat=0
+            tat_message=''
+            if findings_mh_estimate < findings_total_mhs:
+                extended_tat = ((findings_total_mhs - findings_mh_estimate)/(250))
+                tat_message = "Extended TAT is calculated as predicted findings are more than estimated findings"
+            elif findings_mh_estimate > findings_total_mhs:
+                extended_tat = 0
+                tat_message = "No extended TAT as predicted findings are less than estimated findings" 
+            else:
+                extended_tat = 0
+                tat_message = "No extended TAT as predicted findings are equal to estimated findings"   
+            
             estimate_data = replace_nan_inf(result[0] if result else {})
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
@@ -1402,6 +1431,9 @@ class TaskService:
             estimate_data["aircraftRegNo"] = capping_result.get("aircraftRegNo")
             estimate_data["typeOfCheckID"] = capping_result.get("typeOfCheckID")
             estimate_data["typeOfCheck"] = capping_result.get("typeOfCheck")
+            estimate_data["tat"]= tat
+            estimate_data["extendedTat"] = extended_tat
+            estimate_data["tatMessage"] = tat_message
             logger.info("estimate_data fetched")
     #         findings_level_pipeline=[
     #                 {
@@ -2532,6 +2564,12 @@ class TaskService:
             if mpd_task_data.empty:
                 raise ValueError("Input MPD_TASKS or ADD_TASKS data cannot be empty.")
             
+<<<<<<< HEAD
+=======
+            if aircraft_model =="" and len(check_category) == 0:
+                raise ValueError("Both aircraft_model and check_category cannot be empty.")
+            
+>>>>>>> main
             mpd_task_data = mpd_task_data.drop_duplicates(subset=["TASK NUMBER"]).reset_index(drop=True) 
             
             # Fetch aircraft details
@@ -2559,7 +2597,8 @@ class TaskService:
             
             # Convert aircraft_age column to float, handle non-numeric values
             aircraft_details['aircraft_age'] = pd.to_numeric(aircraft_details['aircraft_age'], errors='coerce')
-            
+            aircraft_details["check_category"] = aircraft_details["check_category"].str.replace("EOL CHECK", "EOL")
+
             # Remove rows with invalid aircraft_age
             aircraft_details = aircraft_details.dropna(subset=['aircraft_age'])
             
@@ -2582,6 +2621,17 @@ class TaskService:
             else:
                 # If aircraft_model not found in predefined families, use all available models
                 aircraft_model_family = aircraft_details['aircraft_model'].unique().tolist()
+                
+            normalized_customer_name = customer_name.upper()
+
+            # Filter based on customer name consideration
+            if normalized_customer_name in ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]:
+                customer_name_list = ["AIR INDIA", "AIR ASIA", "AIR INDIA EXPRESS", "VISTARA"]
+            else:
+                customer_name_list = [customer_name]
+
+            # Normalize 'customer_name' column in dataframe for case-insensitive matching
+            aircraft_details["customer_name_upper"] = aircraft_details["customer_name"].str.upper()
 
             print(f"Aircraft model: {aircraft_model}, Check category: {check_category}, Aircraft age: {aircraft_age}")
             print(f"Aircraft model family: {aircraft_model_family}")
@@ -2613,9 +2663,7 @@ class TaskService:
                     
                     if customer_name_consideration and customer_name:
                         # Add customer name filter
-                        customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
-                            customer_name, na=False, case=False
-                        )
+                        customer_filter=(aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))
                         combined_filter = base_filter & customer_filter
                     else:
                         combined_filter = base_filter
@@ -2639,9 +2687,7 @@ class TaskService:
                 )
                 
                 if customer_name_consideration and customer_name:
-                    customer_filter = aircraft_details["customer_name"].astype(str).str.contains(
-                        customer_name, na=False, case=False
-                    )
+                    customer_filter = (aircraft_details["customer_name_upper"].isin([name.upper() for name in customer_name_list]))
                     combined_filter = base_filter & customer_filter
                 else:
                     combined_filter = base_filter

@@ -11,8 +11,12 @@ import math
 import yaml
 import re
 import sys
+<<<<<<< HEAD
 from app.models.estimates import ValidTasks
 from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse
+=======
+from app.models.estimates import ComparisonResponse,ComparisonResult,EstimateResponse,DownloadResponse,EstimateRequest,EstimateStatusResponse,ValidTasks
+>>>>>>> main
 from app.log.logs import logger
 from datetime import datetime, timedelta,timezone
 import io
@@ -34,6 +38,7 @@ from fuzzywuzzy import process
 from app.models.estimates import ValidRequest,ModelTasksRequest
 from difflib import SequenceMatcher
 import io
+from app.services.task_analytics_service import updateLhRhTasks
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
@@ -538,7 +543,10 @@ class ExcelUploadService():
                     }
                 ]
             }, 
+<<<<<<< HEAD
            
+=======
+>>>>>>> main
             'remarks': {
                 '$ifNull': [
                     '$remarks_doc.remarks', ''
@@ -552,13 +560,26 @@ class ExcelUploadService():
             # 'tasks': '$task', 
             # 'descriptions': '$description', 
             'aircraftRegNo': '$aircraftRegNo',
+<<<<<<< HEAD
             'error':  '$error',           
+=======
+            'error':  '$error', 
+           
+>>>>>>> main
             'status': '$status', 
             'totalMhs': 1, 
             'totalPartsCost': 1, 
             'createdAt': '$createdAt', 
             'remarks': 1
         }
+    },
+     {
+        '$sort': {
+            'createdAt': -1  
+        }
+    },
+    {
+        '$limit': 30
     }
 ]
         
@@ -648,7 +669,87 @@ class ExcelUploadService():
             logger.error(f"Failed to update remarks for estimate ID: {estID}")
             raise HTTPException(status_code=500, detail="Failed to update remarks")
     
-        
+    async def validate_tasks_by_estid(self, estimate_id, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
+        """
+        Validate tasks by checking if they exist in the task_description collection.
+        For tasks not found (status=False), fill the description from the input description[] by index.
+        Only unique cleaned taskids will be returned.
+        """
+        try:
+            estimate=await self.get_upload_estimate_byId(estimate_id=estimate_id)
+            task_ids = estimate["task"]
+            input_descriptions = estimate["description"]
+
+            # Map input taskid to its index
+            task_index_map = {task: idx for idx, task in enumerate(task_ids)}
+
+            LhRhTasks = list(self.RHLH_Tasks_collection.find({},))
+            logger.info("LhRhTasks fetched successfully")
+
+            lrhTasks = updateLhRhTasks(LhRhTasks, task_ids)
+
+            existing_tasks_list = self.lhrh_task_description.find(
+                {"task_number": {"$in": lrhTasks}}, {"_id": 0, "task_number": 1, "description": 1}
+            )
+            existing_tasks_list = list(existing_tasks_list)
+
+            cleaned_task_map = {}
+            for doc in existing_tasks_list:
+                task_number = doc["task_number"]
+                description = doc["description"]
+                if " (LH)" in task_number or " (RH)" in task_number:
+                    task_number = task_number.split(" ")[0]
+                cleaned_task_map[task_number] = description
+
+            logger.info(f"cleaned_task_map: {cleaned_task_map}")
+
+            # Use an ordered set for unique cleaned tasks, preserving order of first occurrence
+            from collections import OrderedDict
+            unique_cleaned_lrhTasks = OrderedDict()
+            cleaned_task_original_map = {}
+
+            for task in lrhTasks:
+                cleaned_task = task
+                if " (LH)" in task or " (RH)" in task:
+                    cleaned_task = task.split(" ")[0]
+                if cleaned_task not in unique_cleaned_lrhTasks:
+                    unique_cleaned_lrhTasks[cleaned_task] = None
+                if cleaned_task not in cleaned_task_original_map:
+                    cleaned_task_original_map[cleaned_task] = []
+                cleaned_task_original_map[cleaned_task].append(task)
+
+            validated_tasks = []
+            for cleaned_task in unique_cleaned_lrhTasks.keys():
+                status = cleaned_task in cleaned_task_map
+                if status:
+                    description = cleaned_task_map[cleaned_task]
+                else:
+                    matched_index = None
+                    for orig_task in cleaned_task_original_map.get(cleaned_task, []):
+                        if orig_task in task_index_map:
+                            matched_index = task_index_map[orig_task]
+                            break
+                    # Fallback: try direct match
+                    if matched_index is None and cleaned_task in task_index_map:
+                        matched_index = task_index_map[cleaned_task]
+                    if matched_index is not None and matched_index < len(input_descriptions):
+                        description = input_descriptions[matched_index]
+                    else:
+                        description = ""
+                validated_tasks.append({
+                    "taskid": cleaned_task,
+                    "status": status,
+                    "description": description
+                })
+            return validated_tasks
+
+        except Exception as e:
+            logger.error(f"Error validating tasks: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validating tasks: {str(e)}"
+            )
+
     async def get_upload_estimate_byId(self,estimate_id:str)->Dict[str,Any]:
         
         try:
@@ -1009,7 +1110,7 @@ class ExcelUploadService():
                         'descriptions': {'$ifNull': ['$estima.description', []]},
                         'additionalTasks': {'$ifNull': ['$estima.additionalTasks', []]},
                         'considerDeltaUnAvTasks': {'$ifNull': ['$estima.considerDeltaUnAvTasks', False]},
-                        'operatorForModel': {'$ifNull': ['$estima.operatorForModel', '']},
+                        'operatorForModel': {'$ifNull': ['$estima.operatorForModel', False]},
                         'aircraftageThreshold': {'$ifNull': ['$estima.aircraftageThreshold', 3]},
                         'unbillableManhrs': '$capping_values.unbillableManhrs', 
                         'unbillableSpareCost': '$capping_values.unbillableSpareCost',
@@ -1057,6 +1158,8 @@ class ExcelUploadService():
                         if isinstance(add, dict) and add.get("taskDescription") is not None
                     ]
                 )
+
+                   
                 print("created add_request")
                 sys.stdout.flush()
                 # Validate tasks using the corrected method call
@@ -1091,7 +1194,11 @@ class ExcelUploadService():
                     available_tasks_length = 0
                     unavailable_tasks_length = 0
                 
+<<<<<<< HEAD
                 result['available_tasks_before_filter'] = available_tasks_length-1
+=======
+                result['available_tasks_before_filter'] = available_tasks_length
+>>>>>>> main
                 result['unavailable_tasks_before_filter'] = unavailable_tasks_length-1
                 result["task_matching_percentage_before_filter"] = round(
                     (available_tasks_length / (available_tasks_length + unavailable_tasks_length)) * 100, 4
@@ -1116,7 +1223,7 @@ class ExcelUploadService():
                     ADD_TASKS=add_tasks_request,
                     aircraft_age=float(result.get("aircraftAge", 0)),
                     aircraft_model=result.get("aircraftModel", ""),
-                    customer_name_consideration=result.get("OperatorForModel",False),  # Set based on your business logic
+                    customer_name_consideration=result.get("operatorForModel",False),  # Set based on your business logic
                     check_category=result.get("typeOfCheck", []),
                     customer_name=result.get("operator", ""),
                     age_cap=result.get("aircraftageThreshold", 3)
@@ -1157,9 +1264,13 @@ class ExcelUploadService():
                     
                     # Filter tasks that are available in other check categories
                     delta_tasks_count = 0
+                    #task_unique_list=[]
                     for task in not_available_tasks_list:
                         if isinstance(task, dict):
                             check_category = task.get("check_category", ["Not Available"])
+                            #task_cleaned=task.replace(" (LH)", "").replace(" (RH)", "")
+                            #task_unique_list.append(task.replace(" (LH)", "").replace(" (RH)", ""))
+                            
                             if isinstance(check_category, list) and len(check_category) > 0 and check_category[0] != "Not Available":
                                 delta_tasks_count += 1
                             
@@ -1170,6 +1281,37 @@ class ExcelUploadService():
                                 delta_tasks_count += 1
                                 
                     result['available_tasks_in_other_check_category'] = delta_tasks_count
+                    findings_mh_estimate=0
+                    tasks_total_mhs=result['totalManhrs']
+                    findings_total_mhs=result['findingsManhrs']
+                    check_category = result["typeOfCheck"][0]
+                    if check_category=="C CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.35
+                    elif check_category=="6Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.40
+                    elif check_category=="12Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.50
+                    elif check_category=="18Y CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.50
+                    elif check_category=="EOL CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.80
+                    elif check_category=="NON C CHECK":
+                        findings_mh_estimate = tasks_total_mhs *0.15
+                    tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+                    extended_tat=0
+                    tat_message=''
+                    if findings_mh_estimate < findings_total_mhs:
+                        extended_tat = ((findings_total_mhs - findings_mh_estimate)/(250))
+                        tat_message = "Extended TAT is calculated as predicted findings are more than estimated findings"
+                    elif findings_mh_estimate > findings_total_mhs:
+                        extended_tat = 0
+                        tat_message = "No extended TAT as predicted findings are less than estimated findings" 
+                    else:
+                        extended_tat = 0
+                        tat_message = "No extended TAT as predicted findings are equal to estimated findings" 
+                    result['tat'] = tat
+                    result['extendedTat'] = extended_tat
+                    result['tatMessage'] = tat_message  
 
             # Select only the required columns for the final result
             final_results = []
@@ -1177,10 +1319,10 @@ class ExcelUploadService():
                 final_result = {
                     "estID": result.get("estID"),
                     "aircraftModel": result.get("aircraftModel"),
-                    "aircraftAge": result.get("aircraftAge"),
+                    "aircraftAge": "-" if not result.get("aircraftAge") else result.get("aircraftAge"),
                     "considerDeltaUnAvTasks": result.get("considerDeltaUnAvTasks"),
                     "operatorForModel": result.get("operatorForModel"),
-                    "aircraftageThreshold": result.get("aircraftageThreshold"),
+                    "aircraftageThreshold": "-" if result.get("aircraftageThreshold")==3 else result.get("aircraftageThreshold"),
                     'cappingTypeManhrs': result.get("cappingTypeManhrs"),
                     'cappingTypeSpareCost': result.get("cappingTypeSpareCost"),
                     "unbillableManhrs": result.get("unbillableManhrs"),
@@ -1203,7 +1345,10 @@ class ExcelUploadService():
                     "available_tasks_after_filter": result.get("available_tasks_after_filter"),
                     "unavailable_tasks_after_filter": result.get("unavailable_tasks_after_filter"),
                     "task_matching_percentage_after_filter": result.get("task_matching_percentage_after_filter"),
-                    "available_tasks_in_other_check_category": result.get("available_tasks_in_other_check_category")
+                    "available_tasks_in_other_check_category": result.get("available_tasks_in_other_check_category"),
+                    "TAT": result.get("tat"),
+                    "extendedTAT": result.get("extendedTat"),
+                    "TATMessage": result.get("tatMessage")
                 }
                 final_results.append(final_result)
                 
@@ -2212,6 +2357,53 @@ class ExcelUploadService():
             return "mlttable"
         else:
             return None
+        
+    def update_lh_rh_tasks(self,task):
+        """
+        Convert LH/RH suffix to a standardized format.
+        
+        Args:
+            task: String containing task number/name
+            
+        Returns:
+            String with standardized LH/RH format
+        """
+        if not isinstance(task, str):
+            return task
+        task = task.strip()
+        if task.endswith(" LH") or task.endswith("_LH"):
+            return task[:-3] + " (LH)"
+        elif task.endswith("LH"):
+            return task[:-2] + " (LH)"
+        elif task.endswith(" RH") or task.endswith("_RH"):
+            return task[:-3] + " (RH)"
+        elif task.endswith("RH"):
+            return task[:-2] + " (RH)"
+        else:
+            return task
+    def convert_task_numbers_format(self, df, task_number_columns=["task_number", "source_task_discrepancy_number_updated"]):
+        """
+        Vectorized version using pandas string operations for maximum performance.
+        """
+        result_df = df.copy()
+        
+        for col in task_number_columns:
+            if col in result_df.columns:
+                # Convert to string and handle NaN values
+                series = result_df[col].astype(str).str.strip()
+                
+                # Use vectorized string operations
+                # Replace patterns in order of specificity
+                series = series.str.replace(r'([_ ])LH$', r' (LH)', regex=True)
+                series = series.str.replace(r'LH$', r' (LH)', regex=True)
+                series = series.str.replace(r'([_ ])RH$', r' (RH)', regex=True)
+                series = series.str.replace(r'RH$', r' (RH)', regex=True)
+                
+                # Handle original NaN values
+                result_df[col] = series.where(result_df[col].notna(), result_df[col])
+        
+        return result_df
+
     
     async def compare_estimates(self, estimate_id: str, files: List[UploadFile]) -> Dict[str, Any]:
             """
@@ -2362,6 +2554,11 @@ class ExcelUploadService():
                     }"""
 
                 # Process and compare data
+                task_description= self.convert_task_numbers_format(task_description, task_number_columns=["task_number"])
+                sub_task_description=self.convert_task_numbers_format(sub_task_description, task_number_columns=["source_task_discrepancy_number_updated"])
+                sub_task_parts = self.convert_task_numbers_format(sub_task_parts, task_number_columns=["task_number"])
+                if not task_parts.empty:
+                    task_parts = self.convert_task_numbers_format(task_parts, task_number_columns=["task_number"])
                 compare_result = self.testing(task_description, sub_task_parts, sub_task_description, task_parts, estimate_id)
                 logger.info("Compare result successfully fetched")
 
@@ -2389,7 +2586,7 @@ class ExcelUploadService():
         parts_master=parts_master.drop_duplicates()
         task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
         task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
-        task_parts_up=task_parts[task_parts["part_type"]!="Component"]
+        task_parts_up=task_parts_up[task_parts_up["part_type"]!="Component"]
         task_parts_up = task_parts_up[task_parts_up["issued_part_number"].isin(parts_master["issued_part_number"])]
 
         # Rename column "unit_of_measurement" to "issued_unit_of_measurement"
@@ -2417,7 +2614,11 @@ class ExcelUploadService():
             matching_parts = parts_master[parts_master["issued_part_number"] == row["issued_part_number"]]
             
             if not matching_parts.empty:
-                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * matching_parts.iloc[0]["agg_base_price_usd"]+matching_parts.iloc[0]["agg_freight_cost"]+matching_parts.iloc[0]["agg_admin_charges"]
+                task_parts_up.at[i, "billable_value_usd"] = row["used_quantity"] * (matching_parts.iloc[0]["latest_base_price_usd"]+matching_parts.iloc[0]["latest_freight_cost"]+matching_parts.iloc[0]["latest_admin_charges"])
+                
+        logger.info(f"the shape of the task_parts_up DataFrame is {task_parts_up.shape}")        
+        logger.info(f"the mlttable spare cost {task_parts_up['billable_value_usd'].sum()}")
+
             
         sub_task_parts = pd.concat([sub_task_parts, task_parts_up], ignore_index=True)
         # Convert to string
@@ -2455,20 +2656,32 @@ class ExcelUploadService():
         # Fetch predicted data
         pred_data = list(self.estimate_output.find({"estID": estID}))
         est_upload = list(self.estimate_file_upload.find({"estID": estID}, {"task": 1}))
-        mpd_tasks = list(est_upload[0].get("task", [])) if est_upload else []
-        LhRhTasks = list(self.LhRhTasks_collection.find({},))
+        # Safely extract tasks from the first element of est_upload if available
+        mpd_tasks = est_upload[0].get("task", []) if est_upload else []
+        add_task_data = est_upload[0].get("additionalTasks", []) if est_upload else []
+
+        # Extract taskIDs from additionalTasks
+        add_tasks = [str(task.get("taskID", "")) for task in add_task_data]
+        if len(add_tasks)>0:
+                if " " in addtasks: 
+                    addtasks.remove(" ")
+                addtasks = addtasks.astype(str).str.strip() if hasattr(addtasks, 'str') else [str(task).strip() for task in addtasks]
+
+        # Fetch all documents from the LhRhTasks_collection and convert to DataFrame
+        LhRhTasks = list(self.LhRhTasks_collection.find({}))
         LhRhTasks = pd.DataFrame(LhRhTasks)
+
+        # Combine mpd_tasks and additional task numbers
+        mpd_tasks += add_tasks
 
 
         if not pred_data:
             logger.info(f"No EstID Pred Data --> {estID}")
             raise ValueError(f", No prediction data found for given EstID: {estID}")                 
-                            
-
-
-        
+                                    
         # Process tasks and findings
         pred_tasks_data_full = pd.DataFrame(pred_data[0].get("tasks", []))
+        
         pred_findings_data_full = pd.DataFrame(pred_data[0].get("findings", []))
         
         # Get capping details safely
@@ -2560,7 +2773,7 @@ class ExcelUploadService():
 
         # Calculate actual capping values
         actual_capping_values = actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts)
-        
+       
         # Filter task descriptions
         eligible_task_description = task_description[task_description["task_number"].isin(eligible_tasks)]
         
@@ -2572,9 +2785,12 @@ class ExcelUploadService():
             actual_parts_data = sub_task_parts[sub_task_parts["task_number"] == task]
             predicted_task_data = pred_tasks_data_full[pred_tasks_data_full["sourceTask"] == task]
             
-            if not actual_task_data.empty:
+            if not predicted_task_data.empty:
                 # Process actual man hours
-                actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
+                actual_manhours=0
+                if not actual_task_data.empty:
+                    
+                    actual_manhours = actual_task_data["actual_man_hours"].values[0] if "actual_man_hours" in actual_task_data.columns else 0
                 
                 # Process actual spares
                 actual_spares_cost = 0
@@ -2798,7 +3014,8 @@ class ExcelUploadService():
             "task_avialability_summary":task_availability_summary
         }
         finaloutput= replace_nan_inf(finaloutput)
-        
+        logger.info("Final output structure created successfully")
+        logger.info(f"Final output: {summary_findings_comparision }")
         return finaloutput
     
 def actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts):

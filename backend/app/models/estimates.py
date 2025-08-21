@@ -178,7 +178,11 @@ class EstimateStatusResponse(BaseModel):
     totalPartsCost:float
     status:str
     error: Optional[str] = None
+<<<<<<< HEAD
     aircraftRegNo:str
+=======
+    aircraftRegNo:str  
+>>>>>>> main
     createdAt:datetime
     remarks: List[RemarkItem] = []
 class EstimateResponse(BaseModel):

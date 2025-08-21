@@ -1,11 +1,11 @@
 database:
   uri: "mongodb://admin:admin123@10.100.3.13:27017/"
-  #database: "gmr-mro-staging-5y"
-  database: "data_pipeline_testing_small"
+  database: "gmr-mro-staging-5y"
+  #database: "data_pipeline_testing_small"
 
 excel_files:
   #data_path : "/home/jupyter_workspace/Data/Data"
-  data_path: r"D:\Projects\gmr-mro\Data_Pipeline\Data\2024\"
+  data_path: r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025"
 
   
 

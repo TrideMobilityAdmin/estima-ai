@@ -343,6 +343,7 @@ async def get_estimate_aggregates(
     """
     return await excel_service.get_estimate_aggregates(start_date, end_date,current_user)
 
+<<<<<<< HEAD
 @router.get("/download_estimate_aggregates")
 async def get_download_estimate_aggregates(
     estID: str,
@@ -353,6 +354,8 @@ async def get_download_estimate_aggregates(
     """
     return await excel_service.get_download_estimates(estID, current_user)
 
+=======
+>>>>>>> main
 @router.post("/validate_tasks_by_estid/{estimate_id}",response_model=List[ValidTasks])
 async def validate_tasks(
     estimate_id: str,
