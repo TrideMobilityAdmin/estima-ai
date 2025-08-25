@@ -1232,7 +1232,7 @@ class ExcelUploadService():
                 total_count = filtered_tasks_count.get("total_count", 0)
                 available_count = filtered_tasks_count.get("available_tasks_count", 0)
                 not_available_count = filtered_tasks_count.get("not_available_tasks_count", 0)
-                
+                result['no_of_packages'] = model_validate_tasks_data.get("packages_found", 0)
                 result['total_tasks_count'] = total_count
                 result['available_tasks_after_filter'] = available_count
                 result['unavailable_tasks_after_filter'] = not_available_count
@@ -1269,6 +1269,7 @@ class ExcelUploadService():
                     tasks_total_mhs=result['totalManhrs']
                     findings_total_mhs=result['findingsManhrs']
                     check_category = result["typeOfCheck"][0]
+                    aircraft_model= result["aircraftModel"]
                     if check_category=="C CHECK":
                         findings_mh_estimate = tasks_total_mhs *0.35
                     elif check_category=="6Y CHECK":
@@ -1281,7 +1282,10 @@ class ExcelUploadService():
                         findings_mh_estimate = tasks_total_mhs *0.80
                     elif check_category=="NON C CHECK":
                         findings_mh_estimate = tasks_total_mhs *0.15
-                    tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+                    if aircraft_model.startswith("ATR"):
+                        tat = ((tasks_total_mhs+  findings_mh_estimate)/(25*6.5))
+                    else:
+                        tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
                     extended_tat=0
                     tat_message=''
                     if findings_mh_estimate < findings_total_mhs:
