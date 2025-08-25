@@ -111,8 +111,9 @@ pyarrow==19.0.1
 pyasn1==0.4.8
 pyasn1-modules==0.2.1
 pycparser==2.22
-pydantic==2.11.3
-pydantic_core==2.33.1
+pydantic==2.11.7
+pydantic-core==2.33.2
+pydantic-settings==2.10.1
 Pygments==2.19.1
 PyGObject==3.42.1
 PyHamcrest==2.0.2
