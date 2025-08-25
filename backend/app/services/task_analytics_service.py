@@ -1329,8 +1329,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'estID': 1, 
-            'description': 1, 
-            'noOfPackages': 1,
+            'description': 1,
+            "no_of_packages":1, 
             'cappingDetails':1,
             'cappingValues': '$capping_values',
             'overallEstimateReport': {
@@ -1425,9 +1425,11 @@ class TaskService:
                 tat_message = "No extended TAT as predicted findings are less than estimated findings" 
             else:
                 extended_tat = 0
-                tat_message = "No extended TAT as predicted findings are equal to estimated findings"   
-            
+                tat_message = "No extended TAT as predicted findings are equal to estimated findings"
+                   
+
             estimate_data = replace_nan_inf(result[0] if result else {})
+            estimate_data["noOfPackages"] = result[0].get("no_of_packages", "-")
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
             estimate_data["aircraftAge"] = capping_result.get("aircraftAge")

@@ -1308,6 +1308,7 @@ class ExcelUploadService():
                     "estID": result.get("estID"),
                     "aircraftModel": result.get("aircraftModel"),
                     "aircraftAge": "-" if not result.get("aircraftAge") else result.get("aircraftAge"),
+                    "noOfPackages": result.get("no_of_packages","-"),
                     "considerDeltaUnAvTasks": result.get("considerDeltaUnAvTasks"),
                     "operatorForModel": result.get("operatorForModel"),
                     "aircraftageThreshold": "-" if result.get("aircraftageThreshold")==3 else result.get("aircraftageThreshold"),
