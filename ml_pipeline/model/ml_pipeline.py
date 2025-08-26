@@ -92,7 +92,7 @@ test_packages = []
 # Fetch data from MongoDB collection
 aircraft_details_collection = db["aircraft_details"]
 aircraft_cursor = aircraft_details_collection.find({
-    "year": { "$in": [2022, 2023, 2024, 2025] }
+    
 })
 aircraft_details = pd.DataFrame(list(aircraft_cursor))
 
