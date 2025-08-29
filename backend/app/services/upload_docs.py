@@ -32,6 +32,8 @@ from fuzzywuzzy import process
 from app.models.estimates import ValidRequest,ModelTasksRequest
 from difflib import SequenceMatcher
 import io
+from app.models.audit_logs import AuditLog
+from app.services.audit_logs_service import AuditLogService
 from app.services.task_analytics_service import updateLhRhTasks
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -346,7 +348,7 @@ class ExcelUploadService():
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
     
-    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
+    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...),current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
         try:
             logger.info(f"estimate_request: {estimate_request}")
             
@@ -434,9 +436,20 @@ class ExcelUploadService():
         
             insert_result = self.estima_collection.insert_one(data_to_insert) 
             logger.info("Length of document inserted")
-  
-           
-                        
+
+            # ✅ Add Audit Log
+            audit_service = AuditLogService()
+            log = AuditLog(
+                user_id=str(current_user["_id"]),
+                username=current_user["username"],  # or fetch from current_user
+                module="Estimate",
+                action="estimate_generated",
+                estimate_id=est_id,
+                timestamp=datetime.now(timezone.utc)
+            )
+            await audit_service.log_action(log)
+
+                         
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",

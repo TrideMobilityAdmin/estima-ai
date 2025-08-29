@@ -19,60 +19,12 @@ import json
 
 router = APIRouter(prefix="/api/v1", tags=["API's"])
 
-# @router.get("/auth", response_model=UserResponse)
-# async def auth(current_user: dict = Depends(get_current_user)):
-#     return {
-#         "id": str(current_user["_id"]),
-#         "username": current_user["username"],
-#         "email": current_user["email"],
-#         "createAt": current_user["createAt"]
-#     }
-
-# @router.get(
-#     "/estimation/man_hours/{source_task}",
-#     response_model=List[FindingsManHoursModel],
-#     responses={
-#         404: {"description": "Source task not found"},
-#         500: {"description": "Internal server error"}
-#     }
-# )
-
-# async def get_task_man_hours(
-#     source_task: str,
-#     current_user: dict = Depends(get_current_user)
-# ) -> List[FindingsManHoursModel]:
-#     """
-#     Get man hours estimation for a specific source task.
-#     """
-#     try:
-#         task_service = TaskService()
-#         result = await task_service.get_man_hours_findings(source_task)
-#         return result
-#     except HTTPException as he:
-#         raise he
-#     except Exception as e:
-#         logger.error(f"Error processing request: {str(e)}")
-#         raise HTTPException(
-#             status_code=500,
-#             detail="Internal server error"
-#         )
 @router.get("/estimates/", response_model=List[Estimate])
 async def get_all_estimates(
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends()
 ):
     return await task_service.get_all_estimates()
-
-# @router.get("/spare_parts/{task_id}", response_model=List[SpareResponse])
-# async def get_spare_parts(
-#     task_id: str,
-#     current_user: dict = Depends(get_current_user),
-#     task_service: TaskService = Depends()
-# ):
-#     """
-#     Get spare parts for a specific task.
-#     """
-#     return await task_service.get_spare_parts_findings(task_id)
 
 
 @router.get("/parts/usage")
@@ -128,21 +80,6 @@ async def post_skills_analysis(
     
     return skills_analysis
 
-# @router.post("/estimate_status",response_model=EstimateStatus)
-# async def estimate_status(
-#     estimate_request: EstimateRequest,
-#      current_user: dict = Depends(get_current_user),
-#     task_service: TaskService = Depends()
-# ):
-#      return await task_service.estimate_status(estimate_request,current_user)
-# @router.post("/estimates/", response_model=EstimateResponse, status_code=201)
-# async def create_estimate(
-#     estimate_request: EstimateRequest,
-#      current_user: dict = Depends(get_current_user),
-#     task_service: TaskService = Depends()
-# ):
-#     return await task_service.create_estimate(estimate_request,current_user)
-
 
 @router.get("/estimates/{estimate_id}")
 async def get_estimate_by_id(
@@ -153,12 +90,7 @@ async def get_estimate_by_id(
     return  task_service.get_estimate_by_id(estimate_id)
 
 excel_service = ExcelUploadService()
-# @router.post("/upload/excel/")
-# async def estimate_excel(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-#     """
-#     Endpoint to handle Excel file uploads
-#     """
-#     return await excel_service.upload_excel(file)
+
 
 @router.post("/estimates/{estimate_id}/compare")
 async def compare_estimates(estimate_id: str, files: List[UploadFile] = File(...), current_user: dict = Depends(get_current_user)):
@@ -262,7 +194,7 @@ async def upload_estimate(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid estimate request: {str(e)}")
 
-    return await excel_service.upload_estimate(estimate_request_data, file)
+    return await excel_service.upload_estimate(estimate_request_data, file,current_user)
 
 @router.get("/estimate_file_status",response_model=List[EstimateStatusResponse])
 async def get_estimate_status(
