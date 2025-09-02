@@ -24,3 +24,5 @@ export const getModelTasksValidate_Url = "/model_tasks_validate";
 export const getAllEstimatesSummary_Url = "/estimate_aggregates";
 
 export const getValidatedTasksByID_Url ="/validate_tasks_by_estid/"
+
+export const getUserLogout_Url = baseUrl + "/auth/logout/";

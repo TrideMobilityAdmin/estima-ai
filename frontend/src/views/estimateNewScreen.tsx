@@ -6323,7 +6323,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -6704,7 +6704,7 @@ const OverallFindingsReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -7086,7 +7086,7 @@ const OverallMPDReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -7345,8 +7345,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               sourceTask: finding.taskId,
               description: detail.description,
               cluster_id: detail.cluster,
-              probability: detail.prob,
               taskDefectProbability: detail?.task_defect_probability,
+              probability: detail.prob,
               mhsMin: Math.round(detail.mhs.min),
               mhsMax: Math.round(detail.mhs.max),
               mhsAvg: Math.round(detail.mhs.avg),
@@ -7364,8 +7364,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             sourceTask: finding.taskId,
             description: detail.description,
             cluster_id: detail.cluster,
-            probability: detail.prob,
             taskDefectProbability: detail?.task_defect_probability,
+            probability: detail.prob,
             mhsMin: Math.round(detail.mhs.min),
             mhsMax: Math.round(detail.mhs.max),
             mhsAvg: Math.round(detail.mhs.avg),
@@ -7413,15 +7413,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       resizable: true,
       width: 280,
     },
-    {
-      headerName: "Probability (%)",
-      field: "probability",
-      filter: true,
-      sortable: true,
-      floatingFilter: true,
-      resizable: true,
-      width: 150,
-    },
+    
     // taskDefectProbability :detail?.task_defect_probability,
     {
       headerName: "Task Defect Probability (%)",
@@ -7434,6 +7426,15 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       cellRenderer: (val: any) => {
         return <Text>{(val?.data?.taskDefectProbability || 0).toFixed(2)}</Text>;
       },
+    },
+    {
+      headerName: "Defect Probability (%)",
+      field: "probability",
+      filter: true,
+      sortable: true,
+      floatingFilter: true,
+      resizable: true,
+      width: 150,
     },
     {
       headerName: "Man Hours",
@@ -7640,8 +7641,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Source Task": task.sourceTask || "-",
         "Description": task.description || "-",
         "Cluster ID": task.cluster_id || "-",
-        "Probability": task.probability || 0,
         "Task Defect Probability": task.taskDefectProbability?.toFixed(2) || 0,
+        "Defect Probability": task.probability || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
         // "MHS Avg": task.mhsAvg || 0,
