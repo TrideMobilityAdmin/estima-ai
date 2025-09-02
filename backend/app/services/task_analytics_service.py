@@ -2594,8 +2594,7 @@ class TaskService:
             # Convert aircraft_age column to float, handle non-numeric values
             aircraft_details['aircraft_age'] = pd.to_numeric(aircraft_details['aircraft_age'], errors='coerce')
             aircraft_details["check_category"] = aircraft_details["check_category"].str.replace("EOL CHECK", "EOL")
-            
-            
+
             # Remove rows with invalid aircraft_age
             aircraft_details = aircraft_details.dropna(subset=['aircraft_age'])
             
@@ -2861,7 +2860,7 @@ class TaskService:
         except Exception as e:
             print(f"Error in model_tasks_validate: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        
 def return_all_tasks_as_not_available( mpd_task_data, ADD_TASKS, age_cap=3, packages_found=0):
     """
     Helper method to return all tasks as not available when no packages or task data is found.
