@@ -101,6 +101,7 @@ import {
   IconMessage,
   IconMessage2Plus,
   IconMinimize,
+  IconPackage,
   IconPercentage,
   IconPercentage66,
   IconPin,
@@ -2463,6 +2464,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     "S. NO": index + 1,
     "CREATED AT": dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss"),
     "ESTIMATE ID": item.estID,
+    "NO OF PACKAGES": item.noOfPackages,
     "A/c REG NO": item.aircraftRegNo,
     "OPERATOR": item.operator,
     "AIRCRAFT MODEL": item.aircraftModel,
@@ -2524,6 +2526,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     { wch: 6 },   // S. NO
     { wch: 20 },  // CREATED AT
     { wch: 35 },  // ESTIMATE ID
+    {wch: 15 },  // NO OF PACKAGES
     { wch: 15 },  // A/c REG NO
     { wch: 30 },  // OPERATOR
     { wch: 15 },  // AIRCRAFT MODEL
@@ -5653,69 +5656,68 @@ border-bottom: none;
                 {tabValue === "overall" ? (
                   <>
                     <OverallEstimateReport
-                      totalTATTime={
-                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
-                      }
+                      TATTime={estimateReportData?.tat || 0}
+                      extendedTATTime={estimateReportData?.extendedTat || 0}
                       tatMessage={estimateReportData?.tatMessage}
+                      noOfPackages={estimateReportData?.noOfPackages || 0}
                       estimatedManHrs={
-                        estimateReportData?.overallEstimateReport
-                          ?.estimateManhrs || {}
+                        estimateReportData?.overallEstimateReport?.estimateManhrs || {}
                       }
                       estimatedSparesCost={
-                        estimateReportData?.overallEstimateReport
-                          ?.estimatedSpareCost || 0
+                        estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0
                       }
                       capppingMhsType={
-                        estimateReportData?.cappingValues?.cappingTypeManhrs || 0
+                        estimateReportData?.cappingValues?.cappingTypeManhrs || ""
                       }
                       unbilledCapppingMhs={
                         estimateReportData?.cappingValues?.unbillableManhrs || 0
                       }
                       cappingUnbilledCostType={
-                        estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
+                        estimateReportData?.cappingValues?.cappingTypeSpareCost || ""
                       }
                       cappingUnbilledCost={
                         estimateReportData?.cappingValues?.unbillableSpareCost || 0
                       }
-                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
-                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
-                      
+                      cappingManhrs={
+                        estimateReportData?.cappingDetails?.cappingManhrs || 0
+                      }
+                      cappingSpareCost={
+                        estimateReportData?.cappingDetails?.cappingSpareCost || 0
+                      }
                       parts={
-                        estimateReportData?.overallEstimateReport?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) ||
-                        []
+                        estimateReportData?.overallEstimateReport?.spareParts?.sort(
+                          (a: any, b: any) => b?.price - a?.price
+                        ) || []
                       }
                       spareCostData={[
                         {
                           date: "Min",
                           Cost: Math.round(
-                            estimateReportData?.overallEstimateReport
-                              ?.estimatedSpareCost * 0.95
+                            (estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0) * 0.95
                           ),
                         },
                         {
                           date: "Estimated",
                           Cost: Math.round(
-                            estimateReportData?.overallEstimateReport
-                              ?.estimatedSpareCost
+                            estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0
                           ),
                         },
                         {
                           date: "Max",
                           Cost: Math.round(
-                            estimateReportData?.overallEstimateReport
-                              ?.estimatedSpareCost * 1.03
+                            (estimateReportData?.overallEstimateReport?.estimatedSpareCost || 0) * 1.03
                           ),
                         },
                       ]}
                     />
                   </>
-                ) : tabValue === "finding" ? (
+                ): tabValue === "finding" ? (
                   <>
                     <OverallFindingsReport
-                      totalTATTime={
-                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
-                      }
+                      TATTime={estimateReportData?.tat || 0}
+                      extendedTATTime={estimateReportData?.extendedTat || 0}
                       tatMessage={estimateReportData?.tatMessage}
+                      noOfPackages={estimateReportData?.noOfPackages || 0}
                       estimatedManHrs={
                         estimateReportData?.aggregatedFindings
                           ?.estimateManhrs || {}
@@ -5768,64 +5770,64 @@ border-bottom: none;
                     />
                   </>
                 ) : (
-                  <>
-                    <OverallMPDReport
-                      totalTATTime={
-                        estimateReportData?.tat + estimateReportData?.extendedTat || 0
-                      }
-                      tatMessage={estimateReportData?.tatMessage}
-                      estimatedManHrs={
-                        estimateReportData?.aggregatedTasks?.estimateManhrs ||
-                        {}
-                      }
-                      estimatedSparesCost={
-                        estimateReportData?.aggregatedTasks
-                          ?.estimatedSpareCost || 0
-                      }
-                      capppingMhsType={
-                        estimateReportData?.cappingValues?.cappingTypeManhrs || 0
-                      }
-                      unbilledCapppingMhs={
-                        estimateReportData?.cappingValues?.unbillableManhrs || 0
-                      }
-                      cappingUnbilledCostType={
-                        estimateReportData?.cappingValues?.cappingTypeSpareCost || 0
-                      }
-                      cappingUnbilledCost={
-                        estimateReportData?.cappingValues?.unbillableSpareCost || 0
-                      }
-                      cappingManhrs={estimateReportData?.cappingDetails?.cappingManhrs || 0}
-                      cappingSpareCost={estimateReportData?.cappingDetails?.cappingSpareCost || 0}
-                      
-                      parts={
-                        estimateReportData?.aggregatedTasks?.spareParts?.sort((a: any, b: any) => b?.price - a?.price) || []
-                      }
-                      spareCostData={[
-                        {
-                          date: "Min",
-                          Cost: Math.round(
-                            estimateReportData?.aggregatedTasks
-                              ?.estimatedSpareCost * 0.95
-                          ),
-                        },
-                        {
-                          date: "Estimated",
-                          Cost: Math.round(
-                            estimateReportData?.aggregatedTasks
-                              ?.estimatedSpareCost
-                          ),
-                        },
-                        {
-                          date: "Max",
-                          Cost: Math.round(
-                            estimateReportData?.aggregatedTasks
-                              ?.estimatedSpareCost * 1.03
-                          ),
-                        },
-                      ]}
-                    />
-                  </>
-                )}
+                    <>
+                      <OverallMPDReport
+                        TATTime={estimateReportData?.tat || 0}
+                        extendedTATTime={estimateReportData?.extendedTat || 0}
+                        tatMessage={estimateReportData?.tatMessage}
+                        estimatedManHrs={
+                          estimateReportData?.aggregatedTasks?.estimateManhrs || {}
+                        }
+                        noOfPackages={estimateReportData?.noOfPackages || 0}
+                        estimatedSparesCost={
+                          estimateReportData?.aggregatedTasks?.estimatedSpareCost || 0
+                        }
+                        capppingMhsType={
+                          estimateReportData?.cappingValues?.cappingTypeManhrs || ""
+                        }
+                        unbilledCapppingMhs={
+                          estimateReportData?.cappingValues?.unbillableManhrs || 0
+                        }
+                        cappingUnbilledCostType={
+                          estimateReportData?.cappingValues?.cappingTypeSpareCost || ""
+                        }
+                        cappingUnbilledCost={
+                          estimateReportData?.cappingValues?.unbillableSpareCost || 0
+                        }
+                        cappingManhrs={
+                          estimateReportData?.cappingDetails?.cappingManhrs || 0
+                        }
+                        cappingSpareCost={
+                          estimateReportData?.cappingDetails?.cappingSpareCost || 0
+                        }
+                        parts={
+                          estimateReportData?.aggregatedTasks?.spareParts?.sort(
+                            (a: any, b: any) => b?.price - a?.price
+                          ) || []
+                        }
+                        spareCostData={[
+                          {
+                            date: "Min",
+                            Cost: Math.round(
+                              (estimateReportData?.aggregatedTasks?.estimatedSpareCost || 0) * 0.95
+                            ),
+                          },
+                          {
+                            date: "Estimated",
+                            Cost: Math.round(
+                              estimateReportData?.aggregatedTasks?.estimatedSpareCost || 0
+                            ),
+                          },
+                          {
+                            date: "Max",
+                            Cost: Math.round(
+                              (estimateReportData?.aggregatedTasks?.estimatedSpareCost || 0) * 1.03
+                            ),
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
 
                 <Space h="sm" />
 
@@ -5951,7 +5953,9 @@ interface ChartData {
 }
 
 interface TATDashboardProps {
-  totalTATTime: number;
+  TATTime: number;
+  extendedTATTime: number;
+  noOfPackages: number; // Added noOfPackages prop
   tatMessage: string;
   estimatedManHrs: {
     min: number;
@@ -5971,8 +5975,10 @@ interface TATDashboardProps {
 }
 
 const OverallEstimateReport: React.FC<TATDashboardProps> = ({
-  totalTATTime,
+  TATTime,
+  extendedTATTime,
   tatMessage,
+  noOfPackages, // Added noOfPackages prop
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhsType,
@@ -5993,7 +5999,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
 
-            {/* Total  Tat Time*/}
+            {/* Total TAT Time */}
             <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
@@ -6002,10 +6008,18 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 <Group justify="space-between" style={{ flex: 1 }}>
                   <Flex direction="column" align="flex-start">
                     <Text size="sm" fw={500} c="dimmed">
-                      Total TAT Time
+                      TAT Time
                     </Text>
                     <Text size="xl" fw={700} c="blue.6">
-                      {Math.floor(totalTATTime) || 0} days
+                      {Math.floor(TATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Extended TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(extendedTATTime) || 0} days
                     </Text>
                   </Flex>
                   <Popover position="left" withArrow shadow="md">
@@ -6029,7 +6043,28 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                 </Group>
               </Group>
             </Card>
+            
             <Space h="xs" />
+            
+            {/* Number of Packages */}
+            <Card withBorder radius="md" p="5" bg="orange.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="orange.6">
+                  <IconPackage size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Number of Packages
+                  </Text>
+                  <Text size="xl" fw={700} c="orange.6">
+                    {noOfPackages || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            
+            <Space h="xs" />
+            
             {/* Estimated Man Hours */}
             <Card withBorder radius="md" p="md" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
@@ -6037,7 +6072,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
               </Text>
               <Flex gap="md" direction="column">
                 {Object.entries(estimatedManHrs || {})
-                  .filter(([ke, val]) => ke !== "est")
+                  .filter(([key, val]) => key !== "est")
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
@@ -6064,7 +6099,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                             {typeof value === "number"
                               ? value.toFixed(0)
                               : value}{" "}
-                            hr
+                            Hrs
                           </Text>
                         </Group>
                         <Progress
@@ -6080,32 +6115,13 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       </Box>
                     );
                   })}
-
-                {/* <Box>
-                  <Group justify="space-between" mb={5}>
-                    <Text fz="xs" fw={500}>
-                      Unbillable Man hours
-                    </Text>
-                    <Text fz="sm" fw={600} c="green.6">
-                      {capppingMhs?.toFixed(0)} Hrs
-                    </Text>
-                  </Group>
-                  <Progress
-                    color="green.6"
-                    value={Math.min(capppingMhs / 100, 100) ?? 0}
-                    size="md"
-                    radius="sm"
-                  />
-                </Box> */}
               </Flex>
             </Card>
 
-            <Space h='xs' />
+            <Space h="xs" />
+            
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
-              {/* <Text size="sm" fw={500} c="dimmed">
-                  Unbillable
-              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
@@ -6123,10 +6139,11 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
                   </Text>
-
                 </Flex>
               </Group>
-              <Space h="xs" />
+              
+              <Space h="sm" />
+              
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
@@ -6141,15 +6158,12 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
                       )} - ({cappingManhrs || 0} hr)
                   </Text>
-                  <Text size="lg" fw={600} c={"green.6"}>
+                  <Text size="lg" fw={600} c="green.6">
                     {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
-
             </Card>
-
-            
           </Card>
         </Grid.Col>
 
@@ -6309,7 +6323,7 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -6353,8 +6367,10 @@ const OverallEstimateReport: React.FC<TATDashboardProps> = ({
 };
 
 const OverallFindingsReport: React.FC<any> = ({
-  totalTATTime,
+  TATTime,
+  extendedTATTime,
   tatMessage,
+  noOfPackages, // Added noOfPackages prop
   estimatedManHrs,
   cappingUnbilledCost,
   capppingMhsType,
@@ -6366,7 +6382,7 @@ const OverallFindingsReport: React.FC<any> = ({
   estimatedSparesCost,
   spareCostData,
 }: any) => {
-  return (
+    return (
     <Box>
       {/* <Title order={4} mb="md" fw={500} c="dimmed">Overall Estimate Report</Title> */}
       <Grid gutter="xs">
@@ -6374,7 +6390,8 @@ const OverallFindingsReport: React.FC<any> = ({
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
-                        {/* Total  Tat Time*/}
+
+            {/* Total TAT Time */}
             <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
@@ -6383,10 +6400,18 @@ const OverallFindingsReport: React.FC<any> = ({
                 <Group justify="space-between" style={{ flex: 1 }}>
                   <Flex direction="column" align="flex-start">
                     <Text size="sm" fw={500} c="dimmed">
-                      Total TAT Time
+                      TAT Time
                     </Text>
                     <Text size="xl" fw={700} c="blue.6">
-                      {Math.floor(totalTATTime) || 0} days
+                      {Math.floor(TATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Extended TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(extendedTATTime) || 0} days
                     </Text>
                   </Flex>
                   <Popover position="left" withArrow shadow="md">
@@ -6410,7 +6435,28 @@ const OverallFindingsReport: React.FC<any> = ({
                 </Group>
               </Group>
             </Card>
-            <Space h='xs'   />
+            
+            <Space h="xs" />
+            
+            {/* Number of Packages */}
+            <Card withBorder radius="md" p="5" bg="orange.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="orange.6">
+                  <IconPackage size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Number of Packages
+                  </Text>
+                  <Text size="xl" fw={700} c="orange.6">
+                    {noOfPackages || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            
+            <Space h="xs" />
+            
             {/* Estimated Man Hours */}
             <Card withBorder radius="md" p="md" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
@@ -6418,7 +6464,7 @@ const OverallFindingsReport: React.FC<any> = ({
               </Text>
               <Flex gap="md" direction="column">
                 {Object.entries(estimatedManHrs || {})
-                  .filter(([ke, val]) => ke !== "est")
+                  .filter(([key, val]) => key !== "est")
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
@@ -6461,28 +6507,13 @@ const OverallFindingsReport: React.FC<any> = ({
                       </Box>
                     );
                   })}
-                {/* <Box>
-                                            <Group justify="space-between" mb={5}>
-                                                <Text fz="xs" fw={500}>Est</Text>
-                                                <Text fz="sm" fw={600} c={"green.6"}>
-                                                    {37} Hrs
-                                                </Text>
-                                            </Group>
-                                            <Progress
-                                                color={"green.6"}
-                                                value={ Math.min(37 / 100, 100)}
-                                                size="md"
-                                                radius="sm"
-                                            />
-                                        </Box> */}
               </Flex>
             </Card>
-            <Space h='xs'   />
+
+            <Space h="xs" />
+            
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
-              {/* <Text size="sm" fw={500} c="dimmed">
-                  Unbillable
-              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
@@ -6500,10 +6531,11 @@ const OverallFindingsReport: React.FC<any> = ({
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
                   </Text>
-
                 </Flex>
               </Group>
-              <Space h="xs" />
+              
+              <Space h="sm" />
+              
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
@@ -6518,15 +6550,12 @@ const OverallFindingsReport: React.FC<any> = ({
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
                       )} - ({cappingManhrs || 0} hr)
                   </Text>
-                  <Text size="lg" fw={600} c={"green.6"}>
+                  <Text size="lg" fw={600} c="green.6">
                     {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
-
             </Card>
-
-
           </Card>
         </Grid.Col>
 
@@ -6675,7 +6704,7 @@ const OverallFindingsReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -6719,7 +6748,8 @@ const OverallFindingsReport: React.FC<any> = ({
 };
 
 const OverallMPDReport: React.FC<any> = ({
-  totalTATTime,
+  TATTime,
+  extendedTATTime,
   tatMessage,
   estimatedManHrs,
   cappingUnbilledCost,
@@ -6731,6 +6761,7 @@ const OverallMPDReport: React.FC<any> = ({
   parts,
   estimatedSparesCost,
   spareCostData,
+  noOfPackages, // Added noOfPackages prop
 }: any) => {
   return (
     <Box>
@@ -6740,9 +6771,9 @@ const OverallMPDReport: React.FC<any> = ({
         <Grid.Col span={3}>
           <Card withBorder radius="md" p="xs" h="100%">
             {/* <Title order={5} mb="md" fw={500} c="dimmed">Estimate Overview</Title> */}
-            {/* Total  Tat Time*/}
-                        {/* Total  Tat Time*/}
-                        <Card withBorder radius="md" p="5" bg="blue.0">
+            
+            {/* Total TAT Time */}
+            <Card withBorder radius="md" p="5" bg="blue.0">
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconClock size={24} />
@@ -6750,10 +6781,18 @@ const OverallMPDReport: React.FC<any> = ({
                 <Group justify="space-between" style={{ flex: 1 }}>
                   <Flex direction="column" align="flex-start">
                     <Text size="sm" fw={500} c="dimmed">
-                      Total TAT Time
+                      TAT Time
                     </Text>
                     <Text size="xl" fw={700} c="blue.6">
-                      {Math.floor(totalTATTime) || 0} days
+                      {Math.floor(TATTime) || 0} days
+                    </Text>
+                  </Flex>
+                  <Flex direction="column" align="flex-start">
+                    <Text size="sm" fw={500} c="dimmed">
+                      Extended TAT Time
+                    </Text>
+                    <Text size="xl" fw={700} c="blue.6">
+                      {Math.floor(extendedTATTime) || 0} days
                     </Text>
                   </Flex>
                   <Popover position="left" withArrow shadow="md">
@@ -6777,15 +6816,36 @@ const OverallMPDReport: React.FC<any> = ({
                 </Group>
               </Group>
             </Card>
+            
             <Space h="xs" />
+            
+            {/* Number of Packages */}
+            <Card withBorder radius="md" p="5" bg="orange.0">
+              <Group gap="md">
+                <ThemeIcon variant="light" radius="md" size={50} color="orange.6">
+                  <IconPackage size={24} />
+                </ThemeIcon>
+                <Flex direction="column">
+                  <Text size="sm" fw={500} c="dimmed">
+                    Number of Packages
+                  </Text>
+                  <Text size="xl" fw={700} c="orange.6">
+                    {noOfPackages || 0}
+                  </Text>
+                </Flex>
+              </Group>
+            </Card>
+            
+            <Space h="xs" />
+            
             {/* Estimated Man Hours */}
-            <Card withBorder radius="md" p="md"  bg="gray.0">
+            <Card withBorder radius="md" p="md" bg="gray.0">
               <Text size="sm" fw={500} c="dimmed" mb="md">
                 Estimated Man Hours
               </Text>
               <Flex gap="md" direction="column">
                 {Object.entries(estimatedManHrs || {})
-                  .filter(([ke, val]) => ke !== "est")
+                  .filter(([key, val]) => key !== "est")
                   .map(([key, value]: any) => {
                     // Determine color based on key
                     const color =
@@ -6830,12 +6890,11 @@ const OverallMPDReport: React.FC<any> = ({
                   })}
               </Flex>
             </Card>
-            <Space h='xs'   />
+            
+            <Space h="xs" />
+            
             {/* Unbillable Cost */}
             <Card withBorder radius="md" p="5" mb="sm" bg="gray.0">
-              {/* <Text size="sm" fw={500} c="dimmed">
-                  Unbillable
-              </Text> */}
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="blue.6">
                   <IconSettingsDollar size={24} />
@@ -6853,10 +6912,11 @@ const OverallMPDReport: React.FC<any> = ({
                   <Text size="lg" fw={600} c="blue.6">
                     ${cappingUnbilledCost?.toFixed(2) || 0}
                   </Text>
-
                 </Flex>
               </Group>
+              
               <Space h="sm" />
+              
               <Group gap="md">
                 <ThemeIcon variant="light" radius="md" size={50} color="green.6">
                   <IconClockHour4 size={24} />
@@ -6871,15 +6931,12 @@ const OverallMPDReport: React.FC<any> = ({
                       .replace(/\b\w/g, (char: any) => char.toUpperCase()
                       )} - ({cappingManhrs || 0} hr)
                   </Text>
-                  <Text size="lg" fw={600} c={"green.6"}>
+                  <Text size="lg" fw={600} c="green.6">
                     {Math.round(unbilledCapppingMhs)} hr
                   </Text>
                 </Flex>
               </Group>
-
             </Card>
-
-
           </Card>
         </Grid.Col>
 
@@ -7029,7 +7086,7 @@ const OverallMPDReport: React.FC<any> = ({
                   Spare Cost Trend
                 </Text> */}
               <AreaChart
-                h={310}
+                h={380}
                 data={
                   spareCostData || [
                     { date: "Min", Cost: 100 },
@@ -7288,8 +7345,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
               sourceTask: finding.taskId,
               description: detail.description,
               cluster_id: detail.cluster,
-              probability: detail.prob,
               taskDefectProbability: detail?.task_defect_probability,
+              probability: detail.prob,
               mhsMin: Math.round(detail.mhs.min),
               mhsMax: Math.round(detail.mhs.max),
               mhsAvg: Math.round(detail.mhs.avg),
@@ -7307,8 +7364,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
             sourceTask: finding.taskId,
             description: detail.description,
             cluster_id: detail.cluster,
-            probability: detail.prob,
             taskDefectProbability: detail?.task_defect_probability,
+            probability: detail.prob,
             mhsMin: Math.round(detail.mhs.min),
             mhsMax: Math.round(detail.mhs.max),
             mhsAvg: Math.round(detail.mhs.avg),
@@ -7356,15 +7413,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       resizable: true,
       width: 280,
     },
-    {
-      headerName: "Probability (%)",
-      field: "probability",
-      filter: true,
-      sortable: true,
-      floatingFilter: true,
-      resizable: true,
-      width: 150,
-    },
+    
     // taskDefectProbability :detail?.task_defect_probability,
     {
       headerName: "Task Defect Probability (%)",
@@ -7377,6 +7426,15 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
       cellRenderer: (val: any) => {
         return <Text>{(val?.data?.taskDefectProbability || 0).toFixed(2)}</Text>;
       },
+    },
+    {
+      headerName: "Defect Probability (%)",
+      field: "probability",
+      filter: true,
+      sortable: true,
+      floatingFilter: true,
+      resizable: true,
+      width: 150,
     },
     {
       headerName: "Man Hours",
@@ -7583,8 +7641,8 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Source Task": task.sourceTask || "-",
         "Description": task.description || "-",
         "Cluster ID": task.cluster_id || "-",
-        "Probability": task.probability || 0,
         "Task Defect Probability": task.taskDefectProbability?.toFixed(2) || 0,
+        "Defect Probability": task.probability || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
         // "MHS Avg": task.mhsAvg || 0,

@@ -34,7 +34,7 @@ FROM nginx:alpine
 COPY --from=build /app/dist/ /usr/share/nginx/html
 COPY --from=build /app/nginx.conf /etc/nginx/nginx.conf
 
-EXPOSE 80
+EXPOSE 3000
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
 
 

@@ -1330,7 +1330,8 @@ class TaskService:
         '$project': {
             '_id': 0, 
             'estID': 1, 
-            'description': 1, 
+            'description': 1,
+            "no_of_packages":1, 
             'cappingDetails':1,
             'cappingValues': '$capping_values',
             'overallEstimateReport': {
@@ -1398,6 +1399,7 @@ class TaskService:
             tasks_total_mhs= result[0].get("aggregatedTasks", {}).get("totalMhs", 0)
             findings_total_mhs=result[0].get("aggregatedFindings", {}).get("totalMhs", 0)
             check_category = capping_result.get("typeOfCheck", "")[0]
+            aircraft_model=capping_result.get("aircraftModel","")
             if check_category=="C CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.35
             elif check_category=="6Y CHECK":
@@ -1410,7 +1412,10 @@ class TaskService:
                 findings_mh_estimate = tasks_total_mhs *0.80
             elif check_category=="NON C CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.15
-            tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+            if aircraft_model.startswith("ATR"):
+                tat = ((tasks_total_mhs+  findings_mh_estimate)/(25*6.5))
+            else:
+                tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
             extended_tat=0
             tat_message=''
             if findings_mh_estimate < findings_total_mhs:
@@ -1421,9 +1426,11 @@ class TaskService:
                 tat_message = "No extended TAT as predicted findings are less than estimated findings" 
             else:
                 extended_tat = 0
-                tat_message = "No extended TAT as predicted findings are equal to estimated findings"   
-            
+                tat_message = "No extended TAT as predicted findings are equal to estimated findings"
+                   
+
             estimate_data = replace_nan_inf(result[0] if result else {})
+            estimate_data["noOfPackages"] = result[0].get("no_of_packages", "-")
             estimate_data["operator"] = capping_result.get("operator")
             logger.info(f"operator fetched: {capping_result.get('operator')}")
             estimate_data["aircraftAge"] = capping_result.get("aircraftAge")

@@ -38,6 +38,8 @@ from fuzzywuzzy import process
 from app.models.estimates import ValidRequest,ModelTasksRequest
 from difflib import SequenceMatcher
 import io
+from app.models.audit_logs import AuditLog
+from app.services.audit_logs_service import AuditLogService
 from app.services.task_analytics_service import updateLhRhTasks
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -350,7 +352,7 @@ class ExcelUploadService():
         response.headers["Content-Disposition"] = f"attachment; filename={estimate_id}.pdf"
         return response
     
-    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...)) -> Dict[str, Any]:
+    async def upload_estimate(self, estimate_request: EstimateRequest, file: UploadFile = File(...),current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
         try:
             logger.info(f"estimate_request: {estimate_request}")
             
@@ -438,9 +440,20 @@ class ExcelUploadService():
         
             insert_result = self.estima_collection.insert_one(data_to_insert) 
             logger.info("Length of document inserted")
-  
-           
-                        
+
+            # ✅ Add Audit Log
+            audit_service = AuditLogService()
+            log = AuditLog(
+                user_id=str(current_user["_id"]),
+                username=current_user["username"],  # or fetch from current_user
+                module="Estimate",
+                action="estimate_generated",
+                estimate_id=est_id,
+                timestamp=datetime.now(timezone.utc)
+            )
+            await audit_service.log_action(log)
+
+                         
             response = {
                 "estHashID":taskUniqHash,
                 "status": "Initiated",
@@ -1248,7 +1261,7 @@ class ExcelUploadService():
                 total_count = filtered_tasks_count.get("total_count", 0)
                 available_count = filtered_tasks_count.get("available_tasks_count", 0)
                 not_available_count = filtered_tasks_count.get("not_available_tasks_count", 0)
-                
+                result['no_of_packages'] = model_validate_tasks_data.get("packages_found", 0)
                 result['total_tasks_count'] = total_count
                 result['available_tasks_after_filter'] = available_count
                 result['unavailable_tasks_after_filter'] = not_available_count
@@ -1285,6 +1298,7 @@ class ExcelUploadService():
                     tasks_total_mhs=result['totalManhrs']
                     findings_total_mhs=result['findingsManhrs']
                     check_category = result["typeOfCheck"][0]
+                    aircraft_model= result["aircraftModel"]
                     if check_category=="C CHECK":
                         findings_mh_estimate = tasks_total_mhs *0.35
                     elif check_category=="6Y CHECK":
@@ -1297,7 +1311,10 @@ class ExcelUploadService():
                         findings_mh_estimate = tasks_total_mhs *0.80
                     elif check_category=="NON C CHECK":
                         findings_mh_estimate = tasks_total_mhs *0.15
-                    tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
+                    if aircraft_model.startswith("ATR"):
+                        tat = ((tasks_total_mhs+  findings_mh_estimate)/(25*6.5))
+                    else:
+                        tat = ((tasks_total_mhs+  findings_mh_estimate)/(30*6.5))
                     extended_tat=0
                     tat_message=''
                     if findings_mh_estimate < findings_total_mhs:
@@ -1320,6 +1337,7 @@ class ExcelUploadService():
                     "estID": result.get("estID"),
                     "aircraftModel": result.get("aircraftModel"),
                     "aircraftAge": "-" if not result.get("aircraftAge") else result.get("aircraftAge"),
+                    "noOfPackages": result.get("no_of_packages","-"),
                     "considerDeltaUnAvTasks": result.get("considerDeltaUnAvTasks"),
                     "operatorForModel": result.get("operatorForModel"),
                     "aircraftageThreshold": "-" if result.get("aircraftageThreshold")==3 else result.get("aircraftageThreshold"),

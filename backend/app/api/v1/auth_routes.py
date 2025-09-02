@@ -9,6 +9,8 @@ from app.config.config import settings
 from app.log.logs import logger
 from bson import ObjectId   
 from pymongo import MongoClient
+from app.models.audit_logs import AuditLog
+from app.services.audit_logs_service import AuditLogService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -77,6 +79,16 @@ async def User_login(user: UserLogin):
     }
     user_login_collection.insert_one(login_history)
 
+    # Audit log
+    audit_service = AuditLogService()
+    log_entry = AuditLog(
+    user_id=str(user_found["_id"]),
+    username=user_found["username"],
+    module="UserLogin",
+    action="user_logged_in"
+    )
+    await audit_service.log_action(log_entry)
+
     return {
         "accessToken": access_token,
         "tokenType": "bearer",
@@ -86,40 +98,45 @@ async def User_login(user: UserLogin):
     }
 
 
-@router.post("/logout")
-async def User_logout(response: Response, current_user: dict = Depends(get_current_user)):
+
+@router.post("/logout/{user_id}")
+async def user_logout(user_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Logout user by user_id (path parameter) and record audit log
+    """
     try:
-        current_time = datetime.now(timezone.utc)
-        latest_login = user_login_collection.find_one(
-            {"userID": str(current_user["_id"]), "logout": ""},
-            sort=[("createdAt", -1)]
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+        
+        user_response = await get_user_by_id(user_id, current_user)
+
+        # ✅ Build AuditLog model
+        log = AuditLog(
+            user_id=user_id,
+            username=user_response["username"],
+            module="UserLogout",
+            action="user_logged_out",
+            timestamp=datetime.now(timezone.utc)
         )
-        
-        if latest_login:
-            # Update the logout time
-            update_result=user_login_collection.update_one(
-                {"_id": latest_login["_id"]},
-                {
-                    "$set": {
-                        "logout": current_time,
-                        "updatedAt": current_time,
-                        "updatedBy": str(current_user["_id"])
-                    }
-                }
-            )
-            if update_result.modified_count == 1:
-                return {"message": "User logged out successfully"}
-            else:
-                raise HTTPException(status_code=400, detail="Failed to update logout time")
-        else:
-            raise HTTPException(status_code=404, detail="Login record not found")
-        
+
+        audit_service = AuditLogService()
+        await audit_service.log_action(log)
+
+        return {
+            "message": "User logged out successfully",
+            "userID": user_id,
+            "username": user_response["username"]
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Logout error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Error during logout"
         )
+
 @router.get("/user/{user_id}", response_model=UserResponse)
 async def get_user_by_id(user_id: str,current_user: dict = Depends(get_current_user)):
     """

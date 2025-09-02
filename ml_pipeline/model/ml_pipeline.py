@@ -1867,6 +1867,7 @@ def defects_prediction(estID,aircraft_model, check_category, aircraft_age, MPD_T
         "probabilityGraph": probability_graph,
         "capping_values":capping_values,
         "cappingDetails":cappingDetails,
+        "no_of_packages": len(train_packages),
         "createdAt": datetime.datetime.fromisoformat(datetime.datetime.now().isoformat()),
         "lastUpdated": datetime.datetime.fromisoformat(datetime.datetime.now().isoformat()),
         "createdBy": "estimaai@evrides.live"
