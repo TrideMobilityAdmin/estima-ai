@@ -2209,6 +2209,11 @@ class ExcelUploadService():
         parts_master= pd.DataFrame(parts_master)
         parts_master = parts_master.drop(columns=["_id"], errors="ignore")
         parts_master=parts_master.drop_duplicates()
+        parts_master = parts_master[
+            parts_master[["latest_base_price_usd", "latest_freight_cost", "latest_admin_charges"]]
+            .notna()
+            .all(axis=1)
+        ]
         task_parts.dropna(subset=["task_number","issued_part_number","part_description","used_quantity","issued_stock_status"],inplace=True)
         task_parts_up=task_parts[task_parts["issued_stock_status"]!="Owned"]
         task_parts_up=task_parts_up[task_parts_up["part_type"]!="Component"]
@@ -2253,8 +2258,6 @@ class ExcelUploadService():
             'issued_unit_of_measurement', 'stock_status', 'base_currency',
             'soi_transaction'
         ]
-
-
 
         # Apply conversions
         for col in string_cols:
@@ -2488,7 +2491,10 @@ class ExcelUploadService():
                 (sub_task_parts["task_number"].str.startswith("HMV")) & 
                 (sub_task_parts["task_number"].isin(sub_task_description_data["log_item_number"].tolist()))
             ]
-            
+            '''
+            if task=="335100-12-1":
+                sub_task_description_data.to_csv("sub_task_description_data.csv")
+                actual_findings_parts_data.to_csv("actual_parts_data.csv")'''
             # Process actual findings manhours
             actual_manhours = 0
             for index, row in sub_task_description_data.iterrows():
@@ -2510,6 +2516,10 @@ class ExcelUploadService():
                 spares_dict["unit"] = rowdict.get("issued_unit_of_measurement", "")
                 actual_spares_cost += rowdict.get("billable_value_usd", 0)
                 actual_spares_list.append(spares_dict)
+            '''    
+            if task=="335100-12-1":
+                logger.info(f"actaul spares cost {actual_spares_cost}")
+                logger.info(f"actaul spare items{actual_spares_list}")'''
             
             mydict["actual_findings_spares_cost"] = actual_spares_cost
             mydict["actual_findings_spares_list"] = actual_spares_list
