@@ -1291,7 +1291,7 @@ class ExcelUploadService():
                     findings_mh_estimate = tasks_total_mhs *0.50
                 elif check_category=="18Y CHECK":
                     findings_mh_estimate = tasks_total_mhs *0.50
-                elif check_category=="EOL CHECK":
+                elif check_category=="EOL CHECK" or check_category=="EOL":
                     findings_mh_estimate = tasks_total_mhs *0.80
                 elif check_category=="NON C CHECK":
                     findings_mh_estimate = tasks_total_mhs *0.15
