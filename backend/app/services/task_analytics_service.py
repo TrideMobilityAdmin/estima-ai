@@ -62,6 +62,7 @@ class TaskService:
         self.subtaskpartslhrh_collection.create_index([("task_number", 1), ("package_number", 1)])
         self.taskdescriptionlhrh_collection.create_index([("actual_start_date", 1), ("actual_end_date", 1)])
         self.taskdescriptionlhrh_collection.create_index([("task_number", 1), ("package_number", 1)])
+        self.taskdescriptionlhrh_collection.create_index("task_type")
         self.subtaskdescriptionlhrh_collection.create_index([("actual_start_date", 1), ("actual_end_date", 1)])
         self.subtaskdescriptionlhrh_collection.create_index("log_item_number")
         self.subtaskdescriptionlhrh_collection.create_index("source_task_discrepancy_number_updated")
@@ -272,6 +273,7 @@ class TaskService:
             )
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
+        part_id = part_id.upper()
         """
         Get parts usage for a specific part_id within a date range.
         """
@@ -280,6 +282,11 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline =[
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
             'issued_part_number': part_id, 
@@ -302,7 +309,7 @@ class TaskService:
                 'package_number': '$package_number',
                 'task_number': '$task_number',
                 'requested_stock_status': '$requested_stock_status',
-                'part_description': '$part_description'
+              
             },
             'total_quantity': {
                 '$sum': '$ceilUsedQuantity'
@@ -474,6 +481,11 @@ class TaskService:
 
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
             'issued_part_number': part_id
@@ -689,7 +701,7 @@ class TaskService:
                                             },
                                             {
                                                 '$eq': [
-                                                    '$task_type', 'MPD'  # Add MPD filter here too
+                                                    '$task_type', 'MPD'  
                                                 ]
                                             }
                                         ]
@@ -2677,6 +2689,7 @@ class TaskService:
 
     async def get_each_part_usage_count(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
+        part_id = part_id.upper()
         """
         Get parts usage for a specific part_id within a date range.
         """
@@ -2685,6 +2698,11 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline =[
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
             'issued_part_number': part_id, 
@@ -2707,7 +2725,7 @@ class TaskService:
                 'package_number': '$package_number',
                 'task_number': '$task_number',
                 'requested_stock_status': '$requested_stock_status',
-                'part_description': '$part_description'
+                # 'part_description': '$part_description'
             },
             'total_quantity': {
                 '$sum': '$ceilUsedQuantity'
@@ -2758,7 +2776,7 @@ class TaskService:
                                 },
                                 {
                                     '$eq': [
-                                        '$task_type', 'MPD'  # Add this filter for MPD tasks only
+                                        '$task_type', 'MPD'  
                                     ]
                                 }
                             ]
@@ -2830,14 +2848,10 @@ class TaskService:
                         'tasks': {
                             '$push': {
                                 'taskId': '$task_number', 
-                                # 'taskDescription': '$task_info.description', 
+                                
                                 'packages': [
                                     {
-                                        # 'packageId': '$task_info.package_number', 
-                                        # 'date': '$task_info.actual_start_date', 
-                                        'quantity': '$ceilUsedQuantity', 
-                                        # 'stockStatus': '$requested_stock_status', 
-                                        # 'aircraftModel': '$aircraft_info.aircraft_model'
+                                        'quantity': '$ceilUsedQuantity'
                                     }
                                 ]
                             }
@@ -2860,14 +2874,18 @@ class TaskService:
         '$project': {
             '_id': '$partData._id', 
             'partDescription': '$partData.partDescription', 
-            'tasks': '$partData.tasks', 
-            # 'summary': 1
+            'tasks': '$partData.tasks'
         }
     }
 ]
 
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
             'issued_part_number': part_id
@@ -3131,18 +3149,11 @@ class TaskService:
                         'taskId': {
                             '$first': '$task_number'
                         }, 
-                        'taskDescription': {
-                            '$first': '$task_desc1.Description'
-                        }, 
+                         
                         'packages': {
                             '$push': {
-                                'packageId': '$package_number', 
-                                # 'logItem': '$task_number', 
-                                # 'description': '$task_description', 
-                                # 'date': '$task_desc1.actual_start_date', 
-                                # 'stockStatus': '$stock_status', 
-                                'quantity': '$ceilUsedQuantity', 
-                                # 'aircraftModel': '$aircraft_info.aircraft_model'
+                                'quantity': '$ceilUsedQuantity'
+                                
                             }
                         }
                     }
@@ -3159,20 +3170,12 @@ class TaskService:
                         '_id': '$$hmvTask.issued_part_number', 
                         'findings': {
                             'taskId': '$$hmvTask.task_info.source_task_discrepancy_number_updated', 
-                            'taskDescription': '$$hmvTask.task_desc.Description', 
+                            
                             'packages': [
                                 {
-                                    'packageId': '$$hmvTask.package_number', 
-                                    # 'logItem': '$$hmvTask.task_number', 
-                                    # 'description': '$$hmvTask.task_description', 
-                                    # 'date': {
-                                    #     '$ifNull': [
-                                    #         '$$hmvTask.task_info.actual_start_date',datetime(1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-                                    #     ]
-                                    # }, 
-                                    # 'stockStatus': '$$hmvTask.stock_status', 
-                                    'quantity': '$$hmvTask.ceilUsedQuantity', 
-                                    # 'aircraftModel': '$$hmvTask.aircraft_info.aircraft_model'
+                                     
+                                    'quantity': '$$hmvTask.ceilUsedQuantity'
+                                    
                                 }
                             ]
                         }
@@ -3187,7 +3190,7 @@ class TaskService:
                         '_id': '$$nonHmvTask.issued_part_number', 
                         'findings': {
                             'taskId': '$$nonHmvTask.taskId', 
-                            'taskDescription': '$$nonHmvTask.taskDescription', 
+                            
                             'packages': '$$nonHmvTask.packages'
                         }
                     }
@@ -3256,8 +3259,6 @@ class TaskService:
                 if hmv_tasks:
                     first_hmv = hmv_tasks[0]
                     part_id_hmv = first_hmv.get("_id", "")
-                    # For description, we might need to get it from elsewhere since HMV tasks might not have it
-                    # We'll use the part_id parameter as fallback
                 
                 findings_hmv_output = {
                     "partDescription": part_description,
