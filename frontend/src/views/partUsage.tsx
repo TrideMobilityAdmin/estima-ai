@@ -47,6 +47,7 @@ export default function PartUsage() {
     
     const [inputPartId, setInputPartId] = useState(""); // For input field
     const [selectedPartId, setSelectedPartId] = useState("");
+    const [loadingPartId, setLoadingPartId] = useState<string | null>(null);
     // const today = dayjs().startOf("day").toDate();
     // const twoDaysAgo = dayjs().subtract(2, "day").startOf("day").toDate();
 
@@ -133,8 +134,12 @@ export default function PartUsage() {
         const fetchData = async () => {
             if (!selectedPartId || !dateRange[0] || !dateRange[1]) {
                 setPartUsageData(null);
+                setLoadingPartId(null);
                 return;
             }
+            
+            setLoadingPartId(selectedPartId);
+            
             try {
                 // Format dates to required API format
                 const startDate = dayjs(dateRange[0]).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
@@ -149,6 +154,8 @@ export default function PartUsage() {
             } catch (error) {
                 console.error("Error fetching part usage:", error);
                 setPartUsageData(null);
+            } finally {
+                setLoadingPartId(null);
             }
         };
 
@@ -494,6 +501,8 @@ border-bottom: none;
                                     flex: 1,
                                     resizable: true,
                                     cellRenderer: (val: any) => {
+                                        const isCurrentPartLoading = loadingPartId === val.data.partId;
+                                        
                                         return (
                                             <Group mt='xs' align="center" justify="center">
                                                 <Tooltip label="Get Part Data">
@@ -501,10 +510,12 @@ border-bottom: none;
                                                         size={20}
                                                         color="teal"
                                                         variant="light"
-                                                        // loading={isLoading}
-                                                        // disabled={val?.data?.status?.toLowerCase() !== "completed"}
+                                                        loading={isCurrentPartLoading}
+                                                        disabled={loadingPartId !== null && !isCurrentPartLoading}
                                                         onClick={() => {
-                                                            setSelectedPartId(val.data.partId);
+                                                            if (!isCurrentPartLoading) {
+                                                                setSelectedPartId(val.data.partId);
+                                                            }
                                                         }}
                                                     >
                                                         <IconSettingsDown />
@@ -519,19 +530,22 @@ border-bottom: none;
                     </div>
 
                 </Card>
-                {/* <Space h='sm' /> */}
-                <Divider
-                    variant="dashed"
-                    labelPosition="center"
-                    color={"gray"}
-                    pb='sm'
-                    pt='sm'
-                    label={
-                        <>
-                            <Box >Part Usage</Box>
-                        </>
-                    }
-                />
+                
+                {/* Conditionally render Part Usage section only when data is available */}
+                {(partUsageData) && (
+                    <>
+                        <Divider
+                            variant="dashed"
+                            labelPosition="center"
+                            color={"gray"}
+                            pb='sm'
+                            pt='sm'
+                            label={
+                                <>
+                                    <Box >Part Usage</Box>
+                                </>
+                            }
+                        />
                 <Grid>
                     <Grid.Col span={4}>
                         <Card>
@@ -703,6 +717,8 @@ border-bottom: none;
                         icon="finding"
                     />
                 </SimpleGrid>
+                    </>
+                )}
             </div>
         </>
     )
