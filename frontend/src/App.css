@@ -17,6 +17,25 @@
   border-radius: 10px; /* Round track edges */
 }
 
+/* Chart container scrollbar styling */
+.scrollable-chart-container::-webkit-scrollbar {
+  height: 6px; /* Slightly thicker for charts */
+}
+
+.scrollable-chart-container::-webkit-scrollbar-thumb {
+  background-color: #1445B6; /* Match chart color */
+  border-radius: 10px;
+}
+
+.scrollable-chart-container::-webkit-scrollbar-thumb:hover {
+  background-color: #0d3494; /* Darker shade on hover */
+}
+
+.scrollable-chart-container::-webkit-scrollbar-track {
+  background: #e9ecef;
+  border-radius: 10px;
+}
+
 
 .glass-card {
     background: rgba(255, 255, 255, 0.2); /* Semi-transparent white */
