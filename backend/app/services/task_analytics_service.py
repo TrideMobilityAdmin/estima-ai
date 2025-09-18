@@ -767,7 +767,10 @@ class TaskService:
                     }
                 }, {
                     '$group': {
-                        '_id': '$task_number', 
+                        '_id': {
+                            'task_number': '$task_number',
+                            'package_number': '$package_number',
+                        }, 
                         'taskId': {
                             '$first': '$task_number'
                         }, 
@@ -3169,7 +3172,10 @@ class TaskService:
                     }
                 }, {
                     '$group': {
-                        '_id': '$task_number', 
+                        '_id': {
+                            'task_number': '$task_number',
+                            'package_number': '$package_number',
+                        }, 
                         'taskId': {
                             '$first': '$task_number'
                         }, 
