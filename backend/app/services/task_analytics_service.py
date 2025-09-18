@@ -448,7 +448,9 @@ class TaskService:
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
                                         'quantity': '$ceilUsedQuantity', 
-                                        'stockStatus': '$requested_stock_status', 
+                                        'stockStatus': '$requested_stock_status',
+                                        'description': '$task_info.description',
+                                        'logItem': '$task_number', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
                                 ]
@@ -962,7 +964,7 @@ class TaskService:
                             "taskId": t.get("taskId",""),
                             "taskDescription": t.get("taskDescription",""),
                             "packages": [
-                                {"packageId": pkg["packageId"],"stockStatus":pkg["stockStatus"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"]}
+                                {"packageId": pkg["packageId"],"stockStatus":pkg["stockStatus"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"],"logItem":pkg["logItem"],"description":pkg["description"]}
                                 for pkg in t.get("packages", [])
                             ]
                         }
@@ -2649,36 +2651,58 @@ class TaskService:
             part_id = part_ids[idx]
             if isinstance(result, Exception):
                 logger.error(f"Error processing part_id {part_id}: {str(result)}")
+                task_parts_list.append({
+                    "partDescription": "",
+                    "totalTasksQty": 0,
+                    "partId": part_id,
+                    "totalTasks": 0
+                })
+                findings_hmv_parts_list.append({
+                    "partDescription": "",
+                    "totalFindingsQty": 0,
+                    "partId": part_id,
+                    "totalFindings": 0
+                })
+                findings_non_hmv_tasks_list.append({
+                    "partDescription": "",
+                    "totalTasksQty": 0,
+                    "partId": part_id,
+                    "totalTasks": 0
+                })
                 continue
+            task_parts = result.get("taskParts", {})
+            findings_hmv = result.get("findingsHmvParts", {})
+            findings_non_hmv = result.get("findingsNonHMVTasks", {})
+
+            part_description = task_parts.get("partDescription", "")
+            if not part_description:
+                part_description = findings_hmv.get("partDescription", "")
             # Extract and format task parts data
             task_parts = result.get("taskParts", {})
-            if task_parts and task_parts.get("partID"):
-                task_parts_list.append({
-                    "partDescription": task_parts.get("partDescription", ""),
-                    "totalTasksQty": task_parts.get("totalTasksQty", 0),
-                    "partId": task_parts.get("partID", part_id),
-                    "totalTasks": task_parts.get("totalTasks", 0)
-                })
+            task_parts_list.append({
+                "partDescription": part_description,
+                "totalTasksQty": task_parts.get("totalTasksQty", 0),
+                "partId": task_parts.get("partID", part_id),
+                "totalTasks": task_parts.get("totalTasks", 0)
+            })
 
             # Extract and format HMV parts data
             findings_hmv = result.get("findingsHmvParts", {})
-            if findings_hmv and findings_hmv.get("partID"):
-                findings_hmv_parts_list.append({
-                    "partDescription": task_parts.get("partDescription", ""),
-                    "totalFindingsQty": findings_hmv.get("totalFindingsQty", 0),
-                    "partId": findings_hmv.get("partID", part_id),
-                    "totalFindings": findings_hmv.get("totalFindings", 0)
-                })
+            findings_hmv_parts_list.append({
+                "partDescription": findings_hmv.get("partDescription", ""),
+                "totalFindingsQty": findings_hmv.get("totalFindingsQty", 0),
+                "partId": findings_hmv.get("partID", part_id),
+                "totalFindings": findings_hmv.get("totalFindings", 0)
+            })
 
             # Extract and format non-HMV tasks data
             findings_non_hmv = result.get("findingsNonHMVTasks", {})
-            if findings_non_hmv and findings_non_hmv.get("partID"):
-                findings_non_hmv_tasks_list.append({
-                    "partDescription": task_parts.get("partDescription", ""),
-                    "totalTasksQty": findings_non_hmv.get("totalTasksQty", 0),
-                    "partId": findings_non_hmv.get("partID", part_id),
-                    "totalTasks": findings_non_hmv.get("totalTasks", 0)
-                })
+            findings_non_hmv_tasks_list.append({
+                "partDescription": part_description,
+                "totalTasksQty": findings_non_hmv.get("totalTasksQty", 0),
+                "partId": findings_non_hmv.get("partID", part_id),
+                "totalTasks": findings_non_hmv.get("totalTasks", 0)
+            })
 
         return {
             "taskParts": task_parts_list,
@@ -3167,7 +3191,8 @@ class TaskService:
                     'input': '$hmvTasks', 
                     'as': 'hmvTask', 
                     'in': {
-                        '_id': '$$hmvTask.issued_part_number', 
+                        '_id': '$$hmvTask.issued_part_number',
+                        "partDescription":'$$hmvTask.part_description',
                         'findings': {
                             'taskId': '$$hmvTask.task_info.source_task_discrepancy_number_updated', 
                             
@@ -3222,7 +3247,6 @@ class TaskService:
                 
                 total_tasks = len(tasks)
                 total_tasks_qty = 0
-                
                 for task in tasks:
                     packages = task.get("packages", [])
                     for package in packages:
@@ -3230,7 +3254,7 @@ class TaskService:
                 
                 task_parts_output = {
                     "partDescription": task_data.get("partDescription", ""),
-                    "partID": task_data.get("_id", ""),
+                    "partID": task_data.get("_id", part_id),
                     "totalTasks": total_tasks,
                     "totalTasksQty": total_tasks_qty
                 }
@@ -3259,6 +3283,7 @@ class TaskService:
                 if hmv_tasks:
                     first_hmv = hmv_tasks[0]
                     part_id_hmv = first_hmv.get("_id", "")
+                    part_description=first_hmv.get("partDescription","")
                 
                 findings_hmv_output = {
                     "partDescription": part_description,
@@ -3284,6 +3309,7 @@ class TaskService:
                 if non_hmv_tasks:
                     first_non_hmv = non_hmv_tasks[0]
                     part_id_non_hmv = first_non_hmv.get("_id", "")
+                   
                 
                 findings_non_hmv_output = {
                     "partDescription": part_description_non_hmv,
