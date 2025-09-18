@@ -134,7 +134,11 @@ parts_master = list(parts_master.find({},))
 parts_master= pd.DataFrame(parts_master)
 parts_master = parts_master.drop(columns=["_id"], errors="ignore")
 parts_master=parts_master.drop_duplicates()
-
+parts_master = parts_master[
+            parts_master[["latest_base_price_usd", "latest_freight_cost", "latest_admin_charges"]]
+            .notna()
+            .all(axis=1)
+        ]
 
 task_parts_collection = db["task_parts_lhrh"]
 task_parts  = list(task_parts_collection.find({}, {"package_number": 1, "task_number":1,"part_description":1,"issued_part_number":1,"used_quantity":1,"requested_stock_status":1,"part_type":1,"issued_stock_status":1,"unit_of_measurement":1}))

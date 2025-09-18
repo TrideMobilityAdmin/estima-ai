@@ -1,3 +1,4 @@
+import asyncio
 from app.models.task_models import TaskManHoursModel,ManHrs,FindingsManHoursModel,ProbabilityWiseManhrsSpareCost
 from statistics import mean
 from fastapi import HTTPException,Depends,status
@@ -23,24 +24,23 @@ from app.db.database_connection import MongoDBClient
 class TaskService:
     def __init__(self):
         self.mongo_client = MongoDBClient()
-        # self.collection = self.mongo_client.get_collection("spares-costing")
+     
         self.estimates_collection = self.mongo_client.get_collection("estima_output")
         self.task_spareparts_collection=self.mongo_client.get_collection("task_parts")
     
-        # self.tasks_collection = self.mongo_client.get_collection("tasks")
+        
         self.spareparts_collection=self.mongo_client.get_collection("spares-qty")
         self.taskparts_collection=self.mongo_client.get_collection("task_parts")
-        self.taskpartslhrh_collection=self.mongo_client.get_collection("task_parts_lhrh")
-
         self.subtaskparts_collection=self.mongo_client.get_collection("sub_task_parts")
+        
+        self.taskpartslhrh_collection=self.mongo_client.get_collection("task_parts_lhrh")
         self.subtaskpartslhrh_collection=self.mongo_client.get_collection("sub_task_parts_lhrh")
-        # self.tasks_collection = self.mongo_client.get_collection("tasks")
-        # self.tasks_collection=self.mongo_client.get_collection("task_description")
+
         self.tasks_collection = self.mongo_client.get_collection("estima_input_upload")
         self.taskdescription_collection=self.mongo_client.get_collection("task_description")
-        self.taskdescriptionlhrh_collection=self.mongo_client.get_collection("task_description_max500mh_lhrh")
-
         self.sub_task_collection=self.mongo_client.get_collection("sub_task_description")
+
+        self.taskdescriptionlhrh_collection=self.mongo_client.get_collection("task_description_max500mh_lhrh")
         self.subtaskdescriptionlhrh_collection=self.mongo_client.get_collection("sub_task_description_max500mh_lhrh")
 
         self.estimates_status_collection=self.mongo_client.get_collection("estimates_status")
@@ -51,8 +51,25 @@ class TaskService:
         self.lhrh_task_description=self.mongo_client.get_collection("task_description_max500mh_lhrh")
         self.aircraft_details_collection=self.mongo_client.get_collection("aircraft_details")
         self.operators_collection=self.mongo_client.get_collection("operators_master")
+
+        self._ensure_indexes()
     
-    
+    def _ensure_indexes(self):
+        self.taskpartslhrh_collection.create_index([("task_number", 1), ("package_number", 1)])
+        self.taskpartslhrh_collection.create_index("issued_part_number")
+        self.taskpartslhrh_collection.create_index("requested_stock_status")
+        self.subtaskpartslhrh_collection.create_index("issued_part_number")
+        self.subtaskpartslhrh_collection.create_index([("task_number", 1), ("package_number", 1)])
+        self.taskdescriptionlhrh_collection.create_index([("actual_start_date", 1), ("actual_end_date", 1)])
+        self.taskdescriptionlhrh_collection.create_index([("task_number", 1), ("package_number", 1)])
+        self.taskdescriptionlhrh_collection.create_index("task_type")
+        self.subtaskdescriptionlhrh_collection.create_index([("actual_start_date", 1), ("actual_end_date", 1)])
+        self.subtaskdescriptionlhrh_collection.create_index("log_item_number")
+        self.subtaskdescriptionlhrh_collection.create_index("source_task_discrepancy_number_updated")
+        
+
+
+
     async def get_man_hours(self, source_task: str) -> TaskManHoursModel:
         """
         Get man hours statistics for a specific source task
@@ -257,6 +274,7 @@ class TaskService:
   
     async def get_parts_usage(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
         logger.info(f"startDate and endDate are:\n{startDate,endDate}")
+        part_id = part_id.upper()
         """
         Get parts usage for a specific part_id within a date range.
         """
@@ -265,9 +283,14 @@ class TaskService:
             logger.info(f"Fetching parts usage for part_id: {part_id}")
             # Pipeline for task_parts
             task_parts_pipeline =[
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
-            'requested_part_number': part_id, 
+            'issued_part_number': part_id, 
             'requested_stock_status': {
                 '$ne': 'Owned'
             }
@@ -276,10 +299,46 @@ class TaskService:
      {
         '$addFields': {
             'ceilUsedQuantity': {
-                '$ceil': '$requested_quantity'
+                '$ceil': '$issued_quantity'
             }
         }
-    },  {
+    },
+         # Group and sum quantities before lookups
+    {
+        '$group': {
+            '_id': {
+                'package_number': '$package_number',
+                'task_number': '$task_number',
+                'requested_stock_status': '$requested_stock_status',
+              
+            },
+            'total_quantity': {
+                '$sum': '$ceilUsedQuantity'
+            },
+            'original_docs': {
+                '$push': '$$ROOT'
+            }
+        }
+    },
+    {
+        '$replaceRoot': {
+            'newRoot': {
+                '$mergeObjects': [
+                    {'$arrayElemAt': ['$original_docs', 0]},
+                    {
+                        'ceilUsedQuantity': '$total_quantity',
+                        'grouped': True
+                    }
+                ]
+            }
+        }
+    },
+    {
+        '$project': {
+            'original_docs': 0
+        }
+    },
+    {
         '$lookup': {
             'from': 'task_description_max500mh_lhrh', 
             'let': {
@@ -299,11 +358,35 @@ class TaskService:
                                     '$eq': [
                                         '$task_number', '$$task_number'
                                     ]
+                                },
+                                {
+                                    '$eq': [
+                                        '$task_type', 'MPD'  # Add this filter for MPD tasks only
+                                    ]
                                 }
                             ]
                         }
                     }
-                }, {
+                }, 
+                # Add deduplication stage here
+                {
+                    '$group': {
+                        '_id': {
+                            'package_number': '$package_number',
+                            'task_number': '$task_number',
+                            'actual_start_date': '$actual_start_date',
+                            'actual_end_date': '$actual_end_date'
+                        },
+                        'document': {
+                            '$first': '$$ROOT'
+                        }
+                    }
+                },
+                {
+                    '$replaceRoot': {
+                        'newRoot': '$document'
+                    }
+                },{
                     '$project': {
                         'package_number': '$package_number', 
                         'actual_start_date': 1, 
@@ -353,7 +436,7 @@ class TaskService:
             'mainData': [
                 {
                     '$group': {
-                        '_id': '$requested_part_number', 
+                        '_id': '$issued_part_number', 
                         'partDescription': {
                             '$first': '$part_description'
                         }, 
@@ -366,7 +449,9 @@ class TaskService:
                                         'packageId': '$task_info.package_number', 
                                         'date': '$task_info.actual_start_date', 
                                         'quantity': '$ceilUsedQuantity', 
-                                        'stockStatus': '$requested_stock_status', 
+                                        'stockStatus': '$requested_stock_status',
+                                        'description': '$task_info.description',
+                                        'logItem': '$task_number', 
                                         'aircraftModel': '$aircraft_info.aircraft_model'
                                     }
                                 ]
@@ -374,59 +459,9 @@ class TaskService:
                         }
                     }
                 }
-            ], 
-            'aircraftModels': [
-                {
-                    '$group': {
-                        '_id': '$aircraft_info.aircraft_model', 
-                        'count': {
-                            '$sum': 1
-                        }
-                    }
-                }, {
-                    '$match': {
-                        '_id': {
-                            '$ne': None
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'aircraftModel': '$_id', 
-                        'count': 1, 
-                        '_id': 0
-                    }
-                }, {
-                    '$sort': {
-                        'count': -1
-                    }
-                }
-            ], 
-            'stockStatuses': [
-                {
-                    '$group': {
-                        '_id': '$requested_stock_status', 
-                        'count': {
-                            '$sum': 1
-                        }
-                    }
-                }, {
-                    '$match': {
-                        '_id': {
-                            '$ne': None
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'statusCode': '$_id', 
-                        'count': 1, 
-                        '_id': 0
-                    }
-                }, {
-                    '$sort': {
-                        'count': -1
-                    }
-                }
             ]
+           
+        
         }
     }, {
         '$project': {
@@ -434,24 +469,26 @@ class TaskService:
                 '$arrayElemAt': [
                     '$mainData', 0
                 ]
-            }, 
-            'summary': {
-                'aircraftModels': '$aircraftModels', 
-                'stockStatuses': '$stockStatuses'
             }
+          
         }
     }, {
         '$project': {
             '_id': '$partData._id', 
             'partDescription': '$partData.partDescription', 
             'tasks': '$partData.tasks', 
-            'summary': 1
+            # 'summary': 1
         }
     }
 ]
 
             # Pipeline for sub_task_parts
             sub_task_parts_pipeline = [
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
     {
         '$match': {
             'issued_part_number': part_id
@@ -471,6 +508,31 @@ class TaskService:
                 '$ceil': '$used_quantity'
             }
         }
+    },
+    {
+        '$group': {
+            '_id': {
+                'task_number': '$task_number',
+                'package_number': '$package_number',
+            }, 
+            'doc': {
+                '$first': '$$ROOT'
+            }, 
+            'totalQty': {
+                '$sum': '$ceilUsedQuantity'
+            }
+        }
+    },
+    {
+        '$replaceRoot': {
+            'newRoot': {
+                '$mergeObjects': [
+                    '$doc', {
+                        'ceilUsedQuantity': '$totalQty'
+                    }
+                ]
+            }
+        }
     },{
         '$facet': {
             'hmvTasks': [
@@ -478,7 +540,7 @@ class TaskService:
                     '$match': {
                         'isHMV': 'HMV'
                     }
-                }, {
+                },{
                     '$lookup': {
                         'from': 'aircraft_details', 
                         'localField': 'package_number', 
@@ -497,22 +559,38 @@ class TaskService:
                         'foreignField': 'log_item_number', 
                         'as': 'task_info', 
                         'pipeline': [
-                            {
-                                '$project': {
-                                    'convertedPackage': '$package_number', 
-                                    'actual_start_date': 1, 
-                                    'actual_end_date': 1, 
-                                    'source_task_discrepancy_number': 1, 
-                                    'log_item_number': 1, 
-                                    '_id': 0
-                                }
-                            }
+                             {
+                '$group': {
+                    '_id': {
+                        'log_item_number': '$log_item_number',
+                        'source_task': '$source_task_discrepancy_number_updated',
+                        'package': '$package_number',
+                        'start_date': '$actual_start_date',
+                        'end_date': '$actual_end_date'
+                    },
+                    'doc': {'$first': '$$ROOT'}
+                }
+            },{
+                '$replaceRoot': {
+                    'newRoot': '$doc'
+                }
+            },
+            {
+                '$project': {
+                    'convertedPackage': '$package_number', 
+                    'actual_start_date': 1, 
+                    'actual_end_date': 1, 
+                    'source_task_discrepancy_number_updated': 1, 
+                    'log_item_number': 1, 
+                    '_id': 0
+                }
+            }
                         ]
                     }
                 }, {
                     '$unwind': {
                         'path': '$task_info', 
-                        'preserveNullAndEmptyArrays': True
+                        # 'preserveNullAndEmptyArrays': True
                     }
                 }, {
                     '$match': {
@@ -531,31 +609,12 @@ class TaskService:
                         }
                     }
                 }, 
+               
                 {
-                    '$group': {
-                        '_id': '$task_number', 
-                        'doc': {
-                            '$first': '$$ROOT'
-                        }, 
-                        'totalQty': {
-                            '$sum': '$ceilUsedQuantity'
-                        }
-                    }
-                }, {
-                    '$replaceRoot': {
-                        'newRoot': {
-                            '$mergeObjects': [
-                                '$doc', {
-                                    'ceilUsedQuantity': '$totalQty'
-                                }
-                            ]
-                        }
-                    }
-                }, {
                     '$lookup': {
                         'from': 'task_description_max500mh_lhrh', 
                         'let': {
-                            'source_task': '$task_info.source_task_discrepancy_number', 
+                            'source_task': '$task_info.source_task_discrepancy_number_updated', 
                             'pkg_num': '$package_number'
                         }, 
                         'pipeline': [
@@ -571,6 +630,11 @@ class TaskService:
                                                 '$eq': [
                                                     '$package_number', '$$pkg_num'
                                                 ]
+                                            },
+                                            {
+                                                '$eq': [
+                                                    '$task_type', 'MPD'
+                                                ]
                                             }
                                         ]
                                     }
@@ -578,7 +642,8 @@ class TaskService:
                             }, 
                             {
                                 '$limit': 1
-                            },{
+                            },
+                            {
                                 '$project': {
                                     'Description': {
                                         '$ifNull': [
@@ -593,8 +658,7 @@ class TaskService:
                     }
                 }, {
                     '$unwind': {
-                        'path': '$task_desc', 
-                        'preserveNullAndEmptyArrays': True
+                        'path': '$task_desc'
                     }
                 }
             ], 
@@ -637,11 +701,36 @@ class TaskService:
                                                 '$eq': [
                                                     '$package_number', '$$pkg_num'
                                                 ]
+                                            },
+                                            {
+                                                '$eq': [
+                                                    '$task_type', 'MPD'  
+                                                ]
                                             }
                                         ]
                                     }
                                 }
-                            }, {
+                            },
+                              # Add deduplication stage here (same as in HMV tasks)
+                {
+                    '$group': {
+                        '_id': {
+                            'package_number': '$package_number',
+                            'task_number': '$task_number',
+                            'actual_start_date': '$actual_start_date',
+                            'actual_end_date': '$actual_end_date'
+                        },
+                        'document': {
+                            '$first': '$$ROOT'
+                        }
+                    }
+                },
+                {
+                    '$replaceRoot': {
+                        'newRoot': '$document'
+                    }
+                },
+                {
                                 '$project': {
                                     'actual_start_date': 1, 
                                     'actual_end_date': 1, 
@@ -659,7 +748,7 @@ class TaskService:
                 }, {
                     '$unwind': {
                         'path': '$task_desc1', 
-                        'preserveNullAndEmptyArrays': True
+                        # 'preserveNullAndEmptyArrays': True
                     }
                 }, {
                     '$match': {
@@ -699,50 +788,6 @@ class TaskService:
                         }
                     }
                 }
-            ], 
-            'aircraftModels': [
-                {
-                    '$lookup': {
-                        'from': 'aircraft_details', 
-                        'localField': 'package_number', 
-                        'foreignField': 'package_number', 
-                        'as': 'aircraft_info'
-                    }
-                }, {
-                    '$unwind': {
-                        'path': '$aircraft_info', 
-                        'preserveNullAndEmptyArrays': True
-                    }
-                }, {
-                    '$group': {
-                        '_id': '$aircraft_info.aircraft_model', 
-                        'count': {
-                            '$sum': 1
-                        }
-                    }
-                }, {
-                    '$match': {
-                        '_id': {
-                            '$ne': None
-                        }
-                    }
-                }
-            ], 
-            'stockStatuses': [
-                {
-                    '$group': {
-                        '_id': '$stock_status', 
-                        'count': {
-                            '$sum': 1
-                        }
-                    }
-                }, {
-                    '$match': {
-                        '_id': {
-                            '$ne': None
-                        }
-                    }
-                }
             ]
         }
     }, {
@@ -754,7 +799,7 @@ class TaskService:
                     'in': {
                         '_id': '$$hmvTask.issued_part_number', 
                         'findings': {
-                            'taskId': '$$hmvTask.task_info.source_task_discrepancy_number', 
+                            'taskId': '$$hmvTask.task_info.source_task_discrepancy_number_updated', 
                             'taskDescription': '$$hmvTask.task_desc.Description', 
                             'packages': [
                                 {
@@ -788,9 +833,7 @@ class TaskService:
                         }
                     }
                 }
-            }, 
-            'aircraftModels': '$aircraftModels', 
-            'stockStatuses': '$stockStatuses'
+            }
         }
     }, {
         '$project': {
@@ -798,28 +841,8 @@ class TaskService:
                 'hmvTasks': '$hmvFindings', 
                 'nonHmvTasks': '$nonHmvFindings'
             }, 
-            'summary': {
-                'aircraftModels': {
-                    '$map': {
-                        'input': '$aircraftModels', 
-                        'as': 'model', 
-                        'in': {
-                            'aircraftModel': '$$model._id', 
-                            'count': '$$model.count'
-                        }
-                    }
-                }, 
-                'stockStatuses': {
-                    '$map': {
-                        'input': '$stockStatuses', 
-                        'as': 'status', 
-                        'in': {
-                            'statusCode': '$$status._id', 
-                            'count': '$$status.count'
-                        }
-                    }
-                }
-            }
+            
+        
         }
     }
 ]
@@ -834,36 +857,104 @@ class TaskService:
                 logger.warning(f"No parts usage found for part_id: {part_id}")
                 return {"data": {}, "response": {"statusCode": 404, "message": "No PartID found in the given Date range"}}
            
-            # Initialize aircraft details with empty arrays as default
-            task_parts_aircraft_details = {
-                "aircraftModels": [],
-                "stockStatuses": []
-            }
-
-            sub_task_parts_aircraft_details = {
-                "aircraftModels": [],
-                "stockStatuses": []
-            }
-
-            # Only update aircraft details if there are actual tasks
-            if task_parts_result and len(task_parts_result[0].get("tasks", [])) > 0:
-                task_parts_aircraft_details = {
-                    "aircraftModels": task_parts_result[0].get("summary", {}).get("aircraftModels", []),
-                    "stockStatuses": task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+            # Helper function to calculate aircraft details from actual results
+            def calculate_aircraft_details(task_parts_result, sub_task_parts_result):
+                """Calculate aircraft models and stock statuses from the actual result data"""
+                
+                task_parts_details = {
+                    "aircraftModels": [],
+                    "stockStatuses": []
                 }
-
-            # Only update sub_task aircraft details if there are actual findings and they're not empty
-            findings = sub_task_parts_result[0].get("findings", {}) if sub_task_parts_result else {}
-            hmv_tasks = findings.get("hmvTasks", [])
-            non_hmv_tasks = findings.get("nonHmvTasks", [])
-            
-            if (sub_task_parts_result and 
-                hmv_tasks and  # Check if hmvTasks is not empty
-                (len(hmv_tasks) > 0 or len(non_hmv_tasks) > 0)):
-                sub_task_parts_aircraft_details = {
-                    "aircraftModels": sub_task_parts_result[0].get("summary", {}).get("aircraftModels", []),
-                    "stockStatuses": sub_task_parts_result[0].get("summary", {}).get("stockStatuses", [])
+                
+                sub_task_parts_details = {
+                    "aircraftModels": [],
+                    "stockStatuses": []
                 }
+                
+                # Process task_parts results - COUNT occurrences, not sum quantities
+                if task_parts_result and task_parts_result[0].get("tasks"):
+                    aircraft_model_count = defaultdict(int)
+                    stock_status_count = defaultdict(int)
+                    
+                    for task in task_parts_result[0]["tasks"]:
+                        for pkg in task.get("packages", []):
+                            if pkg.get("aircraftModel"):
+                                aircraft_model_count[pkg["aircraftModel"]] += 1  # Count occurrences
+                            if pkg.get("stockStatus"):
+                                stock_status_count[pkg["stockStatus"]] += 1  # Count occurrences
+                    
+                    task_parts_details["aircraftModels"] = [
+                        {"aircraftModel": model, "count": count} 
+                        for model, count in aircraft_model_count.items()
+                    ]
+                    task_parts_details["stockStatuses"] = [
+                        {"statusCode": status, "count": count} 
+                        for status, count in stock_status_count.items()
+                    ]
+                
+                # Process sub_task_parts results - COUNT occurrences for HMV tasks only
+                if sub_task_parts_result and sub_task_parts_result[0].get("findings", {}).get("hmvTasks"):
+                    hmv_aircraft_count = defaultdict(int)
+                    hmv_stock_count = defaultdict(int)
+                    
+                    # Extract HMV tasks from sub_task_parts_result
+                    hmv_tasks = sub_task_parts_result[0]["findings"]["hmvTasks"]
+                    for task in hmv_tasks:
+                        # Each HMV task has a "findings" object with "packages" array
+                        task_findings = task.get("findings", {})
+                        packages = task_findings.get("packages", [])
+                        for pkg in packages:
+                            if pkg.get("aircraftModel"):
+                                hmv_aircraft_count[pkg["aircraftModel"]] += 1  # Count occurrences
+                            if pkg.get("stockStatus"):
+                                hmv_stock_count[pkg["stockStatus"]] += 1  # Count occurrences
+                    
+                    sub_task_parts_details["aircraftModels"] = [
+                        {"aircraftModel": model, "count": count} 
+                        for model, count in hmv_aircraft_count.items()
+                    ]
+                    sub_task_parts_details["stockStatuses"] = [
+                        {"statusCode": status, "count": count} 
+                        for status, count in hmv_stock_count.items()
+                    ]
+                    
+                    # Non-HMV tasks (merge with task_parts_details)
+                    non_hmv_aircraft_count = defaultdict(int)
+                    non_hmv_stock_count = defaultdict(int) 
+                    # Extract non-HMV tasks from sub_task_parts_result
+                    non_hmv_tasks = sub_task_parts_result[0].get("findings", {}).get("nonHmvTasks", [])
+                    for task in non_hmv_tasks:
+                        # Each non-HMV task has a "findings" object with "packages" array
+                        task_findings = task.get("findings", {})
+                        packages = task_findings.get("packages", [])
+                        for pkg in packages:
+                            if pkg.get("aircraftModel"):
+                                non_hmv_aircraft_count[pkg["aircraftModel"]] += 1  # Count occurrences
+                            if pkg.get("stockStatus"):
+                                non_hmv_stock_count[pkg["stockStatus"]] += 1  # Count occurrences
+                    
+                    # Merge non-HMV with existing task parts details
+                    for model in task_parts_details["aircraftModels"]:
+                        non_hmv_aircraft_count[model["aircraftModel"]] += model["count"]
+                    
+                    for status in task_parts_details["stockStatuses"]:
+                        non_hmv_stock_count[status["statusCode"]] += status["count"]
+                    
+                    task_parts_details["aircraftModels"] = [
+                        {"aircraftModel": model, "count": count} 
+                        for model, count in non_hmv_aircraft_count.items()
+                    ]
+                    task_parts_details["stockStatuses"] = [
+                        {"statusCode": status, "count": count} 
+                        for status, count in non_hmv_stock_count.items()
+                    ]
+                
+                return task_parts_details, sub_task_parts_details
+            # Calculate aircraft details from actual results
+            task_parts_aircraft_details, sub_task_parts_aircraft_details = calculate_aircraft_details(
+                task_parts_result, sub_task_parts_result
+            )
+             
 
             output = {
                 "partId": part_id,
@@ -874,7 +965,7 @@ class TaskService:
                             "taskId": t.get("taskId",""),
                             "taskDescription": t.get("taskDescription",""),
                             "packages": [
-                                {"packageId": pkg["packageId"],"stockStatus":pkg["stockStatus"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"]}
+                                {"packageId": pkg["packageId"],"stockStatus":pkg["stockStatus"],"date": pkg.get("date", "0001-01-01T00:00:00Z"), "quantity": pkg["quantity"],"aircraftModel":pkg["aircraftModel"],"logItem":pkg["logItem"],"description":pkg["description"]}
                                 for pkg in t.get("packages", [])
                             ]
                         }
@@ -930,23 +1021,30 @@ class TaskService:
             date_qty = defaultdict(lambda: {"tasksqty": 0, "findingsqty": 0})
             logger.info("Processing tasks to calculate date-wise quantities.")
             for task in output["usage"]["tasks"]:
-                logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
+                # logger.info(f"Processing task: {task['taskId']} - {task['taskDescription']}")
                 for pkg in task["packages"]:
                     date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]  # Extract date only
                     date_qty[date_key]["tasksqty"] += pkg["quantity"]  # Sum the quantities
-                    logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
+                    # logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
 
             logger.info("Processing findings to calculate date-wise quantities.")
-            for finding_type in ["hmvTasks", "nonHmvTasks"]:
-                for task in output["usage"]["findings"].get(finding_type, []):
-                    logger.info(f"Processing finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
-                    for pkg in task.get("packages", []):
-                        date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]
-                        date_qty[date_key]["findingsqty"] += pkg["quantity"]
-                        logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
-
+            
+            for task in output["usage"]["findings"].get("hmvTasks", []):
+                # logger.info(f"Processing HMV finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
+                for pkg in task.get("packages", []):
+                    date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]
+                    date_qty[date_key]["findingsqty"] += pkg["quantity"]
+                    # logger.info(f"Added {pkg['quantity']} to findingsqty for date {date_key}. Current total: {date_qty[date_key]['findingsqty']}")
+            
+            for task in output["usage"]["findings"].get("nonHmvTasks", []):
+                # logger.info(f"Processing non-HMV finding: {task.get('taskId', '')} - {task.get('taskDescription', '')}")
+                for pkg in task.get("packages", []):
+                    date_key = pkg["date"].strftime("%Y-%m-%d") if isinstance(pkg["date"], datetime) else pkg["date"]
+                    date_qty[date_key]["tasksqty"] += pkg["quantity"]
+                    # logger.info(f"Added {pkg['quantity']} to tasksqty for date {date_key}. Current total: {date_qty[date_key]['tasksqty']}")
+                        
             output["dateWiseQty"] = [{"date": date, **counts} for date, counts in date_qty.items()]
-            logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
+            # logger.info(f"Final date-wise quantities:length={len(output['dateWiseQty'])}")
 
             return {"data": output, "response": {"statusCode": 200, "message": "Parts usage retrieved successfully"}}
         except Exception as e:
@@ -1041,11 +1139,11 @@ class TaskService:
 
             # MongoDB pipeline for sub-task findings
             sub_tasks_skill_pipeline = [
-                {"$match": {"source_task_discrepancy_number": {"$in": source_tasks}}},  # Modified to use $in operator
+                {"$match": {"source_task_discrepancy_number_updated": {"$in": source_tasks}}},  # Modified to use $in operator
                 {
         '$group': {
             '_id': {
-                'task_number': '$source_task_discrepancy_number', 
+                'task_number': '$source_task_discrepancy_number_updated', 
                 'skill_number': '$skill_number'
             }, 
             'actual_man_hours': {
@@ -1408,7 +1506,7 @@ class TaskService:
                 findings_mh_estimate = tasks_total_mhs *0.50
             elif check_category=="18Y CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.50
-            elif check_category=="EOL CHECK":
+            elif check_category=="EOL CHECK" or check_category=="EOL":
                 findings_mh_estimate = tasks_total_mhs *0.80
             elif check_category=="NON C CHECK":
                 findings_mh_estimate = tasks_total_mhs *0.15
@@ -2045,347 +2143,7 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error fetching estimate: {e}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
-    async def multiple_parts_usage(self, part_ids: List[str], startDate: datetime, endDate: datetime) -> Dict:
-        logger.info(f"startDate and endDate are:\n{startDate, endDate}")
-        """
-        Get parts usage for multiple part IDs
-        """
-        logger.info(f"Fetching parts usage for multiple part IDs: {part_ids}")
 
-        task_parts_pipeline = [
-    {
-        '$match': {
-            'requested_part_number': {
-                '$in': part_ids
-            }, 
-            'requested_stock_status': {
-                '$ne': 'Owned'
-            }
-        }
-    },
-      {
-        '$addFields': {
-            'ceilRequestedQuantity': {
-                '$ceil': '$requested_quantity'
-            }
-        }
-    },  {
-        '$lookup': {
-            'from': 'task_description_max500mh_lhrh', 
-            'let': {
-                'package_number': '$package_number', 
-                'task_number': '$task_number'
-            }, 
-            'pipeline': [
-                {
-                    '$match': {
-                        '$expr': {
-                            '$and': [
-                                {
-                                    '$eq': [
-                                        '$package_number', '$$package_number'
-                                    ]
-                                }, {
-                                    '$eq': [
-                                        '$task_number', '$$task_number'
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'package_number': '$package_number', 
-                        'actual_start_date': 1, 
-                        'actual_end_date': 1, 
-                        'description': 1, 
-                        '_id': 0
-                    }
-                }
-            ], 
-            'as': 'task_info'
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_info', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$match': {
-            '$expr': {
-                '$and': [
-                    {
-                        '$gte': [
-                            '$task_info.actual_start_date', startDate
-                        ]
-                    }, {
-                        '$lt': [
-                            '$task_info.actual_end_date', endDate
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$group': {
-            '_id': {
-                'partId': '$requested_part_number', 
-                # 'partDescription': '$part_description'
-            }, 
-            'partDescription': {
-                '$first': '$part_description'
-            }, 
-            'totalTasksQty': {
-                '$sum': '$ceilRequestedQuantity'
-            }, 
-            'taskNumbers': {
-                '$push': '$task_number'
-            }
-        }
-    }, {
-        '$project': {
-            '_id': 0, 
-            'partId': '$_id.partId', 
-            # 'partDescription': '$_id.partDescription', 
-            'partDescription': 1,
-            'totalTasksQty': 1, 
-            'totalTasks': {
-                '$size': '$taskNumbers'
-            }
-        }
-    }
-]
-        findings_HMV_parts_pipeline = [
-    {
-        '$match': {
-            'issued_part_number': {
-                '$in': part_ids
-            }
-        }
-    }, {
-        '$addFields': {
-            'isHMV': {
-                '$substr': [
-                    '$task_number', 0, 3
-                ]
-            }
-        }
-    }, {
-        '$match': {
-            'isHMV': 'HMV'
-        }
-    },
-    {
-        '$addFields': {
-            'ceilUsedQuantity': {
-                '$ceil': '$used_quantity'
-            }
-        }
-    },
-      {
-        '$lookup': {
-            'from': 'sub_task_description_max500mh_lhrh', 
-            'localField': 'task_number', 
-            'foreignField': 'log_item_number', 
-            'as': 'task_info', 
-            'pipeline': [
-                {
-                    '$project': {
-                        'convertedPackage': '$package_number', 
-                        'actual_start_date': 1, 
-                        'actual_end_date': 1, 
-                        'source_task_discrepancy_number': 1, 
-                        'log_item_number': 1, 
-                        '_id': 0
-                    }
-                }
-            ]
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_info', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$match': {
-            '$expr': {
-                '$and': [
-                    {
-                        '$gte': [
-                            '$task_info.actual_start_date', startDate
-                        ]
-                    }, {
-                        '$lt': [
-                            '$task_info.actual_end_date', endDate
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$group': {
-            '_id': {
-                'partId': '$issued_part_number', 
-                # 'partDescription': {
-                #     '$replaceAll': {
-                #         'input': '$part_description', 
-                #         'find': ' ', 
-                #         'replacement': ''
-                #     }
-                # }
-            }, 
-            'partDescription': {
-                '$first': '$part_description'
-            },
-            'totalFindingsQty': {
-                '$sum': '$ceilUsedQuantity'
-            }, 
-            'task_numbers': {
-                '$addToSet': '$task_info.log_item_number'
-            }
-        }
-    }, {
-        '$project': {
-            '_id': 0, 
-            'partId': '$_id.partId', 
-            # 'partDescription': '$_id.partDescription', 
-            'partDescription': 1,
-            'totalFindingsQty': 1, 
-            'totalFindings': {
-                '$size': '$task_numbers'
-            }
-        }
-    }
-]
-        findings_nonHMV_parts_pipeline = [
-    {
-        '$match': {
-            'issued_part_number': {
-                '$in': part_ids
-            }
-        }
-    }, {
-        '$addFields': {
-            'isHMV': {
-                '$substr': [
-                    '$task_number', 0, 3
-                ]
-            }
-        }
-    }, {
-        '$match': {
-            'isHMV': {
-                '$ne': 'HMV'
-            }
-        }
-    }, 
-    {
-        '$addFields': {
-            'ceilUsedQuantity': {
-                '$ceil': '$used_quantity'
-            }
-        }
-    },{
-        '$lookup': {
-            'from': 'task_description_max500mh_lhrh', 
-            'let': {
-                'task_num': '$task_number', 
-                'pkg_num': '$package_number'
-            }, 
-            'pipeline': [
-                {
-                    '$match': {
-                        '$expr': {
-                            '$and': [
-                                {
-                                    '$eq': [
-                                        '$task_number', '$$task_num'
-                                    ]
-                                }, {
-                                    '$eq': [
-                                        '$package_number', '$$pkg_num'
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }, {
-                    '$project': {
-                        'actual_start_date': 1, 
-                        'actual_end_date': 1, 
-                        '_id': 0
-                    }
-                }
-            ], 
-            'as': 'task_info'
-        }
-    }, {
-        '$unwind': {
-            'path': '$task_info', 
-            'preserveNullAndEmptyArrays': True
-        }
-    }, {
-        '$match': {
-            '$expr': {
-                '$and': [
-                    {
-                        '$gte': [
-                            '$task_info.actual_start_date', startDate
-                        ]
-                    }, {
-                        '$lt': [
-                            '$task_info.actual_end_date', endDate
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$group': {
-            '_id': '$issued_part_number', 
-                # 'partDescription': {
-                #     '$replaceAll': {
-                #         'input': '$part_description', 
-                #         'find': ' ', 
-                #         'replacement': ''
-                #     }
-                # }
-            'partDescription': {
-                '$first': '$part_description'
-            },
-            'totalTasksQty': {
-                '$sum': '$ceilUsedQuantity'
-            }, 
-            'task_numbers': {
-                '$addToSet': '$task_number'
-            }
-        }
-    }, {
-        '$project': {
-            '_id': 0, 
-            'partId': '$_id', 
-            'partDescription': 1, 
-            'totalTasksQty': 1, 
-            'totalTasks': {
-                '$size': '$task_numbers'
-            }
-        }
-    }
-]
-        task_parts_results = list(self.taskpartslhrh_collection.aggregate(task_parts_pipeline))
-        logger.info(f"task_parts_results: {len(task_parts_results)}")
-        findings_HMV_results = list(self.subtaskpartslhrh_collection.aggregate(findings_HMV_parts_pipeline))
-        logger.info(f"findings_HMV_results: {len(findings_HMV_results)}")
-        findings_nonHMV_results = (self.subtaskpartslhrh_collection.aggregate(findings_nonHMV_parts_pipeline))
-        logger.info(f"findings_nonHMV_results fetched")
-        
-        combined_results = {
-        "taskParts": task_parts_results,
-        "findingsHMVParts": findings_HMV_results,
-        "findingsNonHMVTasks": findings_nonHMV_results
-    }
-        logger.info(f"Combined results: {combined_results}")
-        return combined_results
 
 
     async def validate_tasks_checkcategory(self, estimate_request: ValidRequestCheckCategory, current_user: dict = Depends(get_current_user)) -> List[ValidTasks]:
@@ -2872,6 +2630,710 @@ class TaskService:
             print(f"Error in model_tasks_validate: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+
+
+    async def multiple_parts_usage(self, part_ids: List[str], startDate: datetime, endDate: datetime) -> Dict:
+        """
+        Get parts usage for multiple part_ids within a date range.
+        Simplified approach to match single part usage API counts.
+        """
+        logger.info(f"Fetching multiple parts usage for part_ids: {part_ids}")
+
+        # Launch all part usage calls concurrently
+        tasks = [
+            self.get_each_part_usage_count(part_id, startDate, endDate)
+            for part_id in part_ids
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Initialize result containers
+        task_parts_list = []
+        findings_hmv_parts_list = []
+        findings_non_hmv_tasks_list = []
+
+        for idx, result in enumerate(results):
+            part_id = part_ids[idx]
+            if isinstance(result, Exception):
+                logger.error(f"Error processing part_id {part_id}: {str(result)}")
+                task_parts_list.append({
+                    "partDescription": "",
+                    "totalTasksQty": 0,
+                    "partId": part_id,
+                    "totalTasks": 0
+                })
+                findings_hmv_parts_list.append({
+                    "partDescription": "",
+                    "totalFindingsQty": 0,
+                    "partId": part_id,
+                    "totalFindings": 0
+                })
+                findings_non_hmv_tasks_list.append({
+                    "partDescription": "",
+                    "totalTasksQty": 0,
+                    "partId": part_id,
+                    "totalTasks": 0
+                })
+                continue
+            task_parts = result.get("taskParts", {})
+            findings_hmv = result.get("findingsHmvParts", {})
+            findings_non_hmv = result.get("findingsNonHMVTasks", {})
+
+            part_description = task_parts.get("partDescription", "")
+            if not part_description:
+                part_description = findings_hmv.get("partDescription", "")
+            # Extract and format task parts data
+            task_parts = result.get("taskParts", {})
+            task_parts_list.append({
+                "partDescription": part_description,
+                "totalTasksQty": task_parts.get("totalTasksQty", 0),
+                "partId": task_parts.get("partID", part_id),
+                "totalTasks": task_parts.get("totalTasks", 0)
+            })
+
+            # Extract and format HMV parts data
+            findings_hmv = result.get("findingsHmvParts", {})
+            findings_hmv_parts_list.append({
+                "partDescription": findings_hmv.get("partDescription", ""),
+                "totalFindingsQty": findings_hmv.get("totalFindingsQty", 0),
+                "partId": findings_hmv.get("partID", part_id),
+                "totalFindings": findings_hmv.get("totalFindings", 0)
+            })
+
+            # Extract and format non-HMV tasks data
+            findings_non_hmv = result.get("findingsNonHMVTasks", {})
+            findings_non_hmv_tasks_list.append({
+                "partDescription": part_description,
+                "totalTasksQty": findings_non_hmv.get("totalTasksQty", 0),
+                "partId": findings_non_hmv.get("partID", part_id),
+                "totalTasks": findings_non_hmv.get("totalTasks", 0)
+            })
+
+        return {
+            "taskParts": task_parts_list,
+            "findingsHMVParts": findings_hmv_parts_list,
+            "findingsNonHMVTasks": findings_non_hmv_tasks_list
+        }  
+
+
+    async def get_each_part_usage_count(self, part_id: str, startDate: datetime, endDate: datetime) -> Dict:
+        logger.info(f"startDate and endDate are:\n{startDate,endDate}")
+        part_id = part_id.upper()
+        """
+        Get parts usage for a specific part_id within a date range.
+        """
+        
+        try:
+            logger.info(f"Fetching parts usage for part_id: {part_id}")
+            # Pipeline for task_parts
+            task_parts_pipeline =[
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
+    {
+        '$match': {
+            'issued_part_number': part_id, 
+            'requested_stock_status': {
+                '$ne': 'Owned'
+            }
+        }
+    },
+     {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$issued_quantity'
+            }
+        }
+    },
+         # Group and sum quantities before lookups
+    {
+        '$group': {
+            '_id': {
+                'package_number': '$package_number',
+                'task_number': '$task_number',
+                'requested_stock_status': '$requested_stock_status',
+                # 'part_description': '$part_description'
+            },
+            'total_quantity': {
+                '$sum': '$ceilUsedQuantity'
+            },
+            'original_docs': {
+                '$push': '$$ROOT'
+            }
+        }
+    },
+    {
+        '$replaceRoot': {
+            'newRoot': {
+                '$mergeObjects': [
+                    {'$arrayElemAt': ['$original_docs', 0]},
+                    {
+                        'ceilUsedQuantity': '$total_quantity',
+                        'grouped': True
+                    }
+                ]
+            }
+        }
+    },
+    {
+        '$project': {
+            'original_docs': 0
+        }
+    },
+    {
+        '$lookup': {
+            'from': 'task_description_max500mh_lhrh', 
+            'let': {
+                'package_number': '$package_number', 
+                'task_number': '$task_number'
+            }, 
+            'pipeline': [
+                {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$eq': [
+                                        '$package_number', '$$package_number'
+                                    ]
+                                }, {
+                                    '$eq': [
+                                        '$task_number', '$$task_number'
+                                    ]
+                                },
+                                {
+                                    '$eq': [
+                                        '$task_type', 'MPD'  
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, 
+                # Add deduplication stage here
+                {
+                    '$group': {
+                        '_id': {
+                            'package_number': '$package_number',
+                            'task_number': '$task_number',
+                            'actual_start_date': '$actual_start_date',
+                            'actual_end_date': '$actual_end_date'
+                        },
+                        'document': {
+                            '$first': '$$ROOT'
+                        }
+                    }
+                },
+                {
+                    '$replaceRoot': {
+                        'newRoot': '$document'
+                    }
+                },{
+                    '$project': {
+                        'package_number': '$package_number', 
+                        'actual_start_date': 1, 
+                        'actual_end_date': 1, 
+                        'description': 1, 
+                        '_id': 0
+                    }
+                }
+            ], 
+            'as': 'task_info'
+        }
+    }, {
+        '$unwind': {
+            'path': '$task_info', 
+            'preserveNullAndEmptyArrays': True
+        }
+    }, {
+        '$match': {
+            '$expr': {
+                '$and': [
+                    {
+                        '$gte': [
+                            '$task_info.actual_start_date', startDate
+                        ]
+                    }, {
+                        '$lt': [
+                            '$task_info.actual_end_date', endDate
+                        ]
+                    }
+                ]
+            }
+        }
+    }, 
+    
+      {
+        '$facet': {
+            'mainData': [
+                {
+                    '$group': {
+                        '_id': '$issued_part_number', 
+                        'partDescription': {
+                            '$first': '$part_description'
+                        }, 
+                        'tasks': {
+                            '$push': {
+                                'taskId': '$task_number', 
+                                
+                                'packages': [
+                                    {
+                                        'quantity': '$ceilUsedQuantity'
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]
+           
+        
+        }
+    }, {
+        '$project': {
+            'partData': {
+                '$arrayElemAt': [
+                    '$mainData', 0
+                ]
+            }
+        }
+    }, {
+        '$project': {
+            '_id': '$partData._id', 
+            'partDescription': '$partData.partDescription', 
+            'tasks': '$partData.tasks'
+        }
+    }
+]
+
+            # Pipeline for sub_task_parts
+            sub_task_parts_pipeline = [
+                {
+        '$addFields': {
+            'issued_part_number': { '$toUpper': '$issued_part_number' }
+        }
+    },
+    {
+        '$match': {
+            'issued_part_number': part_id
+        }
+    }, {
+        '$addFields': {
+            'isHMV': {
+                '$substr': [
+                    '$task_number', 0, 3
+                ]
+            }
+        }
+    }, 
+    {
+        '$addFields': {
+            'ceilUsedQuantity': {
+                '$ceil': '$used_quantity'
+            }
+        }
+    },
+    {
+        '$group': {
+            '_id': {
+                'task_number': '$task_number',
+                'package_number': '$package_number',
+            }, 
+            'doc': {
+                '$first': '$$ROOT'
+            }, 
+            'totalQty': {
+                '$sum': '$ceilUsedQuantity'
+            }
+        }
+    },
+    {
+        '$replaceRoot': {
+            'newRoot': {
+                '$mergeObjects': [
+                    '$doc', {
+                        'ceilUsedQuantity': '$totalQty'
+                    }
+                ]
+            }
+        }
+    },{
+        '$facet': {
+            'hmvTasks': [
+                {
+                    '$match': {
+                        'isHMV': 'HMV'
+                    }
+                },
+                
+                  {
+                    '$lookup': {
+                        'from': 'sub_task_description_max500mh_lhrh', 
+                        'localField': 'task_number', 
+                        'foreignField': 'log_item_number', 
+                        'as': 'task_info', 
+                        'pipeline': [
+                             {
+                '$group': {
+                    '_id': {
+                        'log_item_number': '$log_item_number',
+                        'source_task': '$source_task_discrepancy_number_updated',
+                        'package': '$package_number',
+                        'start_date': '$actual_start_date',
+                        'end_date': '$actual_end_date'
+                    },
+                    'doc': {'$first': '$$ROOT'}
+                }
+            },{
+                '$replaceRoot': {
+                    'newRoot': '$doc'
+                }
+            },
+            {
+                '$project': {
+                    'convertedPackage': '$package_number', 
+                    'actual_start_date': 1, 
+                    'actual_end_date': 1, 
+                    'source_task_discrepancy_number_updated': 1, 
+                    'log_item_number': 1, 
+                    '_id': 0
+                }
+            }
+                        ]
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_info', 
+                        # 'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$gte': [
+                                        '$task_info.actual_start_date', startDate
+                                    ]
+                                }, {
+                                    '$lt': [
+                                        '$task_info.actual_end_date', endDate
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, 
+               
+                {
+                    '$lookup': {
+                        'from': 'task_description_max500mh_lhrh', 
+                        'let': {
+                            'source_task': '$task_info.source_task_discrepancy_number_updated', 
+                            'pkg_num': '$package_number'
+                        }, 
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {
+                                                '$eq': [
+                                                    '$task_number', '$$source_task'
+                                                ]
+                                            }, {
+                                                '$eq': [
+                                                    '$package_number', '$$pkg_num'
+                                                ]
+                                            },
+                                            {
+                                                '$eq': [
+                                                    '$task_type', 'MPD'
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }, 
+                            {
+                                '$limit': 1
+                            },
+                            {
+                                '$project': {
+                                    'Description': {
+                                        '$ifNull': [
+                                            '$description', ''
+                                        ]
+                                    }, 
+                                    '_id': 0
+                                }
+                            }
+                        ], 
+                        'as': 'task_desc'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_desc'
+                    }
+                }
+            ], 
+            'nonHmvTasks': [
+                {
+                    '$match': {
+                        'isHMV': {
+                            '$ne': 'HMV'
+                        }
+                    }
+                },
+                
+                {
+                    '$lookup': {
+                        'from': 'task_description_max500mh_lhrh', 
+                        'let': {
+                            'task_num': '$task_number', 
+                            'pkg_num': '$package_number'
+                        }, 
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {
+                                                '$eq': [
+                                                    '$task_number', '$$task_num'
+                                                ]
+                                            }, {
+                                                '$eq': [
+                                                    '$package_number', '$$pkg_num'
+                                                ]
+                                            },
+                                            {
+                                                '$eq': [
+                                                    '$task_type', 'MPD'  # Add MPD filter here too
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                              # Add deduplication stage here (same as in HMV tasks)
+                {
+                    '$group': {
+                        '_id': {
+                            'package_number': '$package_number',
+                            'task_number': '$task_number',
+                            'actual_start_date': '$actual_start_date',
+                            'actual_end_date': '$actual_end_date'
+                        },
+                        'document': {
+                            '$first': '$$ROOT'
+                        }
+                    }
+                },
+                {
+                    '$replaceRoot': {
+                        'newRoot': '$document'
+                    }
+                },
+                {
+                                '$project': {
+                                    'actual_start_date': 1, 
+                                    'actual_end_date': 1, 
+                                    'Description': {
+                                        '$ifNull': [
+                                            '$description', ''
+                                        ]
+                                    }, 
+                                    '_id': 0
+                                }
+                            }
+                        ], 
+                        'as': 'task_desc1'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$task_desc1', 
+                        # 'preserveNullAndEmptyArrays': True
+                    }
+                }, {
+                    '$match': {
+                        '$expr': {
+                            '$and': [
+                                {
+                                    '$gte': [
+                                        '$task_desc1.actual_start_date', startDate
+                                    ]
+                                }, {
+                                    '$lt': [
+                                        '$task_desc1.actual_end_date',endDate
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$task_number', 
+                        'taskId': {
+                            '$first': '$task_number'
+                        }, 
+                         
+                        'packages': {
+                            '$push': {
+                                'quantity': '$ceilUsedQuantity'
+                                
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    }, {
+        '$project': {
+            'hmvFindings': {
+                '$map': {
+                    'input': '$hmvTasks', 
+                    'as': 'hmvTask', 
+                    'in': {
+                        '_id': '$$hmvTask.issued_part_number',
+                        "partDescription":'$$hmvTask.part_description',
+                        'findings': {
+                            'taskId': '$$hmvTask.task_info.source_task_discrepancy_number_updated', 
+                            
+                            'packages': [
+                                {
+                                     
+                                    'quantity': '$$hmvTask.ceilUsedQuantity'
+                                    
+                                }
+                            ]
+                        }
+                    }
+                }
+            }, 
+            'nonHmvFindings': {
+                '$map': {
+                    'input': '$nonHmvTasks', 
+                    'as': 'nonHmvTask', 
+                    'in': {
+                        '_id': '$$nonHmvTask.issued_part_number', 
+                        'findings': {
+                            'taskId': '$$nonHmvTask.taskId', 
+                            
+                            'packages': '$$nonHmvTask.packages'
+                        }
+                    }
+                }
+            }
+        }
+    }, {
+        '$project': {
+            'findings': {
+                'hmvTasks': '$hmvFindings', 
+                'nonHmvTasks': '$nonHmvFindings'
+            }, 
+        
+        }
+    }
+]
+  
+            task_parts_result = list(self.taskpartslhrh_collection.aggregate(task_parts_pipeline))
+            sub_task_parts_result = list(self.subtaskpartslhrh_collection.aggregate(sub_task_parts_pipeline))
+
+            logger.info(f"Results of task_parts: {len(task_parts_result)}\n")
+            logger.info(f"Results of sub_task_parts: {len(sub_task_parts_result)}\n")
+            
+            # Process task_parts_result
+            task_parts_output = {}
+            if task_parts_result:
+                task_data = task_parts_result[0]
+                tasks = task_data.get("tasks", [])
+                
+                total_tasks = len(tasks)
+                total_tasks_qty = 0
+                for task in tasks:
+                    packages = task.get("packages", [])
+                    for package in packages:
+                        total_tasks_qty += package.get("quantity", 0)
+                
+                task_parts_output = {
+                    "partDescription": task_data.get("partDescription", ""),
+                    "partID": task_data.get("_id", part_id),
+                    "totalTasks": total_tasks,
+                    "totalTasksQty": total_tasks_qty
+                }
+
+            # Process sub_task_parts_result
+            findings_hmv_output = {}
+            findings_non_hmv_output = {}
+            
+            if sub_task_parts_result:
+                findings_data = sub_task_parts_result[0].get("findings", {})
+                
+                # Process HMV tasks
+                hmv_tasks = findings_data.get("hmvTasks", [])
+                total_findings_hmv = len(hmv_tasks)
+                total_findings_hmv_qty = 0
+                
+                for hmv_task in hmv_tasks:
+                    findings = hmv_task.get("findings", {})
+                    packages = findings.get("packages", [])
+                    for package in packages:
+                        total_findings_hmv_qty += package.get("quantity", 0)
+                
+                # Get part info from first HMV task if available
+                part_description = ""
+                part_id_hmv = ""
+                if hmv_tasks:
+                    first_hmv = hmv_tasks[0]
+                    part_id_hmv = first_hmv.get("_id", "")
+                    part_description=first_hmv.get("partDescription","")
+                
+                findings_hmv_output = {
+                    "partDescription": part_description,
+                    "partID": part_id_hmv or part_id,
+                    "totalFindings": total_findings_hmv,
+                    "totalFindingsQty": total_findings_hmv_qty
+                }
+                
+                # Process non-HMV tasks
+                non_hmv_tasks = findings_data.get("nonHmvTasks", [])
+                total_findings_non_hmv = len(non_hmv_tasks)
+                total_findings_non_hmv_qty = 0
+                
+                for non_hmv_task in non_hmv_tasks:
+                    findings = non_hmv_task.get("findings", {})
+                    packages = findings.get("packages", [])
+                    for package in packages:
+                        total_findings_non_hmv_qty += package.get("quantity", 0)
+                
+                # Get part info from first non-HMV task if available
+                part_description_non_hmv = ""
+                part_id_non_hmv = ""
+                if non_hmv_tasks:
+                    first_non_hmv = non_hmv_tasks[0]
+                    part_id_non_hmv = first_non_hmv.get("_id", "")
+                   
+                
+                findings_non_hmv_output = {
+                    "partDescription": part_description_non_hmv,
+                    "partID": part_id_non_hmv or part_id,
+                    "totalTasks": total_findings_non_hmv,
+                    "totalTasksQty": total_findings_non_hmv_qty
+                }
+
+            # Return the final response
+            return {
+                "taskParts": task_parts_output,
+                "findingsHmvParts": findings_hmv_output,
+                "findingsNonHMVTasks": findings_non_hmv_output
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching parts usage: {str(e)}")
+            raise
+
+
 def return_all_tasks_as_not_available( mpd_task_data, ADD_TASKS, age_cap=3, packages_found=0):
     """
     Helper method to return all tasks as not available when no packages or task data is found.
@@ -2993,3 +3455,4 @@ def modelUpdateLhRhTasks(LhRhTasks, MPD_TASKS):
     mpdLhRhTasks = pd.DataFrame(data)
     return mpdLhRhTasks
 
+    
