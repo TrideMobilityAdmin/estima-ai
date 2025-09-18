@@ -229,11 +229,11 @@ const TaskAccordion: React.FC<TaskAccordionProps> = ({
                                                             </Group>
                                                         )}
                                                         
-                                                        {/* Log Item */}
+                                                        {/* Log Item / Task Number */}
                                                         {pkg?.logItem && (
                                                             <Group>
                                                                 <Text c="dimmed" fz="sm">
-                                                                    Log Item:
+                                                                    {title === 'MPD' ? 'Task Number:' : 'Log Item:'}
                                                                 </Text>
                                                                 <Text fw={500} fz="sm">
                                                                     {pkg.logItem}
