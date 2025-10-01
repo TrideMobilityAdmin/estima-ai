@@ -24,7 +24,7 @@ import {
   IconMessageCircle,
   IconLogout,
 } from "@tabler/icons-react";
-import gmrIcon from "../../public/GMR_Icon2.png";
+import gmrIcon from "../../public/tride_icon1.png";
 import aircraftServiceBg from "../../public/airCraft6.jpeg";
 import bgEstimate from "../../public/airCraft10.jpg";
 import bgCompareEstimate from "../../public/airCraft8.jpg";

@@ -23,7 +23,7 @@ import { Overlay } from "@mantine/core";
 import { entityID, roleID, userEmail, userID, userName, userToken } from "../api/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
-import gmrIcon from "../../public/GMR_Icon2.png";
+import gmrIcon from "../../public/tride_icon1.png";
 
 type LoginInput = {
   username: string;
@@ -155,9 +155,9 @@ function Login() {
             fontWeight: 900,
           }}
         >
-          GMR
+          TRIDE
         </div>
-        <div
+        {/* <div
           style={{
             fontSize: "30px",
             color: "rgba(255, 255, 255, 0.25)",
@@ -165,7 +165,7 @@ function Login() {
           }}
         >
           Aero Technic
-        </div>
+        </div> */}
       </div>
 
 
