@@ -7641,7 +7641,7 @@ const FindingsWiseSection: React.FC<FindingsWiseSectionProps> = ({
         "Source Task": task.sourceTask || "-",
         "Description": task.description || "-",
         "Cluster ID": task.cluster_id || "-",
-        "Task Defect Probability": task.taskDefectProbability?.toFixed(2) || 0,
+        "Task Defect Probability": Number((task.taskDefectProbability || 0).toFixed(2)),
         "Defect Probability": task.probability || 0,
         "MHS Min": task.mhsMin || 0,
         "MHS Max": task.mhsMax || 0,
