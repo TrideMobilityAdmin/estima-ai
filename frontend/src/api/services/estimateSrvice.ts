@@ -518,7 +518,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
   const updateProbabilityWiseDetails = async (id: string, data:any) => {
     try {
       const response = await axiosInstance.put(
-        `${getConfigurations_Url}/${id}`,
+        `${getConfigurations_Url}${id}`,
         data
       );
       console.log("✅ API Response probability wise update:", response);
