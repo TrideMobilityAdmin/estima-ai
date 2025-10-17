@@ -30,9 +30,13 @@ TRUSTED_ORIGINS = [
     "http://127.0.0.1:4173",
     
     "http://localhost:8000/docs#",
+    "http://localhost:8000",
     "http://10.100.3.13:8000/api/v1",
     "http://10.100.3.13:8000/docs",
-    "http://10.100.3.13:8000/",    
+    "http://10.100.3.13:8000/", 
+    "http://127.0.0.1:8000",
+    "http://10.100.3.13:3000",  # If your React app runs on port 3000
+    "http://10.100.3.13:5173",   
 ]
 
 app.add_middleware(
@@ -41,9 +45,10 @@ app.add_middleware(
     # allow_origins=["*"],  # Use ["http://localhost:3000"] for better security
     allow_credentials=True,
     # allow_methods=["*"],
-    allow_methods=["GET", "POST", "PUT", "DELETE"], 
+    allow_methods=["GET", "POST", "PUT", "DELETE","OPTIONS"], 
     # allow_headers=["*"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token","X-Requested-With"],
+    expose_headers=["X-CSRF-Token"],  # Important: Expose CSRF token header
 )
 
 app.add_middleware(CSRFMiddleware)
