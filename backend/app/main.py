@@ -13,9 +13,7 @@ app = FastAPI(
 
 app.include_router(auth_routes.router)
 app.include_router(data_routes.router)
-app.add_middleware(CSRFMiddleware)
-app.add_middleware(HostValidationMiddleware)
-app.add_middleware(MethodRestrictionMiddleware)
+
 
 TRUSTED_ORIGINS = [
     "http://10.100.3.13:80",
@@ -25,7 +23,7 @@ TRUSTED_ORIGINS = [
     "https://localhost:3000",
     "http://localhost:8000/docs#",
     "http://10.100.3.13:8000/api/v1",
-    "http://10.100.3.13:8000/docs"
+    "http://10.100.3.13:8000/docs",
     "http://10.100.3.13:8000/"
 ]
 
@@ -39,6 +37,10 @@ app.add_middleware(
     # allow_headers=["*"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
+
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(HostValidationMiddleware)
+app.add_middleware(MethodRestrictionMiddleware)
 
 @app.get("/")
 async def root():
