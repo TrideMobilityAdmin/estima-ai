@@ -1,4 +1,6 @@
+import secrets
 from fastapi import APIRouter, HTTPException, status, Depends,Response
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta,timezone
 from app.models.user import UserCreate,UserResponse,Token,UserLogin,PasswordChangeRequest
@@ -68,6 +70,10 @@ async def User_login(user: UserLogin):
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
+        # Generate CSRF token
+    csrf_token = secrets.token_urlsafe(32)
+
+    
     login_history = {
         "userID": str(user_found["_id"]),
         "login": datetime.now(timezone.utc),
@@ -79,23 +85,24 @@ async def User_login(user: UserLogin):
     }
     user_login_collection.insert_one(login_history)
 
-    # Audit log
-    audit_service = AuditLogService()
-    log_entry = AuditLog(
-    user_id=str(user_found["_id"]),
-    username=user_found["username"],
-    module="UserLogin",
-    action="user_logged_in"
-    )
-    await audit_service.log_action(log_entry)
-
-    return {
+    # Create response
+    response = JSONResponse(content={
         "accessToken": access_token,
         "tokenType": "bearer",
         "userID": str(user_found["_id"]),
         "username": user_found["username"],
-        "email": user_found["email"]
-    }
+        "email": user_found["email"],
+        "csrfToken": csrf_token  # frontend can read this
+    })
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=True,
+        secure=False,  # True in production (HTTPS)
+        samesite="lax"
+    )
+    return response
+
 
 
 
