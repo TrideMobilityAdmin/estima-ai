@@ -30,11 +30,19 @@ const getInitialUserEmail = () => {
   return '';
 };
 
+const getInitialCSRFToken = () => {
+  if (typeof window !== 'undefined') {
+    return sessionStorage.getItem('csrfToken') || '';
+  }
+  return '';
+};
+
 // Initialize atoms with sessionStorage values if available
 export const userToken = atom<any>(getInitialToken());
 export const userID = atom<any>(getInitialUserID());
 export const userName = atom<any>(getInitialUserName());
 export const userEmail = atom<any>(getInitialUserEmail());
+export const csrfToken = atom<any>(getInitialCSRFToken());
 export const roleID = atom<any>('');
 export const entityID = atom<any>('');
 

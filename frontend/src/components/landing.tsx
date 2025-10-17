@@ -28,6 +28,7 @@ import gmrIcon from "../../public/GMR_Icon2.png";
 import aircraftServiceBg from "../../public/airCraft6.jpeg";
 import bgEstimate from "../../public/airCraft10.jpg";
 import bgCompareEstimate from "../../public/airCraft8.jpg";
+import { clearAuthState } from "../main";
 import bgPartUsage from "../../public/airCraftPartsUsage.webp";
 import bgSkillRequirement from "../../public/airCraftSkill.webp";
 import bgConfiguration from "../../public/airCraft8.jpg";
@@ -366,7 +367,10 @@ const Landing: React.FC = () => {
               <Menu.Item
                 color="red"
                 leftSection={<IconLogout size={14} />}
-                onClick={() => navigate("/")}
+                onClick={() => {
+                  clearAuthState();
+                  navigate("/");
+                }}
               >
                 Logout
               </Menu.Item>

@@ -20,7 +20,7 @@ import {
 } from "../constants/GlobalImports";
 import flightBg from '../../public/airCraft8.jpg';
 import { Overlay } from "@mantine/core";
-import { entityID, roleID, userEmail, userID, userName, userToken } from "../api/tokenJotai";
+import { entityID, roleID, userEmail, userID, userName, userToken, csrfToken } from "../api/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
 import gmrIcon from "../../public/GMR_Icon2.png";
@@ -46,6 +46,7 @@ function Login() {
   const [userId, setUserID] = useAtom(userID);
   const [name, setName] = useAtom(userName);
   const [email, setEmail] = useAtom(userEmail);
+  const [csrfTokenState, setCsrfToken] = useAtom(csrfToken);
 
   const login = async (values: LoginInput) => {
     setIsLoading(true);
@@ -59,7 +60,8 @@ function Login() {
         accessToken, 
         userID, 
         username,
-        email
+        email,
+        csrfToken
       } = response.data;
 
       if (response.status === 200) {
@@ -67,12 +69,16 @@ function Login() {
         setUserID(userID);
         setName(username);
         setEmail(email);
+        if (csrfToken) {
+          setCsrfToken(csrfToken);
+        }
 
         saveAuthData({ 
           token: accessToken, 
           userID, 
           username, 
-          email 
+          email,
+          csrfToken
         });
 
         showNotification({

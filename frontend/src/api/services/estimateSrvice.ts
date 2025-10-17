@@ -33,9 +33,14 @@ export const useApi = () => {
     // });
     showAppNotification("error", "Session Expired!", "Your session has expired. Please log in again.");
 
-    // Clear authentication tokens (modify as needed)
+    // Clear authentication tokens including CSRF token
     localStorage.removeItem("authToken");
     sessionStorage.removeItem("authToken");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("csrfToken");
+    sessionStorage.removeItem("userID");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("email");
 
     // Redirect to login page and prevent back navigation
     navigate("/", { replace: true });

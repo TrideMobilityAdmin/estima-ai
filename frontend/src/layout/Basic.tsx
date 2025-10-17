@@ -1,4 +1,5 @@
 import {gmrIcon,ActionIcon, AppShell, Button, Flex, Group, useDisclosure, Outlet, useNavigate, useState,Text, Menu,IconLogout, IconUser, IconTrash, IconMessageCircle, IconPhoto, IconSearch, IconSettings, IconArrowsLeftRight, Card, Avatar} from "../constants/GlobalImports";
+import { clearAuthState } from "../main";
 
 export default function Basic() {
 
@@ -124,6 +125,10 @@ export default function Basic() {
         <Menu.Item
           color="red"
           leftSection={<IconLogout size={14} />}
+          onClick={() => {
+            clearAuthState();
+            navigate("/");
+          }}
         >
           Logout
         </Menu.Item>
