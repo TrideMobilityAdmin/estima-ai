@@ -1,4 +1,6 @@
 // src/api/axiosInstance.ts
+
+// src/api/axiosInstance.ts
 import axios from "axios";
 import { baseUrl } from "./apiUrls";
 
@@ -7,11 +9,31 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use(
-  (config) => {
-    let token = sessionStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  (config: any) => {
+    const token = sessionStorage.getItem("token");
+    const csrfToken = sessionStorage.getItem("csrfToken");
+    const method = config.method?.toLowerCase();
+
+    // Ensure headers exist
+    if (!config.headers) {
+      config.headers = {};
     }
+
+    if (method === "get") {
+      // ✅ Only attach user token for GET requests
+      if (token) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
+      }
+    } else if (["post", "put", "delete"].includes(method || "")) {
+      // ✅ Attach both user token and CSRF token for POST, PUT, DELETE
+      if (token) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
+      }
+      if (csrfToken) {
+        (config.headers as any)["X-CSRF-Token"] = csrfToken;
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -29,6 +51,37 @@ axiosInstance.interceptors.response.use(
 );
 
 export default axiosInstance;
+
+// import axios from "axios";
+// import { baseUrl } from "./apiUrls";
+
+// const axiosInstance = axios.create({
+//   baseURL: baseUrl,
+// });
+
+// axiosInstance.interceptors.request.use(
+//   (config) => {
+//     let token = sessionStorage.getItem("token");
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// axiosInstance.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     if ([401, 403].includes(error?.response?.status)) {
+//       sessionStorage.clear();
+//       window.location.href = "/";
+//     }
+//     return Promise.reject(error);
+//   }
+// );
+
+// export default axiosInstance;
 
 // // src/api/useAxiosInstance.js
 // import axios from "axios";

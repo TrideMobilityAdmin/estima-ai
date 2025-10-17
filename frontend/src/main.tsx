@@ -8,12 +8,15 @@ import { BrowserRouter } from "react-router-dom";
 export const TOKEN_KEY = "token";
 
 // Token management functions
-export const saveAuthData = ({ token, userID, username, email } : any) => {
+export const saveAuthData = ({ token, userID, username, email, csrfToken } : any) => {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(TOKEN_KEY, token);
     sessionStorage.setItem("userID", userID);
     sessionStorage.setItem("username", username);
     sessionStorage.setItem("email", email);
+    if (csrfToken) {
+      sessionStorage.setItem("csrfToken", csrfToken);
+    }
   }
 };
 
@@ -23,6 +26,7 @@ export const clearAuthState = () => {
     sessionStorage.removeItem("userID");
     sessionStorage.removeItem("username");
     sessionStorage.removeItem("email");
+    sessionStorage.removeItem("csrfToken");
   }
 };
 
