@@ -17,18 +17,22 @@ app.include_router(data_routes.router)
 
 TRUSTED_ORIGINS = [
     "http://10.100.3.13:80",
-    "http://10.100.3.13/",
+    "http://10.100.3.13",
+    "https://10.100.3.13",
+
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
+
     "http://localhost:3000",
-    "http://localhost:80",
-    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    
     "http://localhost:8000/docs#",
     "http://10.100.3.13:8000/api/v1",
     "http://10.100.3.13:8000/docs",
-    "http://10.100.3.13:8000/",
-    "http://localhost:4173",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000"
+    "http://10.100.3.13:8000/",    
 ]
 
 app.add_middleware(
