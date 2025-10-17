@@ -1,10 +1,21 @@
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-ALLOWED_HOSTS = {"localhost", "127.0.0.1","127.0.0.1:8000","10.100.3.13", "10.100.3.13:8000","10.100.3.13:80"}
+ALLOWED_HOSTS = {
+    "localhost",
+    "127.0.0.1",
+    "127.0.0.1:8000",
+    "10.100.3.13",
+    "10.100.3.13:8000",
+    "10.100.3.13:80",
+}
 
 class HostValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # ✅ Allow CORS preflight OPTIONS to pass through
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         host = request.headers.get("host", "")
         forwarded_host = request.headers.get("x-forwarded-host", "")
 

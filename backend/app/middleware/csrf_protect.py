@@ -13,7 +13,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             "/docs",
             "/openapi.json",
             "/api/v1/auth/register"
-
         ]
 
         # Skip validation for safe methods or exempted endpoints

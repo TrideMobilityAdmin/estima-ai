@@ -24,7 +24,7 @@ TRUSTED_ORIGINS = [
     "http://localhost:8000/docs#",
     "http://10.100.3.13:8000/api/v1",
     "http://10.100.3.13:8000/docs",
-    "http://10.100.3.13:8000/"
+    "http://10.100.3.13:8000/",
 ]
 
 app.add_middleware(
