@@ -25,8 +25,8 @@ app.add_middleware(
         ],  # Use ["http://localhost:3000"] for better security
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
-    expose_headers=["X-CSRF-Token"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token","Cookie"],
+    expose_headers=["X-CSRF-Token","Set-Cookie"],
 )
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
