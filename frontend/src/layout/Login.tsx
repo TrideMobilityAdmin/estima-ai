@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Text,
   Title,
@@ -9,7 +8,6 @@ import {
   Button,
   Flex,
   Image,
-  Notification,
   useState,
   useNavigate,
   useForm,
@@ -20,7 +18,7 @@ import {
 } from "../constants/GlobalImports";
 import flightBg from '../../public/airCraft8.jpg';
 import { Overlay } from "@mantine/core";
-import { entityID, roleID, userEmail, userID, userName, userToken } from "../api/tokenJotai";
+import { userEmail, userID, userName, userToken, csrfToken } from "../api/tokenJotai";
 import { clearAuthState, saveAuthData } from "../main";
 import { getUserLogin_Url } from "../api/apiUrls";
 import gmrIcon from "../../public/GMR_Icon2.png";
@@ -32,7 +30,6 @@ type LoginInput = {
 
 function Login() {
   const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<any>({
@@ -42,10 +39,11 @@ function Login() {
     },
   });
 
-  const [token, setToken] = useAtom(userToken);
-  const [userId, setUserID] = useAtom(userID);
-  const [name, setName] = useAtom(userName);
-  const [email, setEmail] = useAtom(userEmail);
+  const [, setToken] = useAtom(userToken);
+  const [, setUserID] = useAtom(userID);
+  const [, setName] = useAtom(userName);
+  const [, setEmail] = useAtom(userEmail);
+  const [, setCsrfToken] = useAtom(csrfToken);
 
   const login = async (values: LoginInput) => {
     setIsLoading(true);
@@ -53,6 +51,8 @@ function Login() {
       const response = await axios.post(getUserLogin_Url, {
         username: values.username,
         password: values.password,
+      },{
+        withCredentials: true,
       });
 
       const { 
@@ -62,18 +62,48 @@ function Login() {
         email
       } = response.data;
 
+      // Extract CSRF token from response headers
+      const csrfTokenFromHeaders = response.headers['x-csrf-token'] || 
+                                  response.headers['X-CSRF-Token'] || 
+                                  response.headers['X-Csrf-Token'];
+      console.log("🔍 CSRF Token from Headers:", csrfTokenFromHeaders);
+      console.log("🔍 All Response Headers:", response.headers);
+
       if (response.status === 200) {
         setToken(accessToken);
         setUserID(userID);
         setName(username);
         setEmail(email);
+        if (csrfTokenFromHeaders) {
+          setCsrfToken(csrfTokenFromHeaders);
+        }
 
-        saveAuthData({ 
+        const authData = { 
           token: accessToken, 
           userID, 
           username, 
-          email 
+          email,
+          csrfToken: csrfTokenFromHeaders
+        };
+
+        // Console log what's being stored in storage
+        console.log("🔐 Login Response Data:", {
+          accessToken: accessToken ? `${accessToken.substring(0, 20)}...` : "No token",
+          userID,
+          username,
+          email,
+          csrfTokenFromHeaders: csrfTokenFromHeaders ? `${csrfTokenFromHeaders.substring(0, 20)}...` : "No CSRF token"
         });
+
+        console.log("💾 Storing in sessionStorage:", {
+          token: accessToken ? `${accessToken.substring(0, 20)}...` : "No token",
+          userID,
+          username,
+          email,
+          csrfToken: csrfTokenFromHeaders ? `${csrfTokenFromHeaders.substring(0, 20)}...` : "No CSRF token"
+        });
+
+        saveAuthData(authData);
 
         showNotification({
           title: "Login Successful",

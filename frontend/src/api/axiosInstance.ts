@@ -1,17 +1,60 @@
 // src/api/axiosInstance.ts
+
+// src/api/axiosInstance.ts
 import axios from "axios";
 import { baseUrl } from "./apiUrls";
 
 const axiosInstance = axios.create({
   baseURL: baseUrl,
+  withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use(
-  (config) => {
-    let token = sessionStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  (config: any) => {
+    const token = sessionStorage.getItem("token");
+    const csrfToken = sessionStorage.getItem("csrfToken");
+    const method = config.method?.toLowerCase();
+
+    // Ensure headers exist
+    if (!config.headers) {
+      config.headers = {};
     }
+
+    if (method === "get") {
+      // ✅ Only attach access token for GET requests
+      if (token) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
+        console.log("🔍 GET Request - Using Access Token:", token.substring(0, 20) + "...");
+      }
+    } else if (["post", "put", "delete"].includes(method || "")) {
+      // ✅ Attach both access token and CSRF token for POST, PUT, DELETE
+      if (token) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
+      }
+      if (csrfToken) {
+        (config.headers as any)["X-CSRF-Token"] = csrfToken;
+        // Clear ALL existing csrf_token cookies first (multiple attempts to ensure cleanup)
+        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
+        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`;
+        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`;
+        // Set the same CSRF token as cookie immediately
+        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Lax; Secure=false`;
+        // Force axios to include cookies by ensuring withCredentials is true
+        config.withCredentials = true;
+        // Also try to manually set the cookie header (some servers expect this)
+        (config.headers as any)["Cookie"] = `csrf_token=${csrfToken}`;
+      }
+      console.log(`📤 ${method?.toUpperCase()} in axios instance Request - Using:`, {
+        accessToken: token ? token.substring(0, 20) + "..." : "No token",
+        csrfToken: csrfToken ? csrfToken.substring(0, 20) + "..." : "No CSRF token"
+      });
+      console.log("📤 Request Headers being sent:", config.headers);
+      console.log("🍪 Current cookies in browser:", document.cookie);
+      console.log("🌐 Request URL:", config.url);
+      console.log("🌐 Base URL:", config.baseURL);
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -29,6 +72,37 @@ axiosInstance.interceptors.response.use(
 );
 
 export default axiosInstance;
+
+// import axios from "axios";
+// import { baseUrl } from "./apiUrls";
+
+// const axiosInstance = axios.create({
+//   baseURL: baseUrl,
+// });
+
+// axiosInstance.interceptors.request.use(
+//   (config) => {
+//     let token = sessionStorage.getItem("token");
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// axiosInstance.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     if ([401, 403].includes(error?.response?.status)) {
+//       sessionStorage.clear();
+//       window.location.href = "/";
+//     }
+//     return Promise.reject(error);
+//   }
+// );
+
+// export default axiosInstance;
 
 // // src/api/useAxiosInstance.js
 // import axios from "axios";
