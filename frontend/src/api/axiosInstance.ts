@@ -20,6 +20,13 @@ axiosInstance.interceptors.request.use(
       config.headers = {};
     }
 
+    // Ensure Content-Type is set for POST/PUT/DELETE requests
+    if (["post", "put", "delete"].includes(method || "")) {
+      if (!config.headers["Content-Type"]) {
+        config.headers["Content-Type"] = "application/json";
+      }
+    }
+
     if (method === "get") {
       // ✅ Only attach access token for GET requests
       if (token) {
@@ -42,8 +49,8 @@ axiosInstance.interceptors.request.use(
         document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Lax; Secure=false`;
         // Force axios to include cookies by ensuring withCredentials is true
         config.withCredentials = true;
-        // Also try to manually set the cookie header (some servers expect this)
-        (config.headers as any)["Cookie"] = `csrf_token=${csrfToken}`;
+        // Remove manual Cookie header setting as browsers don't allow it
+        // The cookie will be automatically included by axios due to withCredentials: true
       }
       console.log(`📤 ${method?.toUpperCase()} in axios instance Request - Using:`, {
         accessToken: token ? token.substring(0, 20) + "..." : "No token",
@@ -63,6 +70,15 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.log("🚨 Axios Error Details:", {
+      status: error?.response?.status,
+      statusText: error?.response?.statusText,
+      data: error?.response?.data,
+      headers: error?.response?.headers,
+      config: error?.config,
+      message: error?.message
+    });
+    
     if ([401, 403].includes(error?.response?.status)) {
       sessionStorage.clear();
       window.location.href = "/";

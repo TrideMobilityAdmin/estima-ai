@@ -24,7 +24,7 @@ app.add_middleware(
         "http://10.100.3.13:8000",
         ],  # Use ["http://localhost:3000"] for better security
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Cookie", "X-Csrf-Token"],
     expose_headers=["X-CSRF-Token", "X-Csrf-Token", "Set-Cookie"],
 )
