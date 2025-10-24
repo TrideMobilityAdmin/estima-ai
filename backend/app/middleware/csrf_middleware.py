@@ -16,7 +16,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/logout","/"}
 
     async def dispatch(self, request: Request, call_next):
-        # origin = request.headers.get("origin", "")
+        origin = request.headers.get("origin", "")
         print(f"🔥 CSRF Middleware Triggered: {request.method} {request.url.path}")
         # ✅ Detect if running in local environment
         is_local = any(host in origin for host in ["localhost", "127.0.0.1"])
@@ -101,7 +101,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 content={"detail": e.detail},
             )
             # Include minimal CORS headers manually to avoid browser block
-            response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
 
@@ -111,6 +111,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": "Internal Server Error in CSRF middleware"},
             )
-            response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
