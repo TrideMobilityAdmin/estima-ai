@@ -34,38 +34,33 @@ axiosInstance.interceptors.request.use(
         console.log("🔍 GET Request - Using Access Token:", token.substring(0, 20) + "...");
       }
     } else if (["post", "put", "delete"].includes(method || "")) {
-      // ✅ Attach both access token and CSRF token for POST, PUT, DELETE
-      if (token) {
-        (config.headers as any).Authorization = `Bearer ${token}`;
-      }
-      if (csrfToken) {
-        (config.headers as any)["X-CSRF-Token"] = csrfToken;
-        // Clear ALL existing csrf_token cookies first (multiple attempts to ensure cleanup)
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`;
-        // Set the same CSRF token as cookie immediately
-        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Lax; Secure=false`;
-        // Force axios to include cookies by ensuring withCredentials is true
-        config.withCredentials = true;
-        // Remove manual Cookie header setting as browsers don't allow it
-        // The cookie will be automatically included by axios due to withCredentials: true
-      }
-      console.log(`📤 ${method?.toUpperCase()} in axios instance Request - Using:`, {
-        accessToken: token ? token.substring(0, 20) + "..." : "No token",
-        csrfToken: csrfToken ? csrfToken.substring(0, 20) + "..." : "No CSRF token"
-      });
-      console.log("📤 Request Headers being sent:", config.headers);
-      console.log("🍪 Current cookies in browser:", document.cookie);
-      console.log("🌐 Request URL:", config.url);
-      console.log("🌐 Base URL:", config.baseURL);
-    }
+        if (token) {
+          config.headers["Authorization"] = `Bearer ${token}`;
+        }
+        if (csrfToken) {
+          config.headers["X-CSRF-Token"] = csrfToken;
+        }
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+        // ✅ Keep axios responsible for cookies
+        config.withCredentials = true;
+
+        console.log(`📤 ${method?.toUpperCase()} request:`, {
+          accessToken: token ? token.substring(0, 20) + "..." : "No token",
+          csrfToken: csrfToken ? csrfToken.substring(0, 20) + "..." : "No CSRF token",
+        });
+      
+
+          
+          console.log("📤 Request Headers being sent:", config.headers);
+          console.log("🍪 Current cookies in browser:", document.cookie);
+          console.log("🌐 Request URL:", config.url);
+          console.log("🌐 Base URL:", config.baseURL);
+          }
+
+          return config;
+        },
+        (error) => Promise.reject(error)
+      );
 
 axiosInstance.interceptors.response.use(
   (response) => response,
