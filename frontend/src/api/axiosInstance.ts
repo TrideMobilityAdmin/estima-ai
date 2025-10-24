@@ -111,10 +111,10 @@ axiosInstance.interceptors.request.use(
       }
     }
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+          return config;
+        },
+        (error) => Promise.reject(error)
+      );
 
 axiosInstance.interceptors.response.use(
   (response) => response,

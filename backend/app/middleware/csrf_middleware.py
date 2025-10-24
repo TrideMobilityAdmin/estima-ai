@@ -2,20 +2,19 @@ from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import secrets
-from typing import Optional
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     """
-    CSRF Protection Middleware using Double Submit Cookie pattern
+    CSRF Protection Middleware using Double Submit Cookie pattern.
     """
-    
-    SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
     CSRF_HEADER_NAME = "X-CSRF-Token"
     CSRF_COOKIE_NAME = "csrf_token"
-    
-    # Endpoints that don't require CSRF (typically login)
-    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register", "/"}
-    
+
+    # Endpoints that don't require CSRF (like login/register)
+    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/logout","/"}
+
     async def dispatch(self, request: Request, call_next):
         # Skip CSRF for safe methods
         if request.method in self.SAFE_METHODS:
