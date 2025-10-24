@@ -25,12 +25,11 @@ app.add_middleware(
         "http://10.100.3.13:8000",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:5173"],
-
-          # Use ["http://localhost:3000"] for better security
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Cookie", "X-Csrf-Token"],
     expose_headers=["X-CSRF-Token", "X-Csrf-Token", "Set-Cookie"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
@@ -38,7 +37,7 @@ app.add_middleware(CSRFMiddleware)
 # Add global CORS handler
 @app.middleware("http")
 async def add_cors_headers(request: Request, call_next):
-    """Add CORS headers to all responses"""
+    """Add CORS headers to all responses, including error responses"""
     origin = request.headers.get("origin")
     allowed_origins = [
         "http://localhost:5173",
@@ -50,18 +49,27 @@ async def add_cors_headers(request: Request, call_next):
         "http://127.0.0.1:5173"
     ]
     
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        # Create a JSON response for the error
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": str(e)}
+        )
     
-    # Add CORS headers to all responses
+    # Add CORS headers to all responses, including errors
     if origin in allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = "*"
     
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
+    # Critical CORS headers
+    response.headers.update({
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Expose-Headers": "X-CSRF-Token, X-Csrf-Token, Set-Cookie",
+        "Vary": "Origin"  # Important for proper caching with CORS
+    })
     
     return response
 

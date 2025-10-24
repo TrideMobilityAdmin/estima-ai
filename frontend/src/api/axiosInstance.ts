@@ -7,6 +7,10 @@ import { baseUrl } from "./apiUrls";
 const axiosInstance = axios.create({
   baseURL: baseUrl,
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
 });
 
 // Check and restore CSRF token on page load
