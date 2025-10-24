@@ -16,9 +16,19 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register", "/", "/debug/csrf"}
 
     async def dispatch(self, request: Request, call_next):
-        # Skip CSRF for OPTIONS requests (CORS preflight)
+        # Handle OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
-            response = await call_next(request)
+            origin = request.headers.get("origin")
+            response = JSONResponse({"message": "OK"})
+            
+            if origin in ["http://localhost:5173", "http://localhost:5174"]:
+                response.headers.update({
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-CSRF-Token, X-Csrf-Token, Cookie",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "3600",
+                })
             return response
             
         # Skip CSRF for safe methods
@@ -32,10 +42,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     value=csrf_token,
                     httponly=False,  # Must be False so JavaScript can read it
                     secure=False,     # Set to False for localhost development
-                    samesite="strict",
+                    samesite="Lax",  # Changed to Lax for better compatibility
                     max_age=3600
                 )
-            
             return response
         
         # Check if path is exempt

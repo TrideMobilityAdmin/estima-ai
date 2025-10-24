@@ -29,8 +29,7 @@ ALLOWED_ORIGINS = [
 # Add CORS middleware with more specific configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=None,
+    allow_origins=["http://localhost:5173", "http://localhost:5174","http://10.100.3.13"],  # Restrict to frontend origins
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -49,8 +48,7 @@ app.add_middleware(
         "X-Csrf-Token",
         "Set-Cookie"
     ],
-    max_age=3600,
-    allow_origins_regex=None
+    max_age=3600
 )
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
@@ -98,6 +96,23 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint without CSRF"""
+    return {"status": "healthy"}
+
+@app.options("/{path:path}")
+async def options_handler(request: Request, path: str):
+    """Handle CORS preflight requests"""
+    origin = request.headers.get("origin")
+    if origin in ["http://localhost:5173", "http://localhost:5174"]:
+        response = JSONResponse({"message": "OK"})
+        response.headers.update({
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-CSRF-Token, X-Csrf-Token, Cookie",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        })
+        return response
+    return JSONResponse({"message": "Not allowed"}, status_code=403)
     return {"status": "healthy", "message": "Server is running"}
 
 @app.options("/{path:path}")
