@@ -13,16 +13,25 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     CSRF_COOKIE_NAME = "csrf_token"
 
     # Endpoints that don't require CSRF (like login/register)
-    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/logout","/"}
+    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/logout", "/"}
 
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
         print(f"🔥 CSRF Middleware Triggered: {request.method} {request.url.path}")
-        # ✅ Detect if running in local environment
+        print(f"🌐 Origin: {origin}")
+        
+        # ✅ Detect if running in local/cross-origin environment
         is_local = any(host in origin for host in ["localhost", "127.0.0.1"])
-        # secure = not is_local   # True only for deployed HTTPS
-        samesite = "None" if not is_local else "Lax"  # "None" for cross-site (localhost → VM)
-        domain = None           # Let browser infer domain automatically
+        is_cross_origin = origin and not any(host in origin for host in ["10.100.3.13"])
+        
+        # For cross-origin requests (localhost -> VM), use SameSite=None with Secure=True
+        # For same-origin requests (VM -> VM), use SameSite=Lax
+        samesite = "None" if is_cross_origin else "Lax"
+        # CRITICAL: SameSite=None requires Secure=True (even in dev)
+        secure = is_cross_origin
+        
+        print(f"🔧 Cookie settings: SameSite={samesite}, Secure={secure}, Cross-origin={is_cross_origin}")
+        
         try:
             # ✅ 1️⃣ Always allow preflight OPTIONS requests (CORS pre-checks)
             if request.method == "OPTIONS":
@@ -39,10 +48,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     response.set_cookie(
                         key=self.CSRF_COOKIE_NAME,
                         value=csrf_token,
-                        httponly=False,
-                        secure=False,  # ⚠️ must be False for localhost (set True in production)
+                        httponly=False,  # Must be False so JS can read it
+                        secure=secure,
                         samesite=samesite,
-                        domain=domain,
+                        domain=None,  # Let browser infer
                         max_age=3600,
                         path="/",
                     )
@@ -60,20 +69,24 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                         key=self.CSRF_COOKIE_NAME,
                         value=csrf_token,
                         httponly=False,
-                        secure=False,
+                        secure=secure,
                         samesite=samesite,
-                        domain=domain,
+                        domain=None,
                         max_age=3600,
                         path="/",
                     )
+                    # Also send in header for easy retrieval
                     response.headers[self.CSRF_HEADER_NAME] = csrf_token
+                    print(f"✅ CSRF token set in cookie and header")
                 return response
 
             # ✅ 4️⃣ Validate CSRF tokens for unsafe methods
             csrf_token_header = request.headers.get(self.CSRF_HEADER_NAME)
             csrf_token_cookie = request.cookies.get(self.CSRF_COOKIE_NAME)
-            print(f"📦 Header token: {csrf_token_header}")
-            print(f"📦 Cookie token: {csrf_token_cookie}")
+            
+            print(f"📦 Header token: {csrf_token_header[:20] if csrf_token_header else 'None'}...")
+            print(f"📦 Cookie token: {csrf_token_cookie[:20] if csrf_token_cookie else 'None'}...")
+            print(f"🍪 All cookies: {request.cookies}")
 
             if not csrf_token_header or not csrf_token_cookie:
                 print("❌ CSRF token missing!")
@@ -100,7 +113,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 status_code=e.status_code,
                 content={"detail": e.detail},
             )
-            # Include minimal CORS headers manually to avoid browser block
+            # Include CORS headers to prevent browser block
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
