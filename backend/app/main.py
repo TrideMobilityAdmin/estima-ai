@@ -42,7 +42,7 @@ async def root():
     return {"message": "Welcome to Estamaai APIs!"}
 
 @app.get("/debug/csrf")
-async def debug_csrf(request: Request):
+async def debug_csrf(request: Request): 
     """Debug endpoint to check CSRF token status"""
     return {
         "headers": dict(request.headers),
