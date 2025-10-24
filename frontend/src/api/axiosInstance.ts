@@ -92,12 +92,20 @@ axiosInstance.interceptors.request.use(
         console.log(`🍪 CSRF Token (Cookie): ${currentCookie ? currentCookie.substring(0, 20) + "..." : "Not set"}`);
         console.log(`✅ Tokens Match: ${csrfToken === currentCookie ? "YES" : "NO"}`);
         console.log(`🌐 Request URL: ${config.url}`);
+        console.log(`🌐 Full URL: ${config.baseURL}${config.url}`);
         console.log(`📤 Headers Being Sent:`, {
           'Authorization': config.headers.Authorization ? `${config.headers.Authorization.substring(0, 20)}...` : "Not set",
           'X-CSRF-Token': config.headers['X-CSRF-Token'] ? `${config.headers['X-CSRF-Token'].substring(0, 20)}...` : "Not set",
           'Content-Type': config.headers['Content-Type'] || "Not set"
         });
         console.log(`🍪 All Cookies: ${document.cookie}`);
+        console.log(`🔧 Request Config:`, {
+          method: config.method,
+          url: config.url,
+          baseURL: config.baseURL,
+          withCredentials: config.withCredentials,
+          headers: config.headers
+        });
         
         if (csrfToken !== currentCookie) {
           console.warn("⚠️ CSRF Token mismatch between header and cookie!");

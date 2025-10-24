@@ -12,10 +12,21 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     CSRF_HEADER_NAME = "X-CSRF-Token"
     CSRF_COOKIE_NAME = "csrf_token"
 
-    # Endpoints that don't require CSRF (like login/register)
-    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/logout","/"}
+    # Endpoints that don't require CSRF (typically login)
+    EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register", "/", "/debug/csrf"}
 
     async def dispatch(self, request: Request, call_next):
+        # Skip CSRF for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            # Add CORS headers for OPTIONS requests
+            response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "86400"
+            return response
+            
         # Skip CSRF for safe methods
         if request.method in self.SAFE_METHODS:
             response = await call_next(request)
@@ -26,10 +37,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     key=self.CSRF_COOKIE_NAME,
                     value=csrf_token,
                     httponly=False,  # Must be False so JavaScript can read it
-                    secure=True,      # Set to True in production (HTTPS)
+                    secure=False,     # Set to False for localhost development
                     samesite="strict",
                     max_age=3600
                 )
+            
+            # Add CORS headers to safe method responses
+            origin = request.headers.get("origin")
+            if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
+                response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
+            
             return response
         
         # Check if path is exempt
@@ -47,6 +66,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     max_age=3600
                 )
                 response.headers[self.CSRF_HEADER_NAME] = csrf_token 
+            
+            # Add CORS headers to exempt path responses
+            origin = request.headers.get("origin")
+            if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
+                response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
+            
             return response
         
         # Validate CSRF token for non-safe methods
@@ -78,4 +105,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         print(f"✅ CSRF Debug - Validation successful")
         
         response = await call_next(request)
+        
+        # Add CORS headers to all responses
+        origin = request.headers.get("origin")
+        if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
+        
         return response

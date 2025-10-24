@@ -41,6 +41,11 @@ app.include_router(data_routes.router)
 async def root():
     return {"message": "Welcome to Estamaai APIs!"}
 
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight requests"""
+    return {"message": "OK"}
+
 @app.get("/debug/csrf")
 async def debug_csrf(request: Request): 
     """Debug endpoint to check CSRF token status"""
