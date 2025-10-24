@@ -8,7 +8,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     CSRF Protection Middleware using Double Submit Cookie pattern.
     """
 
-    SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
     CSRF_HEADER_NAME = "X-CSRF-Token"
     CSRF_COOKIE_NAME = "csrf_token"
 
@@ -16,8 +16,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/logout","/"}
 
     async def dispatch(self, request: Request, call_next):
+        # origin = request.headers.get("origin", "")
         print(f"🔥 CSRF Middleware Triggered: {request.method} {request.url.path}")
-
+        # ✅ Detect if running in local environment
+        is_local = any(host in origin for host in ["localhost", "127.0.0.1"])
+        # secure = not is_local   # True only for deployed HTTPS
+        samesite = "None" if not is_local else "Lax"  # "None" for cross-site (localhost → VM)
+        domain = None           # Let browser infer domain automatically
         try:
             # ✅ 1️⃣ Always allow preflight OPTIONS requests (CORS pre-checks)
             if request.method == "OPTIONS":
@@ -36,7 +41,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                         value=csrf_token,
                         httponly=False,
                         secure=False,  # ⚠️ must be False for localhost (set True in production)
-                        samesite="Lax",
+                        samesite=samesite,
+                        domain=domain,
                         max_age=3600,
                         path="/",
                     )
@@ -55,7 +61,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                         value=csrf_token,
                         httponly=False,
                         secure=False,
-                        samesite="Lax",
+                        samesite=samesite,
+                        domain=domain,
                         max_age=3600,
                         path="/",
                     )
