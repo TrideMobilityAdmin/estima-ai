@@ -41,6 +41,11 @@ app.include_router(data_routes.router)
 async def root():
     return {"message": "Welcome to Estamaai APIs!"}
 
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint without CSRF"""
+    return {"status": "healthy", "message": "Server is running"}
+
 @app.options("/{path:path}")
 async def options_handler(path: str):
     """Handle CORS preflight requests"""
@@ -56,4 +61,14 @@ async def debug_csrf(request: Request):
         "csrf_cookie": request.cookies.get("csrf_token"),
         "method": request.method,
         "url": str(request.url)
+    }
+
+@app.get("/debug/cors")
+async def debug_cors(request: Request):
+    """Debug endpoint to test CORS configuration"""
+    return {
+        "message": "CORS test successful",
+        "origin": request.headers.get("origin"),
+        "method": request.method,
+        "headers": dict(request.headers)
     }
