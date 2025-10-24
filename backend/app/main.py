@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from app.api.v1 import data_routes, auth_routes
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -37,3 +37,15 @@ app.include_router(data_routes.router)
 @app.get("/")
 async def root():
     return {"message": "Welcome to Estamaai APIs!"}
+
+@app.get("/debug/csrf")
+async def debug_csrf(request: Request):
+    """Debug endpoint to check CSRF token status"""
+    return {
+        "headers": dict(request.headers),
+        "cookies": dict(request.cookies),
+        "csrf_header": request.headers.get("X-CSRF-Token"),
+        "csrf_cookie": request.cookies.get("csrf_token"),
+        "method": request.method,
+        "url": str(request.url)
+    }

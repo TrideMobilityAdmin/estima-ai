@@ -54,17 +54,29 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         csrf_token_header = request.headers.get(self.CSRF_HEADER_NAME)
         csrf_token_cookie = request.cookies.get(self.CSRF_COOKIE_NAME)
         
+        # Debug logging
+        print(f"🔍 CSRF Debug - Method: {request.method}")
+        print(f"🔍 CSRF Debug - URL: {request.url}")
+        print(f"🔍 CSRF Debug - Headers: {dict(request.headers)}")
+        print(f"🔍 CSRF Debug - Cookies: {dict(request.cookies)}")
+        print(f"🔍 CSRF Debug - Header Token: {csrf_token_header}")
+        print(f"🔍 CSRF Debug - Cookie Token: {csrf_token_cookie}")
+        
         if not csrf_token_header or not csrf_token_cookie:
+            print(f"❌ CSRF Debug - Missing tokens: header={bool(csrf_token_header)}, cookie={bool(csrf_token_cookie)}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="CSRF token missing"
             )
         
         if not secrets.compare_digest(csrf_token_header, csrf_token_cookie):
+            print(f"❌ CSRF Debug - Token mismatch: header={csrf_token_header[:10]}..., cookie={csrf_token_cookie[:10]}...")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="CSRF token validation failed"
             )
+        
+        print(f"✅ CSRF Debug - Validation successful")
         
         response = await call_next(request)
         return response

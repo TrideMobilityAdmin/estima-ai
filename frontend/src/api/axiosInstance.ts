@@ -9,6 +9,37 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
+// Check and restore CSRF token on page load
+const checkAndRestoreCsrfToken = () => {
+  const sessionToken = sessionStorage.getItem("csrfToken");
+  const cookieToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrf_token='))
+    ?.split('=')[1];
+  
+  if (sessionToken && !cookieToken) {
+    // Restore cookie from sessionStorage
+    document.cookie = `csrf_token=${sessionToken}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+    console.log("🔄 CSRF Token restored from sessionStorage to cookie");
+  } else if (cookieToken && !sessionToken) {
+    // Restore sessionStorage from cookie
+    sessionStorage.setItem("csrfToken", cookieToken);
+    console.log("🔄 CSRF Token restored from cookie to sessionStorage");
+  }
+  
+  if (sessionToken || cookieToken) {
+    console.log("🔐 CSRF Token Status on Page Load:");
+    console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
+    console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
+    console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
+  }
+};
+
+// Run on page load
+if (typeof window !== 'undefined') {
+  checkAndRestoreCsrfToken();
+}
+
 axiosInstance.interceptors.request.use(
   (config: any) => {
     const token = sessionStorage.getItem("token");
@@ -38,28 +69,46 @@ axiosInstance.interceptors.request.use(
       if (token) {
         (config.headers as any).Authorization = `Bearer ${token}`;
       }
+      
       if (csrfToken) {
+        // Set CSRF token in header
         (config.headers as any)["X-CSRF-Token"] = csrfToken;
-        // Clear ALL existing csrf_token cookies first (multiple attempts to ensure cleanup)
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`;
-        document.cookie = `csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`;
-        // Set the same CSRF token as cookie immediately
-        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Lax; Secure=false`;
-        // Force axios to include cookies by ensuring withCredentials is true
+        
+        // Set CSRF token as cookie (matching backend expectations)
+        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+        
+        // Ensure withCredentials is true for cookie inclusion
         config.withCredentials = true;
-        // Remove manual Cookie header setting as browsers don't allow it
-        // The cookie will be automatically included by axios due to withCredentials: true
+        
+        // Get current cookie value for verification
+        const currentCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('csrf_token='))
+          ?.split('=')[1];
+        
+        // Console log CSRF token and cookie details
+        console.log(`🔐 CSRF Token Details for ${method?.toUpperCase()} Request:`);
+        console.log(`📋 CSRF Token (Header): ${csrfToken.substring(0, 20)}...`);
+        console.log(`🍪 CSRF Token (Cookie): ${currentCookie ? currentCookie.substring(0, 20) + "..." : "Not set"}`);
+        console.log(`✅ Tokens Match: ${csrfToken === currentCookie ? "YES" : "NO"}`);
+        console.log(`🌐 Request URL: ${config.url}`);
+        console.log(`📤 Headers Being Sent:`, {
+          'Authorization': config.headers.Authorization ? `${config.headers.Authorization.substring(0, 20)}...` : "Not set",
+          'X-CSRF-Token': config.headers['X-CSRF-Token'] ? `${config.headers['X-CSRF-Token'].substring(0, 20)}...` : "Not set",
+          'Content-Type': config.headers['Content-Type'] || "Not set"
+        });
+        console.log(`🍪 All Cookies: ${document.cookie}`);
+        
+        if (csrfToken !== currentCookie) {
+          console.warn("⚠️ CSRF Token mismatch between header and cookie!");
+        }
+      } else {
+        console.error(`❌ No CSRF token found for ${method?.toUpperCase()} request!`);
+        console.error("Available tokens:", {
+          sessionStorage: sessionStorage.getItem("csrfToken") ? "Present" : "Missing",
+          cookies: document.cookie.includes("csrf_token") ? "Present" : "Missing"
+        });
       }
-      console.log(`📤 ${method?.toUpperCase()} in axios instance Request - Using:`, {
-        accessToken: token ? token.substring(0, 20) + "..." : "No token",
-        csrfToken: csrfToken ? csrfToken.substring(0, 20) + "..." : "No CSRF token"
-      });
-      console.log("📤 Request Headers being sent:", config.headers);
-      console.log("🍪 Current cookies in browser:", document.cookie);
-      console.log("🌐 Request URL:", config.url);
-      console.log("🌐 Base URL:", config.baseURL);
     }
 
     return config;
@@ -79,13 +128,37 @@ axiosInstance.interceptors.response.use(
       message: error?.message
     });
     
-    if ([401, 403].includes(error?.response?.status)) {
-      sessionStorage.clear();
-      window.location.href = "/";
-    }
+    // if ([401, 403].includes(error?.response?.status)) {
+    //   sessionStorage.clear();
+    //   window.location.href = "/";
+    // }
     return Promise.reject(error);
   }
 );
+
+// Global function to check CSRF token status (can be called from browser console)
+(window as any).checkCsrfToken = () => {
+  const sessionToken = sessionStorage.getItem("csrfToken");
+  const cookieToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrf_token='))
+    ?.split('=')[1];
+  
+  console.log("🔍 CSRF Token Status Check:");
+  console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
+  console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
+  console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
+  console.log(`🍪 All Cookies: ${document.cookie}`);
+  console.log(`📋 All SessionStorage Keys: ${Object.keys(sessionStorage).join(", ")}`);
+  
+  return {
+    sessionToken,
+    cookieToken,
+    tokensMatch: sessionToken === cookieToken,
+    allCookies: document.cookie,
+    sessionStorageKeys: Object.keys(sessionStorage)
+  };
+};
 
 export default axiosInstance;
 

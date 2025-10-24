@@ -86,6 +86,20 @@ function Login() {
           csrfToken: csrfTokenFromHeaders
         };
 
+        // Set CSRF token in sessionStorage
+        if (csrfTokenFromHeaders) {
+          sessionStorage.setItem("csrfToken", csrfTokenFromHeaders);
+          // Set CSRF token as cookie (matching backend expectations)
+          document.cookie = `csrf_token=${csrfTokenFromHeaders}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+          // Also set in Jotai state
+          setCsrfToken(csrfTokenFromHeaders);
+          
+          console.log("🔐 CSRF Token Set After Login:");
+          console.log(`📋 SessionStorage: ${csrfTokenFromHeaders.substring(0, 20)}...`);
+          console.log(`🍪 Cookie: ${document.cookie.includes("csrf_token") ? "Set" : "Not set"}`);
+          console.log(`🍪 All Cookies: ${document.cookie}`);
+        }
+
         // Console log what's being stored in storage
         console.log("🔐 Login Response Data:", {
           accessToken: accessToken ? `${accessToken.substring(0, 20)}...` : "No token",
