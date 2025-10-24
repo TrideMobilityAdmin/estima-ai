@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from app.api.v1 import data_routes, auth_routes
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.middleware.csrf_middleware import CSRFMiddleware
 
@@ -34,6 +35,36 @@ app.add_middleware(
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
 
+# Add global CORS handler
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    """Add CORS headers to all responses"""
+    origin = request.headers.get("origin")
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:5174", 
+        "http://10.100.3.13",
+        "http://10.100.3.13:80",
+        "http://10.100.3.13:8000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:5173"
+    ]
+    
+    response = await call_next(request)
+    
+    # Add CORS headers to all responses
+    if origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
+    
+    return response
+
 app.include_router(auth_routes.router)
 app.include_router(data_routes.router)
 
@@ -47,9 +78,32 @@ async def health_check():
     return {"status": "healthy", "message": "Server is running"}
 
 @app.options("/{path:path}")
-async def options_handler(path: str):
+async def options_handler(path: str, request: Request):
     """Handle CORS preflight requests"""
-    return {"message": "OK"}
+    origin = request.headers.get("origin")
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:5174", 
+        "http://10.100.3.13",
+        "http://10.100.3.13:80",
+        "http://10.100.3.13:8000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:5173"
+    ]
+    
+    response = JSONResponse({"message": "OK"})
+    
+    if origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Max-Age"] = "86400"
+    
+    return response
 
 @app.get("/debug/csrf")
 async def debug_csrf(request: Request): 

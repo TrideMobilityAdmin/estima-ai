@@ -19,12 +19,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # Skip CSRF for OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
             response = await call_next(request)
-            # Add CORS headers for OPTIONS requests
-            response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, Cookie, X-Csrf-Token"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Max-Age"] = "86400"
             return response
             
         # Skip CSRF for safe methods
@@ -41,13 +35,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     samesite="strict",
                     max_age=3600
                 )
-            
-            # Add CORS headers to safe method responses
-            origin = request.headers.get("origin")
-            if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
-                response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
             
             return response
         
@@ -66,13 +53,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     max_age=3600
                 )
                 response.headers[self.CSRF_HEADER_NAME] = csrf_token 
-            
-            # Add CORS headers to exempt path responses
-            origin = request.headers.get("origin")
-            if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
-                response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
             
             return response
         
@@ -105,12 +85,4 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         print(f"✅ CSRF Debug - Validation successful")
         
         response = await call_next(request)
-        
-        # Add CORS headers to all responses
-        origin = request.headers.get("origin")
-        if origin in ["http://localhost:5173", "http://localhost:5174", "http://10.100.3.13", "http://10.100.3.13:80", "http://10.100.3.13:8000", "http://127.0.0.1:8000", "http://127.0.0.1:5173"]:
-            response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Expose-Headers"] = "X-CSRF-Token, X-Csrf-Token, Set-Cookie"
-        
         return response
