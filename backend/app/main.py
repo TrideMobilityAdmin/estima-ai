@@ -16,7 +16,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Use ["http://localhost:3000"] for better security
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
