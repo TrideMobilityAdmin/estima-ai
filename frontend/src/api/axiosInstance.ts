@@ -7,10 +7,10 @@ import { baseUrl } from "./apiUrls";
 const axiosInstance = axios.create({
   baseURL: baseUrl,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
+  // headers: {
+  //   'Content-Type': 'application/json',
+  //   'Accept': 'application/json',
+  // },
 });
 
 // Check and restore CSRF token on page load
@@ -23,7 +23,7 @@ const checkAndRestoreCsrfToken = () => {
   
   if (sessionToken && !cookieToken) {
     // Restore cookie from sessionStorage
-    document.cookie = `csrf_token=${sessionToken}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+    document.cookie = `csrf_token=${sessionToken}; path=/; SameSite=Lax; Max-Age=3600`;
     console.log("🔄 CSRF Token restored from sessionStorage to cookie");
   } else if (cookieToken && !sessionToken) {
     // Restore sessionStorage from cookie
@@ -79,7 +79,7 @@ axiosInstance.interceptors.request.use(
         (config.headers as any)["X-CSRF-Token"] = csrfToken;
         
         // Set CSRF token as cookie (matching backend expectations)
-        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+        document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Lax; Max-Age=3600`;
         
         // Ensure withCredentials is true for cookie inclusion
         config.withCredentials = true;
