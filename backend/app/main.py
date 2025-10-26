@@ -28,8 +28,8 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["POST", "GET", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Cookie"],
-    expose_headers=["X-CSRF-Token", "Set-Cookie"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Cookie", "X-Csrf-Token"],
+    expose_headers=["X-CSRF-Token", "X-Csrf-Token", "Set-Cookie"],
 )
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
