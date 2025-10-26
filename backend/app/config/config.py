@@ -1,11 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-<<<<<<< HEAD
-    DATABASE_URL: str ="mongodb://admin:admin123@10.100.3.13:27017/"  
-=======
     DATABASE_URL: str ="mongodb://admin:admin123@10.100.3.13:27017/"
->>>>>>> main
     DB_NAME: str = "gmr-mro-staging-5y"
     SECRET_KEY: str = "AIzaSyBtLc5L8WECfgz6i1NzzNU7uFfhIig7DyQ"
     ALGORITHM: str = "HS256"
