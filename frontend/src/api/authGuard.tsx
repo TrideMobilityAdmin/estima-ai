@@ -14,7 +14,7 @@ const AuthGuard = ({ children }:any) => {
     const storedToken = getToken();
     
     if (!storedToken) {
-      console.log('⚠️ No token found, redirecting to login');
+      // console.log('⚠️ No token found, redirecting to login');
       navigate('/');
       return;
     }

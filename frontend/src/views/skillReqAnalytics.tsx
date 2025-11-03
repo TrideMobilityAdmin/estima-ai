@@ -353,7 +353,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
 
-        // console.log("filtered skills >>>",filteredSkills);
+        // // console.log("filtered skills >>>",filteredSkills);
         const [activePage, setActivePage] = useState(1);
         const itemsPerPage = 6;
 
@@ -556,7 +556,7 @@ const SkillRequirementAnalytics = ({ skillAnalysisData } : any) => {
             item.skill.toLowerCase().includes(skillSearch.toLowerCase())
         );
 
-        console.log("filtered findins skills >>>>",filteredSkills);
+        // console.log("filtered findins skills >>>>",filteredSkills);
         
         const [currentPage, setCurrentPage] = useState(1);
         const itemsPerPage = 5;

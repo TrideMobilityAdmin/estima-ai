@@ -230,7 +230,7 @@ export default function EstimateNewScreen() {
 
   // const [validatedTasks, setValidatedTasks] = useState<any[]>([]);
   // const [isLoading, setIsLoading] = useState(false);
-  console.log("selected remarks >>>>", selectedEstRemarksData);
+  // console.log("selected remarks >>>>", selectedEstRemarksData);
 
   const [menuOpened, { open, close }] = useDisclosure(false);
   // const fetchEstimatesStatus = async () => {
@@ -352,8 +352,8 @@ export default function EstimateNewScreen() {
       // );
       // setEstimatesStatusData(sortedData);
 
-  // console.log("all estimates status>>>", estimatesStatusData);
-  // console.log("selected estimate tasks >>>>", selectedEstimateTasks);
+  // // console.log("all estimates status>>>", estimatesStatusData);
+  // // console.log("selected estimate tasks >>>>", selectedEstimateTasks);
 
   const [historyEstimatesStatusData, setHistoryEstimatesStatusData] = useState<any[]>([]);
   const [historyEstimatesCount, setHistoryEstimatesCount] = useState<any>();
@@ -426,8 +426,8 @@ export default function EstimateNewScreen() {
     }
   }, [loadingHistoryEstimates, historyEstimatesStatusData, gridApi]);
 
-  console.log("all history estimates status>>>", historyEstimatesStatusData);
-  console.log("history cout  >>>>", historyEstimatesCount);
+  // console.log("all history estimates status>>>", historyEstimatesStatusData);
+  // console.log("history cout  >>>>", historyEstimatesCount);
 
 
   useEffect(() => {
@@ -452,9 +452,9 @@ export default function EstimateNewScreen() {
       console.error("Error fetching data:", error);
     }
   };
-  console.log("expert insight data >>>>", expertInsightsData);
+  // console.log("expert insight data >>>>", expertInsightsData);
 
-  console.log("expert insight tasks >>>>", expertInsightsTasks);
+  // console.log("expert insight tasks >>>>", expertInsightsTasks);
 
   const handleExpertInsightsChange = (selectedIDs: string[]) => {
     setSelectedExpertInsightTaskIDs(selectedIDs);
@@ -466,11 +466,11 @@ export default function EstimateNewScreen() {
     setSelectedExpertInsightTasks(selectedObjects);
   };
 
-  console.log(
+  // console.log(
     "selected expert insights tasks ids >>>>",
     selectedExpertInsightsTaskIDs
   );
-  console.log(
+  // console.log(
     "selected expert insights tasks obj >>>>",
     selectedExpertInsightTasks
   );
@@ -489,17 +489,17 @@ export default function EstimateNewScreen() {
     setExtractedDescriptions(descriptions ?? []); // ADD THIS
     setSheetInfo(fileSheetInfo);
 
-    console.log("✅ Selected File:", file ? file.name : "None");
-    console.log(
+    // console.log("✅ Selected File:", file ? file.name : "None");
+    // console.log(
       "📌 Extracted Tasks:",
       tasks.length > 0 ? tasks : "No tasks found"
     );
-    console.log(
+    // console.log(
       "📝 Extracted Descriptions:",
       descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
     );
-    console.log("From sheet:", fileSheetInfo?.sheetName);
-    console.log("From column:", fileSheetInfo?.columnName);
+    // console.log("From sheet:", fileSheetInfo?.sheetName);
+    // console.log("From column:", fileSheetInfo?.columnName);
 
     if (tasks.length > 0) {
       // Send both tasks and descriptions to validation API
@@ -984,7 +984,7 @@ const handleEditAndGenerateFile = async (estID: string) => {
 
 
 
-  console.log("Estimate Id Details >>>", estimateDetails);
+  // console.log("Estimate Id Details >>>", estimateDetails);
 
   const [filteredTasksList, setFilteredTasksList] = useState<any>(null);
   const [loadingFiltTasks, setLoadingFiltTasks] = useState(false);
@@ -1019,8 +1019,8 @@ const handleEditAndGenerateFile = async (estID: string) => {
   ];
 
 
-  // console.log("Filtered Tasks List >>>", filteredTasksList);
-  // console.log("Filtered combined List >>>", combinedFilteredTasksList);
+  // // console.log("Filtered Tasks List >>>", filteredTasksList);
+  // // console.log("Filtered combined List >>>", combinedFilteredTasksList);
 
   // const downloadAllValidatedTasks = async (
   //   tasks: string[],
@@ -1156,7 +1156,7 @@ const handleEditAndGenerateFile = async (estID: string) => {
         columnName: "TASK NUMBER"
       });
 
-      console.log(`Excel file ${fileName} created and auto-selected successfully`);
+      // console.log(`Excel file ${fileName} created and auto-selected successfully`);
 
     } catch (error) {
       console.error('Error creating and selecting Excel file:', error);
@@ -1355,7 +1355,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
     fetchOperators();
   }, []);
 
-  console.log("all operatorsListAll>>>", operatorsListAll);
+  // console.log("all operatorsListAll>>>", operatorsListAll);
 
   const combobox = useCombobox({
     onDropdownClose: () => combobox.resetSelectedOption(),
@@ -1497,7 +1497,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
       miscLaborTasks: defaultMiscLaborTasks,
       considerDeltaUnAvTasks: form.values.considerDeltaUnAvTasks || false,
     };
-    // console.log("request data >>>>",requestData);
+    // // console.log("request data >>>>",requestData);
     try {
       setLoading(true);
 
@@ -1559,7 +1559,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
   };
 
 
-  console.log("rfq sub >>> ", rfqSubmissionResponse);
+  // console.log("rfq sub >>> ", rfqSubmissionResponse);
 
   const [modalTaskValidateData, setModalTaskValidateData] = useState<any>(null);
   const [loadingModalTasksValidate, setLoadingModalTasksValidate] = useState(false);
@@ -1609,7 +1609,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
     form.values.aircraftAgeThreshold,
   ]);
 
-  console.log("Modal Task Validate Data >>>", modalTaskValidateData);
+  // console.log("Modal Task Validate Data >>>", modalTaskValidateData);
 
   const combinedModalTasksValidate = [
     ...(modalTaskValidateData?.filtered_tasks_list || [])
@@ -1643,7 +1643,7 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
       .filter((task: any) => task.task_number && task.task_number.trim() !== '')
   ];
 
-  console.log("Combined Modal Tasks Validate >>>", combinedModalTasksValidate);
+  // console.log("Combined Modal Tasks Validate >>>", combinedModalTasksValidate);
 
   const [excelModalOpened, setExcelModalOpened] = useState(false);
   const [downloadedNotAvailableTasks, setDownloadedNotAvailableTasks] = useState<any[]>([]);
@@ -1712,12 +1712,12 @@ const downloadAllValidatedTasksOnly = async (estID: string) => {
 //       source_tasks: validTasks,
 //     };
 
-//     console.log("Submitting data:", requestData);
+//     // console.log("Submitting data:", requestData);
 
 //     try {
 //       setLoading(true);
 //       const response = await getSkillAnalysis(requestData);
-//       console.log("API Response:", response);
+//       // console.log("API Response:", response);
 
 //       // if (response) {
 //       setSkillAnalysisData(response);
@@ -1751,12 +1751,12 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     source_tasks: validTasks,
   };
 
-  console.log("Submitting to skill analysis:", requestData);
+  // console.log("Submitting to skill analysis:", requestData);
 
   try {
     setLoading(true);
     const response = await getSkillAnalysis(requestData);
-    console.log("🎯 Skill Analysis Response:", response);
+    // console.log("🎯 Skill Analysis Response:", response);
     setSkillAnalysisData(response);
     return response;
   } catch (error) {
@@ -1770,7 +1770,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
 };
 
 
-  console.log("skillAnalysisData", skillAnalysisData);
+  // console.log("skillAnalysisData", skillAnalysisData);
 
   const handleCloseModal = () => {
     setRfqSubModalOpened(false);
@@ -1796,7 +1796,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
       fetchEstimateById(selectedEstimateIdReport);
     }
   }, [selectedEstimateIdReport]);
-  console.log("estimate report >>>>", estimateReportData);
+  // console.log("estimate report >>>>", estimateReportData);
 
   const fetchProbabilityWisedata = async (id: string) => {
     if (!id) return;
@@ -1814,7 +1814,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
       fetchProbabilityWisedata(selectedEstimateIdProbability);
     }
   }, [selectedEstimateIdProbability]);
-  console.log("probabilityWiseData  >>>>", probabilityWiseData);
+  // console.log("probabilityWiseData  >>>>", probabilityWiseData);
 
   // Transform data for the chart
   const transformedData = probabilityWiseData?.estProb?.map((item: any) => ({
@@ -1855,7 +1855,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
     setAdditionalTasks(newTasks);
   };
 
-  console.log("additional tasks >>>>", additionalTasks);
+  // console.log("additional tasks >>>>", additionalTasks);
 
   // Step 3: Modify the "Show Tasks" button click handler to include additional tasks validation
   const handleShowTasks = async () => {
@@ -1889,7 +1889,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
       if (response.length > 0) {
         setValidatedAdditionalTasks(response);
       }
-      console.log("Validated Additional Tasks:", response);
+      // console.log("Validated Additional Tasks:", response);
     } catch (error) {
       console.error("Error validating additional tasks:", error);
     } finally {
@@ -1923,12 +1923,12 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
   //         aircraftFlightCycles: Number(form.values.aircraftFlightCycles),
   //     };
 
-  //     console.log("Submitting data:", requestData);
+  //     // console.log("Submitting data:", requestData);
 
   //     try {
   //         setLoading(true);
   //         const response = await postEstimateReport(requestData);
-  //         console.log("API Response:", response);
+  //         // console.log("API Response:", response);
 
   //         if (response) {
   //             setEstReportData(response);
@@ -1952,9 +1952,9 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
   // };
 
   // useEffect(() => {
-  //     console.log("Updated UI response:", estimateReportData);
+  //     // console.log("Updated UI response:", estimateReportData);
   // }, [estimateReportData]);
-  // console.log("response UI >>>>", estimateReportData);
+  // // console.log("response UI >>>>", estimateReportData);
   const [expanded, setExpanded] = useState(false);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [showFields, setShowFields] = useState<string[]>([]);
@@ -2112,7 +2112,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
 
     const data = { remark: newRemark };
     const result = await updateRemarkByEstID(selectedEstimateRemarks, data);
-    console.log("result", result);
+    // console.log("result", result);
     if (result) {
       // Create a new remark object similar to what your API would return
       const user = currentUser; // Replace with actual current user name or ID
@@ -2395,7 +2395,7 @@ const handleSubmitSkills = async (validatedTasks: any[]) => {
   const [loadingEstimatesSummary, setLoadingEstimatesSummary] = useState(false);
   const [statusText, setStatusText] = useState("");
 
-  console.log("Selected Date range :",rangeType + dateRange);
+  // console.log("Selected Date range :",rangeType + dateRange);
 
   
   const fetchAllEstimatesSummary = async () => {

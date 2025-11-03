@@ -40,11 +40,11 @@ const [sheetInfo, setSheetInfo] = useState<
     // const handleFileChange = async (file: File | null, tasks: string[]) => {
     //     setSelectedFile(file);
     //     setTasks(tasks ?? []); // Ensure tasks is always an array
-    //     console.log("✅ Selected File:", file ? file.name : "None");
-    //     console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
+    //     // console.log("✅ Selected File:", file ? file.name : "None");
+    //     // console.log("📌 Extracted Tasks:", tasks.length > 0 ? tasks : "No tasks found");
 
 
-    //     console.log("Extracted Tasks:", tasks);
+    //     // console.log("Extracted Tasks:", tasks);
     //     const response = await validateTasks(tasks);
     //     setValidatedTasks(response);
     //     setIsLoading(false);
@@ -74,17 +74,17 @@ const [sheetInfo, setSheetInfo] = useState<
         setExtractedDescriptions(descriptions ?? []); // ADD THIS
         setSheetInfo(fileSheetInfo);
       
-        console.log("✅ Selected File:", file ? file.name : "None");
-        console.log(
+        // console.log("✅ Selected File:", file ? file.name : "None");
+        // console.log(
           "📌 Extracted Tasks:",
           tasks.length > 0 ? tasks : "No tasks found"
         );
-        console.log(
+        // console.log(
           "📝 Extracted Descriptions:",
           descriptions.length > 0 ? descriptions.slice(0, 5) : "No descriptions found"
         );
-        console.log("From sheet:", fileSheetInfo?.sheetName);
-        console.log("From column:", fileSheetInfo?.columnName);
+        // console.log("From sheet:", fileSheetInfo?.sheetName);
+        // console.log("From column:", fileSheetInfo?.columnName);
       
         if (tasks.length > 0) {
           // Send both tasks and descriptions to validation API
@@ -108,7 +108,7 @@ const [sheetInfo, setSheetInfo] = useState<
       };
 
     const handleFiles = (files: File[]) => {
-        console.log("Uploaded files:", files);
+        // console.log("Uploaded files:", files);
     };
 
     //  Extracted tasks are passed to validation API
@@ -116,7 +116,7 @@ const [sheetInfo, setSheetInfo] = useState<
     //     setIsLoading(true);
     //     setTasks(extractedTasks);
 
-    //     console.log("Extracted Tasks:", extractedTasks);
+    //     // console.log("Extracted Tasks:", extractedTasks);
     //     const response = await validateTasks(extractedTasks);
     //     setValidatedTasks(response);
     //     setIsLoading(false);
@@ -156,12 +156,12 @@ const [sheetInfo, setSheetInfo] = useState<
             source_tasks: validTasks,
         };
 
-        console.log("Submitting data:", requestData);
+        // console.log("Submitting data:", requestData);
 
         try {
             setLoading(true);
             const response = await getSkillAnalysis(requestData);
-            console.log("API Response:", response);
+            // console.log("API Response:", response);
 
             if (response) {
                 setSkillAnalysisData(response);

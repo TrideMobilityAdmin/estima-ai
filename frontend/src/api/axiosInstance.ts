@@ -24,18 +24,18 @@ const checkAndRestoreCsrfToken = () => {
   if (sessionToken && !cookieToken) {
     // Restore cookie from sessionStorage
     document.cookie = `csrf_token=${sessionToken}; path=/; SameSite=Lax; Max-Age=3600`;
-    console.log("🔄 CSRF Token restored from sessionStorage to cookie");
+    // console.log("🔄 CSRF Token restored from sessionStorage to cookie");
   } else if (cookieToken && !sessionToken) {
     // Restore sessionStorage from cookie
     sessionStorage.setItem("csrfToken", cookieToken);
-    console.log("🔄 CSRF Token restored from cookie to sessionStorage");
+    // console.log("🔄 CSRF Token restored from cookie to sessionStorage");
   }
   
   if (sessionToken || cookieToken) {
-    console.log("🔐 CSRF Token Status on Page Load:");
-    console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
-    console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
-    console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
+    // console.log("🔐 CSRF Token Status on Page Load:");
+    // console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
+    // console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
+    // console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
   }
 };
 
@@ -66,7 +66,7 @@ axiosInstance.interceptors.request.use(
       // ✅ Only attach access token for GET requests
       if (token) {
         (config.headers as any).Authorization = `Bearer ${token}`;
-        console.log("🔍 GET Request - Using Access Token:", token.substring(0, 20) + "...");
+        // console.log("🔍 GET Request - Using Access Token:", token.substring(0, 20) + "...");
       }
     } else if (["post", "put", "delete"].includes(method || "")) {
       // ✅ Attach both access token and CSRF token for POST, PUT, DELETE
@@ -91,25 +91,25 @@ axiosInstance.interceptors.request.use(
           ?.split('=')[1];
         
         // Console log CSRF token and cookie details
-        console.log(`🔐 CSRF Token Details for ${method?.toUpperCase()} Request:`);
-        console.log(`📋 CSRF Token (Header): ${csrfToken.substring(0, 20)}...`);
-        console.log(`🍪 CSRF Token (Cookie): ${currentCookie ? currentCookie.substring(0, 20) + "..." : "Not set"}`);
-        console.log(`✅ Tokens Match: ${csrfToken === currentCookie ? "YES" : "NO"}`);
-        console.log(`🌐 Request URL: ${config.url}`);
-        console.log(`🌐 Full URL: ${config.baseURL}${config.url}`);
-        console.log(`📤 Headers Being Sent:`, {
-          'Authorization': config.headers.Authorization ? `${config.headers.Authorization.substring(0, 20)}...` : "Not set",
-          'X-CSRF-Token': config.headers['X-CSRF-Token'] ? `${config.headers['X-CSRF-Token'].substring(0, 20)}...` : "Not set",
-          'Content-Type': config.headers['Content-Type'] || "Not set"
-        });
-        console.log(`🍪 All Cookies: ${document.cookie}`);
-        console.log(`🔧 Request Config:`, {
-          method: config.method,
-          url: config.url,
-          baseURL: config.baseURL,
-          withCredentials: config.withCredentials,
-          headers: config.headers
-        });
+        // console.log(`🔐 CSRF Token Details for ${method?.toUpperCase()} Request:`);
+        // console.log(`📋 CSRF Token (Header): ${csrfToken.substring(0, 20)}...`);
+        // console.log(`🍪 CSRF Token (Cookie): ${currentCookie ? currentCookie.substring(0, 20) + "..." : "Not set"}`);
+        // console.log(`✅ Tokens Match: ${csrfToken === currentCookie ? "YES" : "NO"}`);
+        // console.log(`🌐 Request URL: ${config.url}`);
+        // console.log(`🌐 Full URL: ${config.baseURL}${config.url}`);
+        // console.log(`📤 Headers Being Sent:`, {
+        //   'Authorization': config.headers.Authorization ? `${config.headers.Authorization.substring(0, 20)}...` : "Not set",
+        //   'X-CSRF-Token': config.headers['X-CSRF-Token'] ? `${config.headers['X-CSRF-Token'].substring(0, 20)}...` : "Not set",
+        //   'Content-Type': config.headers['Content-Type'] || "Not set"
+        // });
+        // console.log(`🍪 All Cookies: ${document.cookie}`);
+        // console.log(`🔧 Request Config:`, {
+        //   method: config.method,
+        //   url: config.url,
+        //   baseURL: config.baseURL,
+        //   withCredentials: config.withCredentials,
+        //   headers: config.headers
+        // });
         
         if (csrfToken !== currentCookie) {
           console.warn("⚠️ CSRF Token mismatch between header and cookie!");
@@ -131,14 +131,14 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.log("🚨 Axios Error Details:", {
-      status: error?.response?.status,
-      statusText: error?.response?.statusText,
-      data: error?.response?.data,
-      headers: error?.response?.headers,
-      config: error?.config,
-      message: error?.message
-    });
+    // console.log("🚨 Axios Error Details:", {
+    //   status: error?.response?.status,
+    //   statusText: error?.response?.statusText,
+    //   data: error?.response?.data,
+    //   headers: error?.response?.headers,
+    //   config: error?.config,
+    //   message: error?.message
+    // });
     
     // if ([401, 403].includes(error?.response?.status)) {
     //   sessionStorage.clear();
@@ -156,12 +156,12 @@ axiosInstance.interceptors.response.use(
     .find(row => row.startsWith('csrf_token='))
     ?.split('=')[1];
   
-  console.log("🔍 CSRF Token Status Check:");
-  console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
-  console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
-  console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
-  console.log(`🍪 All Cookies: ${document.cookie}`);
-  console.log(`📋 All SessionStorage Keys: ${Object.keys(sessionStorage).join(", ")}`);
+  // console.log("🔍 CSRF Token Status Check:");
+  // console.log(`📋 SessionStorage: ${sessionToken ? sessionToken.substring(0, 20) + "..." : "Not set"}`);
+  // console.log(`🍪 Cookie: ${cookieToken ? cookieToken.substring(0, 20) + "..." : "Not set"}`);
+  // console.log(`✅ Tokens Match: ${sessionToken === cookieToken ? "YES" : "NO"}`);
+  // console.log(`🍪 All Cookies: ${document.cookie}`);
+  // console.log(`📋 All SessionStorage Keys: ${Object.keys(sessionStorage).join(", ")}`);
   
   return {
     sessionToken,
@@ -230,7 +230,7 @@ export default axiosInstance;
 
 //       if (authToken) {
 //         config.headers.Authorization = `Bearer ${authToken}`;
-//         console.log("🔄 Token Applied in Request:", authToken.substring(0, 10) + "...");
+//         // console.log("🔄 Token Applied in Request:", authToken.substring(0, 10) + "...");
 //       } else {
 //         console.warn("⚠️ No token found in state or sessionStorage!");
 //       }
@@ -245,7 +245,7 @@ export default axiosInstance;
 //     (response) => response,
 //     (error) => {
 //       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-//         console.log("⚠️ Token expired or unauthorized. Redirecting to login...");
+//         // console.log("⚠️ Token expired or unauthorized. Redirecting to login...");
 //         // Clear auth state
 //         if (typeof window !== 'undefined') {
 //           sessionStorage.removeItem('token');

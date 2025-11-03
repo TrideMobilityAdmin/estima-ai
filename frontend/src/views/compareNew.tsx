@@ -37,11 +37,11 @@ export default function CompareNew() {
     fetchEstimates();
   }, []);
 
-  console.log("all estimates>>>", estimates);
+  // console.log("all estimates>>>", estimates);
 
 
   const handleFileChange = (files: File[]) => {
-    console.log("Files selected:", files);
+    // console.log("Files selected:", files);
     setSelectedFiles(files);
   };
 
@@ -59,13 +59,13 @@ export default function CompareNew() {
     try {
       setIsLoading(true);
 
-      console.log("Uploading files:", selectedFiles.map((file) => file.name));
-      console.log("Selected Estimate ID:", selectedEstID);
+      // console.log("Uploading files:", selectedFiles.map((file) => file.name));
+      // console.log("Selected Estimate ID:", selectedEstID);
 
       const response = await compareUploadFile(selectedFiles, selectedEstID);
 
       if (response) {
-        console.log("Upload successful:", response);
+        // console.log("Upload successful:", response);
         setCompareEstimatedData(response?.data);
       }
     } catch (error) {
@@ -77,7 +77,7 @@ export default function CompareNew() {
   };
 
 
-  console.log("Compare UI response:", compareEstimatedData);
+  // console.log("Compare UI response:", compareEstimatedData);
 
 
   // Helper function to format column headers and handle null/empty values

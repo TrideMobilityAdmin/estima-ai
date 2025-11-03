@@ -77,7 +77,7 @@ export default App
 //     const storedEmail = sessionStorage.getItem('email');
 
 //     if (storedToken && !token) {
-//       console.log("🔄 Loading auth data from sessionStorage on app init");
+//       // console.log("🔄 Loading auth data from sessionStorage on app init");
 //       setToken(storedToken);
 //     }
     
