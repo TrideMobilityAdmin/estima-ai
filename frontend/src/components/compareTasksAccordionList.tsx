@@ -29,7 +29,7 @@ const TaskListCompareScreen: React.FC<{ tasksEligible: any[], tasksNotEligible: 
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const taskListRef = useRef<HTMLDivElement>(null);
-    console.log("tasksEligible >>>> Component >>>> ", tasksEligible);
+    // console.log("tasksEligible >>>> Component >>>> ", tasksEligible);
     const filteredTasks = useMemo(() => {
         const search = taskSearch?.trim()?.toLowerCase();
         if (!search) return tasksEligible;

@@ -40,11 +40,11 @@
 
 //     fetchEstimates();
 //   }, []);
-//   console.log("all estimates>>>", estimates);
+//   // console.log("all estimates>>>", estimates);
 
 
 //   const handleFileChange = (files: File[]) => {
-//     console.log("Files selected:", files);
+//     // console.log("Files selected:", files);
 //     setSelectedFiles(files);
 //   };
 
@@ -61,13 +61,13 @@
 
 //     try {
 //       setIsLoading(true); // Set loading to true
-//       console.log("Uploading files:", selectedFiles.map((file) => file.name));
-//       console.log("Selected Estimate ID:", selectedEstID);
+//       // console.log("Uploading files:", selectedFiles.map((file) => file.name));
+//       // console.log("Selected Estimate ID:", selectedEstID);
 
 //       const response = await compareUploadFile(selectedFiles, selectedEstID);
 
 //       if (response) {
-//         console.log("Upload successful:", response);
+//         // console.log("Upload successful:", response);
 //         setCompareEstimatedData(response?.data);
 //       }
 //     } catch (error) {
@@ -78,7 +78,7 @@
 //     }
 //   };
 
-//   console.log("Compare UI response:", compareEstimatedData);
+//   // console.log("Compare UI response:", compareEstimatedData);
 
 //   return (
 //     <>

@@ -29,7 +29,7 @@ export const useApiPartUsage = () => {
     try {
         const response = await axiosInstance.get(`${getPartUsage_Url}?part_id=${partId}&startDate=${startDate}&endDate=${endDate}`);
 
-        console.log("response part single >>>>",response.data);
+        // console.log("response part single >>>>",response.data);
         
         if (Object.keys(response.data.data).length > 0) {
             showNotification({
@@ -75,7 +75,7 @@ const getMultiPartUsage = async (partIds: string[], startDate: any, endDate: any
 
         // Make the POST request
         const response = await axiosInstance.post(`${getMultiPartUsage_Url}?startDate=${startDate}&endDate=${endDate}`, requestBody);
-        console.log("response part multiple >>>>", response.data);
+        // console.log("response part multiple >>>>", response.data);
         if (response.data?.findingsHMVParts?.length > 0 &&
             response.data?.findingsNonHMVTasks?.length > 0 &&
             response.data?.taskParts?.length > 0) {
@@ -99,7 +99,7 @@ const getMultiPartUsage = async (partIds: string[], startDate: any, endDate: any
             });
         }
 
-        console.log("response multiple >>>>", response.data);
+        // console.log("response multiple >>>>", response.data);
 
         return response.data;
     } catch (error: any) {

@@ -34,24 +34,24 @@ export default function CompareEstimate() {
     fetchEstimates();
   }, []);
 
-  console.log("all estimates>>>", estimates);
+  // console.log("all estimates>>>", estimates);
 
   // // Handle file selection from DropZoneExcel
   // const handleFileChange = (files: any) => {
   //   // DropZoneExcel component already provides the files array
   //   if (files && files.length > 0) {
   //     setSelectedFile(files[0]);
-  //     console.log("✅ File Selected:", files[0].name);
+  //     // console.log("✅ File Selected:", files[0].name);
   //   } else {
   //     setSelectedFile(null);
-  //     console.log("❌ No file selected");
+  //     // console.log("❌ No file selected");
   //   }
   // };
 
   // // Handle upload
   // const handleUpload = async () => {
   //   if (!selectedFile) {
-  //     console.log("Current file state:", selectedFile);
+  //     // console.log("Current file state:", selectedFile);
   //     alert("Please select a file first!");
   //     return;
   //   }
@@ -62,8 +62,8 @@ export default function CompareEstimate() {
   //   }
 
   //   try {
-  //     console.log("Uploading file:", selectedFile.name);
-  //     console.log("Selected Estimate ID:", selectedEstID);
+  //     // console.log("Uploading file:", selectedFile.name);
+  //     // console.log("Selected Estimate ID:", selectedEstID);
 
   //     // Create FormData and append file
   //     const formData = new FormData();
@@ -73,7 +73,7 @@ export default function CompareEstimate() {
   //     const response = await uploadFile(selectedFile, selectedEstID);
 
   //     if (response) {
-  //       console.log("Upload successful:", response);
+  //       // console.log("Upload successful:", response);
   //       setCompareEstimatedData(response?.data);
   //       // Reset the form
   //       setSelectedFile(null);
@@ -87,9 +87,9 @@ export default function CompareEstimate() {
   const handleFileChange = (file: File | null) => {
     setSelectedFile(file);
     if (file) {
-      console.log("✅ File Selected:", file.name);
+      // console.log("✅ File Selected:", file.name);
     } else {
-      console.log("❌ No file selected");
+      // console.log("❌ No file selected");
     }
   };
 
@@ -105,8 +105,8 @@ export default function CompareEstimate() {
     }
 
     try {
-      console.log("Uploading file:", selectedFile.name);
-      console.log("Selected Estimate ID:", selectedEstID);
+      // console.log("Uploading file:", selectedFile.name);
+      // console.log("Selected Estimate ID:", selectedEstID);
 
       const formData = new FormData();
       formData.append("file", selectedFile);
@@ -114,7 +114,7 @@ export default function CompareEstimate() {
       const response = await compareUploadFile(selectedFile, selectedEstID);
 
       if (response) {
-        console.log("Upload successful:", response);
+        // console.log("Upload successful:", response);
         // Reset file and ID after successful upload
         setCompareEstimatedData(response?.data);
 
@@ -126,7 +126,7 @@ export default function CompareEstimate() {
   };
 
 
-  console.log("comapre ui rsp>>>>", compareEstimatedData);
+  // console.log("comapre ui rsp>>>>", compareEstimatedData);
 
 
   const [manHours, setManHours] = useState<any | null>(null);
@@ -189,7 +189,7 @@ export default function CompareEstimate() {
   // Handle extracted tasks
   const handleTasks = (extractedTasks: string[]) => {
     setTasks(extractedTasks);
-    console.log("tasks :", extractedTasks);
+    // console.log("tasks :", extractedTasks);
   };
 
   // const jsonData = {
