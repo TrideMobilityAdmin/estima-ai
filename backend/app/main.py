@@ -3,6 +3,7 @@ from app.api.v1 import data_routes, auth_routes
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.middleware.csrf_middleware import CSRFMiddleware
+from app.middleware.security_header_middleware import SecurityHeadersMiddleware
 
 
 app = FastAPI(
@@ -23,8 +24,6 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "https://127.0.0.1:5173",
-        
-
     ],
     allow_credentials=True,
     allow_methods=["POST", "GET", "PUT", "DELETE", "OPTIONS"],
@@ -33,6 +32,7 @@ app.add_middleware(
 )
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(auth_routes.router)
 app.include_router(data_routes.router)

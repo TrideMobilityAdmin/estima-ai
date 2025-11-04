@@ -29,6 +29,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         origin = request.headers.get("origin", "") 
               
         try:
+
+            # 🚫 Explicitly block insecure HTTP methods
+            if request.method in {"TRACE", "TRACK"}:
+                raise HTTPException(
+                    status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                    detail=f"HTTP method {request.method} not allowed",
+                )
             # ✅  Always allow preflight OPTIONS requests (CORS pre-checks)
             if request.method == "OPTIONS":            
                 return await call_next(request)
