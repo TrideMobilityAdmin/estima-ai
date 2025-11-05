@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.middleware.csrf_middleware import CSRFMiddleware
 from app.middleware.security_header_middleware import SecurityHeadersMiddleware
+from app.middleware.hide_optionsheader_middleware import HideOptionsHeaderMiddleware
 
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.add_middleware(
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(HideOptionsHeaderMiddleware)
 
 app.include_router(auth_routes.router)
 app.include_router(data_routes.router)
