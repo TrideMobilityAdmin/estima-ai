@@ -13,7 +13,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
+app.add_middleware(HideOptionsHeaderMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +34,7 @@ app.add_middleware(
 # Add CSRF Protection Middleware
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(HideOptionsHeaderMiddleware)
+
 
 app.include_router(auth_routes.router)
 app.include_router(data_routes.router)
