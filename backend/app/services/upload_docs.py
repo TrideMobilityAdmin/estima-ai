@@ -2417,6 +2417,18 @@ class ExcelUploadService():
 
         # Calculate actual capping values
         actual_capping_values = actual_cap_calculation(cappingDetails, eligible_tasks, sub_task_description, sub_task_parts)
+
+        def extract_package_number(dataframe: pd.DataFrame) -> Optional[str]:
+            if dataframe.empty or "package_number" not in dataframe.columns:
+                return None
+
+            for value in dataframe["package_number"].dropna().tolist():
+                package_number = str(value).strip()
+                if package_number and package_number.lower() != "none":
+                    return package_number
+            return None
+
+        compare_package_number = extract_package_number(sub_task_parts)
        
         # Filter task descriptions
         eligible_task_description = task_description[task_description["task_number"].isin(eligible_tasks)]
@@ -2647,6 +2659,8 @@ class ExcelUploadService():
         
         # Create the final output structure to match testing function
         finaloutput = {
+            "package_number": compare_package_number,
+            "estID": estID,
             "tasks": eligible_tasks_comparision,
             "findings": eligible_findings_comparision,
             # Adding additional aircraft info that was in testing2 but not in testing
