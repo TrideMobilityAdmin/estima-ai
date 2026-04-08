@@ -8,6 +8,10 @@ from difflib import SequenceMatcher
 from pymongo import MongoClient
 import numpy as np
 from typing import List, Dict, Optional
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
+import io
+import zipfile
 # Initialize logger
 logger = setup_logging()
 #'/home/CNLT7197/estima-ai/data_pipeline/config.yaml'
@@ -65,6 +69,220 @@ def clean_fly_hours(value):
         else:
             value = pd.to_numeric(value, errors='coerce')  # Convert to float if possible
     return value
+
+def list_available_sheets(file_path):
+    """
+    List all available sheet names in an Excel file.
+    Useful for debugging missing sheets.
+    Tries multiple methods to handle corrupted files.
+    """
+    try:
+        # Try pandas first
+        excel_file = pd.ExcelFile(file_path)
+        return excel_file.sheet_names
+    except Exception as e:
+        logger.debug(f"pandas.ExcelFile failed for {file_path}: {e}")
+        try:
+            # If pandas fails, try openpyxl directly
+            wb = load_workbook(file_path, rich_text=False, data_only=False)
+            sheets = wb.sheetnames
+            logger.info(f"Successfully retrieved sheet names for {file_path} using openpyxl: {sheets}")
+            return sheets
+        except Exception as inner_e:
+            logger.debug(f"openpyxl failed for {file_path}: {inner_e}")
+            try:
+                # Last resort: try with even more lenient settings
+                wb = load_workbook(file_path, rich_text=False, data_only=False, keep_vba=False)
+                sheets = wb.sheetnames
+                logger.info(f"Successfully retrieved sheet names for {file_path} using openpyxl (lenient): {sheets}")
+                return sheets
+            except Exception as final_e:
+                logger.error(f"Could not list sheets in {file_path}: {final_e}")
+                return []
+
+def read_excel_safely(file_path, sheet_name, engine="openpyxl"):
+    """
+    Read Excel file with fallback handling for corrupted cell references and XML.
+    
+    Args:
+        file_path (str): Path to the Excel file
+        sheet_name (str): Name of the sheet to read
+        engine (str): Engine to use (openpyxl, pyxlsb, xlrd)
+    
+    Returns:
+        pd.DataFrame: DataFrame from the sheet, or empty DataFrame if failed
+    """
+    try:
+        # First try standard pandas read_excel
+        engine_kwargs = {'data_only': True} if engine == 'openpyxl' else {}
+        excel_file = pd.ExcelFile(file_path, engine=engine, engine_kwargs=engine_kwargs)
+        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+        logger.info(f"Successfully read {file_path}, sheet {sheet_name} using pandas. Shape: {df.shape}")
+        return df
+    except Exception as e:
+        error_msg = str(e)
+        logger.warning(f"Standard pandas read failed for {file_path}, sheet {sheet_name}: {error_msg}")
+        
+        # If it fails with cell reference or XML issues, try direct XML extraction
+        if ("does not match pattern" in error_msg or 
+            "invalid XML" in error_msg or 
+            "cannot read worksheets" in error_msg.lower()) and engine == "openpyxl":
+            
+            logger.info(f"Attempting direct XML extraction for {file_path}...")
+            df = read_excel_from_xml(file_path, sheet_name)
+            
+            if not df.empty:
+                logger.info(f"Successfully extracted {file_path}, sheet {sheet_name} from XML. Shape: {df.shape}")
+                return df
+            else:
+                logger.error(f"XML extraction returned empty DataFrame for {file_path}, sheet {sheet_name}")
+                return pd.DataFrame()
+        else:
+            logger.error(f"Failed to read {file_path}, sheet {sheet_name}: {error_msg}")
+            return pd.DataFrame()
+
+
+def read_excel_from_xml(file_path, sheet_name):
+    """
+    Read Excel file directly from XML by extracting it from the .xlsx ZIP archive.
+    This bypasses openpyxl's validation entirely and works with corrupted XML.
+    
+    Args:
+        file_path (str): Path to the Excel file
+        sheet_name (str): Name of the sheet to read
+    
+    Returns:
+        pd.DataFrame: DataFrame from the sheet
+    """
+    try:
+        import xml.etree.ElementTree as ET
+        
+        logger.info(f"Attempting to extract {sheet_name} from XML in {file_path}")
+        
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            # First, get the relationships to map sheet names to file names
+            workbook_rels = {}
+            try:
+                rels_xml = zip_ref.read('xl/_rels/workbook.xml.rels').decode('utf-8')
+                rels_root = ET.fromstring(rels_xml)
+                for rel in rels_root:
+                    rel_id = rel.get('Id')
+                    target = rel.get('Target')
+                    workbook_rels[rel_id] = target
+            except Exception as e:
+                logger.debug(f"Could not read relationships: {e}")
+            
+            # Now read workbook.xml to find the sheet mapping
+            workbook_xml = zip_ref.read('xl/workbook.xml').decode('utf-8')
+            workbook_root = ET.fromstring(workbook_xml)
+            
+            # Find sheets
+            ns = {'': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+                  'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+            
+            sheet_file = None
+            for sheet in workbook_root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet'):
+                sheet_name_attr = sheet.get('name')
+                rid = sheet.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+                
+                logger.debug(f"Found sheet: {sheet_name_attr}, rid: {rid}")
+                
+                if sheet_name_attr and sheet_name_attr.lower() == sheet_name.lower():
+                    # Map the relationship ID to the actual file
+                    sheet_file = workbook_rels.get(rid)
+                    logger.info(f"Matched sheet {sheet_name} to file {sheet_file}")
+                    break
+            
+            if not sheet_file:
+                logger.error(f"Could not find sheet {sheet_name} in workbook")
+                return pd.DataFrame()
+            
+            # Read the actual sheet XML
+            sheet_path = f'xl/{sheet_file}'
+            try:
+                sheet_xml_content = zip_ref.read(sheet_path).decode('utf-8')
+            except KeyError:
+                logger.error(f"Sheet file {sheet_path} not found in archive")
+                return pd.DataFrame()
+            
+            # Read shared strings (must be inside the with block)
+            shared_strings = {}
+            try:
+                strings_xml = zip_ref.read('xl/sharedStrings.xml').decode('utf-8')
+                strings_root = ET.fromstring(strings_xml)
+                for i, si in enumerate(strings_root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si')):
+                    text_elements = si.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                    text = ''.join([t.text or '' for t in text_elements])
+                    shared_strings[i] = text
+                logger.info(f"Loaded {len(shared_strings)} shared strings")
+            except Exception as e:
+                logger.debug(f"No shared strings found: {e}")
+        
+        # Parse the sheet XML (outside the context manager is OK)
+        try:
+            sheet_root = ET.fromstring(sheet_xml_content)
+        except ET.ParseError as e:
+            logger.error(f"Failed to parse XML: {e}")
+            # Try to fix common XML issues
+            logger.info("Attempting to fix malformed XML...")
+            sheet_xml_content = sheet_xml_content.replace('&', '&amp;')
+            sheet_xml_content = sheet_xml_content.replace('&amp;amp;', '&amp;')
+            try:
+                sheet_root = ET.fromstring(sheet_xml_content)
+            except ET.ParseError as e2:
+                logger.error(f"Still unable to parse XML after fixes: {e2}")
+                return pd.DataFrame()
+        
+        # Extract cell values from the sheet
+        # Extract all rows
+        data = []
+        max_col = 0
+        
+        for row in sheet_root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row'):
+            row_data = []
+            for cell in row.findall('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c'):
+                cell_type = cell.get('t', 'n')  # Default to number
+                
+                # Get cell value
+                value_elem = cell.find('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v')
+                value = None
+                
+                if value_elem is not None and value_elem.text:
+                    if cell_type == 's':  # String reference
+                        try:
+                            str_index = int(value_elem.text)
+                            value = shared_strings.get(str_index, value_elem.text)
+                        except ValueError:
+                            value = value_elem.text
+                    else:
+                        value = value_elem.text
+                
+                row_data.append(value)
+            
+            if row_data:
+                max_col = max(max_col, len(row_data))
+                if any(v is not None for v in row_data):
+                    data.append(row_data)
+        
+        logger.info(f"Extracted {len(data)} rows from sheet XML")
+        
+        if data:
+            # Normalize row lengths
+            for row in data:
+                while len(row) < max_col:
+                    row.append(None)
+            
+            headers = data[0]
+            df = pd.DataFrame(data[1:], columns=headers)
+            logger.info(f"Created DataFrame with shape {df.shape}")
+            return df
+        else:
+            logger.warning(f"No data extracted from XML")
+            return pd.DataFrame()
+            
+    except Exception as e:
+        logger.error(f"Error reading from XML: {e}", exc_info=True)
+        return pd.DataFrame()
 
 def get_best_match(target, candidates):
     """
@@ -169,14 +387,8 @@ def get_processed_files(files_to_process, error_message=""):
                 file_extension = os.path.splitext(file_path)[1]
                 engine = "openpyxl" if file_extension in [".xlsx", ".xlsm"] else "pyxlsb" if file_extension == ".xlsb" else "xlrd"
 
-
-
-                # First, read the Excel file using ExcelFile to inspect sheets
-                excel_file = pd.ExcelFile(file_path, engine=engine)
-                #print(f"sheet names: {excel_file.sheet_names}")
-
-                # Then, read the specific sheet into a DataFrame
-                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                # Read Excel file with safe handling for corrupted cell references
+                df = read_excel_safely(file_path, sheet_name, engine)
 
                 #print(f"df.shape: {df.shape}")
                 #print(f"df.columns: {df.columns}")
@@ -716,8 +928,13 @@ def get_processed_files(files_to_process, error_message=""):
                     )
                 
                 # Read Excel file and get available sheets
-                excel_file = pd.ExcelFile(file_path)
-                available_sheets = excel_file.sheet_names
+                # Use the safe sheet listing function that handles corrupted files
+                available_sheets = list_available_sheets(file_path)
+                if not available_sheets:
+                    print(f"⚠️ Could not read sheets from {file_path}")
+                    error_message += f"\n File {file_path} could not be read or has no sheets. So, Skipping it."
+                    return pd.DataFrame()
+                
                 sheet_names_lower = [name.lower() for name in sheet_names]
                 valid_sheets = [sheet for sheet in available_sheets 
                             if sheet.lower() in sheet_names_lower]
@@ -725,7 +942,9 @@ def get_processed_files(files_to_process, error_message=""):
                 sheet_name = valid_sheets[0] if valid_sheets else None
                 if not sheet_name:
                     print(f"⚠️ Skipping file {file_path}: None of the required sheets found.")
-                    error_message += f"\n File {file_path} does not contain any of the required sheets: {sheet_names}. So, Skipping it."
+                    print(f"   Available sheets: {available_sheets}")
+                    print(f"   Expected sheets: {sheet_names}")
+                    error_message += f"\n File {file_path} does not contain any of the required sheets: {sheet_names}. Available sheets: {available_sheets}. So, Skipping it."
                     return pd.DataFrame()  # Return empty DataFrame if no valid sheet found
 
                 # Process the file (assuming read_and_process_file function exists)

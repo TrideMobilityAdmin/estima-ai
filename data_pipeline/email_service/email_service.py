@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 
 def send_email(subject, body, receiver_email):
-    smtp_host = "mail.tridemobility.com"  # Replace with actual SMTP host
+    smtp_host = "smtp.office365.com"
     smtp_port = 587  # Usually 587 or 465
     username = "admin@tridemobility.com"
     password = "Tride$2025"  # Or App Password

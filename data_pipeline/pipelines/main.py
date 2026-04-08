@@ -441,7 +441,8 @@ async def main():
         #if not os.path.exists(data_path):
         #data_path = r"D:\Projects\gmr-mro\Data_Pipeline\Data"
         #data_path=config["excel_files"]["data_path"] 
-        data_path = r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025"
+        data_path=r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025\INCREMENTAL DATA-3\2025"
+        
         # Prepare to track files that need updating (modified since last processed)
         files_to_process = set()
         updated_files = set()  # Track files that are updates (not new)
@@ -550,7 +551,17 @@ async def main():
         body = error_message
         receiver_email = "adithya.d@tridemobility.com"
         #print("sending email\n",body, "\n", receiver_email)
-        send_email("Data Pipeline Failed Files Report", body, receiver_email)
+        file_path = r"D:\Projects\gmr-mro\test_data_pipeline\Data\Data\2025\INCREMENTAL DATA-3\2025\error_message.txt"
+
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # Save error message to text file
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(body)
+
+        logger.info(f"Error message saved to {file_path}")
+        #send_email("Data Pipeline Failed Files Report", body, receiver_email)
         #print(f"Email is successfully sent to the {receiver_email}")
         
     except Exception as e:
