@@ -66,8 +66,8 @@ const Landing: React.FC = () => {
     ? aircraftServiceBg
     : backgroundMap[location.pathname] || "#f7f7f7";
 
-  console.log("current user >>>>", currentUser);
-  console.log("current user email >>>>", currentUserEmail);
+  // console.log("current user >>>>", currentUser);
+  // console.log("current user email >>>>", currentUserEmail);
 
   const [PasswordModalInfo, setPasswordModalInfo] = useState(false);
   // Password Change Logic

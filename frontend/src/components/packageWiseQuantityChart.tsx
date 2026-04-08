@@ -11,7 +11,7 @@ const PackageWiseQuantityChart: React.FC<PackageWiseChartProps> = ({ title, data
     const chartRef = useRef<HTMLDivElement>(null);
     const chartInstanceRef = useRef<echarts.ECharts | null>(null);
     
-    console.log(`${title} - Received data:`, data);
+    // console.log(`${title} - Received data:`, data);
 
     useEffect(() => {
         // Cleanup previous chart

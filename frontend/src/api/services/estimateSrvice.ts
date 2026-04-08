@@ -95,7 +95,7 @@ export const useApi = () => {
       });
 
       if (response.status === 200 || response.status === 201) {
-        console.log("✅ Upload successful:", response.data);
+        // console.log("✅ Upload successful:", response.data);
         showNotification({
           title: "Success!",
           message: "Estimate data uploaded successfully",
@@ -126,7 +126,7 @@ export const useApi = () => {
   const getAllEstimatesStatus = async () => {
     try {
       const response = await axiosInstance.get(getEstimateStatus_Url);
-      console.log("✅ API Response all estimates status :", response);
+      // console.log("✅ API Response all estimates status :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -157,7 +157,7 @@ export const useApi = () => {
     });
 
     const response = await axiosInstance.get(`${getHistoryEstimateStatus_Url}?${query.toString()}`);
-    console.log("✅ API Response all history estimates status:", response);
+    // console.log("✅ API Response all history estimates status:", response);
     return response.data;
   } catch (error: any) {
     console.error("❌ API Error:", error.response?.data || error.message);
@@ -173,7 +173,7 @@ export const useApi = () => {
   const getEstimateByID = async (estimateId:any) => {
     try {
       const response = await axiosInstance.get(getEstimateReport_Url+estimateId);
-      console.log("✅ API Response estimate by id :", response);
+      // console.log("✅ API Response estimate by id :", response);
       showNotification({
         title: "Estimate!",
         message: "Estimate displayed below.",
@@ -233,7 +233,7 @@ export const useApi = () => {
    const getValidatedTasksByID = async (estimateId: string) => {
     try {
       const response = await axiosInstance.post(getValidatedTasksByID_Url + estimateId);
-      console.log("✅ API Response validated by estimate details :", response);
+      // console.log("✅ API Response validated by estimate details :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -248,7 +248,7 @@ export const useApi = () => {
   const postEstimateReport = async (data: EstimateReportPayload) => {
     try {
       const response = await axiosInstance.post(getEstimateReport_Url, data);
-      console.log("✅ API Response (Estimate Report):", response);
+      // console.log("✅ API Response (Estimate Report):", response);
       showNotification({
         title: "Estimate Generated!",
         message: "Successfully Estimate Report Generated",
@@ -271,7 +271,7 @@ export const useApi = () => {
   const getAllEstimates = async () => {
     try {
       const response = await axiosInstance.get(getEstimateReport_Url);
-      console.log("✅ API Response all estimates:", response);
+      // console.log("✅ API Response all estimates:", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -286,7 +286,7 @@ export const useApi = () => {
   const getOperatorsList = async () => {
     try {
       const response = await axiosInstance.get(getOperatorsList_Url);
-      console.log("✅ API Response all operators:", response);
+      // console.log("✅ API Response all operators:", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -301,7 +301,7 @@ export const useApi = () => {
   const getEstimateDetailsByID = async (estimateId: string) => {
     try {
       const response = await axiosInstance.get(getEstimateDetails_Url + estimateId);
-      console.log("✅ API Response estimate details :", response);
+      // console.log("✅ API Response estimate details :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -316,7 +316,7 @@ export const useApi = () => {
   const getFilteredTasksByID = async (estimateId: string) => {
     try {
       const response = await axiosInstance.get(getFilteredTasks_Url + estimateId);
-      console.log("✅ API Response filtered tasks :", response);
+      // console.log("✅ API Response filtered tasks :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -343,7 +343,7 @@ export const useApi = () => {
 
   try {
     const response = await axiosInstance.post(getModelTasksValidate_Url, payloadRequest);
-    console.log("✅ API Response model tasks validate:", response);
+    // console.log("✅ API Response model tasks validate:", response);
     return response.data;
   } catch (error: any) {
     console.error("modal Task Validation API Error:", error.response?.data || error.message);
@@ -359,7 +359,7 @@ export const useApi = () => {
 const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
     try {
       const response = await axiosInstance.get(`${getAllEstimatesSummary_Url}?start_date=${startDate}&end_date=${endDate}`);
-      console.log("✅ API Response all estimates summary :", response);
+      // console.log("✅ API Response all estimates summary :", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -395,7 +395,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
         }
       );
   
-      console.log("✅ Upload successful:", response.data);
+      // console.log("✅ Upload successful:", response.data);
   
       showAppNotification("success", "Success!", "Estimate Comparison Successfully!");
   
@@ -472,7 +472,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
   const getAllDataExpertInsights = async () => {
     try {
       const response = await axiosInstance.get(getConfigurations_Url);
-      console.log("✅ API Response all expert inssights:", response);
+      // console.log("✅ API Response all expert inssights:", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ API Error:", error.response?.data || error.message);
@@ -487,7 +487,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
   const getProbabilityWiseDetails = async (estimateId:any) => {
     try {
       const response = await axiosInstance.get(getProbabilityWise_Url+estimateId);
-      console.log("✅ API Response probability wise :", response);
+      // console.log("✅ API Response probability wise :", response);
       // showNotification({
       //   title: "Probability wise data !",
       //   message: "Successfully Estimate Report Generated",
@@ -526,7 +526,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
         `${getConfigurations_Url}/${id}`,
         data
       );
-      console.log("✅ API Response probability wise update:", response);
+      // console.log("✅ API Response probability wise update:", response);
       
       showNotification({
         title: "Success!",
@@ -566,7 +566,7 @@ const getAllEstimatesSummary = async (startDate : any, endDate : any) => {
   const updateRemarkByEstID = async (estimateId:any,data: any) => {
     try {
       const response = await axiosInstance.put(getEstimateReport_Url+estimateId+'/remarks', data);
-      console.log("✅ API Response update remark:", response);
+      // console.log("✅ API Response update remark:", response);
       showNotification({
         title: "Updated Successfully!",
         message: "Successfully Updated Remark",

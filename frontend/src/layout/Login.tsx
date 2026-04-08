@@ -66,8 +66,8 @@ function Login() {
       const csrfTokenFromHeaders = response.headers['x-csrf-token'] || 
                                   response.headers['X-CSRF-Token'] || 
                                   response.headers['X-Csrf-Token'];
-      console.log("🔍 CSRF Token from Headers:", csrfTokenFromHeaders);
-      console.log("🔍 All Response Headers:", response.headers);
+      // console.log("🔍 CSRF Token from Headers:", csrfTokenFromHeaders);
+      // console.log("🔍 All Response Headers:", response.headers);
 
       if (response.status === 200) {
         setToken(accessToken);
@@ -86,8 +86,22 @@ function Login() {
           csrfToken: csrfTokenFromHeaders
         };
 
+        // Set CSRF token in sessionStorage
+        if (csrfTokenFromHeaders) {
+          sessionStorage.setItem("csrfToken", csrfTokenFromHeaders);
+          // Set CSRF token as cookie (matching backend expectations)
+          document.cookie = `csrf_token=${csrfTokenFromHeaders}; path=/; SameSite=Strict; Secure=false; Max-Age=3600`;
+          // Also set in Jotai state
+          setCsrfToken(csrfTokenFromHeaders);
+          
+          // console.log("🔐 CSRF Token Set After Login:");
+          // console.log(`📋 SessionStorage: ${csrfTokenFromHeaders.substring(0, 20)}...`);
+          // console.log(`🍪 Cookie: ${document.cookie.includes("csrf_token") ? "Set" : "Not set"}`);
+          // console.log(`🍪 All Cookies: ${document.cookie}`);
+        }
+
         // Console log what's being stored in storage
-        console.log("🔐 Login Response Data:", {
+        // console.log("🔐 Login Response Data:", {
           accessToken: accessToken ? `${accessToken.substring(0, 20)}...` : "No token",
           userID,
           username,
@@ -95,7 +109,7 @@ function Login() {
           csrfTokenFromHeaders: csrfTokenFromHeaders ? `${csrfTokenFromHeaders.substring(0, 20)}...` : "No CSRF token"
         });
 
-        console.log("💾 Storing in sessionStorage:", {
+        // console.log("💾 Storing in sessionStorage:", {
           token: accessToken ? `${accessToken.substring(0, 20)}...` : "No token",
           userID,
           username,

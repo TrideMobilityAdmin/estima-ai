@@ -32,7 +32,7 @@ const RFQSkillsUploadDropZoneExcel = ({
     if (newFiles.length > 0) {
       const selectedFile = newFiles[0];
       setFile(selectedFile);
-      console.log("✅ File Selected:", selectedFile.name);
+      // console.log("✅ File Selected:", selectedFile.name);
       await extractTasks(selectedFile);
     }
   };
@@ -63,7 +63,7 @@ const RFQSkillsUploadDropZoneExcel = ({
       key.toLowerCase().includes('task')
     );
 
-    console.log("🔍 Found Task Column:", columnName);
+    // console.log("🔍 Found Task Column:", columnName);
     return columnName;
   };
 
@@ -80,7 +80,7 @@ const RFQSkillsUploadDropZoneExcel = ({
       .filter((task: string) => task.length > 0)
       .map((task: string) => task.replace(/[^\w\s-/#]/g, "")); // Allow hyphen, forward slash, and hash
 
-    console.log("📌 Processed Tasks:", tasks);
+    // console.log("📌 Processed Tasks:", tasks);
     return tasks;
   };
 
@@ -95,10 +95,10 @@ const RFQSkillsUploadDropZoneExcel = ({
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
-            console.log("📊 CSV Parse Results:", results);
+            // console.log("📊 CSV Parse Results:", results);
             
             if (results.data.length === 0) {
-              console.log("❌ No data found in CSV");
+              // console.log("❌ No data found in CSV");
               return;
             }
 
@@ -107,21 +107,21 @@ const RFQSkillsUploadDropZoneExcel = ({
             const taskColumnName = findTaskColumn(firstRow);
 
             if (!taskColumnName) {
-              console.log("❌ No task column found in CSV");
+              // console.log("❌ No task column found in CSV");
               return;
             }
 
             results.data.forEach((row: any) => {
-              console.log("🔍 Processing Row:", row);
+              // console.log("🔍 Processing Row:", row);
               const taskCell = row[taskColumnName];
-              console.log("📌 Task Cell Value:", taskCell);
+              // console.log("📌 Task Cell Value:", taskCell);
               
               const tasks = processTaskCell(taskCell);
               tasks.forEach(task => extractedTasks.add(task));
             });
 
             const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
-            console.log("📌 Final Extracted Tasks:", uniqueTasks);
+            // console.log("📌 Final Extracted Tasks:", uniqueTasks);
             setTasks(uniqueTasks);
             changeHandler(file, uniqueTasks);
           },
@@ -137,10 +137,10 @@ const RFQSkillsUploadDropZoneExcel = ({
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
-        console.log("📊 Excel Parse Results:", jsonData);
+        // console.log("📊 Excel Parse Results:", jsonData);
         
         if (jsonData.length === 0) {
-          console.log("❌ No data found in Excel");
+          // console.log("❌ No data found in Excel");
           return;
         }
 
@@ -149,21 +149,21 @@ const RFQSkillsUploadDropZoneExcel = ({
         const taskColumnName = findTaskColumn(firstRow);
 
         if (!taskColumnName) {
-          console.log("❌ No task column found in Excel");
+          // console.log("❌ No task column found in Excel");
           return;
         }
 
         jsonData.forEach((row: any) => {
-          console.log("🔍 Processing Row:", row);
+          // console.log("🔍 Processing Row:", row);
           const taskCell = row[taskColumnName];
-          console.log("📌 Task Cell Value:", taskCell);
+          // console.log("📌 Task Cell Value:", taskCell);
           
           const tasks = processTaskCell(taskCell);
           tasks.forEach(task => extractedTasks.add(task));
         });
 
         const uniqueTasks = Array.from(extractedTasks).filter(Boolean);
-        console.log("📌 Final Extracted Tasks:", uniqueTasks);
+        // console.log("📌 Final Extracted Tasks:", uniqueTasks);
         setTasks(uniqueTasks);
         changeHandler(file, uniqueTasks);
       }

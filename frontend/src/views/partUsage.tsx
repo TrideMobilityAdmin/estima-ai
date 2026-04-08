@@ -32,7 +32,7 @@ export default function PartUsage() {
 
         setInputPartIds(idsArray);
     };
-    console.log("part ids >>>>", inputPartIds);
+    // console.log("part ids >>>>", inputPartIds);
 
     // Handle check button click
     // const handleCheck = () => {
@@ -126,9 +126,9 @@ export default function PartUsage() {
         };
     }, [validatedPartIds, dateRange, refreshTrigger]);
     
-    console.log("Multi Validated Parts >>>>", validatedPartIds);
-    console.log("Multi part data >>>>", multiPartUsageData);
-    console.log("Multi part merged data >>>>", multiPartMergedData);
+    // console.log("Multi Validated Parts >>>>", validatedPartIds);
+    // console.log("Multi part data >>>>", multiPartUsageData);
+    // console.log("Multi part merged data >>>>", multiPartMergedData);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -161,7 +161,7 @@ export default function PartUsage() {
 
         fetchData();
     }, [selectedPartId, dateRange]);
-    console.log("partt usage data by single >>>>", partUsageData);
+    // console.log("partt usage data by single >>>>", partUsageData);
 
 
     // Prepare data for Daily trend analysis

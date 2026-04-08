@@ -11,7 +11,7 @@ export const useApiSkillAnalysis = () => {
     const getSkillAnalysis = async (data: any) => {
         try {
           const response = await axiosInstance.post(getSkillReq_Url, data);
-          console.log("✅ API Response (skill req):", response);
+          // console.log("✅ API Response (skill req):", response);
           // showAppNotification("success", "Skill analysis!", "Successfully Generated Skill Analysis");
           return response.data;
         } catch (error: any) {

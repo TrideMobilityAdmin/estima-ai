@@ -18,11 +18,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
         print(f"🔥 CSRF Middleware Triggered: {request.method} {request.url.path}")
-        # ✅ Detect if running in local environment
-        is_local = any(host in origin for host in ["localhost", "127.0.0.1"])
-        # secure = not is_local   # True only for deployed HTTPS
-        samesite = "None" if not is_local else "Lax"  # "None" for cross-site (localhost → VM)
-        domain = None           # Let browser infer domain automatically
+              
         try:
             # ✅ 1️⃣ Always allow preflight OPTIONS requests (CORS pre-checks)
             if request.method == "OPTIONS":
@@ -41,8 +37,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                         value=csrf_token,
                         httponly=False,
                         secure=False,  # ⚠️ must be False for localhost (set True in production)
-                        samesite=samesite,
-                        domain=domain,
+                        samesite="lax",
                         max_age=3600,
                         path="/",
                     )
@@ -61,8 +56,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                         value=csrf_token,
                         httponly=False,
                         secure=False,
-                        samesite=samesite,
-                        domain=domain,
+                        samesite="lax",
                         max_age=3600,
                         path="/",
                     )
@@ -114,3 +108,5 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
+
+

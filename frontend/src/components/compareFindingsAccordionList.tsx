@@ -28,7 +28,7 @@ const FindingListCompareScreen: React.FC<{ findingsEligible: any[], findingsNotE
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const findingListRef = useRef<HTMLDivElement>(null);
-    console.log("findingsEligible >>>> Component >>>> ", findingsEligible);
+    // console.log("findingsEligible >>>> Component >>>> ", findingsEligible);
     const filteredFindings = useMemo(() => {
         const search = findingSearch?.trim()?.toLowerCase();
         if (!search) return findingsEligible;
